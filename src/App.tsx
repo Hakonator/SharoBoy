@@ -15,7 +15,32 @@ const INITIAL_HUD: HudData = {
   banner: null,
   stuck: true,
   newRecord: false,
+  shield: 0,
+  wideOn: false,
+  slowOn: false,
+  fastOn: false,
+  shrinkOn: false,
+  laserOn: false,
+  rocketOn: false,
 };
+
+/* ---------- чип активного эффекта ---------- */
+function EffectChip({ label, good, keyVal }: { label: string; good: boolean; keyVal: string }) {
+  return (
+    <span
+      key={keyVal}
+      className={`anim-pop inline-flex items-center gap-1.5 border px-2.5 py-1 font-display text-[11px] tracking-wider ${
+        good
+          ? "border-[#4dff9e66] bg-[#0b3d26cc] text-[#7dffb9] shadow-[0_0_12px_rgba(77,255,158,0.25)]"
+          : "border-[#ff534766] bg-[#3d120ecc] text-[#ff8d84] shadow-[0_0_12px_rgba(255,83,71,0.25)]"
+      }`}
+      style={{ clipPath: "polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)" }}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${good ? "bg-[#4dff9e]" : "bg-[#ff5347]"} animate-pulse`} />
+      {label}
+    </span>
+  );
+}
 
 /* ---------- inline icons ---------- */
 const IconPause = () => (
@@ -97,7 +122,7 @@ function ControlsPanel() {
         </li>
         <li className="flex items-center gap-3">
           <Key wide>ПРОБЕЛ</Key>
-          <span>запуск шара</span>
+          <span>запуск шара и стрельба оружием</span>
         </li>
         <li className="flex items-center gap-3">
           <span className="flex gap-1">
@@ -190,6 +215,16 @@ export default function App() {
                 <div className="font-display text-xl leading-none text-punch sm:text-2xl">×{hud.combo}</div>
               </div>
             )}
+            {hud.shield > 0 && (
+              <div key={hud.shield} className="hud-chip anim-combo px-3.5 py-2">
+                <div className="hud-label">Щит</div>
+                <div className="mt-1 flex gap-1">
+                  {Array.from({ length: hud.shield }).map((_, i) => (
+                    <span key={i} className="h-3.5 w-3.5 rounded-full bg-[#4dff9e] shadow-[0_0_8px_rgba(77,255,158,0.8)]" />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="hud-chip stripe-hazard hidden px-5 py-2 text-center md:block">
@@ -241,12 +276,29 @@ export default function App() {
         </div>
       )}
 
-      {/* launch hint */}
-      {hud.phase === "playing" && hud.stuck && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[104px] z-20 flex justify-center sm:bottom-[110px]">
-          <div className="anim-blink hud-chip px-4 py-2 font-display text-sm tracking-wider text-cyan-neon">
-            КЛИК / ПРОБЕЛ — ЗАПУСК
-          </div>
+      {/* подсказки: запуск и оружие */}
+      {hud.phase === "playing" && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[96px] z-20 flex flex-col items-center gap-2 sm:bottom-[102px]">
+          {(hud.laserOn || hud.rocketOn) && (
+            <div className="anim-blink hud-chip px-4 py-2 font-display text-sm tracking-wider text-mint">
+              {hud.laserOn && hud.rocketOn ? "ЛАЗЕР + РАКЕТЫ" : hud.laserOn ? "ЛАЗЕР" : "РАКЕТЫ"} — ПРОБЕЛ / ТАП
+            </div>
+          )}
+          {hud.stuck && (
+            <div className="anim-blink hud-chip px-4 py-2 font-display text-sm tracking-wider text-cyan-neon">
+              КЛИК / ПРОБЕЛ — ЗАПУСК
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* активные эффекты */}
+      {inGame && (hud.wideOn || hud.slowOn || hud.fastOn || hud.shrinkOn) && (
+        <div className="pointer-events-none absolute bottom-3 left-3 z-20 flex max-w-[46vw] flex-wrap gap-1.5 sm:bottom-4 sm:left-4">
+          {hud.wideOn && <EffectChip keyVal="wide" label="ШИРЕ" good />}
+          {hud.slowOn && <EffectChip keyVal="slow" label="МЕДЛЕННЕЕ" good />}
+          {hud.fastOn && <EffectChip keyVal="fast" label="БЫСТРЕЕ" good={false} />}
+          {hud.shrinkOn && <EffectChip keyVal="shrink" label="УЗКАЯ" good={false} />}
         </div>
       )}
 
@@ -315,18 +367,19 @@ export default function App() {
 
             <div className="anim-rise w-full max-w-sm" style={{ animationDelay: "0.12s" }}>
               <ControlsPanel />
-              <div className="hud-chip mt-3 p-4">
-                <div className="hud-label mb-2">Бонусы</div>
-                <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-foam/90">
-                  <span>
-                    <b className="text-gold">«Ш»</b> — шире ракетка
-                  </span>
-                  <span>
-                    <b className="text-punch">«×3»</b> — тройной шар
-                  </span>
-                  <span>
-                    <b className="text-mint">«+1»</b> — жизнь
-                  </span>
+              <div className="hud-chip mt-3 p-4 sm:p-5">
+                <div className="hud-label mb-3">Выпадает из мишеней</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px] leading-snug text-foam/90">
+                  <span><b className="text-[#4dff9e]">«ШИР»</b> — шире ракетка</span>
+                  <span><b className="text-[#4dff9e]">«×3»</b> — тройной шар</span>
+                  <span><b className="text-[#4dff9e]">«+1»</b> — жизнь</span>
+                  <span><b className="text-[#4dff9e]">«СК↓»</b> — медленный шар</span>
+                  <span><b className="text-[#4dff9e]">«ЩИТ»</b> — экран внизу ×3</span>
+                  <span><b className="text-[#4dff9e]">«ЛАЗ»</b> — лазеры (пробел)</span>
+                  <span><b className="text-[#4dff9e]">«РКТ»</b> — ракеты (пробел)</span>
+                  <span className="col-span-2 mt-1 border-t border-line pt-2 text-dim">Анти-бонусы — красные:</span>
+                  <span><b className="text-[#ff5347]">«СК↑»</b> — шар быстрее</span>
+                  <span><b className="text-[#ff5347]">«УЗК»</b> — узкая ракетка</span>
                 </div>
               </div>
             </div>

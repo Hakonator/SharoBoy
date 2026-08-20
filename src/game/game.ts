@@ -5,7 +5,16 @@ import { SFX } from "./audio";
    ============================================================ */
 
 export type Phase = "menu" | "playing" | "paused" | "over" | "won";
-export type PowerType = "wide" | "multi" | "life";
+export type PowerType =
+  | "wide"
+  | "multi"
+  | "life"
+  | "slow"
+  | "fast"
+  | "shield"
+  | "shrink"
+  | "laser"
+  | "rocket";
 
 export interface HudData {
   phase: Phase;
@@ -21,6 +30,13 @@ export interface HudData {
   banner: string | null;
   stuck: boolean;
   newRecord: boolean;
+  shield: number;
+  wideOn: boolean;
+  slowOn: boolean;
+  fastOn: boolean;
+  shrinkOn: boolean;
+  laserOn: boolean;
+  rocketOn: boolean;
 }
 
 interface Block {
@@ -87,6 +103,15 @@ interface PowerUp {
   t: number;
 }
 
+interface Projectile {
+  x: number;
+  y: number;
+  vy: number;
+  kind: "laser" | "rocket";
+  r: number;
+  dead: boolean;
+}
+
 interface Bubble {
   x: number;
   y: number;
@@ -102,10 +127,17 @@ const TIER = {
   3: { base: "#ff6a5c", light: "#ffc4bd", dark: "#b02818", glow: "rgba(255,106,92,0.6)" },
 } as const;
 
-const POWER_META: Record<PowerType, { label: string; color: string; edge: string }> = {
-  wide: { label: "Ш", color: "#ffc94d", edge: "#fff1c4" },
-  multi: { label: "×3", color: "#ff5ca8", edge: "#ffd0e8" },
-  life: { label: "+1", color: "#5dffb0", edge: "#d2ffee" },
+/** Положительные бонусы — зелёные, отрицательные (анти-бонусы) — красные. */
+const POWER_META: Record<PowerType, { label: string; good: boolean; color: string; edge: string }> = {
+  wide: { label: "ШИР", good: true, color: "#4dff9e", edge: "#d2ffee" },
+  multi: { label: "×3", good: true, color: "#4dff9e", edge: "#d2ffee" },
+  life: { label: "+1", good: true, color: "#4dff9e", edge: "#d2ffee" },
+  slow: { label: "СК↓", good: true, color: "#4dff9e", edge: "#d2ffee" },
+  shield: { label: "ЩИТ", good: true, color: "#4dff9e", edge: "#d2ffee" },
+  laser: { label: "ЛАЗ", good: true, color: "#4dff9e", edge: "#d2ffee" },
+  rocket: { label: "РКТ", good: true, color: "#4dff9e", edge: "#d2ffee" },
+  fast: { label: "СК↑", good: false, color: "#ff5347", edge: "#ffd0cb" },
+  shrink: { label: "УЗК", good: false, color: "#ff5347", edge: "#ffd0cb" },
 };
 
 interface LayoutItem {
@@ -141,33 +173,41 @@ type LevelSpec = PatternSpec | LayoutSpec;
  * малые вертикальные овалы-стабилизаторы и треугольник с крупным овалом-остриём.
  */
 const L1_LAYOUT: LayoutItem[] = [
-  // плотная верхняя полоса из мелких шаров
-  ...[-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6].map(
-    (x): LayoutItem => ({ x, y: 0.7, rx: 0.34, hp: 1 })
+  // плотная верхняя полоса из мелких шаров (прилегают почти вплотную)
+  ...[-5.1, -4.25, -3.4, -2.55, -1.7, -0.85, 0, 0.85, 1.7, 2.55, 3.4, 4.25, 5.1].map(
+    (x): LayoutItem => ({ x, y: 0.6, rx: 0.36, hp: 1 })
   ),
   // широкие горизонтальные овалы-крылья
-  { x: -4.7, y: 2.0, rx: 1.35, ry: 0.55, hp: 2 },
-  { x: 4.7, y: 2.0, rx: 1.35, ry: 0.55, hp: 2 },
+  { x: -4.0, y: 1.7, rx: 1.35, ry: 0.55, hp: 2 },
+  { x: 4.0, y: 1.7, rx: 1.35, ry: 0.55, hp: 2 },
   // малые вертикальные овалы-стабилизаторы
-  { x: -4.9, y: 4.9, rx: 0.42, ry: 0.8, hp: 1 },
-  { x: 4.9, y: 4.9, rx: 0.42, ry: 0.8, hp: 1 },
+  { x: -4.17, y: 4.2, rx: 0.44, ry: 0.85, hp: 1 },
+  { x: 4.17, y: 4.2, rx: 0.44, ry: 0.85, hp: 1 },
   // остриё — крупный вертикальный овал
-  { x: 0, y: 7.0, rx: 0.58, ry: 1.2, hp: 3 },
-  // треугольник стрелы (ряды снизу вверх)
-  { x: -1.15, y: 5.9, rx: 0.55, hp: 2 },
-  { x: 1.15, y: 5.9, rx: 0.55, hp: 2 },
-  { x: -2.3, y: 4.85, rx: 0.45, hp: 1 },
-  { x: 0, y: 4.85, rx: 0.5, hp: 2 },
-  { x: 2.3, y: 4.85, rx: 0.45, hp: 1 },
-  { x: -1.86, y: 3.8, rx: 0.45, hp: 1 },
-  { x: -0.62, y: 3.8, rx: 0.5, hp: 2 },
-  { x: 0.62, y: 3.8, rx: 0.5, hp: 2 },
-  { x: 1.86, y: 3.8, rx: 0.45, hp: 1 },
-  { x: -2.48, y: 2.75, rx: 0.42, hp: 1 },
-  { x: -1.24, y: 2.75, rx: 0.48, hp: 2 },
-  { x: 0, y: 2.75, rx: 0.48, hp: 2 },
-  { x: 1.24, y: 2.75, rx: 0.48, hp: 2 },
-  { x: 2.48, y: 2.75, rx: 0.42, hp: 1 },
+  { x: 0, y: 6.0, rx: 0.6, ry: 1.25, hp: 3 },
+  // треугольник стрелы (ряды снизу вверх), набран плотно
+  { x: -0.98, y: 5.05, rx: 0.58, hp: 2 },
+  { x: 0.98, y: 5.05, rx: 0.58, hp: 2 },
+  { x: 0, y: 5.05, rx: 0.38, hp: 1 },
+  { x: -1.96, y: 4.12, rx: 0.48, hp: 1 },
+  { x: 0, y: 4.12, rx: 0.52, hp: 2 },
+  { x: 1.96, y: 4.12, rx: 0.48, hp: 1 },
+  { x: -1.58, y: 3.23, rx: 0.48, hp: 1 },
+  { x: -0.53, y: 3.23, rx: 0.52, hp: 2 },
+  { x: 0.53, y: 3.23, rx: 0.52, hp: 2 },
+  { x: 1.58, y: 3.23, rx: 0.48, hp: 1 },
+  { x: -2.11, y: 2.34, rx: 0.45, hp: 1 },
+  { x: -1.05, y: 2.34, rx: 0.5, hp: 2 },
+  { x: 0, y: 2.34, rx: 0.5, hp: 2 },
+  { x: 1.05, y: 2.34, rx: 0.5, hp: 2 },
+  { x: 2.11, y: 2.34, rx: 0.45, hp: 1 },
+  // мелкие шары-заполнители между крыльями и корпусом
+  { x: -2.2, y: 1.5, rx: 0.32, hp: 1 },
+  { x: 2.2, y: 1.5, rx: 0.32, hp: 1 },
+  { x: -2.9, y: 2.9, rx: 0.3, hp: 1 },
+  { x: 2.9, y: 2.9, rx: 0.3, hp: 1 },
+  { x: -3.3, y: 3.7, rx: 0.3, hp: 1 },
+  { x: 3.3, y: 3.7, rx: 0.3, hp: 1 },
 ];
 
 const LEVELS: LevelSpec[] = [
@@ -179,7 +219,7 @@ const LEVELS: LevelSpec[] = [
   {
     name: "ОВАЛЬНЫЙ РИФ",
     rows: 6,
-    counts: [6, 7, 8, 8, 7, 6],
+    counts: [7, 8, 9, 9, 8, 7],
     shape: (r, i) => ((r + i) % 3 === 0 ? (i % 2 ? "ev" : "eh") : "circle"),
     hp: (r, i) => (r < 2 ? (i % 4 === 0 ? 3 : 2) : r < 4 ? 2 : 1),
     speed: 450,
@@ -187,7 +227,7 @@ const LEVELS: LevelSpec[] = [
   {
     name: "ЯДРО",
     rows: 7,
-    counts: [8, 9, 8, 9, 8, 9, 8],
+    counts: [9, 10, 9, 10, 9, 10, 9],
     shape: (r, i) => ((r + i) % 2 === 0 ? (r % 2 ? "ev" : "eh") : "circle"),
     hp: (r, i) => (r < 2 ? 3 : r < 5 ? 2 : i % 2 ? 2 : 1),
     speed: 500,
@@ -223,6 +263,15 @@ export class Game {
 
   private paddle = { x: 400, y: 540, w: 150, baseW: 150, h: 18, squash: 0, vx: 0 };
   private wideUntil = 0;
+  private slowUntil = 0;
+  private fastUntil = 0;
+  private shrinkUntil = 0;
+  private laserUntil = 0;
+  private rocketUntil = 0;
+  private shield = 0;
+  private weaponCd = 0;
+  private tapFire = false;
+  private effectsKey = "";
   private balls: Ball[] = [];
   private blocks: Block[] = [];
   private particles: Particle[] = [];
@@ -230,8 +279,9 @@ export class Game {
   private popups: Popup[] = [];
   private powers: PowerUp[] = [];
   private bubbles: Bubble[] = [];
+  private projectiles: Projectile[] = [];
 
-  private keys = { left: false, right: false };
+  private keys = { left: false, right: false, space: false };
   private pointerX: number | null = null;
   private shake = 0;
 
@@ -313,6 +363,7 @@ export class Game {
     if (c === "KeyP" || c === "Escape") {
       if (this.phase === "playing" || this.phase === "paused") this.togglePause();
     }
+    if (c === "Space") this.keys.space = true;
     if (c === "Space" || c === "Enter") {
       if (this.phase === "menu" || this.phase === "over" || this.phase === "won") this.startGame();
       else if (this.phase === "playing") this.launch();
@@ -322,6 +373,7 @@ export class Game {
   private handleKeyUp = (e: KeyboardEvent) => {
     if (e.code === "ArrowLeft" || e.code === "KeyA") this.keys.left = false;
     if (e.code === "ArrowRight" || e.code === "KeyD") this.keys.right = false;
+    if (e.code === "Space") this.keys.space = false;
   };
 
   private handleVis = () => {
@@ -335,6 +387,7 @@ export class Game {
   private handlePointerDown = (e: PointerEvent) => {
     this.sfx.ensure();
     this.pointerX = e.clientX;
+    this.tapFire = true;
     if (this.phase === "playing") this.launch();
   };
 
@@ -352,7 +405,16 @@ export class Game {
     this.rings = [];
     this.popups = [];
     this.powers = [];
+    this.projectiles = [];
     this.wideUntil = 0;
+    this.slowUntil = 0;
+    this.fastUntil = 0;
+    this.shrinkUntil = 0;
+    this.laserUntil = 0;
+    this.rocketUntil = 0;
+    this.shield = 0;
+    this.weaponCd = 0;
+    this.effectsKey = "";
     this.transition = 0;
     this.buildLevel(1);
     this.serveBall();
@@ -367,6 +429,7 @@ export class Game {
     this.balls = [];
     this.blocks = [];
     this.powers = [];
+    this.projectiles = [];
     this.banner = null;
     this.pushHud();
   }
@@ -374,6 +437,7 @@ export class Game {
   togglePause() {
     if (this.phase === "playing") {
       this.phase = "paused";
+      this.keys.space = false;
       this.sfx.ui();
     } else if (this.phase === "paused") {
       this.phase = "playing";
@@ -461,28 +525,29 @@ export class Game {
 
     for (let r = 0; r < spec.rows; r++) {
       let count = spec.counts[r % spec.counts.length];
-      while ((this.w - margin * 2) / count < 58 && count > 3) count--;
+      while ((this.w - margin * 2) / count < 60 && count > 3) count--;
       const slot = (this.w - margin * 2) / count;
       for (let i = 0; i < count; i++) {
         const kind = spec.shape(r, i);
         const hp = spec.hp(r, i);
         const cx = clamp(
-          margin + slot * (i + 0.5) + rand(-1, 1) * slot * 0.06,
+          margin + slot * (i + 0.5) + rand(-1, 1) * slot * 0.02,
           margin + slot * 0.3,
           this.w - margin - slot * 0.3
         );
-        const cy = top + gap * (r + 0.5) + rand(-1, 1) * gap * 0.06;
+        const cy = top + gap * (r + 0.5) + rand(-1, 1) * gap * 0.02;
         let rx: number;
         let ry: number;
         if (kind === "circle") {
-          const rr = clamp(Math.min(slot * 0.42, gap * 0.34) * rand(0.82, 1), 13, 36);
+          // диаметры почти касаются соседей — плотная кладка
+          const rr = clamp(Math.min(slot * 0.5, gap * 0.44) * rand(0.9, 1), 12, 42);
           rx = ry = rr;
         } else if (kind === "eh") {
-          rx = clamp(slot * 0.44 * rand(0.85, 1), 20, 52);
-          ry = clamp(gap * 0.24 * rand(0.85, 1), 11, 24);
+          rx = clamp(slot * 0.52 * rand(0.9, 1), 18, 60);
+          ry = clamp(gap * 0.3 * rand(0.9, 1), 11, 27);
         } else {
-          rx = clamp(slot * 0.22 * rand(0.85, 1), 11, 24);
-          ry = clamp(gap * 0.38 * rand(0.85, 1), 16, 40);
+          rx = clamp(slot * 0.27 * rand(0.9, 1), 10, 26);
+          ry = clamp(gap * 0.47 * rand(0.9, 1), 15, 46);
         }
         blocks.push({
           x: cx,
@@ -589,11 +654,14 @@ export class Game {
 
     if (this.phase !== "playing") return;
 
+    this.syncEffectsHud();
     this.updatePaddle(dt);
     this.updatePowers(dt);
 
     const frozen = this.transition > 0 || this.bannerTimer > 1.1;
     if (!frozen) {
+      this.tryFire(dt);
+      this.updateProjectiles(dt);
       for (const ball of this.balls) this.updateBall(ball, dt);
       this.balls = this.balls.filter((b) => !(b as Ball & { lost?: boolean }).lost);
       if (this.balls.length === 0) this.onBallLost();
@@ -609,7 +677,10 @@ export class Game {
 
   private updatePaddle(dt: number) {
     const p = this.paddle;
-    const targetW = p.baseW * (this.time < this.wideUntil ? 1.45 : 1);
+    let wMult = 1;
+    if (this.time < this.wideUntil) wMult = 1.45;
+    else if (this.time < this.shrinkUntil) wMult = 0.6;
+    const targetW = p.baseW * wMult;
     p.w += (targetW - p.w) * Math.min(1, dt * 10);
     const prevX = p.x;
     if (this.keys.left || this.keys.right) {
@@ -659,7 +730,18 @@ export class Game {
         this.sfx.wall();
       }
 
-      // низ — потеря
+      // низ — защитный экран или потеря
+      if (this.shield > 0 && ball.vy > 0 && ball.y + ball.r >= this.h - 14) {
+        this.shield--;
+        ball.y = this.h - 14 - ball.r;
+        ball.vy = -Math.abs(ball.vy);
+        this.sfx.shieldHit();
+        this.burst(ball.x, this.h - 14, "#4dff9e", 14, 220);
+        this.rings.push({ x: ball.x, y: this.h - 14, r: 8, maxR: 74, color: "rgba(77,255,158,0.8)", t: 0 });
+        this.shake = Math.min(this.shake + 2.5, 8);
+        this.pushHud();
+        continue;
+      }
       if (ball.y > this.h + ball.r * 2) {
         (ball as Ball & { lost?: boolean }).lost = true;
         return;
@@ -676,6 +758,15 @@ export class Game {
       ball.vy = sign * sp * 0.22;
       const nx = Math.sqrt(Math.max(sp * sp - ball.vy * ball.vy, 0));
       ball.vx = Math.sign(ball.vx || 1) * nx;
+    }
+
+    // режимы скорости шара (замедление / ускорение от бонусов)
+    const mult = this.time < this.slowUntil ? 0.72 : this.time < this.fastUntil ? 1.32 : 1;
+    const cur = Math.hypot(ball.vx, ball.vy) || 1;
+    const target = ball.speed * mult;
+    if (Math.abs(cur - target) > 1) {
+      ball.vx = (ball.vx / cur) * target;
+      ball.vy = (ball.vy / cur) * target;
     }
 
     ball.trail.push({ x: ball.x, y: ball.y });
@@ -774,13 +865,24 @@ export class Game {
     });
     this.shake = Math.min(this.shake + (b.tier === 3 ? 3.4 : 2), 9);
 
-    // бонус
-    if (Math.random() < 0.13) {
+    // бонусы (зелёные) и анти-бонусы (красные) — падают часто
+    if (Math.random() < 0.22) {
       const roll = Math.random();
-      const type: PowerType = roll < 0.45 ? "wide" : roll < 0.85 ? "multi" : "life";
-      if (!(type === "multi" && this.balls.length >= 4) && !(type === "life" && this.lives >= 5)) {
-        this.powers.push({ x: b.x, y: b.y, vy: 150, type, t: 0 });
-      }
+      const type: PowerType =
+        roll < 0.09 ? "life"
+        : roll < 0.19 ? "wide"
+        : roll < 0.29 ? "multi"
+        : roll < 0.39 ? "slow"
+        : roll < 0.49 ? "shield"
+        : roll < 0.59 ? "laser"
+        : roll < 0.68 ? "rocket"
+        : roll < 0.86 ? "fast"
+        : "shrink";
+      const skip =
+        (type === "multi" && this.balls.length >= 4) ||
+        (type === "life" && this.lives >= 5) ||
+        (type === "shield" && this.shield >= 5);
+      if (!skip) this.powers.push({ x: b.x, y: b.y, vy: 150, type, t: 0 });
     }
     this.pushHud();
   }
@@ -805,38 +907,158 @@ export class Game {
   }
 
   private applyPower(type: PowerType) {
-    this.sfx.power();
     const meta = POWER_META[type];
-    if (type === "wide") {
-      this.wideUntil = this.time + 12;
-      this.popups.push({ x: this.paddle.x, y: this.paddle.y - 30, text: "ШИРЕ!", color: meta.color, t: 0, size: 18 });
-    } else if (type === "life") {
-      this.lives = Math.min(this.lives + 1, 5);
-      this.popups.push({ x: this.paddle.x, y: this.paddle.y - 30, text: "+ЖИЗНЬ", color: meta.color, t: 0, size: 18 });
+    if (meta.good) this.sfx.power();
+    else this.sfx.powerBad();
+    const popup = (text: string) =>
+      this.popups.push({ x: this.paddle.x, y: this.paddle.y - 36, text, color: meta.color, t: 0, size: 18 });
+
+    switch (type) {
+      case "wide":
+        this.wideUntil = this.time + 12;
+        this.shrinkUntil = 0;
+        popup("ШИРЕ!");
+        break;
+      case "shrink":
+        this.shrinkUntil = this.time + 10;
+        this.wideUntil = 0;
+        popup("УЗКАЯ РАКЕТКА");
+        break;
+      case "life":
+        this.lives = Math.min(this.lives + 1, 5);
+        popup("+ЖИЗНЬ");
+        break;
+      case "slow":
+        this.slowUntil = this.time + 10;
+        this.fastUntil = 0;
+        popup("ЗАМЕДЛЕНИЕ");
+        break;
+      case "fast":
+        this.fastUntil = this.time + 8;
+        this.slowUntil = 0;
+        popup("УСКОРЕНИЕ!");
+        break;
+      case "shield":
+        this.shield = Math.min(this.shield + 3, 5);
+        popup("ЩИТ +3");
+        break;
+      case "laser":
+        this.laserUntil = this.time + 12;
+        popup("ЛАЗЕР — ПРОБЕЛ");
+        break;
+      case "rocket":
+        this.rocketUntil = this.time + 12;
+        popup("РАКЕТЫ — ПРОБЕЛ");
+        break;
+      case "multi": {
+        const src = [...this.balls].filter((b) => !b.stuck);
+        const donors = src.length ? src : this.balls.slice(0, 1);
+        for (const d of donors) {
+          for (const da of [-0.55, 0.55]) {
+            if (this.balls.length >= 6) break;
+            const ang = Math.atan2(d.vy || -1, d.vx) + da;
+            this.balls.push({
+              x: d.x,
+              y: d.y,
+              vx: Math.cos(ang) * d.speed,
+              vy: Math.sin(ang) * d.speed,
+              r: d.r,
+              speed: d.speed,
+              stuck: false,
+              stuckOffset: 0,
+              trail: [],
+            });
+          }
+        }
+        popup("×3 ШАРА!");
+        break;
+      }
+    }
+    this.burst(this.paddle.x, this.paddle.y - 10, meta.color, 12, 190);
+    this.pushHud();
+  }
+
+  /* ---------------- оружие: лазеры и ракеты ---------------- */
+
+  private tryFire(dt: number) {
+    const laserOn = this.time < this.laserUntil;
+    const rocketOn = this.time < this.rocketUntil;
+    if ((!laserOn && !rocketOn) || (!this.keys.space && !this.tapFire)) {
+      this.weaponCd = 0;
+      this.tapFire = false;
+      return;
+    }
+    this.tapFire = false;
+    this.weaponCd -= dt;
+    if (this.weaponCd > 0) return;
+    const p = this.paddle;
+    if (laserOn) {
+      this.projectiles.push(
+        { x: p.x - p.w * 0.36, y: p.y - p.h, vy: -1000, kind: "laser", r: 4, dead: false },
+        { x: p.x + p.w * 0.36, y: p.y - p.h, vy: -1000, kind: "laser", r: 4, dead: false }
+      );
+      this.sfx.laser();
+      this.weaponCd = 0.14;
+      this.burst(p.x, p.y - p.h, "#7cf5ff", 4, 110);
     } else {
-      const src = [...this.balls].filter((b) => !b.stuck);
-      const donors = src.length ? src : this.balls.slice(0, 1);
-      for (const d of donors) {
-        for (const da of [-0.55, 0.55]) {
-          if (this.balls.length >= 6) break;
-          const ang = Math.atan2(d.vy || -1, d.vx) + da;
-          this.balls.push({
-            x: d.x,
-            y: d.y,
-            vx: Math.cos(ang) * d.speed,
-            vy: Math.sin(ang) * d.speed,
-            r: d.r,
-            speed: d.speed,
-            stuck: false,
-            stuckOffset: 0,
-            trail: [],
-          });
+      this.projectiles.push({ x: p.x, y: p.y - p.h - 6, vy: -560, kind: "rocket", r: 7, dead: false });
+      this.sfx.rocket();
+      this.weaponCd = 0.32;
+      this.burst(p.x, p.y - p.h, "#ffc94d", 5, 120);
+    }
+    if (this.projectiles.length > 48) this.projectiles.splice(0, this.projectiles.length - 48);
+    p.squash = Math.max(p.squash, 0.35);
+  }
+
+  private updateProjectiles(dt: number) {
+    for (const pr of this.projectiles) {
+      pr.y += pr.vy * dt;
+      if (pr.kind === "rocket" && Math.random() < 0.55) {
+        this.particles.push({
+          x: pr.x + rand(-2.5, 2.5),
+          y: pr.y + 9,
+          vx: rand(-26, 26),
+          vy: rand(60, 150),
+          life: rand(0.2, 0.42),
+          maxLife: 0.42,
+          size: rand(2, 4),
+          color: Math.random() < 0.5 ? "#ffc94d" : "#ff8a3d",
+          grav: 0,
+        });
+      }
+      if (pr.y < -30) pr.dead = true;
+    }
+    for (const pr of this.projectiles) {
+      if (pr.dead) continue;
+      for (const b of this.blocks) {
+        if (b.dead) continue;
+        const dx = (pr.x - b.x) / (b.rx + pr.r);
+        const dy = (pr.y - b.y) / (b.ry + pr.r);
+        if (dx * dx + dy * dy <= 1) {
+          pr.dead = true;
+          if (pr.kind === "rocket") this.explode(pr.x, pr.y);
+          else {
+            this.damageBlock(b);
+            this.burst(pr.x, pr.y, "#7cf5ff", 6, 150);
+          }
+          break;
         }
       }
-      this.popups.push({ x: this.paddle.x, y: this.paddle.y - 30, text: "×3 ШАРА!", color: meta.color, t: 0, size: 18 });
     }
-    this.burst(this.paddle.x, this.paddle.y - 10, meta.color, 10, 190);
-    this.pushHud();
+    this.projectiles = this.projectiles.filter((pr) => !pr.dead);
+  }
+
+  private explode(x: number, y: number) {
+    this.sfx.explosion();
+    this.shake = Math.min(this.shake + 4, 10);
+    this.rings.push({ x, y, r: 12, maxR: 140, color: "rgba(255,138,61,0.85)", t: 0 });
+    this.burst(x, y, "#ffc94d", 14, 270);
+    this.burst(x, y, "#ff8a3d", 10, 210);
+    const R = 85;
+    for (const b of this.blocks) {
+      if (b.dead) continue;
+      if (Math.hypot(b.x - x, b.y - y) < R + Math.max(b.rx, b.ry)) this.damageBlock(b);
+    }
   }
 
   private onBallLost() {
@@ -845,7 +1067,14 @@ export class Game {
     this.shake = 10;
     this.sfx.loseLife();
     this.wideUntil = 0;
+    this.slowUntil = 0;
+    this.fastUntil = 0;
+    this.shrinkUntil = 0;
+    this.laserUntil = 0;
+    this.rocketUntil = 0;
+    this.weaponCd = 0;
     this.powers = [];
+    this.projectiles = [];
     if (this.lives <= 0) {
       this.phase = "over";
       this.sfx.gameOver();
@@ -902,6 +1131,23 @@ export class Game {
     if (this.particles.length > 420) this.particles.splice(0, this.particles.length - 420);
   }
 
+  private syncEffectsHud() {
+    const t = this.time;
+    const key = [
+      this.shield,
+      t < this.wideUntil ? 1 : 0,
+      t < this.slowUntil ? 1 : 0,
+      t < this.fastUntil ? 1 : 0,
+      t < this.shrinkUntil ? 1 : 0,
+      t < this.laserUntil ? 1 : 0,
+      t < this.rocketUntil ? 1 : 0,
+    ].join("");
+    if (key !== this.effectsKey) {
+      this.effectsKey = key;
+      this.pushHud();
+    }
+  }
+
   private pushHud() {
     this.onHud({
       phase: this.phase,
@@ -917,6 +1163,13 @@ export class Game {
       banner: this.banner,
       stuck: this.balls.some((b) => b.stuck),
       newRecord: this.newRecord,
+      shield: this.shield,
+      wideOn: this.time < this.wideUntil,
+      slowOn: this.time < this.slowUntil,
+      fastOn: this.time < this.fastUntil,
+      shrinkOn: this.time < this.shrinkUntil,
+      laserOn: this.time < this.laserUntil,
+      rocketOn: this.time < this.rocketUntil,
     });
   }
 
@@ -958,7 +1211,9 @@ export class Game {
     this.drawBlocks();
     this.drawRings();
     this.drawPowers();
+    this.drawProjectiles();
     this.drawParticles();
+    this.drawShield();
     this.drawPaddle();
     this.drawBalls();
     this.drawPopups();
@@ -1076,23 +1331,112 @@ export class Game {
       const meta = POWER_META[pw.type];
       ctx.save();
       ctx.translate(pw.x, pw.y);
-      ctx.rotate(Math.sin(pw.t * 5) * 0.15);
+      ctx.rotate(Math.sin(pw.t * 5) * 0.12);
+      const pulse = 1 + Math.sin(pw.t * 9) * 0.05;
+      ctx.scale(pulse, pulse);
       ctx.shadowColor = meta.color;
-      ctx.shadowBlur = 14;
+      ctx.shadowBlur = 20;
       ctx.fillStyle = meta.color;
-      this.roundRect(-17, -12, 34, 24, 12);
+      this.roundRect(-24, -16, 48, 32, 16);
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.strokeStyle = meta.edge;
-      ctx.lineWidth = 2;
-      this.roundRect(-17, -12, 34, 24, 12);
+      ctx.lineWidth = 2.5;
+      this.roundRect(-24, -16, 48, 32, 16);
       ctx.stroke();
+      // блик
+      ctx.fillStyle = "rgba(255,255,255,0.38)";
+      this.roundRect(-18, -12.5, 36, 10, 8);
+      ctx.fill();
       ctx.fillStyle = "#04121c";
-      ctx.font = '700 13px "Russo One", sans-serif';
+      ctx.font = '700 15px "Russo One", sans-serif';
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(meta.label, 0, 1.5);
+      ctx.fillText(meta.label, 0, 2);
       ctx.restore();
+    }
+  }
+
+  private drawShield() {
+    if (this.shield <= 0 || this.phase === "menu") return;
+    const { ctx, w, h } = this;
+    const y = h - 14;
+    const a = 0.5 + Math.sin(this.time * 6) * 0.18;
+    const g = ctx.createLinearGradient(0, y - 9, 0, y + 9);
+    g.addColorStop(0, "rgba(77,255,158,0)");
+    g.addColorStop(0.5, `rgba(77,255,158,${a})`);
+    g.addColorStop(1, "rgba(77,255,158,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, y - 9, w, 18);
+    ctx.strokeStyle = `rgba(210,255,238,${Math.min(1, a + 0.2)})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+    // пипсы зарядов
+    ctx.shadowColor = "#4dff9e";
+    ctx.shadowBlur = 9;
+    for (let i = 0; i < this.shield; i++) {
+      const px = w / 2 + (i - (this.shield - 1) / 2) * 15;
+      ctx.beginPath();
+      ctx.arc(px, y, 4.2, 0, Math.PI * 2);
+      ctx.fillStyle = "#4dff9e";
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  private drawProjectiles() {
+    const { ctx } = this;
+    for (const pr of this.projectiles) {
+      if (pr.kind === "laser") {
+        ctx.save();
+        ctx.shadowColor = "#7cf5ff";
+        ctx.shadowBlur = 12;
+        const g = ctx.createLinearGradient(pr.x, pr.y - 18, pr.x, pr.y + 18);
+        g.addColorStop(0, "rgba(124,245,255,0)");
+        g.addColorStop(0.5, "#eaffff");
+        g.addColorStop(1, "rgba(124,245,255,0.25)");
+        ctx.fillStyle = g;
+        ctx.fillRect(pr.x - 2.5, pr.y - 18, 5, 36);
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.translate(pr.x, pr.y);
+        ctx.shadowColor = "#ffc94d";
+        ctx.shadowBlur = 14;
+        const g = ctx.createLinearGradient(0, -11, 0, 8);
+        g.addColorStop(0, "#ffe9a8");
+        g.addColorStop(0.5, "#ffc94d");
+        g.addColorStop(1, "#c07f0e");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(0, -11);
+        ctx.quadraticCurveTo(6, -4, 5, 6);
+        ctx.lineTo(-5, 6);
+        ctx.quadraticCurveTo(-6, -4, 0, -11);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#ff6a5c";
+        ctx.beginPath();
+        ctx.moveTo(0, -11);
+        ctx.quadraticCurveTo(3.4, -7, 3, -4);
+        ctx.lineTo(-3, -4);
+        ctx.quadraticCurveTo(-3.4, -7, 0, -11);
+        ctx.fill();
+        // пламя
+        const fl = 6 + Math.sin(this.time * 42) * 3;
+        ctx.fillStyle = "#ff8a3d";
+        ctx.beginPath();
+        ctx.moveTo(-3, 6);
+        ctx.lineTo(0, 10 + fl);
+        ctx.lineTo(3, 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
     }
   }
 
@@ -1146,6 +1490,32 @@ export class Game {
     ctx.arc(-ww / 2 + hh / 2, 0, hh * 0.22, 0, Math.PI * 2);
     ctx.arc(ww / 2 - hh / 2, 0, hh * 0.22, 0, Math.PI * 2);
     ctx.fill();
+
+    // оружейные пилоны
+    const laserOn = this.time < this.laserUntil;
+    const rocketOn = this.time < this.rocketUntil;
+    if (laserOn) {
+      ctx.shadowColor = "#7cf5ff";
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = "#9df2ff";
+      for (const sx of [-0.36, 0.36]) {
+        this.roundRect(ww * sx - 3, -hh / 2 - 9, 6, 10, 2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+    }
+    if (rocketOn) {
+      ctx.shadowColor = "#ffc94d";
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = "#ffe9a8";
+      this.roundRect(-4.5, -hh / 2 - 13, 9, 14, 3);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#ff6a5c";
+      ctx.beginPath();
+      ctx.arc(0, -hh / 2 - 13, 3, Math.PI, 0);
+      ctx.fill();
+    }
     ctx.restore();
   }
 

@@ -86,6 +86,25 @@ export class SFX {
     this.blip(520, 0.08, "square", 0.2, 780);
     this.blip(780, 0.1, "square", 0.18, 1040, 0.07);
   }
+  powerBad() {
+    this.blip(300, 0.12, "square", 0.2, 110);
+    this.blip(220, 0.14, "square", 0.16, 80, 0.08);
+  }
+  laser() {
+    this.blip(1350, 0.07, "sawtooth", 0.13, 320);
+  }
+  rocket() {
+    this.blip(160, 0.16, "sawtooth", 0.2, 920);
+    this.noise(0.1, 0.08, 0.02);
+  }
+  explosion() {
+    this.noise(0.32, 0.26);
+    this.blip(120, 0.28, "square", 0.2, 40);
+  }
+  shieldHit() {
+    this.blip(520, 0.12, "sine", 0.24, 880);
+    this.blip(880, 0.1, "sine", 0.16, 440, 0.05);
+  }
   launch() {
     this.blip(200, 0.14, "sawtooth", 0.2, 520);
   }
