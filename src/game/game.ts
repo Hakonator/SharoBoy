@@ -108,23 +108,73 @@ const POWER_META: Record<PowerType, { label: string; color: string; edge: string
   life: { label: "+1", color: "#5dffb0", edge: "#d2ffee" },
 };
 
-interface LevelSpec {
+interface LayoutItem {
+  /** x — в единицах cell от центра поля, y — в единицах cell от верха зоны */
+  x: number;
+  y: number;
+  rx: number;
+  ry?: number;
+  hp: 1 | 2 | 3;
+}
+
+interface BaseSpec {
   name: string;
+  speed: number;
+}
+
+interface PatternSpec extends BaseSpec {
   rows: number;
   counts: number[];
   shape: (r: number, i: number) => "circle" | "eh" | "ev";
   hp: (r: number, i: number) => 1 | 2 | 3;
-  speed: number;
 }
+
+interface LayoutSpec extends BaseSpec {
+  layout: LayoutItem[];
+}
+
+type LevelSpec = PatternSpec | LayoutSpec;
+
+/**
+ * Уровень 1 «СТРЕЛА»: плотная симметричная ракета остриём вниз.
+ * 32 цели: плотная полоса мелких шаров, широкие овалы-крылья,
+ * малые вертикальные овалы-стабилизаторы и треугольник с крупным овалом-остриём.
+ */
+const L1_LAYOUT: LayoutItem[] = [
+  // плотная верхняя полоса из мелких шаров
+  ...[-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6].map(
+    (x): LayoutItem => ({ x, y: 0.7, rx: 0.34, hp: 1 })
+  ),
+  // широкие горизонтальные овалы-крылья
+  { x: -4.7, y: 2.0, rx: 1.35, ry: 0.55, hp: 2 },
+  { x: 4.7, y: 2.0, rx: 1.35, ry: 0.55, hp: 2 },
+  // малые вертикальные овалы-стабилизаторы
+  { x: -4.9, y: 4.9, rx: 0.42, ry: 0.8, hp: 1 },
+  { x: 4.9, y: 4.9, rx: 0.42, ry: 0.8, hp: 1 },
+  // остриё — крупный вертикальный овал
+  { x: 0, y: 7.0, rx: 0.58, ry: 1.2, hp: 3 },
+  // треугольник стрелы (ряды снизу вверх)
+  { x: -1.15, y: 5.9, rx: 0.55, hp: 2 },
+  { x: 1.15, y: 5.9, rx: 0.55, hp: 2 },
+  { x: -2.3, y: 4.85, rx: 0.45, hp: 1 },
+  { x: 0, y: 4.85, rx: 0.5, hp: 2 },
+  { x: 2.3, y: 4.85, rx: 0.45, hp: 1 },
+  { x: -1.86, y: 3.8, rx: 0.45, hp: 1 },
+  { x: -0.62, y: 3.8, rx: 0.5, hp: 2 },
+  { x: 0.62, y: 3.8, rx: 0.5, hp: 2 },
+  { x: 1.86, y: 3.8, rx: 0.45, hp: 1 },
+  { x: -2.48, y: 2.75, rx: 0.42, hp: 1 },
+  { x: -1.24, y: 2.75, rx: 0.48, hp: 2 },
+  { x: 0, y: 2.75, rx: 0.48, hp: 2 },
+  { x: 1.24, y: 2.75, rx: 0.48, hp: 2 },
+  { x: 2.48, y: 2.75, rx: 0.42, hp: 1 },
+];
 
 const LEVELS: LevelSpec[] = [
   {
-    name: "РАЗМИНКА",
-    rows: 5,
-    counts: [7, 8, 7, 8, 7],
-    shape: () => "circle",
-    hp: (r, i) => (r === 0 ? 2 : i % 5 === 2 ? 2 : 1),
+    name: "СТРЕЛА",
     speed: 400,
+    layout: L1_LAYOUT,
   },
   {
     name: "ОВАЛЬНЫЙ РИФ",
@@ -375,8 +425,39 @@ export class Game {
     const margin = clamp(this.w * 0.055, 22, 72);
     const top = clamp(this.h * 0.14, 86, 160);
     const bottom = clamp(this.h * 0.6, 300, 660);
-    const gap = (bottom - top) / spec.rows;
     const blocks: Block[] = [];
+
+    // авторская раскладка: единый масштаб cell, фигура вписывается в зону
+    if ("layout" in spec) {
+      let maxAx = 0;
+      let maxY = 0;
+      for (const it of spec.layout) {
+        maxAx = Math.max(maxAx, Math.abs(it.x) + it.rx);
+        maxY = Math.max(maxY, it.y + (it.ry ?? it.rx));
+      }
+      const unit = Math.min((this.w - margin * 2) / (maxAx * 2), (bottom - top) / (maxY + 0.4));
+      for (const it of spec.layout) {
+        const rx = Math.max(it.rx * unit, 8);
+        const ry = Math.max((it.ry ?? it.rx) * unit, 8);
+        blocks.push({
+          x: clamp(this.w / 2 + it.x * unit, margin * 0.5 + rx, this.w - margin * 0.5 - rx),
+          y: top + it.y * unit,
+          rx,
+          ry,
+          circle: Math.abs(rx - ry) < 0.6,
+          hp: it.hp,
+          maxHp: it.hp,
+          tier: it.hp,
+          flash: 0,
+          seed: rand(0, Math.PI * 2),
+          dead: false,
+        });
+      }
+      this.blocks = blocks;
+      return;
+    }
+
+    const gap = (bottom - top) / spec.rows;
 
     for (let r = 0; r < spec.rows; r++) {
       let count = spec.counts[r % spec.counts.length];
