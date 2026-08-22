@@ -390,9 +390,14 @@ export class Game {
     window.addEventListener("resize", this.handleResize);
     window.addEventListener("keydown", this.handleKeyDown);
     window.addEventListener("keyup", this.handleKeyUp);
+    window.addEventListener("blur", this.handleBlur);
     document.addEventListener("visibilitychange", this.handleVis);
-    this.canvas.addEventListener("pointermove", this.handlePointerMove);
+    // движение слушаем на всём окне — панель HUD не «съедает» указатель
+    window.addEventListener("pointermove", this.handlePointerMove);
     this.canvas.addEventListener("pointerdown", this.handlePointerDown);
+    // курсор покинул окно — сбрасываем цель, ракетка не застревает у края
+    document.documentElement.addEventListener("pointerleave", this.handlePointerLeave);
+    document.documentElement.addEventListener("dragend", this.handlePointerLeave);
     this.handleResize();
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.loop);
@@ -405,9 +410,12 @@ export class Game {
     window.removeEventListener("resize", this.handleResize);
     window.removeEventListener("keydown", this.handleKeyDown);
     window.removeEventListener("keyup", this.handleKeyUp);
+    window.removeEventListener("blur", this.handleBlur);
     document.removeEventListener("visibilitychange", this.handleVis);
-    this.canvas.removeEventListener("pointermove", this.handlePointerMove);
+    window.removeEventListener("pointermove", this.handlePointerMove);
     this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
+    document.documentElement.removeEventListener("pointerleave", this.handlePointerLeave);
+    document.documentElement.removeEventListener("dragend", this.handlePointerLeave);
   }
 
   /* ---------------- input ---------------- */
@@ -474,6 +482,20 @@ export class Game {
 
   private handlePointerMove = (e: PointerEvent) => {
     this.pointerX = e.clientX;
+  };
+
+  /** Курсор ушёл за пределы окна: сбрасываем устаревшую цель,
+   *  чтобы ракетка сразу слушалась клавиш и не липла к краю. */
+  private handlePointerLeave = () => {
+    this.pointerX = null;
+  };
+
+  /** Окно потеряло фокус: отпускаем «залипшие» клавиши и указатель. */
+  private handleBlur = () => {
+    this.keys.left = false;
+    this.keys.right = false;
+    this.keys.space = false;
+    this.pointerX = null;
   };
 
   private handlePointerDown = (e: PointerEvent) => {
@@ -981,7 +1003,7 @@ export class Game {
       p.x += (this.keys.right ? v : 0) * dt - (this.keys.left ? v : 0) * dt;
       this.pointerX = null;
     } else if (this.pointerX !== null) {
-      const k = 1 - Math.exp(-dt * 16);
+      const k = 1 - Math.exp(-dt * 26);
       p.x += (this.pointerX - p.x) * k;
     }
     p.x = clamp(p.x, p.w / 2 + 4, this.w - p.w / 2 - 4);
