@@ -215,13 +215,13 @@ export default function App() {
               </div>
             </div>
             {hud.combo >= 2 && (
-              <div key={hud.combo} className="hud-chip anim-combo px-3.5 py-2">
+              <div key={`combo-${hud.combo}`} className="hud-chip anim-combo px-3.5 py-2">
                 <div className="hud-label">Серия</div>
                 <div className="font-display text-xl leading-none text-punch sm:text-2xl">×{hud.combo}</div>
               </div>
             )}
             {hud.shield > 0 && (
-              <div key={hud.shield} className="hud-chip anim-combo px-3.5 py-2">
+              <div key={`shield-${hud.shield}`} className="hud-chip anim-combo px-3.5 py-2">
                 <div className="hud-label">Щит</div>
                 <div className="mt-1 flex gap-1">
                   {Array.from({ length: hud.shield }).map((_, i) => (
