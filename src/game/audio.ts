@@ -123,4 +123,12 @@ export class SFX {
       this.blip(f, 0.16, "square", 0.2, undefined, i * 0.1)
     );
   }
+  burn() {
+    this.blip(980, 0.09, "sawtooth", 0.13, 240);
+    this.noise(0.06, 0.06);
+  }
+  bossDie() {
+    [520, 392, 311, 233, 155].forEach((f, i) => this.blip(f, 0.2, "sawtooth", 0.2, undefined, i * 0.09));
+    this.noise(0.5, 0.2, 0.1);
+  }
 }

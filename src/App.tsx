@@ -15,6 +15,10 @@ const INITIAL_HUD: HudData = {
   banner: null,
   stuck: true,
   newRecord: false,
+  fireOn: false,
+  topEndless: [],
+  mode: "campaign",
+  wave: 0,
   shield: 0,
   wideOn: false,
   slowOn: false,
@@ -230,7 +234,9 @@ export default function App() {
 
           <div className="hud-chip stripe-hazard hidden px-5 py-2 text-center md:block">
             <div className="hud-label">
-              Уровень {hud.level}/{hud.levelCount} · {hud.levelName}
+              {hud.mode === "endless"
+                ? `Волна ${hud.wave} · ∞`
+                : `Уровень ${hud.level}/${hud.levelCount} · ${hud.levelName}`}
             </div>
             <div className="font-display text-lg leading-tight text-cyan-neon">
               ЦЕЛИ: <span className="text-foam tabular-nums">{hud.blocksLeft}</span>
@@ -272,7 +278,7 @@ export default function App() {
       {inGame && (
         <div className="pointer-events-none absolute left-1/2 top-[68px] z-20 -translate-x-1/2 md:hidden">
           <div className="hud-chip px-3 py-1 font-display text-xs text-cyan-neon">
-            УР. {hud.level}/{hud.levelCount} · ЦЕЛИ {hud.blocksLeft}
+            {hud.mode === "endless" ? `ВОЛНА ${hud.wave}` : `УР. ${hud.level}/${hud.levelCount}`} · ЦЕЛИ {hud.blocksLeft}
           </div>
         </div>
       )}
@@ -297,6 +303,7 @@ export default function App() {
       {inGame && (hud.wideOn || hud.slowOn || hud.fastOn || hud.shrinkOn) && (
         <div className="pointer-events-none absolute bottom-3 left-3 z-20 flex max-w-[46vw] flex-wrap gap-1.5 sm:bottom-4 sm:left-4">
           {hud.wideOn && <EffectChip keyVal="wide" label="ШИРЕ" good />}
+          {hud.fireOn && <EffectChip keyVal="fire" label="ОГНЬ" good />}
           {hud.slowOn && <EffectChip keyVal="slow" label="МЕДЛЕННЕЕ" good />}
           {hud.fastOn && <EffectChip keyVal="fast" label="БЫСТРЕЕ" good={false} />}
           {hud.shrinkOn && <EffectChip keyVal="shrink" label="УЗКАЯ" good={false} />}
@@ -335,13 +342,20 @@ export default function App() {
               </h1>
               <p className="mt-5 max-w-md text-base leading-relaxed text-foam/80 sm:text-lg">
                 Вместо кирпичей — <b className="text-mint">шары</b> и <b className="text-gold">овалы</b> разной
-                величины. Отбивай ядром, собирай серии, лови бонусы и зачисти все{" "}
-                <b className="text-cyan-neon">3 уровня</b>.
+                величины. Отбивай ядром, собирай серии, лови бонусы, одолей{" "}
+                <b className="text-cyan-neon">4 уровня с боссом</b> — или выживай в{" "}
+                <b className="text-punch">бесконечных волнах</b>.
               </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-4">
                 <button className="btn-arcade px-8 py-4 text-lg sm:text-xl" onClick={() => g()?.startGame()}>
-                  Играть
+                  Кампания
+                </button>
+                <button
+                  className="btn-ghost px-6 py-4 font-display text-base sm:text-lg"
+                  onClick={() => g()?.startEndless()}
+                >
+                  Бесконечный
                 </button>
                 {hud.best > 0 && (
                   <div className="hud-chip px-4 py-3">
@@ -369,10 +383,30 @@ export default function App() {
             <div className="anim-rise w-full max-w-sm" style={{ animationDelay: "0.12s" }}>
               {hud.top.length > 0 && (
                 <div className="hud-chip mb-3 p-4 sm:p-5">
-                  <div className="hud-label mb-3">Таблица рекордов</div>
+                  <div className="hud-label mb-3">Рекорды кампании</div>
                   <ol className="space-y-1.5">
                     {hud.top.map((s, i) => (
                       <li key={`${s}-${i}`} className="flex items-center font-display text-sm">
+                        <span
+                          className={
+                            i === 0 ? "text-gold" : i === 1 ? "text-foam" : i === 2 ? "text-coral" : "text-dim"
+                          }
+                        >
+                          {i + 1}.
+                        </span>
+                        <span className="mx-3 flex-1 border-b border-dotted border-line" />
+                        <span className="text-foam tabular-nums">{s.toLocaleString("ru-RU")}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {hud.topEndless.length > 0 && (
+                <div className="hud-chip mb-3 p-4 sm:p-5">
+                  <div className="hud-label mb-3">Рекорды — бесконечный</div>
+                  <ol className="space-y-1.5">
+                    {hud.topEndless.map((s, i) => (
+                      <li key={`e-${s}-${i}`} className="flex items-center font-display text-sm">
                         <span
                           className={
                             i === 0 ? "text-gold" : i === 1 ? "text-foam" : i === 2 ? "text-coral" : "text-dim"
@@ -398,9 +432,15 @@ export default function App() {
                   <span><b className="text-[#4dff9e]">«ЩИТ»</b> — экран внизу ×3</span>
                   <span><b className="text-[#4dff9e]">«ЛАЗ»</b> — лазеры (пробел)</span>
                   <span><b className="text-[#4dff9e]">«РКТ»</b> — ракеты (пробел)</span>
+                  <span className="col-span-2">
+                    <b className="text-[#4dff9e]">«ОГНЬ»</b> — ядро прожигает блоки насквозь
+                  </span>
                   <span className="col-span-2 mt-1 border-t border-line pt-2 text-dim">Анти-бонусы — красные:</span>
                   <span><b className="text-[#ff5347]">«СК↑»</b> — шар быстрее</span>
                   <span><b className="text-[#ff5347]">«УЗК»</b> — узкая ракетка</span>
+                </div>
+                <div className="mt-3 border-t border-line pt-2.5 text-xs text-dim">
+                  Тёмные <b className="text-coral">бомбы с фитилём</b> детонируют по площади — собирай цепочки!
                 </div>
               </div>
             </div>
@@ -419,7 +459,10 @@ export default function App() {
                 <button className="btn-arcade flex items-center justify-center gap-2 px-6 py-3.5" onClick={() => g()?.togglePause()}>
                   <IconPlay /> Продолжить
                 </button>
-                <button className="btn-ghost px-6 py-3" onClick={() => g()?.startGame()}>
+                <button
+                  className="btn-ghost px-6 py-3"
+                  onClick={() => (hud.mode === "endless" ? g()?.startEndless() : g()?.startGame())}
+                >
                   Заново
                 </button>
                 <button className="btn-ghost px-6 py-3" onClick={() => g()?.toMenu()}>
@@ -460,8 +503,27 @@ export default function App() {
                 <div className="font-display text-3xl text-gold tabular-nums">{hud.best.toLocaleString("ru-RU")}</div>
               </div>
             </div>
+            {hud.mode === "endless" && (
+              <div className="mt-4 font-display text-sm tracking-wider text-cyan-neon">
+                ДОСТИГНУТА ВОЛНА {hud.wave}
+              </div>
+            )}
+            {hud.mode === "endless" && hud.topEndless.length > 0 && (
+              <div className="hud-chip mx-auto mt-4 max-w-xs p-3 text-left">
+                <div className="hud-label mb-2">Лучшие результаты</div>
+                {hud.topEndless.map((s, i) => (
+                  <div key={`eo-${s}-${i}`} className="flex justify-between font-display text-xs text-foam/85">
+                    <span className={i === 0 ? "text-gold" : "text-dim"}>{i + 1}.</span>
+                    <span className="tabular-nums">{s.toLocaleString("ru-RU")}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="mt-7 flex flex-wrap justify-center gap-3">
-              <button className="btn-arcade px-8 py-3.5 text-lg" onClick={() => g()?.startGame()}>
+              <button
+                className="btn-arcade px-8 py-3.5 text-lg"
+                onClick={() => (hud.mode === "endless" ? g()?.startEndless() : g()?.startGame())}
+              >
                 Ещё раз
               </button>
               <button className="btn-ghost px-6 py-3.5" onClick={() => g()?.toMenu()}>

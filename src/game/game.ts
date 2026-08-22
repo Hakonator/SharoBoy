@@ -14,7 +14,8 @@ export type PowerType =
   | "shield"
   | "shrink"
   | "laser"
-  | "rocket";
+  | "rocket"
+  | "fire";
 
 export interface HudData {
   phase: Phase;
@@ -37,7 +38,11 @@ export interface HudData {
   shrinkOn: boolean;
   laserOn: boolean;
   rocketOn: boolean;
+  fireOn: boolean;
   top: number[];
+  topEndless: number[];
+  mode: "campaign" | "endless";
+  wave: number;
 }
 
 interface Block {
@@ -57,6 +62,23 @@ interface Block {
   swayAmp: number;
   swayFreq: number;
   swayPh: number;
+  /** блок-бомба: детонирует по площади при разрушении */
+  bomb: boolean;
+  boomQueued?: boolean;
+  /** миньон босса: орбита вокруг ядра */
+  minionOrbit?: { ang: number; rad: number; dir: number; speed: number };
+}
+
+interface BossState {
+  x: number;
+  y: number;
+  baseY: number;
+  r: number;
+  hp: number;
+  maxHp: number;
+  t: number;
+  flash: number;
+  dropTimer: number;
 }
 
 interface Ball {
@@ -144,6 +166,7 @@ const POWER_META: Record<PowerType, { label: string; good: boolean; color: strin
   shield: { label: "ЩИТ", good: true, color: "#4dff9e", edge: "#d2ffee" },
   laser: { label: "ЛАЗ", good: true, color: "#4dff9e", edge: "#d2ffee" },
   rocket: { label: "РКТ", good: true, color: "#4dff9e", edge: "#d2ffee" },
+  fire: { label: "ОГНЬ", good: true, color: "#4dff9e", edge: "#d2ffee" },
   fast: { label: "СК↑", good: false, color: "#ff5347", edge: "#ffd0cb" },
   shrink: { label: "УЗК", good: false, color: "#ff5347", edge: "#ffd0cb" },
 };
@@ -155,6 +178,7 @@ interface LayoutItem {
   rx: number;
   ry?: number;
   hp: 1 | 2 | 3;
+  bomb?: boolean;
 }
 
 interface BaseSpec {
@@ -173,7 +197,11 @@ interface LayoutSpec extends BaseSpec {
   layout: LayoutItem[];
 }
 
-type LevelSpec = PatternSpec | LayoutSpec;
+interface BossSpec extends BaseSpec {
+  boss: { hp: number; minions: number; bombs: number };
+}
+
+type LevelSpec = PatternSpec | LayoutSpec | BossSpec;
 
 /**
  * Уровень 1 «СТРЕЛА»: плотная симметричная ракета остриём вниз.
@@ -216,6 +244,9 @@ const L1_LAYOUT: LayoutItem[] = [
   { x: 2.9, y: 2.9, rx: 0.3, hp: 1 },
   { x: -3.3, y: 3.7, rx: 0.3, hp: 1 },
   { x: 3.3, y: 3.7, rx: 0.3, hp: 1 },
+  // бомбы у основания стрелы
+  { x: -2.6, y: 6.6, rx: 0.42, hp: 1, bomb: true },
+  { x: 2.6, y: 6.6, rx: 0.42, hp: 1, bomb: true },
 ];
 
 const LEVELS: LevelSpec[] = [
@@ -240,10 +271,32 @@ const LEVELS: LevelSpec[] = [
     hp: (r, i) => (r < 2 ? 3 : r < 5 ? 2 : i % 2 ? 2 : 1),
     speed: 500,
   },
+  {
+    name: "ЦАРЬ-ШАР",
+    speed: 430,
+    boss: { hp: 45, minions: 4, bombs: 4 },
+  },
 ];
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
+/** Детерминированный ГПСЧ (mulberry32) — для волн бесконечного режима. */
+function mulberry32(a: number) {
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Сид дня: одна и та же последовательность волн для всех игроков в этот день. */
+function daySeed() {
+  const d = new Date();
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
 
 export class Game {
   private canvas: HTMLCanvasElement;
@@ -298,6 +351,15 @@ export class Game {
   private countdown = 0;
   private levelLostBall = false;
   private top: number[] = [];
+  private topEndless: number[] = [];
+
+  private mode: "campaign" | "endless" = "campaign";
+  private wave = 0;
+  private waveSpec: { name: string; speed: number } | null = null;
+  private fireUntil = 0;
+  private boss: BossState | null = null;
+  private boomQueue: { x: number; y: number; at: number }[] = [];
+  private bossHitCd = 0;
 
   sfx = new SFX();
 
@@ -313,6 +375,12 @@ export class Game {
       this.top = Array.isArray(parsed) ? (parsed as number[]).filter((n) => typeof n === "number") : [];
     } catch {
       this.top = [];
+    }
+    try {
+      const parsedE = JSON.parse(localStorage.getItem("sharoboy-top-endless") || "[]") as unknown;
+      this.topEndless = Array.isArray(parsedE) ? (parsedE as number[]).filter((n) => typeof n === "number") : [];
+    } catch {
+      this.topEndless = [];
     }
   }
 
@@ -386,8 +454,11 @@ export class Game {
     }
     if (c === "Space") this.keys.space = true;
     if (c === "Space" || c === "Enter") {
-      if (this.phase === "menu" || this.phase === "over" || this.phase === "won") this.startGame();
-      else if (this.phase === "playing") this.launch();
+      if (this.phase === "menu" || this.phase === "won") this.startGame();
+      else if (this.phase === "over") {
+        if (this.mode === "endless") this.startEndless();
+        else this.startGame();
+      } else if (this.phase === "playing") this.launch();
     }
   };
 
@@ -417,6 +488,12 @@ export class Game {
   startGame() {
     this.sfx.ensure();
     this.sfx.ui();
+    this.mode = "campaign";
+    this.wave = 0;
+    this.waveSpec = null;
+    this.boss = null;
+    this.boomQueue = [];
+    this.fireUntil = 0;
     this.score = 0;
     this.lives = 3;
     this.combo = 0;
@@ -441,6 +518,42 @@ export class Game {
     this.serveBall();
     this.phase = "playing";
     this.setBanner(`УРОВЕНЬ 1 — ${LEVELS[0].name}`);
+    this.pushHud();
+  }
+
+  startEndless() {
+    this.sfx.ensure();
+    this.sfx.ui();
+    this.mode = "endless";
+    this.wave = 1;
+    this.waveSpec = { name: "ВОЛНА 1", speed: 400 };
+    this.boss = null;
+    this.boomQueue = [];
+    this.score = 0;
+    this.lives = 3;
+    this.combo = 0;
+    this.level = 1;
+    this.newRecord = false;
+    this.particles = [];
+    this.rings = [];
+    this.popups = [];
+    this.powers = [];
+    this.projectiles = [];
+    this.wideUntil = 0;
+    this.slowUntil = 0;
+    this.fastUntil = 0;
+    this.shrinkUntil = 0;
+    this.laserUntil = 0;
+    this.rocketUntil = 0;
+    this.fireUntil = 0;
+    this.shield = 0;
+    this.weaponCd = 0;
+    this.effectsKey = "";
+    this.transition = 0;
+    this.buildWave(1);
+    this.serveBall();
+    this.phase = "playing";
+    this.setBanner("БЕСКОНЕЧНЫЙ РЕЖИМ — ВОЛНА 1");
     this.pushHud();
   }
 
@@ -507,8 +620,17 @@ export class Game {
   }
 
   private buildLevel(n: number) {
-    const spec = LEVELS[n - 1];
     this.levelLostBall = false;
+    this.buildFromSpec(LEVELS[n - 1]);
+  }
+
+  private buildFromSpec(spec: LevelSpec) {
+    this.boss = null;
+    this.boomQueue = [];
+    if ("boss" in spec) {
+      this.buildBossLevel(spec.boss.hp, spec.boss.minions, spec.boss.bombs);
+      return;
+    }
     const margin = clamp(this.w * 0.055, 22, 72);
     const top = clamp(this.h * 0.14, 86, 160);
     const bottom = clamp(this.h * 0.6, 300, 660);
@@ -543,6 +665,7 @@ export class Game {
           swayAmp: 0,
           swayFreq: 0,
           swayPh: 0,
+          bomb: it.bomb ?? false,
         });
       }
       this.blocks = blocks;
@@ -557,7 +680,8 @@ export class Game {
       const slot = (this.w - margin * 2) / count;
       for (let i = 0; i < count; i++) {
         const kind = spec.shape(r, i);
-        const hp = spec.hp(r, i);
+        const isBomb = Math.random() < 0.07;
+        const hp = (isBomb ? 1 : spec.hp(r, i)) as 1 | 2 | 3;
         const cx = clamp(
           margin + slot * (i + 0.5) + rand(-1, 1) * slot * 0.02,
           margin + slot * 0.3,
@@ -592,6 +716,7 @@ export class Game {
           swayAmp: rand(5, 13),
           swayFreq: rand(0.5, 1.0) * (r % 2 === 0 ? 1 : -1),
           swayPh: rand(0, Math.PI * 2),
+          bomb: isBomb,
           dead: false,
         });
       }
@@ -599,9 +724,107 @@ export class Game {
     this.blocks = blocks;
   }
 
+  /** Бесконечный режим: волна n с детерминированным сидом дня. Каждая 5-я — босс. */
+  private buildWave(n: number) {
+    this.levelLostBall = false;
+    this.waveSpec = { name: `ВОЛНА ${n}`, speed: clamp(380 + n * 22, 380, 650) };
+    if (n % 5 === 0) {
+      this.buildBossLevel(38 + n * 4, Math.min(5, 3 + Math.floor(n / 10)), 4);
+      return;
+    }
+    const rng = mulberry32(daySeed() * 31 + n * 7919);
+    const rows = clamp(5 + Math.floor(n / 3), 5, 8);
+    const spec: PatternSpec = {
+      name: this.waveSpec.name,
+      speed: this.waveSpec.speed,
+      rows,
+      counts: Array.from({ length: rows }, (_, r) => clamp(6 + ((r + n) % 3) + Math.floor(n / 4), 6, 10)),
+      shape: () => {
+        const t = rng();
+        return (t < 0.5 ? "circle" : t < 0.78 ? "eh" : "ev") as "circle" | "eh" | "ev";
+      },
+      hp: (r) =>
+        (r < rows * 0.4 ? (rng() < 0.4 ? 3 : 2) : r < rows * 0.75 ? (rng() < 0.45 ? 2 : 1) : 1) as 1 | 2 | 3,
+    };
+    this.buildFromSpec(spec);
+  }
+
+  /** Уровень-босс: ЦАРЬ-ШАР с орбитальными миньонами и бомбами по углам. */
+  private buildBossLevel(hp: number, minions: number, bombs: number) {
+    const top = clamp(this.h * 0.14, 86, 160);
+    const r = clamp(Math.min(this.w, this.h) * 0.1, 52, 84);
+    const baseY = top + r + 34;
+    this.boss = { x: this.w / 2, y: baseY, baseY, r, hp, maxHp: hp, t: 0, flash: 0, dropTimer: 5 };
+    const blocks: Block[] = [];
+    const orbit = clamp(r * 2.5, 110, Math.min(this.w * 0.3, 280));
+    for (let i = 0; i < minions; i++) {
+      blocks.push({
+        x: this.w / 2,
+        y: baseY,
+        rx: 15,
+        ry: 15,
+        circle: true,
+        hp: 2,
+        maxHp: 2,
+        tier: 2,
+        flash: 0,
+        seed: rand(0, Math.PI * 2),
+        dead: false,
+        x0: this.w / 2,
+        swayAmp: 0,
+        swayFreq: 0,
+        swayPh: 0,
+        bomb: false,
+        minionOrbit: { ang: (i * Math.PI * 2) / minions, rad: orbit, dir: i % 2 ? 1 : -1, speed: 1.05 },
+      });
+    }
+    const spots = [
+      [0.13, 0.16],
+      [0.87, 0.16],
+      [0.13, 0.55],
+      [0.87, 0.55],
+      [0.5, 0.7],
+    ];
+    for (let i = 0; i < bombs; i++) {
+      const [fx, fy] = spots[i % spots.length];
+      const bx = clamp(this.w * fx, 40, this.w - 40);
+      const by = top + fy * clamp(this.h * 0.42, 220, 420);
+      blocks.push({
+        x: bx,
+        y: by,
+        rx: 20,
+        ry: 20,
+        circle: true,
+        hp: 1,
+        maxHp: 1,
+        tier: 1,
+        flash: 0,
+        seed: rand(0, Math.PI * 2),
+        dead: false,
+        x0: bx,
+        swayAmp: 0,
+        swayFreq: 0,
+        swayPh: 0,
+        bomb: true,
+      });
+    }
+    this.blocks = blocks;
+  }
+
+  private levelSpeed() {
+    return this.mode === "endless" ? this.waveSpec?.speed ?? 400 : LEVELS[this.level - 1].speed;
+  }
+
+  private levelDisplayName() {
+    return this.mode === "endless" ? this.waveSpec?.name ?? "ВОЛНА" : LEVELS[this.level - 1].name;
+  }
+
   private serveBall() {
-    const spec = LEVELS[this.level - 1];
-    const base = clamp(Math.min(this.h * 0.62, spec.speed + this.level * 30), 340, 660);
+    const base = clamp(
+      Math.min(this.h * 0.62, this.levelSpeed() + (this.mode === "endless" ? this.wave * 14 : this.level * 30)),
+      340,
+      720
+    );
     this.balls = [
       {
         x: this.paddle.x,
@@ -681,10 +904,17 @@ export class Game {
     if (this.transition > 0 && this.phase === "playing") {
       this.transition -= dt;
       if (this.transition <= 0) {
-        this.level++;
-        this.buildLevel(this.level);
-        this.serveBall();
-        this.setBanner(`УРОВЕНЬ ${this.level} — ${LEVELS[this.level - 1].name}`);
+        if (this.mode === "endless") {
+          this.wave++;
+          this.buildWave(this.wave);
+          this.serveBall();
+          this.setBanner(this.wave % 5 === 0 ? `ВОЛНА ${this.wave} — БОСС!` : `ВОЛНА ${this.wave}`);
+        } else {
+          this.level++;
+          this.buildLevel(this.level);
+          this.serveBall();
+          this.setBanner(`УРОВЕНЬ ${this.level} — ${LEVELS[this.level - 1].name}`);
+        }
       }
     }
 
@@ -712,6 +942,14 @@ export class Game {
     this.syncEffectsHud();
     this.updatePaddle(dt);
     this.updatePowers(dt);
+    if (this.boss) this.updateBoss(dt);
+    if (this.boomQueue.length) {
+      const due = this.boomQueue.filter((q) => this.time >= q.at);
+      if (due.length) {
+        this.boomQueue = this.boomQueue.filter((q) => this.time < q.at);
+        for (const q of due) this.explode(q.x, q.y);
+      }
+    }
 
     const frozen = this.transition > 0 || this.bannerTimer > 1.1 || this.countdown > 0;
     if (!frozen) {
@@ -725,7 +963,7 @@ export class Game {
         if (ball.stuck) this.stickBall(ball);
     }
 
-    if (this.blocks.length === 0 && this.transition <= 0 && this.phase === "playing") {
+    if (this.blocks.length === 0 && !this.boss && this.transition <= 0 && this.phase === "playing") {
       this.onLevelCleared();
     }
   }
@@ -805,6 +1043,7 @@ export class Game {
 
       this.collidePaddle(ball);
       this.collideBlocks(ball);
+      this.collideBoss(ball);
     }
 
     // страховка от горизонтального зацикливания
@@ -817,6 +1056,21 @@ export class Game {
     }
 
     ball.squash = Math.max(0, ball.squash - dt * 6);
+
+    // искры огненного ядра
+    if (this.time < this.fireUntil && Math.random() < 0.75) {
+      this.particles.push({
+        x: ball.x + rand(-5, 5),
+        y: ball.y + rand(-5, 5),
+        vx: rand(-30, 30),
+        vy: rand(-120, -40),
+        life: rand(0.2, 0.45),
+        maxLife: 0.45,
+        size: rand(2, 4),
+        color: Math.random() < 0.5 ? "#ff8a3d" : "#ffc94d",
+        grav: -120,
+      });
+    }
 
     // режимы скорости шара (замедление / ускорение от бонусов)
     const mult = this.time < this.slowUntil ? 0.72 : this.time < this.fastUntil ? 1.32 : 1;
@@ -857,6 +1111,7 @@ export class Game {
   }
 
   private collideBlocks(ball: Ball) {
+    const fire = this.time < this.fireUntil;
     for (const b of this.blocks) {
       if (b.dead) continue;
       const ex = b.rx + ball.r;
@@ -876,18 +1131,23 @@ export class Game {
       const sc = 1 / Math.sqrt(Math.max(q, 1e-6));
       ball.x = b.x + dx * sc + nx * 0.8;
       ball.y = b.y + dy * sc + ny * 0.8;
-      const dot = ball.vx * nx + ball.vy * ny;
-      if (dot < 0) {
-        ball.vx -= 2 * dot * nx;
-        ball.vy -= 2 * dot * ny;
+      if (!fire) {
+        const dot = ball.vx * nx + ball.vy * ny;
+        if (dot < 0) {
+          ball.vx -= 2 * dot * nx;
+          ball.vy -= 2 * dot * ny;
+        }
+        this.damageBlock(b);
+        return;
       }
-      this.damageBlock(b);
-      return;
+      // огненное ядро прожигает блоки насквозь
+      this.sfx.burn();
+      this.damageBlock(b, 2);
     }
   }
 
-  private damageBlock(b: Block) {
-    b.hp--;
+  private damageBlock(b: Block, dmg = 1) {
+    b.hp -= dmg;
     b.flash = 1;
     const tier = TIER[b.tier];
     this.sfx.blockHit(this.combo);
@@ -899,6 +1159,10 @@ export class Game {
 
     b.dead = true;
     this.blocks = this.blocks.filter((x) => !x.dead);
+    if (b.bomb && !b.boomQueued) {
+      b.boomQueued = true;
+      this.boomQueue.push({ x: b.x, y: b.y, at: this.time + 0.09 });
+    }
     this.combo++;
     const sizeBonus = Math.round((34 - Math.min(b.rx, b.ry)) * 1.4);
     const base = (b.tier === 3 ? 120 : b.tier === 2 ? 80 : 50) + Math.max(0, sizeBonus);
@@ -934,17 +1198,18 @@ export class Game {
     }
 
     // бонусы (зелёные) и анти-бонусы (красные) — падают часто
-    if (Math.random() < 0.22) {
+    if (Math.random() < 0.24) {
       const roll = Math.random();
       const type: PowerType =
-        roll < 0.09 ? "life"
-        : roll < 0.19 ? "wide"
-        : roll < 0.29 ? "multi"
-        : roll < 0.39 ? "slow"
-        : roll < 0.49 ? "shield"
-        : roll < 0.59 ? "laser"
-        : roll < 0.68 ? "rocket"
-        : roll < 0.86 ? "fast"
+        roll < 0.08 ? "life"
+        : roll < 0.17 ? "wide"
+        : roll < 0.26 ? "multi"
+        : roll < 0.35 ? "slow"
+        : roll < 0.44 ? "shield"
+        : roll < 0.53 ? "laser"
+        : roll < 0.61 ? "rocket"
+        : roll < 0.71 ? "fire"
+        : roll < 0.87 ? "fast"
         : "shrink";
       const skip =
         (type === "multi" && this.balls.length >= 4) ||
@@ -1017,6 +1282,10 @@ export class Game {
       case "rocket":
         this.rocketUntil = this.time + 12;
         popup("РАКЕТЫ — ПРОБЕЛ");
+        break;
+      case "fire":
+        this.fireUntil = this.time + 8;
+        popup("ОГНЕННОЕ ЯДРО!");
         break;
       case "multi": {
         const src = [...this.balls].filter((b) => !b.stuck);
@@ -1112,21 +1381,161 @@ export class Game {
           break;
         }
       }
+      if (!pr.dead && this.boss) {
+        if (Math.hypot(pr.x - this.boss.x, pr.y - this.boss.y) < this.boss.r + pr.r + 4) {
+          pr.dead = true;
+          if (pr.kind === "rocket") this.explode(pr.x, pr.y);
+          else {
+            this.damageBoss(1, true);
+            this.burst(pr.x, pr.y, "#7cf5ff", 6, 150);
+          }
+        }
+      }
     }
     this.projectiles = this.projectiles.filter((pr) => !pr.dead);
   }
 
   private explode(x: number, y: number) {
     this.sfx.explosion();
-    this.shake = Math.min(this.shake + 4, 10);
-    this.rings.push({ x, y, r: 12, maxR: 140, color: "rgba(255,138,61,0.85)", t: 0 });
+    this.shake = Math.min(this.shake + 5, 12);
+    this.flash = Math.max(this.flash, 0.4);
+    this.rings.push({ x, y, r: 12, maxR: 150, color: "rgba(255,138,61,0.85)", t: 0 });
     this.burst(x, y, "#ffc94d", 14, 270);
     this.burst(x, y, "#ff8a3d", 10, 210);
-    const R = 85;
-    for (const b of this.blocks) {
+    const R = 90;
+    for (const b of [...this.blocks]) {
       if (b.dead) continue;
-      if (Math.hypot(b.x - x, b.y - y) < R + Math.max(b.rx, b.ry)) this.damageBlock(b);
+      if (Math.hypot(b.x - x, b.y - y) < R + Math.max(b.rx, b.ry)) this.damageBlock(b, 3);
     }
+    if (this.boss && Math.hypot(this.boss.x - x, this.boss.y - y) < R + this.boss.r) this.damageBoss(3, true);
+  }
+
+  /* ---------------- босс «ЦАРЬ-ШАР» ---------------- */
+
+  private updateBoss(dt: number) {
+    const bo = this.boss;
+    if (!bo) return;
+    bo.t += dt;
+    bo.flash = Math.max(0, bo.flash - dt * 4);
+    this.bossHitCd = Math.max(0, this.bossHitCd - dt);
+    const angry = bo.hp < bo.maxHp * 0.4;
+    bo.x = this.w / 2 + Math.sin(bo.t * (angry ? 0.95 : 0.55)) * this.w * 0.2;
+    bo.y = bo.baseY + Math.sin(bo.t * 1.6) * 12;
+    for (const b of this.blocks) {
+      const o = b.minionOrbit;
+      if (!o) continue;
+      o.ang += dt * o.speed * o.dir * (angry ? 1.6 : 1);
+      b.x0 = clamp(bo.x + Math.cos(o.ang) * o.rad, b.rx + 4, this.w - b.rx - 4);
+      b.y = clamp(bo.y + Math.sin(o.ang) * o.rad * 0.42 + 8, b.ry + 4, this.h * 0.7);
+      b.x = b.x0;
+    }
+    const frozen = this.transition > 0 || this.bannerTimer > 1.1 || this.countdown > 0;
+    if (!frozen) {
+      bo.dropTimer -= dt;
+      if (bo.dropTimer <= 0) {
+        bo.dropTimer = angry ? 4.5 : 6.5;
+        const pool: PowerType[] = ["wide", "multi", "slow", "shield", "laser", "rocket", "fire", "fast"];
+        const type = pool[Math.floor(Math.random() * pool.length)];
+        this.powers.push({ x: bo.x, y: bo.y + bo.r + 10, vy: 150, type, t: 0 });
+        this.burst(bo.x, bo.y + bo.r, "#ff5ca8", 8, 140);
+      }
+    }
+  }
+
+  private collideBoss(ball: Ball) {
+    const bo = this.boss;
+    if (!bo) return;
+    const dx = ball.x - bo.x;
+    const dy = ball.y - bo.y;
+    const rr = bo.r + ball.r;
+    if (dx * dx + dy * dy >= rr * rr) return;
+    const d = Math.hypot(dx, dy) || 1;
+    const nx = dx / d;
+    const ny = dy / d;
+    ball.x = bo.x + nx * rr;
+    ball.y = bo.y + ny * rr;
+    const fire = this.time < this.fireUntil;
+    if (!fire) {
+      const dot = ball.vx * nx + ball.vy * ny;
+      if (dot < 0) {
+        ball.vx -= 2 * dot * nx;
+        ball.vy -= 2 * dot * ny;
+      }
+    }
+    ball.squash = 1;
+    this.damageBoss(fire ? 2 : 1, false);
+  }
+
+  private damageBoss(dmg: number, force: boolean) {
+    const bo = this.boss;
+    if (!bo) return;
+    if (!force && this.bossHitCd > 0) return;
+    this.bossHitCd = 0.12;
+    bo.hp -= dmg;
+    bo.flash = 1;
+    this.sfx.blockHit(this.combo);
+    this.burst(bo.x + rand(-bo.r * 0.5, bo.r * 0.5), bo.y + rand(-bo.r * 0.4, bo.r * 0.4), "#ff5ca8", 7, 170);
+    this.shake = Math.min(this.shake + 1.2, 8);
+    if (bo.hp <= 0) this.killBoss();
+  }
+
+  private killBoss() {
+    const bo = this.boss;
+    if (!bo) return;
+    this.boss = null;
+    this.sfx.bossDie();
+    this.sfx.explosion();
+    this.flash = 1;
+    this.shake = 14;
+    this.hitStop = Math.max(this.hitStop, 0.5);
+    for (let i = 0; i < 70; i++) {
+      const c = ["#ff5ca8", "#ffc94d", "#ff6a5c", "#eaf7ff"][i % 4];
+      const a = rand(0, Math.PI * 2);
+      const v = rand(60, 420);
+      this.particles.push({
+        x: bo.x,
+        y: bo.y,
+        vx: Math.cos(a) * v,
+        vy: Math.sin(a) * v,
+        life: rand(0.5, 1.2),
+        maxLife: 1.2,
+        size: rand(3, 7),
+        color: c,
+        grav: 220,
+      });
+    }
+    this.rings.push({ x: bo.x, y: bo.y, r: bo.r, maxR: bo.r * 4.5, color: "rgba(255,92,168,0.9)", t: 0 });
+    this.rings.push({ x: bo.x, y: bo.y, r: bo.r * 0.5, maxR: bo.r * 3, color: "rgba(255,201,77,0.9)", t: 0 });
+    const pts = this.mode === "campaign" ? 1500 : 500 + this.wave * 100;
+    this.score += pts;
+    if (this.score > this.best) {
+      this.best = this.score;
+      this.newRecord = true;
+      localStorage.setItem("sharoboy-best", String(this.best));
+    }
+    this.popups.push({ x: bo.x, y: bo.y, text: `ЦАРЬ ПОВЕРЖЕН! +${pts}`, color: "#ffc94d", t: 0, size: 24 });
+    // миньоны разлетаются цепочкой взрывов
+    let k = 0;
+    for (const b of [...this.blocks]) {
+      if (b.minionOrbit) {
+        this.boomQueue.push({ x: b.x, y: b.y, at: this.time + 0.12 + k * 0.09 });
+        k++;
+        b.dead = true;
+      }
+    }
+    this.blocks = this.blocks.filter((x) => !x.dead);
+    // прощальные подарки
+    const gifts: PowerType[] = ["fire", "shield", "multi"];
+    for (let g = 0; g < 2; g++) {
+      this.powers.push({
+        x: clamp(bo.x + rand(-90, 90), 40, this.w - 40),
+        y: bo.y,
+        vy: 150,
+        type: gifts[g % gifts.length],
+        t: 0,
+      });
+    }
+    this.pushHud();
   }
 
   private onBallLost() {
@@ -1141,6 +1550,7 @@ export class Game {
     this.shrinkUntil = 0;
     this.laserUntil = 0;
     this.rocketUntil = 0;
+    this.fireUntil = 0;
     this.weaponCd = 0;
     this.powers = [];
     this.projectiles = [];
@@ -1169,6 +1579,13 @@ export class Game {
     }
     this.flash = 1;
     this.hitStop = Math.max(this.hitStop, 0.35);
+    if (this.mode === "endless") {
+      this.sfx.levelClear();
+      this.lives = Math.min(this.lives + 1, 5);
+      this.setBanner(`ВОЛНА ${this.wave} ПРОЙДЕНА!  +ЖИЗНЬ`);
+      this.transition = 1.6;
+      return;
+    }
     if (this.level >= LEVELS.length) {
       this.phase = "won";
       this.sfx.win();
@@ -1225,6 +1642,7 @@ export class Game {
       t < this.shrinkUntil ? 1 : 0,
       t < this.laserUntil ? 1 : 0,
       t < this.rocketUntil ? 1 : 0,
+      t < this.fireUntil ? 1 : 0,
     ].join("");
     if (key !== this.effectsKey) {
       this.effectsKey = key;
@@ -1238,9 +1656,11 @@ export class Game {
       score: this.score,
       best: this.best,
       lives: this.lives,
-      level: this.level,
-      levelCount: LEVELS.length,
-      levelName: LEVELS[this.level - 1].name,
+      level: this.mode === "endless" ? this.wave : this.level,
+      levelCount: this.mode === "endless" ? -1 : LEVELS.length,
+      levelName: this.levelDisplayName(),
+      mode: this.mode,
+      wave: this.wave,
       combo: this.combo,
       blocksLeft: this.blocks.length,
       muted: this.sfx.muted,
@@ -1254,14 +1674,21 @@ export class Game {
       shrinkOn: this.time < this.shrinkUntil,
       laserOn: this.time < this.laserUntil,
       rocketOn: this.time < this.rocketUntil,
+      fireOn: this.time < this.fireUntil,
       top: this.top,
+      topEndless: this.topEndless,
     });
   }
 
   private saveTop() {
     if (this.score <= 0) return;
-    this.top = [...this.top, this.score].sort((a, b) => b - a).slice(0, 5);
-    localStorage.setItem("sharoboy-top", JSON.stringify(this.top));
+    if (this.mode === "endless") {
+      this.topEndless = [...this.topEndless, this.score].sort((a, b) => b - a).slice(0, 5);
+      localStorage.setItem("sharoboy-top-endless", JSON.stringify(this.topEndless));
+    } else {
+      this.top = [...this.top, this.score].sort((a, b) => b - a).slice(0, 5);
+      localStorage.setItem("sharoboy-top", JSON.stringify(this.top));
+    }
   }
 
   /* ---------------- drawing ---------------- */
@@ -1305,6 +1732,7 @@ export class Game {
 
     this.drawDanger();
     this.drawBlocks();
+    this.drawBoss();
     this.drawRings();
     this.drawPowers();
     this.drawProjectiles();
@@ -1371,6 +1799,11 @@ export class Game {
       const tier = TIER[b.tier];
       b.flash = Math.max(0, b.flash - 0.08);
 
+      if (b.bomb) {
+        this.drawBomb(b, x, y);
+        continue;
+      }
+
       ctx.save();
       ctx.translate(x, y);
       ctx.scale(b.rx, b.ry);
@@ -1430,6 +1863,164 @@ export class Game {
         }
       }
     }
+  }
+
+  private drawBomb(b: Block, x: number, y: number) {
+    const { ctx } = this;
+    const pulse = 0.5 + 0.5 * Math.sin(this.time * 6 + b.seed);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.shadowColor = "rgba(255,140,60,0.9)";
+    ctx.shadowBlur = 8 + pulse * 12;
+    ctx.scale(b.rx, b.ry);
+    const g = ctx.createRadialGradient(-0.35, -0.4, 0.05, 0, 0, 1.15);
+    g.addColorStop(0, "#7b8b98");
+    g.addColorStop(0.45, "#3a4750");
+    g.addColorStop(1, "#141b21");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 0, 0.96, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,150,70,${0.4 + pulse * 0.4})`;
+    ctx.lineWidth = 0.07;
+    ctx.stroke();
+    ctx.restore();
+    // фитиль с искрой
+    ctx.strokeStyle = "#c9a25f";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y - b.ry);
+    ctx.quadraticCurveTo(x + 4, y - b.ry - 9, x + 11, y - b.ry - 6);
+    ctx.stroke();
+    ctx.save();
+    ctx.shadowColor = "#ffc94d";
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = "#ffe9a8";
+    ctx.beginPath();
+    ctx.arc(x + 11, y - b.ry - 6, 2.4 + pulse * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  private drawBoss() {
+    const bo = this.boss;
+    if (!bo || this.phase === "menu") return;
+    const { ctx } = this;
+    const angry = bo.hp < bo.maxHp * 0.4;
+    ctx.save();
+    ctx.translate(bo.x, bo.y);
+
+    // тело с аурой
+    ctx.shadowColor = angry ? "#ff5347" : "#ff5ca8";
+    ctx.shadowBlur = 32;
+    const g = ctx.createRadialGradient(-bo.r * 0.3, -bo.r * 0.35, bo.r * 0.1, 0, 0, bo.r);
+    g.addColorStop(0, angry ? "#ffd0cb" : "#ffc4dd");
+    g.addColorStop(0.45, angry ? "#ff5347" : "#e0355f");
+    g.addColorStop(1, angry ? "#7c1208" : "#5e0f2e");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, bo.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // корона
+    const cw = bo.r * 0.95;
+    const cy0 = -bo.r * 0.78;
+    const chh = bo.r * 0.42;
+    ctx.fillStyle = "#ffc94d";
+    ctx.strokeStyle = "#8a5a00";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-cw / 2, cy0);
+    ctx.lineTo(-cw / 2, cy0 - chh * 0.7);
+    ctx.lineTo(-cw * 0.25, cy0 - chh * 0.28);
+    ctx.lineTo(0, cy0 - chh);
+    ctx.lineTo(cw * 0.25, cy0 - chh * 0.28);
+    ctx.lineTo(cw / 2, cy0 - chh * 0.7);
+    ctx.lineTo(cw / 2, cy0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ff5347";
+    ctx.beginPath();
+    ctx.arc(0, cy0 - chh * 0.62, bo.r * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+
+    // глаза следят за ближайшим шаром
+    let tx = this.paddle.x - bo.x;
+    let ty = this.paddle.y - bo.y;
+    let bd = Infinity;
+    for (const b of this.balls) {
+      const d = Math.hypot(b.x - bo.x, b.y - bo.y);
+      if (d < bd) {
+        bd = d;
+        tx = b.x - bo.x;
+        ty = b.y - bo.y;
+      }
+    }
+    const tl = Math.hypot(tx, ty) || 1;
+    const px = (tx / tl) * bo.r * 0.09;
+    const py = (ty / tl) * bo.r * 0.09;
+    for (const sx of [-1, 1]) {
+      const exx = sx * bo.r * 0.34;
+      const eyy = -bo.r * 0.12;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.ellipse(exx, eyy, bo.r * 0.2, bo.r * (angry ? 0.17 : 0.24), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = angry ? "#7c1208" : "#2a0a18";
+      ctx.beginPath();
+      ctx.arc(exx + px, eyy + py, bo.r * 0.09, 0, Math.PI * 2);
+      ctx.fill();
+      if (angry) {
+        ctx.strokeStyle = "#7c1208";
+        ctx.lineWidth = bo.r * 0.05;
+        ctx.beginPath();
+        ctx.moveTo(exx - sx * bo.r * 0.22, eyy - bo.r * 0.3);
+        ctx.lineTo(exx + sx * bo.r * 0.14, eyy - bo.r * 0.16);
+        ctx.stroke();
+      }
+    }
+
+    // рот: зигзаг-пасть в ярости, иначе ухмылка
+    ctx.strokeStyle = "#2a0a18";
+    ctx.lineWidth = bo.r * 0.05;
+    ctx.beginPath();
+    if (angry) {
+      ctx.moveTo(-bo.r * 0.3, bo.r * 0.42);
+      for (let i = 1; i <= 6; i++) {
+        ctx.lineTo(-bo.r * 0.3 + (bo.r * 0.6 * i) / 6, bo.r * (0.42 + (i % 2 ? -0.08 : 0.08)));
+      }
+    } else {
+      ctx.arc(0, bo.r * 0.3, bo.r * 0.26, 0.2, Math.PI - 0.2);
+    }
+    ctx.stroke();
+
+    if (bo.flash > 0) {
+      ctx.beginPath();
+      ctx.arc(0, 0, bo.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.6})`;
+      ctx.fill();
+    }
+
+    // кольцо HP
+    const pct = Math.max(0, bo.hp / bo.maxHp);
+    ctx.lineCap = "round";
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "rgba(234,247,255,0.15)";
+    ctx.beginPath();
+    ctx.arc(0, 0, bo.r + 13, 0, Math.PI * 2);
+    ctx.stroke();
+    const hpColor = pct > 0.5 ? "#5dffb0" : pct > 0.25 ? "#ffc94d" : "#ff5347";
+    ctx.shadowColor = hpColor;
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = hpColor;
+    ctx.beginPath();
+    ctx.arc(0, 0, bo.r + 13, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct);
+    ctx.stroke();
+    ctx.restore();
   }
 
   private drawRings() {
@@ -1649,9 +2240,10 @@ export class Game {
   private drawBalls() {
     if (this.phase === "menu") return;
     const { ctx } = this;
-    // цвет шара подсказывает режим скорости
-    const mode =
-      this.time < this.slowUntil
+    // цвет шара подсказывает режим: огонь / замедление / ускорение / норма
+    const mode = this.time < this.fireUntil
+      ? { trail: "rgba(255,138,61,", mid: "#ffe9a8", core: "#ff5347", glow: "#ff8a3d" }
+      : this.time < this.slowUntil
         ? { trail: "rgba(93,255,176,", mid: "#d2ffee", core: "#2fd98a", glow: "#5dffb0" }
         : this.time < this.fastUntil
           ? { trail: "rgba(255,106,92,", mid: "#ffd9d4", core: "#ff5347", glow: "#ff6a5c" }
