@@ -22,6 +22,7 @@ const INITIAL_HUD: HudData = {
   shrinkOn: false,
   laserOn: false,
   rocketOn: false,
+  top: [],
 };
 
 /* ---------- чип активного эффекта ---------- */
@@ -366,6 +367,26 @@ export default function App() {
             </div>
 
             <div className="anim-rise w-full max-w-sm" style={{ animationDelay: "0.12s" }}>
+              {hud.top.length > 0 && (
+                <div className="hud-chip mb-3 p-4 sm:p-5">
+                  <div className="hud-label mb-3">Таблица рекордов</div>
+                  <ol className="space-y-1.5">
+                    {hud.top.map((s, i) => (
+                      <li key={`${s}-${i}`} className="flex items-center font-display text-sm">
+                        <span
+                          className={
+                            i === 0 ? "text-gold" : i === 1 ? "text-foam" : i === 2 ? "text-coral" : "text-dim"
+                          }
+                        >
+                          {i + 1}.
+                        </span>
+                        <span className="mx-3 flex-1 border-b border-dotted border-line" />
+                        <span className="text-foam tabular-nums">{s.toLocaleString("ru-RU")}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
               <ControlsPanel />
               <div className="hud-chip mt-3 p-4 sm:p-5">
                 <div className="hud-label mb-3">Выпадает из мишеней</div>

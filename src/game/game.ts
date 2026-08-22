@@ -37,6 +37,7 @@ export interface HudData {
   shrinkOn: boolean;
   laserOn: boolean;
   rocketOn: boolean;
+  top: number[];
 }
 
 interface Block {
@@ -51,6 +52,11 @@ interface Block {
   flash: number;
   seed: number;
   dead: boolean;
+  /** базовая x для покачивания ряда */
+  x0: number;
+  swayAmp: number;
+  swayFreq: number;
+  swayPh: number;
 }
 
 interface Ball {
@@ -63,6 +69,8 @@ interface Ball {
   stuck: boolean;
   stuckOffset: number;
   trail: { x: number; y: number }[];
+  /** сплющивание при ударе (0..1) */
+  squash: number;
 }
 
 interface Particle {
@@ -285,6 +293,12 @@ export class Game {
   private pointerX: number | null = null;
   private shake = 0;
 
+  private hitStop = 0;
+  private flash = 0;
+  private countdown = 0;
+  private levelLostBall = false;
+  private top: number[] = [];
+
   sfx = new SFX();
 
   constructor(canvas: HTMLCanvasElement, onHud: (h: HudData) => void) {
@@ -294,6 +308,12 @@ export class Game {
     this.ctx = ctx;
     this.onHud = onHud;
     this.best = Number(localStorage.getItem("sharoboy-best") || 0) || 0;
+    try {
+      const parsed = JSON.parse(localStorage.getItem("sharoboy-top") || "[]") as unknown;
+      this.top = Array.isArray(parsed) ? (parsed as number[]).filter((n) => typeof n === "number") : [];
+    } catch {
+      this.top = [];
+    }
   }
 
   /* ---------------- lifecycle ---------------- */
@@ -340,6 +360,7 @@ export class Game {
     if (oldW > 0 && (sx !== 1 || sy !== 1)) {
       for (const b of this.blocks) {
         b.x = clamp(b.x * sx, b.rx + 6, this.w - b.rx - 6);
+        b.x0 = clamp(b.x0 * sx, b.rx + 6, this.w - b.rx - 6);
         b.y = clamp(b.y * sy, b.ry + 6, this.h * 0.75);
       }
       for (const b of this.balls) {
@@ -441,6 +462,7 @@ export class Game {
       this.sfx.ui();
     } else if (this.phase === "paused") {
       this.phase = "playing";
+      this.countdown = 3;
       this.sfx.ui();
       this.last = performance.now();
     }
@@ -486,6 +508,7 @@ export class Game {
 
   private buildLevel(n: number) {
     const spec = LEVELS[n - 1];
+    this.levelLostBall = false;
     const margin = clamp(this.w * 0.055, 22, 72);
     const top = clamp(this.h * 0.14, 86, 160);
     const bottom = clamp(this.h * 0.6, 300, 660);
@@ -503,8 +526,9 @@ export class Game {
       for (const it of spec.layout) {
         const rx = Math.max(it.rx * unit, 8);
         const ry = Math.max((it.ry ?? it.rx) * unit, 8);
+        const cx = clamp(this.w / 2 + it.x * unit, margin * 0.5 + rx, this.w - margin * 0.5 - rx);
         blocks.push({
-          x: clamp(this.w / 2 + it.x * unit, margin * 0.5 + rx, this.w - margin * 0.5 - rx),
+          x: cx,
           y: top + it.y * unit,
           rx,
           ry,
@@ -515,6 +539,10 @@ export class Game {
           flash: 0,
           seed: rand(0, Math.PI * 2),
           dead: false,
+          x0: cx,
+          swayAmp: 0,
+          swayFreq: 0,
+          swayPh: 0,
         });
       }
       this.blocks = blocks;
@@ -560,6 +588,10 @@ export class Game {
           tier: hp,
           flash: 0,
           seed: rand(0, Math.PI * 2),
+          x0: cx,
+          swayAmp: rand(5, 13),
+          swayFreq: rand(0.5, 1.0) * (r % 2 === 0 ? 1 : -1),
+          swayPh: rand(0, Math.PI * 2),
           dead: false,
         });
       }
@@ -581,6 +613,7 @@ export class Game {
         stuck: true,
         stuckOffset: 0,
         trail: [],
+        squash: 0,
       },
     ];
     this.combo = 0;
@@ -596,9 +629,13 @@ export class Game {
 
   private loop = (t: number) => {
     if (this.destroyed) return;
-    const dt = clamp((t - this.last) / 1000, 0, 0.033);
+    const dtRaw = clamp((t - this.last) / 1000, 0, 0.033);
     this.last = t;
+    // hit-stop: время на миг замедляется на самых сочных событиях
+    if (this.hitStop > 0) this.hitStop = Math.max(0, this.hitStop - dtRaw);
+    const dt = this.hitStop > 0 ? dtRaw * 0.18 : dtRaw;
     this.time += dt;
+    this.flash = Math.max(0, this.flash - dtRaw * 2.6);
     this.update(dt);
     this.draw();
     this.raf = requestAnimationFrame(this.loop);
@@ -612,6 +649,24 @@ export class Game {
       if (b.y < -20) {
         b.y = this.h + 20;
         b.x = Math.random() * this.w;
+      }
+    }
+
+    // обратный отсчёт после снятия с паузы
+    if (this.countdown > 0 && this.phase === "playing") {
+      const prev = Math.ceil(this.countdown);
+      this.countdown = Math.max(0, this.countdown - dt);
+      if (this.countdown > 0 && Math.ceil(this.countdown) !== prev) this.sfx.ui();
+    }
+
+    // живые ряды: мягкое покачивание блоков (узорные уровни)
+    for (const b of this.blocks) {
+      if (b.swayAmp > 0) {
+        b.x = clamp(
+          b.x0 + Math.sin(this.time * b.swayFreq + b.swayPh) * b.swayAmp,
+          b.rx + 4,
+          this.w - b.rx - 4
+        );
       }
     }
 
@@ -658,7 +713,7 @@ export class Game {
     this.updatePaddle(dt);
     this.updatePowers(dt);
 
-    const frozen = this.transition > 0 || this.bannerTimer > 1.1;
+    const frozen = this.transition > 0 || this.bannerTimer > 1.1 || this.countdown > 0;
     if (!frozen) {
       this.tryFire(dt);
       this.updateProjectiles(dt);
@@ -735,6 +790,7 @@ export class Game {
         this.shield--;
         ball.y = this.h - 14 - ball.r;
         ball.vy = -Math.abs(ball.vy);
+        ball.squash = 1;
         this.sfx.shieldHit();
         this.burst(ball.x, this.h - 14, "#4dff9e", 14, 220);
         this.rings.push({ x: ball.x, y: this.h - 14, r: 8, maxR: 74, color: "rgba(77,255,158,0.8)", t: 0 });
@@ -759,6 +815,8 @@ export class Game {
       const nx = Math.sqrt(Math.max(sp * sp - ball.vy * ball.vy, 0));
       ball.vx = Math.sign(ball.vx || 1) * nx;
     }
+
+    ball.squash = Math.max(0, ball.squash - dt * 6);
 
     // режимы скорости шара (замедление / ускорение от бонусов)
     const mult = this.time < this.slowUntil ? 0.72 : this.time < this.fastUntil ? 1.32 : 1;
@@ -790,6 +848,7 @@ export class Game {
     ball.vx = Math.sin(ang) * ball.speed + clamp(p.vx * 0.12, -70, 70);
     ball.vy = -Math.cos(ang) * ball.speed;
     ball.y = p.y - hh - ball.r - 0.5;
+    ball.squash = 1;
     this.combo = 0;
     p.squash = 1;
     this.sfx.paddle();
@@ -864,6 +923,15 @@ export class Game {
       size: this.combo > 3 ? 20 : 15,
     });
     this.shake = Math.min(this.shake + (b.tier === 3 ? 3.4 : 2), 9);
+    if (b.tier === 3) this.hitStop = Math.max(this.hitStop, 0.055);
+
+    // вехи серии
+    if (this.combo === 5 || this.combo === 10 || this.combo === 15) {
+      const word = this.combo === 5 ? "ГОРЯЧО!" : this.combo === 10 ? "НЕУДЕРЖИМО!" : "БЕЗУМИЕ!";
+      this.popups.push({ x: b.x, y: b.y - 28, text: `${word} ×${this.combo}`, color: "#ffc94d", t: 0, size: 22 });
+      this.rings.push({ x: b.x, y: b.y, r: 10, maxR: 130, color: "rgba(255,201,77,0.8)", t: 0 });
+      this.sfx.power();
+    }
 
     // бонусы (зелёные) и анти-бонусы (красные) — падают часто
     if (Math.random() < 0.22) {
@@ -964,11 +1032,11 @@ export class Game {
               vy: Math.sin(ang) * d.speed,
               r: d.r,
               speed: d.speed,
-              stuck: false,
-              stuckOffset: 0,
-              trail: [],
-            });
-          }
+            stuck: false,
+            stuckOffset: 0,
+            trail: [],
+            squash: 0,
+          });          }
         }
         popup("×3 ШАРА!");
         break;
@@ -1064,6 +1132,7 @@ export class Game {
   private onBallLost() {
     this.lives--;
     this.combo = 0;
+    this.levelLostBall = true;
     this.shake = 10;
     this.sfx.loseLife();
     this.wideUntil = 0;
@@ -1078,6 +1147,7 @@ export class Game {
     if (this.lives <= 0) {
       this.phase = "over";
       this.sfx.gameOver();
+      this.saveTop();
       this.pushHud();
       return;
     }
@@ -1086,6 +1156,19 @@ export class Game {
   }
 
   private onLevelCleared() {
+    // бонус за уровень без единой потери шара
+    if (!this.levelLostBall) {
+      this.score += 500;
+      if (this.score > this.best) {
+        this.best = this.score;
+        this.newRecord = true;
+        localStorage.setItem("sharoboy-best", String(this.best));
+      }
+      this.popups.push({ x: this.w / 2, y: this.h * 0.42, text: "ЧИСТО! +500", color: "#5dffb0", t: 0, size: 26 });
+      this.sfx.power();
+    }
+    this.flash = 1;
+    this.hitStop = Math.max(this.hitStop, 0.35);
     if (this.level >= LEVELS.length) {
       this.phase = "won";
       this.sfx.win();
@@ -1103,6 +1186,7 @@ export class Game {
           grav: 260,
         });
       }
+      this.saveTop();
       this.pushHud();
       return;
     }
@@ -1170,7 +1254,14 @@ export class Game {
       shrinkOn: this.time < this.shrinkUntil,
       laserOn: this.time < this.laserUntil,
       rocketOn: this.time < this.rocketUntil,
+      top: this.top,
     });
+  }
+
+  private saveTop() {
+    if (this.score <= 0) return;
+    this.top = [...this.top, this.score].sort((a, b) => b - a).slice(0, 5);
+    localStorage.setItem("sharoboy-top", JSON.stringify(this.top));
   }
 
   /* ---------------- drawing ---------------- */
@@ -1187,8 +1278,13 @@ export class Game {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, w, h);
 
+    // зарево реагирует на серию: растёт и теплеет
+    const heat = Math.min(this.combo, 12) / 12;
     const glow = ctx.createRadialGradient(w / 2, h * 0.16, 40, w / 2, h * 0.16, Math.max(w, h) * 0.7);
-    glow.addColorStop(0, "rgba(53,224,255,0.10)");
+    glow.addColorStop(
+      0,
+      heat > 0.5 ? `rgba(255,201,77,${0.08 + heat * 0.12})` : `rgba(53,224,255,${0.1 + heat * 0.08})`
+    );
     glow.addColorStop(1, "rgba(53,224,255,0)");
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, w, h);
@@ -1219,6 +1315,31 @@ export class Game {
     this.drawPopups();
 
     ctx.restore();
+
+    // вспышка на сочных событиях
+    if (this.flash > 0) {
+      ctx.fillStyle = `rgba(234,247,255,${this.flash * 0.3})`;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    // обратный отсчёт после паузы
+    if (this.countdown > 0 && this.phase === "playing") {
+      ctx.fillStyle = "rgba(4,16,26,0.45)";
+      ctx.fillRect(0, 0, w, h);
+      const n = Math.ceil(this.countdown);
+      const frac = this.countdown - Math.floor(this.countdown);
+      ctx.save();
+      ctx.translate(w / 2, h * 0.44);
+      ctx.scale(0.8 + frac * 0.5, 0.8 + frac * 0.5);
+      ctx.font = '120px "Russo One", sans-serif';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "#35e0ff";
+      ctx.shadowBlur = 34;
+      ctx.fillStyle = "#eaf7ff";
+      ctx.fillText(String(n), 0, 0);
+      ctx.restore();
+    }
 
     // виньетка
     const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.42, w / 2, h / 2, Math.max(w, h) * 0.78);
@@ -1464,13 +1585,19 @@ export class Game {
 
     ctx.save();
     ctx.translate(p.x, p.y);
-    ctx.shadowColor = wide ? "#ffc94d" : "#35e0ff";
+    ctx.rotate(clamp(p.vx * 0.00011, -0.1, 0.1));
+    const shrink = !wide && this.time < this.shrinkUntil;
+    ctx.shadowColor = wide ? "#ffc94d" : shrink ? "#ff5347" : "#35e0ff";
     ctx.shadowBlur = 22;
     const g = ctx.createLinearGradient(0, -hh / 2, 0, hh / 2);
     if (wide) {
       g.addColorStop(0, "#ffe9a8");
       g.addColorStop(0.5, "#ffc94d");
       g.addColorStop(1, "#c07f0e");
+    } else if (shrink) {
+      g.addColorStop(0, "#ffb8b0");
+      g.addColorStop(0.5, "#ff5347");
+      g.addColorStop(1, "#8f1d12");
     } else {
       g.addColorStop(0, "#aef7ff");
       g.addColorStop(0.5, "#35e0ff");
@@ -1522,6 +1649,13 @@ export class Game {
   private drawBalls() {
     if (this.phase === "menu") return;
     const { ctx } = this;
+    // цвет шара подсказывает режим скорости
+    const mode =
+      this.time < this.slowUntil
+        ? { trail: "rgba(93,255,176,", mid: "#d2ffee", core: "#2fd98a", glow: "#5dffb0" }
+        : this.time < this.fastUntil
+          ? { trail: "rgba(255,106,92,", mid: "#ffd9d4", core: "#ff5347", glow: "#ff6a5c" }
+          : { trail: "rgba(120,240,255,", mid: "#c9f6ff", core: "#38bcd8", glow: "#7cf5ff" };
     for (const b of this.balls) {
       // хвост
       for (let i = 0; i < b.trail.length; i++) {
@@ -1529,7 +1663,7 @@ export class Game {
         const a = (i / b.trail.length) * 0.28;
         ctx.beginPath();
         ctx.arc(t.x, t.y, b.r * (0.3 + (i / b.trail.length) * 0.6), 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(120,240,255,${a})`;
+        ctx.fillStyle = `${mode.trail}${a})`;
         ctx.fill();
       }
 
@@ -1537,23 +1671,27 @@ export class Game {
         const pr = b.r + 6 + Math.sin(this.time * 6) * 2.5;
         ctx.beginPath();
         ctx.arc(b.x, b.y, pr, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(120,240,255,0.65)";
+        ctx.strokeStyle = `${mode.trail}0.65)`;
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 6]);
         ctx.stroke();
         ctx.setLineDash([]);
       }
 
+      // сплющивание при ударе
+      const sq = b.squash * 0.28;
       ctx.save();
-      ctx.shadowColor = "#7cf5ff";
+      ctx.translate(b.x, b.y);
+      ctx.scale(1 + sq, 1 - sq);
+      ctx.shadowColor = mode.glow;
       ctx.shadowBlur = 16;
-      const g = ctx.createRadialGradient(b.x - 3, b.y - 3, 1, b.x, b.y, b.r);
+      const g = ctx.createRadialGradient(-3, -3, 1, 0, 0, b.r);
       g.addColorStop(0, "#ffffff");
-      g.addColorStop(0.55, "#c9f6ff");
-      g.addColorStop(1, "#38bcd8");
+      g.addColorStop(0.55, mode.mid);
+      g.addColorStop(1, mode.core);
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.arc(0, 0, b.r, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
