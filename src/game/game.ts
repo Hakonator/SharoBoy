@@ -344,6 +344,9 @@ export class Game {
 
   private keys = { left: false, right: false, space: false };
   private pointerX: number | null = null;
+  /** pointer lock активен: управление дельтами мыши за пределами экрана */
+  private locked = false;
+  private virtualX: number | null = null;
   private shake = 0;
 
   private hitStop = 0;
@@ -392,12 +395,12 @@ export class Game {
     window.addEventListener("keyup", this.handleKeyUp);
     window.addEventListener("blur", this.handleBlur);
     document.addEventListener("visibilitychange", this.handleVis);
-    // движение слушаем на всём окне — панель HUD не «съедает» указатель
+    // движение слушаем на всём окне — панель HUD не «съедает» указатель;
+    // mousemove нужен для дельт при захвате курсора (pointer lock)
     window.addEventListener("pointermove", this.handlePointerMove);
+    window.addEventListener("mousemove", this.handlePointerMove);
+    document.addEventListener("pointerlockchange", this.handleLockChange);
     this.canvas.addEventListener("pointerdown", this.handlePointerDown);
-    // курсор покинул окно — сбрасываем цель, ракетка не застревает у края
-    document.documentElement.addEventListener("pointerleave", this.handlePointerLeave);
-    document.documentElement.addEventListener("dragend", this.handlePointerLeave);
     this.handleResize();
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.loop);
@@ -413,9 +416,9 @@ export class Game {
     window.removeEventListener("blur", this.handleBlur);
     document.removeEventListener("visibilitychange", this.handleVis);
     window.removeEventListener("pointermove", this.handlePointerMove);
+    window.removeEventListener("mousemove", this.handlePointerMove);
+    document.removeEventListener("pointerlockchange", this.handleLockChange);
     this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
-    document.documentElement.removeEventListener("pointerleave", this.handlePointerLeave);
-    document.documentElement.removeEventListener("dragend", this.handlePointerLeave);
   }
 
   /* ---------------- input ---------------- */
@@ -480,14 +483,16 @@ export class Game {
     if (document.hidden && this.phase === "playing") this.togglePause();
   };
 
-  private handlePointerMove = (e: PointerEvent) => {
+  private handlePointerMove = (e: PointerEvent | MouseEvent) => {
+    if (this.locked) {
+      // курсор захвачен: ракетка следует за дельтами движения,
+      // где бы физически ни находилась мышь — хоть за краем экрана
+      const vx = (this.virtualX ?? this.paddle.x) + e.movementX;
+      this.virtualX = clamp(vx, 0, this.w);
+      this.pointerX = this.virtualX;
+      return;
+    }
     this.pointerX = e.clientX;
-  };
-
-  /** Курсор ушёл за пределы окна: сбрасываем устаревшую цель,
-   *  чтобы ракетка сразу слушалась клавиш и не липла к краю. */
-  private handlePointerLeave = () => {
-    this.pointerX = null;
   };
 
   /** Окно потеряло фокус: отпускаем «залипшие» клавиши и указатель. */
@@ -501,8 +506,47 @@ export class Game {
   private handlePointerDown = (e: PointerEvent) => {
     this.sfx.ensure();
     this.pointerX = e.clientX;
+    this.virtualX = e.clientX;
     this.tapFire = true;
-    if (this.phase === "playing") this.launch();
+    if (this.phase === "playing") {
+      this.launch();
+      this.requestLock();
+    }
+  };
+
+  /* -------- захват курсора (pointer lock): управление за краем экрана -------- */
+
+  private requestLock() {
+    if (this.locked) return;
+    try {
+      const el = this.canvas as HTMLCanvasElement & {
+        requestPointerLock?: () => Promise<void> | void;
+      };
+      const res = el.requestPointerLock?.();
+      if (res && typeof (res as Promise<void>).catch === "function") {
+        (res as Promise<void>).catch(() => undefined);
+      }
+    } catch {
+      // захват недоступен (sandbox/iframe) — остаёмся в обычном режиме
+    }
+  }
+
+  private releaseLock() {
+    try {
+      if (document.pointerLockElement) document.exitPointerLock?.();
+    } catch {
+      /* игнорируем */
+    }
+  }
+
+  private handleLockChange = () => {
+    this.locked = document.pointerLockElement === this.canvas;
+    if (this.locked) {
+      this.virtualX = this.pointerX ?? this.paddle.x;
+    } else if (this.virtualX !== null) {
+      // после Esc/паузы ракетка остаётся там, где её оставил виртуальный курсор
+      this.pointerX = this.virtualX;
+    }
   };
 
   /* ---------------- public controls ---------------- */
@@ -581,6 +625,7 @@ export class Game {
 
   toMenu() {
     this.sfx.ui();
+    this.releaseLock();
     this.phase = "menu";
     this.balls = [];
     this.blocks = [];
@@ -594,6 +639,7 @@ export class Game {
     if (this.phase === "playing") {
       this.phase = "paused";
       this.keys.space = false;
+      this.releaseLock();
       this.sfx.ui();
     } else if (this.phase === "paused") {
       this.phase = "playing";
@@ -1003,7 +1049,8 @@ export class Game {
       p.x += (this.keys.right ? v : 0) * dt - (this.keys.left ? v : 0) * dt;
       this.pointerX = null;
     } else if (this.pointerX !== null) {
-      const k = 1 - Math.exp(-dt * 26);
+      // при захваченном курсоре отклик практически мгновенный
+      const k = 1 - Math.exp(-dt * (this.locked ? 44 : 26));
       p.x += (this.pointerX - p.x) * k;
     }
     p.x = clamp(p.x, p.w / 2 + 4, this.w - p.w / 2 - 4);
@@ -1578,6 +1625,7 @@ export class Game {
     this.projectiles = [];
     if (this.lives <= 0) {
       this.phase = "over";
+      this.releaseLock();
       this.sfx.gameOver();
       this.saveTop();
       this.pushHud();
@@ -1610,6 +1658,7 @@ export class Game {
     }
     if (this.level >= LEVELS.length) {
       this.phase = "won";
+      this.releaseLock();
       this.sfx.win();
       for (let i = 0; i < 130; i++) {
         const c = ["#35e0ff", "#5dffb0", "#ffc94d", "#ff6a5c", "#ff5ca8"][i % 5];

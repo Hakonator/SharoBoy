@@ -138,6 +138,13 @@ function ControlsPanel() {
           <Key>M</Key>
           <span>звук</span>
         </li>
+        <li className="flex items-start gap-3 border-t border-line pt-2.5 text-dim">
+          <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-cyan-neon" />
+          <span>
+            Клик в игре <b className="text-cyan-neon">захватывает курсор</b> — ракетка слушается мыши даже за
+            краем экрана. <Key>ESC</Key> — отпустить.
+          </span>
+        </li>
       </ul>
     </div>
   );
