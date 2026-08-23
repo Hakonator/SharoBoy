@@ -1763,7 +1763,8 @@ export class Game {
       case "coin":
         this.addCoins(1);
         popup("+1 МОНЕТА");
-        this.sfx.power();
+        this.sfx.coin();
+        this.burst(this.paddle.x, this.paddle.y - 12, "#ffd66b", 10, 170);
         break;
     }
     this.burst(this.paddle.x, this.paddle.y - 10, meta.color, 12, 190);
@@ -2428,6 +2429,10 @@ export class Game {
   private drawPowers() {
     const { ctx } = this;
     for (const pw of this.powers) {
+      if (pw.type === "coin") {
+        this.drawCoin(pw.x, pw.y, pw.t);
+        continue;
+      }
       const meta = POWER_META[pw.type];
       ctx.save();
       ctx.translate(pw.x, pw.y);
@@ -2453,6 +2458,76 @@ export class Game {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(meta.label, 0, 2);
+      ctx.restore();
+    }
+  }
+
+  /** Круглая золотая монета: вращается, поблёскивает. */
+  private drawCoin(x: number, y: number, t: number) {
+    const { ctx } = this;
+    // вращение вокруг вертикальной оси: диск периодически «схлопывается»
+    const spin = 0.32 + 0.68 * Math.abs(Math.sin(t * 4.6));
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(spin, 1);
+    ctx.shadowColor = "#ffc94d";
+    ctx.shadowBlur = 14;
+    const g = ctx.createRadialGradient(-4, -5, 1, 0, 0, 13);
+    g.addColorStop(0, "#fff6cf");
+    g.addColorStop(0.45, "#ffd66b");
+    g.addColorStop(0.85, "#e8a91c");
+    g.addColorStop(1, "#a8720a");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // кант и внутреннее кольцо
+    ctx.strokeStyle = "#8a5f06";
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(0, 0, 12.4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(138,95,6,0.65)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 9, 0, Math.PI * 2);
+    ctx.stroke();
+    // звёздочка в центре
+    ctx.fillStyle = "#8a5f06";
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4 - Math.PI / 2;
+      const r = i % 2 === 0 ? 5.2 : 2.2;
+      const px = Math.cos(a) * r;
+      const py = Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    // блик
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.beginPath();
+    ctx.ellipse(-4.5, -5.5, 3.6, 2, -0.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // пробегающая искра
+    const sp = (t * 2.2) % 1;
+    if (sp < 0.3) {
+      const sa = sp / 0.3;
+      ctx.save();
+      ctx.globalAlpha = Math.sin(sa * Math.PI) * 0.9;
+      ctx.strokeStyle = "#fffbe8";
+      ctx.lineWidth = 1.6;
+      const cx = x - 12 + sa * 24;
+      const cy = y - 11;
+      ctx.beginPath();
+      ctx.moveTo(cx - 4, cy);
+      ctx.lineTo(cx + 4, cy);
+      ctx.moveTo(cx, cy - 4);
+      ctx.lineTo(cx, cy + 4);
+      ctx.stroke();
       ctx.restore();
     }
   }

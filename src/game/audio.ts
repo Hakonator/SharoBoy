@@ -109,6 +109,10 @@ export class SFX {
     this.blip(520, 0.12, "sine", 0.24, 880);
     this.blip(880, 0.1, "sine", 0.16, 440, 0.05);
   }
+  coin() {
+    this.blip(1568, 0.06, "square", 0.16, 2093);
+    this.blip(2093, 0.12, "square", 0.14, 2637, 0.05);
+  }
   burn() {
     this.blip(980, 0.09, "sawtooth", 0.13, 240);
     this.noise(0.06, 0.06);
