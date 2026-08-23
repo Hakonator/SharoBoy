@@ -1,1 +1,176 @@
 @import "tailwindcss";
+
+@theme {
+  --font-display: "Russo One", "Rubik", sans-serif;
+  --font-body: "Rubik", sans-serif;
+
+  --color-abyss: #061822;
+  --color-deep: #0a2434;
+  --color-panel: #0c2b3d;
+  --color-line: #1d4a61;
+  --color-foam: #eaf7ff;
+  --color-dim: #7fa6ba;
+
+  --color-cyan-neon: #35e0ff;
+  --color-mint: #5dffb0;
+  --color-gold: #ffc94d;
+  --color-coral: #ff6a5c;
+  --color-punch: #ff5ca8;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-foam);
+  background: radial-gradient(120% 90% at 50% 0%, #0e3a4e 0%, #082434 46%, #04121c 100%);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+canvas {
+  display: block;
+}
+
+/* ---------- HUD panels ---------- */
+.hud-chip {
+  background: linear-gradient(180deg, rgba(13, 45, 62, 0.92), rgba(7, 26, 38, 0.92));
+  border: 1px solid rgba(63, 148, 181, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(3, 14, 21, 0.8),
+    0 6px 18px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(141, 220, 255, 0.12);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+
+.hud-label {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+  font-weight: 600;
+}
+
+/* ---------- buttons ---------- */
+.btn-arcade {
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #04121c;
+  background: linear-gradient(180deg, #7cf5ff 0%, #35e0ff 45%, #12b8d8 100%);
+  border: 1px solid #9df2ff;
+  box-shadow:
+    0 0 22px rgba(53, 224, 255, 0.55),
+    0 6px 0 #0a6e85,
+    0 10px 24px rgba(0, 0, 0, 0.5);
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    filter 0.12s ease;
+}
+.btn-arcade:hover {
+  filter: brightness(1.12);
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 34px rgba(53, 224, 255, 0.8),
+    0 8px 0 #0a6e85,
+    0 14px 30px rgba(0, 0, 0, 0.55);
+}
+.btn-arcade:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 0 18px rgba(53, 224, 255, 0.5),
+    0 2px 0 #0a6e85,
+    0 6px 14px rgba(0, 0, 0, 0.5);
+}
+
+.btn-ghost {
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-cyan-neon);
+  border: 1px solid rgba(53, 224, 255, 0.45);
+  background: rgba(9, 36, 52, 0.7);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  transition: all 0.1s ease;
+}
+.btn-ghost:hover {
+  background: rgba(18, 60, 84, 0.9);
+  box-shadow: 0 0 18px rgba(53, 224, 255, 0.35);
+}
+
+.icon-btn {
+  color: #9fd6ea;
+  border: 1px solid rgba(63, 148, 181, 0.4);
+  background: linear-gradient(180deg, rgba(16, 52, 71, 0.9), rgba(8, 29, 42, 0.9));
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  transition: all 0.1s ease;
+}
+.icon-btn:hover {
+  color: #e6fbff;
+  box-shadow: 0 0 14px rgba(53, 224, 255, 0.4);
+}
+
+/* ---------- title & fx ---------- */
+.title-glow {
+  text-shadow:
+    0 0 18px rgba(53, 224, 255, 0.6),
+    0 0 60px rgba(53, 224, 255, 0.3),
+    0 4px 0 rgba(4, 18, 26, 0.9);
+}
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0) rotate(var(--tilt, 0deg)); }
+  50% { transform: translateY(-14px) rotate(var(--tilt, 0deg)); }
+}
+.anim-bob { animation: bob 3.2s ease-in-out infinite; }
+
+@keyframes popIn {
+  0% { transform: scale(0.6); opacity: 0; }
+  70% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.anim-pop { animation: popIn 0.32s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+
+@keyframes bannerIn {
+  0% { transform: scale(0.4) rotate(-4deg); opacity: 0; }
+  60% { transform: scale(1.1) rotate(1deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.anim-banner { animation: bannerIn 0.4s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+
+@keyframes comboPop {
+  0% { transform: scale(1.9); filter: brightness(2); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+.anim-combo { animation: comboPop 0.25s ease-out both; }
+
+@keyframes blinkSoft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.anim-blink { animation: blinkSoft 1.4s ease-in-out infinite; }
+
+@keyframes slideUp {
+  from { transform: translateY(26px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.anim-rise { animation: slideUp 0.4s cubic-bezier(0.2, 1, 0.3, 1) both; }
+
+.stripe-hazard {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 201, 77, 0.16) 0 10px,
+    transparent 10px 20px
+  );
+}
