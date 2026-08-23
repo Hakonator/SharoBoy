@@ -392,6 +392,8 @@ export class Game {
   private spawnTimer = 8;
   /** таймер редкого смещения всего поля */
   private shiftTimer = 14;
+  /** активная плавная анимация сдвига поля */
+  private fieldShift: { dx: number; dy: number; t: number; dur: number } | null = null;
   /** сколько блоков было в начале уровня — для нарастания скорости шара */
   private blocksInitial = 1;
 
@@ -1028,6 +1030,7 @@ export class Game {
     this.balls = [ball];
     this.spawnTimer = rand(7, 10);
     this.shiftTimer = rand(12, 18);
+    this.fieldShift = null;
     this.pushHud();
   }
 
@@ -1519,17 +1522,38 @@ export class Game {
     }
   }
 
-  /** Редко всё поле мягко сдвигается в случайную сторону (не выходя за экран). */
+  /** Редко всё поле плавно сдвигается в случайную сторону (не выходя за экран). */
   private periodicShift(dt: number) {
     if (this.blocks.length === 0) return;
+
+    // доводим начатый дрейф до конца: блоки едут по smoothstep-кривой
+    if (this.fieldShift) {
+      const fs = this.fieldShift;
+      const p0 = clamp(fs.t / fs.dur, 0, 1);
+      fs.t += dt;
+      const p1 = clamp(fs.t / fs.dur, 0, 1);
+      const ease = (p: number) => p * p * (3 - 2 * p);
+      const f = ease(p1) - ease(p0);
+      if (f > 0) {
+        for (const b of this.blocks) {
+          if (b.minionOrbit) continue;
+          b.x = clamp(b.x + fs.dx * f, b.rx + 8, this.w - b.rx - 8);
+          b.x0 = clamp(b.x0 + fs.dx * f, b.rx + 8, this.w - b.rx - 8);
+          b.y = clamp(b.y + fs.dy * f, b.ry + 64, this.h * 0.78);
+        }
+      }
+      if (fs.t >= fs.dur) this.fieldShift = null;
+      return;
+    }
+
     this.shiftTimer -= dt;
     if (this.shiftTimer > 0) return;
     this.shiftTimer = rand(12, 18);
     const ang = rand(0, Math.PI * 2);
-    const mag = rand(18, 34);
+    const mag = rand(22, 40);
     let dx = Math.cos(ang) * mag;
     let dy = Math.sin(ang) * mag * 0.6;
-    // не даём полю вылезти за экран
+    // заранее не даём полю вылезти за экран
     for (const b of this.blocks) {
       if (b.minionOrbit) continue;
       const nx = b.x + dx;
@@ -1537,12 +1561,7 @@ export class Game {
       dx = clamp(dx, b.rx + 8 - nx, this.w - b.rx - 8 - nx);
       dy = clamp(dy, b.ry + 64 - ny, this.h * 0.78 - ny);
     }
-    for (const b of this.blocks) {
-      if (b.minionOrbit) continue;
-      b.x += dx;
-      b.x0 += dx;
-      b.y += dy;
-    }
+    this.fieldShift = { dx, dy, t: 0, dur: rand(0.6, 0.9) };
     this.popups.push({
       x: this.w / 2,
       y: this.h * 0.3,
@@ -1551,7 +1570,7 @@ export class Game {
       t: 0,
       size: 18,
     });
-    this.shake = Math.min(this.shake + 3, 7);
+    this.shake = Math.min(this.shake + 2, 6);
     this.sfx.ui();
   }
 
