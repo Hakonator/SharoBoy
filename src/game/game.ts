@@ -37,6 +37,8 @@ export interface Block {
   y: number;
   rx: number;
   ry: number;
+  /** поворот эллипса (радианы); 0 — оси выровнены с экраном */
+  rot: number;
   circle: boolean;
   hp: number;
   maxHp: number;
@@ -70,6 +72,8 @@ export interface Ball {
   trail: { x: number; y: number }[];
   /** сплющивание при ударе (0..1) */
   squash: number;
+  /** время с последнего касания блока/ракетки — для ловли «ленивых» траекторий */
+  sinceHit: number;
 }
 
 export interface Particle {
@@ -211,6 +215,26 @@ function daySeed() {
   return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
 }
 
+/** Случайный наклон эллипса; уменьшается, пока повёрнутая фигура влезает в отведённое место. */
+function fitTilt(rx: number, ry: number, maxHalfW: number, maxHalfH: number): number {
+  let rot = rand(-0.7, 0.7);
+  for (let i = 0; i < 3; i++) {
+    const hw = Math.hypot(rx * Math.cos(rot), ry * Math.sin(rot));
+    const hh = Math.hypot(rx * Math.sin(rot), ry * Math.cos(rot));
+    if (hw <= maxHalfW && hh <= maxHalfH) return rot;
+    rot *= 0.5;
+  }
+  return 0;
+}
+
+/** Габариты повёрнутого эллипса по осям экрана. */
+function rotatedExtents(rx: number, ry: number, rot: number) {
+  return {
+    hw: Math.hypot(rx * Math.cos(rot), ry * Math.sin(rot)),
+    hh: Math.hypot(rx * Math.sin(rot), ry * Math.cos(rot)),
+  };
+}
+
 interface BaseSpec {
   name: string;
   speed: number;
@@ -227,6 +251,8 @@ interface LayoutItem {
   y: number;
   rx: number;
   ry?: number;
+  /** наклон эллипса в радианах */
+  rot?: number;
   hp: 1 | 2 | 3;
   bomb?: boolean;
   splits?: boolean;
@@ -248,11 +274,11 @@ const L1_LAYOUT: LayoutItem[] = [
     rx: 0.46,
     hp: 1 as const,
   })),
-  // широкие «крылья» — горизонтальные овалы
-  { x: -4.2, y: 1.9, rx: 1.35, ry: 0.55, hp: 2 },
-  { x: 4.2, y: 1.9, rx: 1.35, ry: 0.55, hp: 2 },
-  { x: -4.9, y: 3.1, rx: 1.15, ry: 0.5, hp: 2 },
-  { x: 4.9, y: 3.1, rx: 1.15, ry: 0.5, hp: 2 },
+  // широкие «крылья» — наклонённые овалы (стреловидные)
+  { x: -4.2, y: 1.9, rx: 1.35, ry: 0.55, rot: -0.38, hp: 2 },
+  { x: 4.2, y: 1.9, rx: 1.35, ry: 0.55, rot: 0.38, hp: 2 },
+  { x: -4.9, y: 3.1, rx: 1.15, ry: 0.5, rot: -0.32, hp: 2 },
+  { x: 4.9, y: 3.1, rx: 1.15, ry: 0.5, rot: 0.32, hp: 2 },
   // корпус стрелы: треугольник из шаров
   { x: 0, y: 1.5, rx: 0.5, hp: 2 },
   { x: -1, y: 1.5, rx: 0.5, hp: 2 },
@@ -271,8 +297,8 @@ const L1_LAYOUT: LayoutItem[] = [
   // крупный вертикальный «нос»-остриё
   { x: 0, y: 6.3, rx: 0.58, ry: 1.2, hp: 3 },
   // малые вертикальные «стабилизаторы»
-  { x: -3.5, y: 4.6, rx: 0.42, ry: 0.8, hp: 1 },
-  { x: 3.5, y: 4.6, rx: 0.42, ry: 0.8, hp: 1 },
+  { x: -3.5, y: 4.6, rx: 0.42, ry: 0.8, rot: -0.28, hp: 1 },
+  { x: 3.5, y: 4.6, rx: 0.42, ry: 0.8, rot: 0.28, hp: 1 },
   // мелкие шары-заполнители между крыльями и корпусом
   { x: -2.2, y: 1.5, rx: 0.32, hp: 1 },
   { x: 2.2, y: 1.5, rx: 0.32, hp: 1 },
@@ -835,6 +861,7 @@ export class Game {
           y: top + it.y * cellY,
           rx,
           ry,
+          rot: it.rot ?? 0,
           circle: Math.abs(rx - ry) < 0.6,
           hp: it.hp,
           maxHp: it.hp,
@@ -886,11 +913,17 @@ export class Game {
           rx = clamp(slot * 0.27 * rand(0.9, 1), 10, 26);
           ry = clamp(gap * 0.47 * rand(0.9, 1), 15, 46);
         }
+        // овалы наклонены под случайным углом (укладываются в ячейку)
+        const rot =
+          kind !== "circle" && !isBomb && Math.random() < 0.65
+            ? fitTilt(rx, ry, slot / 2 - 4, gap / 2 - 4)
+            : 0;
         blocks.push({
           x: cx,
           y: cy,
           rx,
           ry,
+          rot,
           circle: kind === "circle",
           hp,
           maxHp: hp,
@@ -950,6 +983,7 @@ export class Game {
         y: baseY,
         rx: 15,
         ry: 15,
+        rot: 0,
         circle: true,
         hp: 2,
         maxHp: 2,
@@ -982,6 +1016,7 @@ export class Game {
         y: by,
         rx: 20,
         ry: 20,
+        rot: 0,
         circle: true,
         hp: 1,
         maxHp: 1,
@@ -1022,11 +1057,11 @@ export class Game {
       vy: 0,
       r: clamp(Math.min(this.w, this.h) * 0.014, 8, 12),
       speed: base,
-      stuck: true,
-      stuckOffset: 0,
-      trail: [],
-      squash: 0,
-    };
+        stuck: true,
+        stuckOffset: 0,
+        trail: [],
+        squash: 0,
+        sinceHit: 0,    };
     this.balls = [ball];
     this.spawnTimer = rand(14, 20);
     this.shiftTimer = rand(12, 18);
@@ -1193,6 +1228,8 @@ export class Game {
       return;
     }
 
+    ball.sinceHit += dt;
+
     // субстепы против туннелирования
     const speed = Math.hypot(ball.vx, ball.vy) || 1;
     const steps = Math.max(1, Math.ceil((speed * dt) / (ball.r * 0.8)));
@@ -1201,16 +1238,18 @@ export class Game {
       ball.x += ball.vx * sdt;
       ball.y += ball.vy * sdt;
 
-      // стены
+      // стены; лёгкий случайный подброс по вертикали, чтобы траектория не «застревала»
       if (ball.x - ball.r < 0) {
         ball.x = ball.r;
         ball.vx = Math.abs(ball.vx);
+        ball.vy += rand(-1, 1) * speed * 0.06;
         ball.squash = 1;
         this.sfx.wall();
       }
       if (ball.x + ball.r > this.w) {
         ball.x = this.w - ball.r;
         ball.vx = -Math.abs(ball.vx);
+        ball.vy += rand(-1, 1) * speed * 0.06;
         ball.squash = 1;
         this.sfx.wall();
       }
@@ -1248,6 +1287,27 @@ export class Game {
     if (ball.trail.length > 12) ball.trail.shift();
 
     ball.squash = Math.max(0, ball.squash - dt * 6);
+
+    // страховка от горизонтального зацикливания
+    const sp0 = Math.hypot(ball.vx, ball.vy) || 1;
+    if (Math.abs(ball.vy) < sp0 * 0.16) {
+      const sign = ball.vy === 0 ? -1 : Math.sign(ball.vy);
+      ball.vy = sign * sp0 * 0.22;
+      const nx = Math.sqrt(Math.max(sp0 * sp0 - ball.vy * ball.vy, 0));
+      ball.vx = Math.sign(ball.vx || 1) * nx;
+    }
+
+    // «ленивый» шар: долго ни с чем не сталкивался — мягко доворачиваем к вертикали
+    if (ball.sinceHit > 4) {
+      const sp = Math.hypot(ball.vx, ball.vy) || 1;
+      const excess = Math.min(ball.sinceHit - 4, 4);
+      const k = 1 - Math.exp(-dt * (0.6 + excess * 0.5));
+      const targetVy = (Math.sign(ball.vy) || -1) * sp * 0.5;
+      ball.vy += (targetVy - ball.vy) * k;
+      const c = sp / (Math.hypot(ball.vx, ball.vy) || 1);
+      ball.vx *= c;
+      ball.vy *= c;
+    }
 
     // искры огненного ядра
     if (this.time < this.fireUntil && Math.random() < 0.75) {
@@ -1294,6 +1354,7 @@ export class Game {
       ball.vy = Math.sin(ang) * sp;
       ball.y = top - ball.r - 0.5;
       ball.squash = 1;
+      ball.sinceHit = 0;
       p.squash = 1;
       this.combo = 0;
       this.sfx.paddle(Math.abs(rel));
@@ -1310,24 +1371,35 @@ export class Game {
       const ey = b.ry + ball.r;
       const dx = ball.x - b.x;
       const dy = ball.y - b.y;
-      const q = (dx * dx) / (ex * ex) + (dy * dy) / (ey * ey);
+
+      // переводим в локальную систему повёрнутого эллипса
+      const cs = Math.cos(b.rot);
+      const sn = Math.sin(b.rot);
+      const lx = dx * cs + dy * sn;
+      const ly = -dx * sn + dy * cs;
+      const q = (lx * lx) / (ex * ex) + (ly * ly) / (ey * ey);
       if (q > 1) continue;
 
-      // нормаль через градиент эллипса
-      let nx = dx / (ex * ex);
-      let ny = dy / (ey * ey);
+      // нормаль через градиент эллипса (в локальных осях), затем обратно в мир
+      let nx = lx / (ex * ex);
+      let ny = ly / (ey * ey);
       const nl = Math.hypot(nx, ny) || 1;
       nx /= nl;
       ny /= nl;
-      // выталкиваем к границе
+      const wnx = nx * cs - ny * sn;
+      const wny = nx * sn + ny * cs;
+      // выталкиваем к границе эллипса
       const sc = 1 / Math.sqrt(Math.max(q, 1e-6));
-      ball.x = b.x + dx * sc + nx * 0.8;
-      ball.y = b.y + dy * sc + ny * 0.8;
+      const plx = lx * sc;
+      const ply = ly * sc;
+      ball.x = b.x + plx * cs - ply * sn + wnx * 0.8;
+      ball.y = b.y + plx * sn + ply * cs + wny * 0.8;
+      ball.sinceHit = 0;
       if (!fire) {
-        const dot = ball.vx * nx + ball.vy * ny;
+        const dot = ball.vx * wnx + ball.vy * wny;
         if (dot < 0) {
-          ball.vx -= 2 * dot * nx;
-          ball.vy -= 2 * dot * ny;
+          ball.vx -= 2 * dot * wnx;
+          ball.vy -= 2 * dot * wny;
         }
         this.damageBlock(b);
         return;
@@ -1449,6 +1521,7 @@ export class Game {
         y: cy,
         rx: r,
         ry: r,
+        rot: 0,
         circle: true,
         hp: 1,
         maxHp: 1,
@@ -1482,13 +1555,14 @@ export class Game {
       const kind = kinds[Math.floor(rand(0, 3))];
       const rx = kind === "circle" ? rand(14, 26) : kind === "eh" ? rand(26, 44) : rand(12, 20);
       const ry = kind === "circle" ? rx : kind === "eh" ? rand(12, 20) : rand(24, 38);
-      const x = rand(rx + 12, this.w - rx - 12);
-      const y = rand(ry + 70, this.h * 0.5);
+      const rot = kind === "circle" ? 0 : fitTilt(rx, ry, 56, 52);
+      const ext = rotatedExtents(rx, ry, rot);
+      const x = rand(ext.hw + 12, this.w - ext.hw - 12);
+      const y = rand(ext.hh + 70, this.h * 0.5);
       let overlaps = false;
       for (const b of this.blocks) {
-        const dx = (x - b.x) / (b.rx + rx + 8);
-        const dy = (y - b.y) / (b.ry + ry + 8);
-        if (dx * dx + dy * dy < 1) {
+        const be = rotatedExtents(b.rx, b.ry, b.rot);
+        if (Math.abs(x - b.x) < be.hw + ext.hw + 8 && Math.abs(y - b.y) < be.hh + ext.hh + 8) {
           overlaps = true;
           break;
         }
@@ -1501,6 +1575,7 @@ export class Game {
         y,
         rx,
         ry,
+        rot,
         circle: kind === "circle",
         hp,
         maxHp: hp,
@@ -1754,6 +1829,7 @@ export class Game {
               stuckOffset: 0,
               trail: [],
               squash: 0,
+              sinceHit: 0,
             });
           }
         }
@@ -1820,16 +1896,21 @@ export class Game {
   private beamHit(px: number) {
     const pylonY = this.paddle.y - this.paddle.h / 2 - 8;
     let best: Block | null = null;
+    let bestHH = 0;
     for (const b of this.blocks) {
       if (b.dead) continue;
-      if (Math.abs(b.x - px) > b.rx + 3) continue;
-      if (b.y + b.ry >= pylonY) continue;
-      if (!best || b.y > best.y) best = b;
+      const e = rotatedExtents(b.rx, b.ry, b.rot);
+      if (Math.abs(b.x - px) > e.hw + 3) continue;
+      if (b.y + e.hh >= pylonY) continue;
+      if (!best || b.y > best.y) {
+        best = b;
+        bestHH = e.hh;
+      }
     }
     if (best) {
       this.damageBlock(best, 3);
-      this.burst(px, best.y + best.ry, "#7cf5ff", 8, 180);
-      this.rings.push({ x: px, y: best.y + best.ry, r: 4, maxR: 44, color: "rgba(124,245,255,0.85)", t: 0 });
+      this.burst(px, best.y + bestHH, "#7cf5ff", 8, 180);
+      this.rings.push({ x: px, y: best.y + bestHH, r: 4, maxR: 44, color: "rgba(124,245,255,0.85)", t: 0 });
       return;
     }
     if (this.boss && Math.abs(this.boss.x - px) < this.boss.r && this.boss.y + this.boss.r < pylonY) {
@@ -2184,6 +2265,7 @@ export class Game {
 
       ctx.save();
       ctx.translate(x, y);
+      ctx.rotate(b.rot);
       ctx.scale(b.rx, b.ry);
       const g = ctx.createRadialGradient(-0.35, -0.4, 0.05, 0, 0, 1.15);
       g.addColorStop(0, tier.light);
@@ -2546,10 +2628,15 @@ export class Game {
       let hitY = -30;
       let best: Block | null = null;
       for (const b of this.blocks) {
-        if (b.dead || Math.abs(b.x - px) > b.rx + 3 || b.y + b.ry >= pylonY) continue;
-        if (!best || b.y > best.y) best = b;
+        if (b.dead) continue;
+        const e = rotatedExtents(b.rx, b.ry, b.rot);
+        if (Math.abs(b.x - px) > e.hw + 3 || b.y + e.hh >= pylonY) continue;
+        if (!best || b.y > best.y) {
+          best = b;
+          hitY = b.y + e.hh - 2;
+        }
       }
-      if (best) hitY = best.y + best.ry - 2;
+      if (best) hitY = Math.max(hitY, -30);
       else if (this.boss && Math.abs(this.boss.x - px) < this.boss.r && this.boss.y + this.boss.r < pylonY)
         hitY = this.boss.y + this.boss.r - 2;
 
@@ -2741,8 +2828,11 @@ export class Game {
         ctx.strokeStyle = `${mode.trail}0.65)`;
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 6]);
+        // бегущий пунктир: весь ободок вращается, «замерзшая» правая часть исчезает
+        ctx.lineDashOffset = -this.time * 26;
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.lineDashOffset = 0;
       }
 
       const sq = b.squash * 0.28;
