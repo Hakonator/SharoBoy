@@ -389,7 +389,7 @@ export class Game {
   private laserArmedUntil = 0;
 
   /** таймер периодического появления новых блоков */
-  private spawnTimer = 8;
+  private spawnTimer = 16;
   /** таймер редкого смещения всего поля */
   private shiftTimer = 14;
   /** активная плавная анимация сдвига поля */
@@ -1028,7 +1028,7 @@ export class Game {
       squash: 0,
     };
     this.balls = [ball];
-    this.spawnTimer = rand(7, 10);
+    this.spawnTimer = rand(14, 20);
     this.shiftTimer = rand(12, 18);
     this.fieldShift = null;
     this.pushHud();
@@ -1434,14 +1434,14 @@ export class Game {
 
   /* ---------------- периодические события поля ---------------- */
 
-  /** «Матрёшка»: вокруг разбитого блока рассыпаются мелкие шары. */
+  /** «Матрёшка»: вокруг разбитого блока рассыпаются шары покрупнее (3–10 шт). */
   private spawnScatter(b: Block) {
     if (this.blocks.length > 150) return;
-    const n = 4 + Math.floor(rand(0, 2));
+    const n = 3 + Math.floor(rand(0, 8)); // 3..10
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rand(-0.4, 0.4);
-      const d = Math.max(b.rx, b.ry) * rand(1.5, 2.1);
-      const r = rand(10, 13);
+      const d = Math.max(b.rx, b.ry) * rand(1.7, 2.4);
+      const r = rand(17, 23);
       const cx = clamp(b.x + Math.cos(a) * d, r + 6, this.w - r - 6);
       const cy = clamp(b.y + Math.sin(a) * d, r + 6, this.h * 0.72);
       this.blocks.push({
@@ -1474,8 +1474,8 @@ export class Game {
     if (this.boss) return;
     this.spawnTimer -= dt;
     if (this.spawnTimer > 0) return;
-    this.spawnTimer = rand(7, 10);
-    const cap = Math.min(this.blocksInitial + 26, 150);
+    this.spawnTimer = rand(14, 20);
+    const cap = Math.min(this.blocksInitial + 12, 150);
     if (this.blocks.length >= cap) return;
     const kinds = ["circle", "eh", "ev"] as const;
     for (let attempt = 0; attempt < 7; attempt++) {
@@ -1513,7 +1513,7 @@ export class Game {
         swayFreq: rand(0.5, 1) * (Math.random() < 0.5 ? 1 : -1),
         swayPh: rand(0, Math.PI * 2),
         bomb: false,
-        splits: Math.random() < 0.12,
+        splits: Math.random() < 0.05,
       });
       this.rings.push({ x, y, r: 6, maxR: 66, color: "rgba(124,245,255,0.7)", t: 0 });
       this.popups.push({ x, y: y - ry - 8, text: "ПОПОЛНЕНИЕ!", color: "#7cf5ff", t: 0, size: 14 });
