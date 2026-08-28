@@ -25,6 +25,7 @@ export interface HudData {
   laserArmed: boolean;
   rocketOn: boolean;
   fireOn: boolean;
+  magnetOn: boolean;
   top: number[];
   topEndless: number[];
   mode: "campaign" | "endless";
@@ -119,6 +120,7 @@ export type PowerType =
   | "multi"
   | "life"
   | "coin"
+  | "magnet"
   | "slow"
   | "shield"
   | "laser"
@@ -169,6 +171,7 @@ const POWER_META: Record<PowerType, { label: string; good: boolean; color: strin
   fire: { label: "ОГНЬ", good: true, color: "#4dff9e", edge: "#d2ffee" },
   fast: { label: "СК↑", good: false, color: "#ff5347", edge: "#ffd0cb" },
   shrink: { label: "УЗК", good: false, color: "#ff5347", edge: "#ffd0cb" },
+  magnet: { label: "МАГ", good: true, color: "#4dff9e", edge: "#d2ffee" },
 };
 
 /* ---------- Скелет системы прокачки (пока ВЫКЛЮЧЕН) ----------
@@ -416,6 +419,9 @@ export class Game {
 
   /** таймер периодического появления новых блоков */
   private spawnTimer = 16;
+  /** таймер периодического «небесного» сброса бонусов */
+  private skyDropTimer = 10;
+  private magnetUntil = 0;
   /** таймер редкого смещения всего поля */
   private shiftTimer = 14;
   /** активная плавная анимация сдвига поля */
@@ -719,6 +725,7 @@ export class Game {
     this.boss = null;
     this.boomQueue = [];
     this.fireUntil = 0;
+    this.magnetUntil = 0;
     this.score = 0;
     this.lives = 3;
     this.combo = 0;
@@ -737,6 +744,7 @@ export class Game {
     this.laserArmed = false;
     this.rocketUntil = 0;
     this.fireUntil = 0;
+    this.magnetUntil = 0;
     this.shield = 0;
     this.weaponCd = 0;
     this.effectsKey = "";
@@ -775,6 +783,7 @@ export class Game {
     this.laserArmed = false;
     this.rocketUntil = 0;
     this.fireUntil = 0;
+    this.magnetUntil = 0;
     this.shield = 0;
     this.weaponCd = 0;
     this.effectsKey = "";
@@ -902,8 +911,8 @@ export class Game {
         const cy = top + gap * (r + 0.5) + rand(-1, 1) * gap * 0.02;
         let rx: number;
         let ry: number;
-        if (kind === "circle") {
-          // диаметры почти касаются соседей — плотная кладка
+        if (kind === "circle" || isBomb) {
+          // бомбы — только круглые; диаметры почти касаются соседей (плотная кладка)
           const rr = clamp(Math.min(slot * 0.5, gap * 0.44) * rand(0.9, 1), 12, 42);
           rx = ry = rr;
         } else if (kind === "eh") {
@@ -924,7 +933,7 @@ export class Game {
           rx,
           ry,
           rot,
-          circle: kind === "circle",
+          circle: kind === "circle" || isBomb,
           hp,
           maxHp: hp,
           tier: hp,
@@ -1068,6 +1077,7 @@ export class Game {
         sinceHit: 0,    };
     this.balls = [ball];
     this.spawnTimer = rand(14, 20);
+    this.skyDropTimer = rand(9, 14);
     this.shiftTimer = rand(12, 18);
     this.fieldShift = null;
     this.pushHud();
@@ -1078,7 +1088,9 @@ export class Game {
     for (const b of this.balls) {
       if (b.stuck) {
         b.stuck = false;
-        const ang = -Math.PI / 2 + rand(-0.35, 0.35);
+        // угол зависит от позиции на ракетке — магнитом можно целиться
+        const rel = clamp(b.stuckOffset / (this.paddle.w / 2), -1, 1);
+        const ang = -Math.PI / 2 + rel * 0.95 + rand(-0.05, 0.05);
         b.vx = Math.cos(ang) * b.speed;
         b.vy = Math.sin(ang) * b.speed;
         launched = true;
@@ -1128,6 +1140,7 @@ export class Game {
       this.updateLaser();
       this.tryFire(dt);
       this.periodicSpawn(dt);
+      this.periodicPowerDrop(dt);
       this.periodicShift(dt);
       this.updateProjectiles(dt);
       for (const ball of this.balls) this.updateBall(ball, dt);
@@ -1352,6 +1365,18 @@ export class Game {
       ball.x <= p.x + p.w / 2 + ball.r
     ) {
       const rel = clamp((ball.x - p.x) / (p.w / 2), -1, 1);
+      // магнит: шар прилипает к ракетке вместо отскока
+      if (this.time < this.magnetUntil && !ball.stuck) {
+        ball.stuck = true;
+        ball.stuckOffset = clamp(ball.x - p.x, -p.w / 2 + ball.r, p.w / 2 - ball.r);
+        ball.vx = 0;
+        ball.vy = 0;
+        ball.squash = 1;
+        ball.sinceHit = 0;
+        this.sfx.paddle(Math.abs(rel));
+        this.burst(ball.x, top, "#4dff9e", 8, 140);
+        return;
+      }
       const ang = rel * 1.05 - Math.PI / 2; // до ±60°
       const sp = ball.speed * (this.time < this.slowUntil ? 0.72 : this.time < this.fastUntil ? 1.32 : 1);
       ball.vx = Math.cos(ang) * sp + p.vx * 0.18;
@@ -1703,26 +1728,61 @@ export class Game {
     }
 
     // бонусы (зелёные) и анти-бонусы (красные) — падают часто
-    if (Math.random() < 0.24) {
-      const roll = Math.random();
-      const type: PowerType =
-        roll < 0.08 ? "life"
-        : roll < 0.17 ? "wide"
-        : roll < 0.26 ? "multi"
-        : roll < 0.35 ? "slow"
-        : roll < 0.44 ? "shield"
-        : roll < 0.53 ? "laser"
-        : roll < 0.61 ? "rocket"
-        : roll < 0.71 ? "fire"
-        : roll < 0.87 ? "fast"
-        : "shrink";
-      const skip =
-        (type === "multi" && this.balls.length >= 4) ||
-        (type === "life" && this.lives >= 5) ||
-        (type === "shield" && this.shield >= 5);
-      if (!skip) this.powers.push({ x: b.x, y: b.y, vy: 150, type, t: 0 });
-    }
+    if (Math.random() < 0.24) this.dropPower(b.x, b.y);
     this.pushHud();
+  }
+
+  /** Общая таблица дропа; при дефиците целей вес лазеров/ракет растёт. */
+  private pickPowerType(): PowerType {
+    const scarcity = clamp(1 - this.blocks.length / this.blocksInitial, 0, 1);
+    const boost = scarcity > 0.6 ? 1 + (scarcity - 0.6) * 5 : 1; // до ×3 на зачищенном поле
+    const table: [PowerType, number][] = [
+      ["life", 6],
+      ["wide", 9],
+      ["multi", 9],
+      ["slow", 8],
+      ["shield", 8],
+      ["magnet", 9],
+      ["laser", 10 * boost],
+      ["rocket", 9 * boost],
+      ["fire", 8],
+      ["fast", 12],
+      ["shrink", 8],
+    ];
+    const total = table.reduce((s, [, w]) => s + w, 0);
+    let roll = Math.random() * total;
+    for (const [type, w] of table) {
+      roll -= w;
+      if (roll <= 0) return type;
+    }
+    return "wide";
+  }
+
+  private dropPower(x: number, y: number) {
+    const type = this.pickPowerType();
+    const skip =
+      (type === "multi" && this.balls.length >= 4) ||
+      (type === "life" && this.lives >= 5) ||
+      (type === "shield" && this.shield >= 5);
+    if (!skip) this.powers.push({ x, y, vy: 150, type, t: 0 });
+  }
+
+  /** Периодически бонусы сыплются прямо с верхней границы поля. */
+  private periodicPowerDrop(dt: number) {
+    if (this.boss && this.blocks.length > 0) {
+      // у босса свой темп: небо не спамит
+      this.skyDropTimer -= dt * 0.4;
+    } else {
+      this.skyDropTimer -= dt;
+    }
+    if (this.skyDropTimer > 0) return;
+    this.skyDropTimer = rand(9, 14);
+    if (this.powers.length >= 6) return;
+    const x = rand(36, this.w - 36);
+    this.dropPower(x, -22);
+    this.rings.push({ x, y: 18, r: 4, maxR: 52, color: "rgba(124,245,255,0.6)", t: 0 });
+    this.popups.push({ x, y: 40, text: "С НЕБА!", color: "#7cf5ff", t: 0, size: 13 });
+    this.sfx.ui();
   }
 
   private explode(x: number, y: number) {
@@ -1814,6 +1874,10 @@ export class Game {
       case "fire":
         this.fireUntil = this.time + 8;
         popup("ОГНЕННОЕ ЯДРО!");
+        break;
+      case "magnet":
+        this.magnetUntil = this.time + 7;
+        popup("МАГНИТ!");
         break;
       case "multi": {
         const src = [...this.balls].filter((b) => !b.stuck);
@@ -1985,6 +2049,7 @@ export class Game {
     this.laserArmed = false;
     this.rocketUntil = 0;
     this.fireUntil = 0;
+    this.magnetUntil = 0;
     this.weaponCd = 0;
     this.powers = [];
     this.projectiles = [];
@@ -2010,6 +2075,7 @@ export class Game {
     this.laserArmed = false;
     this.rocketUntil = 0;
     this.fireUntil = 0;
+    this.magnetUntil = 0;
     this.weaponCd = 0;
     this.shield = 0;
     this.laserWasOn = false;
@@ -2087,6 +2153,7 @@ export class Game {
       this.laserArmed ? 1 : 0,
       t < this.rocketUntil ? 1 : 0,
       t < this.fireUntil ? 1 : 0,
+      t < this.magnetUntil ? 1 : 0,
     ].join("");
     if (key !== this.effectsKey) {
       this.effectsKey = key;
@@ -2120,6 +2187,7 @@ export class Game {
       laserArmed: this.laserArmed,
       rocketOn: this.time < this.rocketUntil,
       fireOn: this.time < this.fireUntil,
+      magnetOn: this.time < this.magnetUntil,
       top: this.top,
       topEndless: this.topEndless,
       coins: this.coins,
@@ -2791,6 +2859,19 @@ export class Game {
       ctx.beginPath();
       ctx.arc(0, -hh / 2 - 13, 3, Math.PI, 0);
       ctx.fill();
+    }
+    // магнитное поле: бегущая дуга над ракеткой
+    if (this.time < this.magnetUntil) {
+      const pulse = 0.5 + Math.sin(this.time * 8) * 0.25;
+      ctx.strokeStyle = `rgba(77,255,158,${pulse})`;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([6, 7]);
+      ctx.lineDashOffset = -this.time * 30;
+      ctx.beginPath();
+      ctx.arc(0, -hh / 2 - 4, ww * 0.44, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
     }
     ctx.restore();
   }

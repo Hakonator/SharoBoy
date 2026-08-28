@@ -24,6 +24,7 @@ const INITIAL_HUD: HudData = {
   laserArmed: false,
   rocketOn: false,
   fireOn: false,
+  magnetOn: false,
   top: [],
   topEndless: [],
   mode: "campaign",
@@ -318,6 +319,7 @@ export default function App() {
         <div className="pointer-events-none absolute bottom-3 left-3 z-20 flex max-w-[46vw] flex-wrap gap-1.5 sm:bottom-4 sm:left-4">
           {hud.wideOn && <EffectChip keyVal="wide" label="ШИРЕ" good />}
           {hud.fireOn && <EffectChip keyVal="fire" label="ОГНЬ" good />}
+          {hud.magnetOn && <EffectChip keyVal="magnet" label="МАГНИТ" good />}
           {hud.slowOn && <EffectChip keyVal="slow" label="МЕДЛЕННЕЕ" good />}
           {hud.fastOn && <EffectChip keyVal="fast" label="БЫСТРЕЕ" good={false} />}
           {hud.shrinkOn && <EffectChip keyVal="shrink" label="УЗКАЯ" good={false} />}
