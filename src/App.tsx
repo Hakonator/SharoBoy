@@ -346,10 +346,6 @@ export default function App() {
           <FloatingBalls />
           <div className="relative flex min-h-full flex-col items-start justify-center gap-8 p-6 md:flex-row md:items-center md:gap-16 md:p-16 lg:p-24">
             <div className="anim-rise max-w-xl">
-              <div className="mb-3 inline-flex items-center gap-2 border border-line bg-deep/80 px-3 py-1.5">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-mint" />
-                <span className="font-display text-[11px] tracking-[0.3em] text-dim">МОРСКАЯ АРКАДА</span>
-              </div>
               <h1 className="font-display leading-[0.95]">
                 <span className="title-glow block text-6xl text-foam sm:text-7xl lg:text-8xl">ШАРО</span>
                 <span className="title-glow block text-6xl text-cyan-neon sm:text-7xl lg:text-8xl">
@@ -358,7 +354,7 @@ export default function App() {
               </h1>
               <p className="mt-5 max-w-md text-base leading-relaxed text-foam/80 sm:text-lg">
                 Вместо кирпичей — <b className="text-mint">шары</b> и <b className="text-gold">овалы</b> разной
-                величины. Отбивай ядром, собирай серии, лови бонусы, одолей{" "}
+                величины. Отбивай ракеткой, собирай серии, лови бонусы, одолей{" "}
                 <b className="text-cyan-neon">4 уровня с боссом</b> — или выживай в{" "}
                 <b className="text-punch">бесконечных волнах</b>.
               </p>
