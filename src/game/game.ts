@@ -340,7 +340,7 @@ const LEVELS: LevelSpec[] = [
   {
     name: "ЦАРЬ-ШАР",
     speed: 430,
-    boss: { hp: 45, minions: 4, bombs: 4 },
+    boss: { hp: 30, minions: 4, bombs: 4 },
   },
 ];
 
@@ -556,8 +556,13 @@ export class Game {
     const dt = this.hitStop > 0 ? dtRaw * 0.18 : dtRaw;
     this.time += dt;
     this.flash = Math.max(0, this.flash - dtRaw * 2.6);
-    this.update(dt);
-    this.draw();
+    try {
+      this.update(dt);
+      this.draw();
+    } catch (err) {
+      // страховка: единичная ошибка не должна намертво останавливать игру
+      console.error("[ШАРОБОЙ] ошибка в игровом цикле:", err);
+    }
     this.raf = requestAnimationFrame(this.loop);
   };
 
@@ -1137,8 +1142,12 @@ export class Game {
 
     const frozen = this.transition > 0 || this.bannerTimer > 1.1 || this.countdown > 0;
     if (!frozen) {
-      this.updateLaser();
-      this.tryFire(dt);
+      // ввод на выстрел читается ровно один раз за кадр —
+      // лазер и ракеты больше не могут «украсть» нажатие друг у друга
+      const wantFire = this.keys.space || this.tapFire;
+      this.tapFire = false;
+      this.tryFire(dt, wantFire);
+      this.updateLaser(wantFire);
       this.periodicSpawn(dt);
       this.periodicPowerDrop(dt);
       this.periodicShift(dt);
@@ -1457,7 +1466,12 @@ export class Game {
       ball.vy -= 2 * dot * ny;
     }
     ball.squash = 1;
-    this.damageBoss(this.time < this.fireUntil ? 2 : 1, false);
+    // шар отскакивает от босса, поэтому каждый прилёт — полноценный удар;
+    // маленькая заслонка страхует лишь от двойного засчёта на субстепах
+    if (ball.sinceHit > 0.03) {
+      ball.sinceHit = 0;
+      this.damageBoss(this.time < this.fireUntil ? 3 : 2, false);
+    }
   }
 
   /* ---------------- босс ---------------- */
@@ -1516,10 +1530,11 @@ export class Game {
     this.burst(bo.x, bo.y, "#ffc94d", 26, 320);
     this.rings.push({ x: bo.x, y: bo.y, r: 10, maxR: 320, color: "rgba(255,92,168,0.9)", t: 0 });
     this.popups.push({ x: bo.x, y: bo.y, text: "+1500", color: "#ffc94d", t: 0, size: 30 });
-    // миньоны разлетаются цепочкой взрывов
+    // миньоны и оставшиеся бомбы разлетаются цепочкой взрывов —
+    // поле после победы босса зачищается полностью
     let i = 0;
     for (const b of [...this.blocks]) {
-      if (b.minionOrbit) {
+      if (b.minionOrbit || b.bomb) {
         this.boomQueue.push({ x: b.x, y: b.y, at: this.time + 0.12 + i * 0.1 });
         b.hp = 0;
         b.dead = true;
@@ -1920,14 +1935,12 @@ export class Game {
 
   /* ---------------- оружие: лазеры и ракеты ---------------- */
 
-  private tryFire(dt: number) {
+  private tryFire(dt: number, fire: boolean) {
     const rocketOn = this.time < this.rocketUntil;
-    if (!rocketOn || (!this.keys.space && !this.tapFire)) {
+    if (!rocketOn || !fire) {
       this.weaponCd = 0;
-      this.tapFire = false;
       return;
     }
-    this.tapFire = false;
     this.weaponCd -= dt;
     if (this.weaponCd > 0) return;
     const p = this.paddle;
@@ -1939,14 +1952,14 @@ export class Game {
     p.squash = Math.max(p.squash, 0.35);
   }
 
-  /** Лазер — не снаряд, а луч: короткие импульсы от пилонов, пока активен бонус (~2 с). */
-  private updateLaser() {
+  /** Лазер — не снаряд, а луч: короткие импульсы от пилонов, пока активен бонус (~2 с).
+   *  Получает общий сигнал выстрела: одно нажатие может выстрелить и лазер, и ракеты. */
+  private updateLaser(fire: boolean) {
     // взведённый заряд сгорает, если не выстрелить вовремя
     if (this.laserArmed && this.time > this.laserArmedUntil) this.laserArmed = false;
     // активация залпа: пробел, клик или тап
-    if (this.laserArmed && (this.keys.space || this.tapFire)) {
+    if (this.laserArmed && fire) {
       this.laserArmed = false;
-      this.tapFire = false;
       this.laserUntil = this.time + 2;
       this.laserWasOn = false;
     }
