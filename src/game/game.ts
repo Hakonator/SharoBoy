@@ -1045,10 +1045,14 @@ export class Game {
   }
 
   private serveBall() {
+    // базовая скорость повышена на 50% по просьбе игрока
     const base = clamp(
-      Math.min(this.h * 0.62, this.levelSpeed() + (this.mode === "endless" ? this.wave * 18 : this.level * 45)),
-      360,
-      760
+      Math.min(
+        this.h * 0.62,
+        (this.levelSpeed() + (this.mode === "endless" ? this.wave * 18 : this.level * 45)) * 1.5
+      ),
+      540,
+      1140
     );
     const ball: Ball = {
       x: this.paddle.x,
@@ -2191,7 +2195,6 @@ export class Game {
       ctx.translate(rand(-1, 1) * this.shake * 0.6, rand(-1, 1) * this.shake * 0.6);
     }
 
-    this.drawDanger();
     this.drawBlocks();
     this.drawBoss();
     this.drawRings();
@@ -2237,15 +2240,6 @@ export class Game {
     v.addColorStop(1, "rgba(2,8,14,0.55)");
     ctx.fillStyle = v;
     ctx.fillRect(0, 0, w, h);
-  }
-
-  private drawDanger() {
-    const { ctx, w, h } = this;
-    const g = ctx.createLinearGradient(0, h - 90, 0, h);
-    g.addColorStop(0, "rgba(255,106,92,0)");
-    g.addColorStop(1, `rgba(255,106,92,${0.16 + Math.sin(this.time * 10) * 0.06})`);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, h - 90, w, 90);
   }
 
   private drawBlocks() {
@@ -2823,13 +2817,17 @@ export class Game {
 
       if (b.stuck) {
         const pr = b.r + 6 + Math.sin(this.time * 6) * 2.5;
+        // штрихи подбираются так, чтобы ровно делить окружность —
+        // без «шва», а начало дуги (единственный стык) спрятано внизу, в толще ракетки
+        const c = Math.PI * 2 * pr;
+        const n = 18;
+        const seg = c / n;
         ctx.beginPath();
-        ctx.arc(b.x, b.y, pr, 0, Math.PI * 2);
+        ctx.arc(b.x, b.y, pr, Math.PI / 2, Math.PI / 2 + Math.PI * 2);
         ctx.strokeStyle = `${mode.trail}0.65)`;
         ctx.lineWidth = 2;
-        ctx.setLineDash([4, 6]);
-        // бегущий пунктир: весь ободок вращается, «замерзшая» правая часть исчезает
-        ctx.lineDashOffset = -this.time * 26;
+        ctx.setLineDash([seg * 0.45, seg * 0.55]);
+        ctx.lineDashOffset = -this.time * 30;
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.lineDashOffset = 0;
