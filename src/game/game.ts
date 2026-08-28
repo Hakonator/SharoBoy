@@ -420,7 +420,7 @@ export class Game {
   /** таймер периодического появления новых блоков */
   private spawnTimer = 18;
   /** таймер периодического «небесного» сброса бонусов */
-  private skyDropTimer = 3;
+  private skyDropTimer = 22;
   private magnetUntil = 0;
   /** таймер редкого смещения всего поля */
   private shiftTimer = 14;
@@ -1091,7 +1091,7 @@ export class Game {
         sinceHit: 0,    };
     this.balls = [ball];
     this.spawnTimer = rand(16, 22);
-    this.skyDropTimer = rand(2.5, 3.5);
+    this.skyDropTimer = rand(18, 27);
     this.shiftTimer = rand(12, 18);
     this.fieldShift = null;
     this.pushHud();
@@ -1801,7 +1801,7 @@ export class Game {
       this.skyDropTimer -= dt;
     }
     if (this.skyDropTimer > 0) return;
-    this.skyDropTimer = rand(2, 3);
+    this.skyDropTimer = rand(18, 27);
     if (this.powers.length >= 6) return;
     const x = rand(36, this.w - 36);
     this.dropPower(x, -22);
