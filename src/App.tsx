@@ -7,45 +7,30 @@ const INITIAL_HUD: HudData = {
   best: 0,
   lives: 3,
   level: 1,
-  levelCount: 3,
-  levelName: "РАЗМИНКА",
+  levelCount: 4,
+  levelName: "СТРЕЛА",
   combo: 0,
   blocksLeft: 0,
   muted: false,
   banner: null,
   stuck: true,
   newRecord: false,
-  fireOn: false,
-  topEndless: [],
-  mode: "campaign",
-  wave: 0,
   shield: 0,
   wideOn: false,
   slowOn: false,
   fastOn: false,
   shrinkOn: false,
   laserOn: false,
+  laserArmed: false,
   rocketOn: false,
+  fireOn: false,
+  magnetOn: false,
   top: [],
+  topEndless: [],
+  mode: "campaign",
+  wave: 0,
+  coins: 0,
 };
-
-/* ---------- чип активного эффекта ---------- */
-function EffectChip({ label, good, keyVal }: { label: string; good: boolean; keyVal: string }) {
-  return (
-    <span
-      key={keyVal}
-      className={`anim-pop inline-flex items-center gap-1.5 border px-2.5 py-1 font-display text-[11px] tracking-wider ${
-        good
-          ? "border-[#4dff9e66] bg-[#0b3d26cc] text-[#7dffb9] shadow-[0_0_12px_rgba(77,255,158,0.25)]"
-          : "border-[#ff534766] bg-[#3d120ecc] text-[#ff8d84] shadow-[0_0_12px_rgba(255,83,71,0.25)]"
-      }`}
-      style={{ clipPath: "polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)" }}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${good ? "bg-[#4dff9e]" : "bg-[#ff5347]"} animate-pulse`} />
-      {label}
-    </span>
-  );
-}
 
 /* ---------- inline icons ---------- */
 const IconPause = () => (
@@ -105,6 +90,17 @@ const Key = ({ children, wide }: { children: React.ReactNode; wide?: boolean }) 
   </span>
 );
 
+const EffectChip = ({ keyVal, label, good }: { keyVal: string; label: string; good: boolean }) => (
+  <div
+    key={keyVal}
+    className={`hud-chip px-2.5 py-1 font-display text-[11px] tracking-wider ${
+      good ? "text-[#7dffb9]" : "text-[#ff8d84]"
+    }`}
+  >
+    {label}
+  </div>
+);
+
 function ControlsPanel() {
   return (
     <div className="hud-chip p-4 sm:p-5">
@@ -123,11 +119,13 @@ function ControlsPanel() {
             <Key>←</Key>
             <Key>→</Key>
           </span>
-          <span>или <Key>A</Key> <Key>D</Key> — движение</span>
+          <span>
+            или <Key>A</Key> <Key>D</Key> — движение
+          </span>
         </li>
         <li className="flex items-center gap-3">
           <Key wide>ПРОБЕЛ</Key>
-          <span>запуск шара и стрельба оружием</span>
+          <span>запуск шара, выстрел ракетами и лазером</span>
         </li>
         <li className="flex items-center gap-3">
           <span className="flex gap-1">
@@ -220,12 +218,23 @@ export default function App() {
                 <div className="font-display text-xl leading-none text-punch sm:text-2xl">×{hud.combo}</div>
               </div>
             )}
+            {hud.coins > 0 && (
+              <div className="hud-chip px-3.5 py-2">
+                <div className="hud-label">Монеты</div>
+                <div className="font-display text-xl leading-none text-gold tabular-nums sm:text-2xl">
+                  {hud.coins}
+                </div>
+              </div>
+            )}
             {hud.shield > 0 && (
               <div key={`shield-${hud.shield}`} className="hud-chip anim-combo px-3.5 py-2">
                 <div className="hud-label">Щит</div>
                 <div className="mt-1 flex gap-1">
                   {Array.from({ length: hud.shield }).map((_, i) => (
-                    <span key={i} className="h-3.5 w-3.5 rounded-full bg-[#4dff9e] shadow-[0_0_8px_rgba(77,255,158,0.8)]" />
+                    <span
+                      key={i}
+                      className="h-3.5 w-3.5 rounded-full bg-[#4dff9e] shadow-[0_0_8px_rgba(77,255,158,0.8)]"
+                    />
                   ))}
                 </div>
               </div>
@@ -278,17 +287,23 @@ export default function App() {
       {inGame && (
         <div className="pointer-events-none absolute left-1/2 top-[68px] z-20 -translate-x-1/2 md:hidden">
           <div className="hud-chip px-3 py-1 font-display text-xs text-cyan-neon">
-            {hud.mode === "endless" ? `ВОЛНА ${hud.wave}` : `УР. ${hud.level}/${hud.levelCount}`} · ЦЕЛИ {hud.blocksLeft}
+            {hud.mode === "endless" ? `ВОЛНА ${hud.wave}` : `УР. ${hud.level}/${hud.levelCount}`} · ЦЕЛИ{" "}
+            {hud.blocksLeft}
           </div>
         </div>
       )}
 
-      {/* подсказки: запуск и оружие */}
+      {/* подсказки: оружие и запуск */}
       {hud.phase === "playing" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-[96px] z-20 flex flex-col items-center gap-2 sm:bottom-[102px]">
-          {(hud.laserOn || hud.rocketOn) && (
+          {hud.laserArmed && (
+            <div className="anim-blink hud-chip px-4 py-2 font-display text-sm tracking-wider text-[#9df2ff]">
+              ЛАЗЕР ГОТОВ — ПРОБЕЛ / ТАП
+            </div>
+          )}
+          {hud.rocketOn && (
             <div className="anim-blink hud-chip px-4 py-2 font-display text-sm tracking-wider text-mint">
-              {hud.laserOn && hud.rocketOn ? "ЛАЗЕР + РАКЕТЫ" : hud.laserOn ? "ЛАЗЕР" : "РАКЕТЫ"} — ПРОБЕЛ / ТАП
+              РАКЕТЫ — ПРОБЕЛ / ТАП
             </div>
           )}
           {hud.stuck && (
@@ -300,10 +315,11 @@ export default function App() {
       )}
 
       {/* активные эффекты */}
-      {inGame && (hud.wideOn || hud.slowOn || hud.fastOn || hud.shrinkOn) && (
+      {inGame && (hud.wideOn || hud.slowOn || hud.fastOn || hud.shrinkOn || hud.fireOn) && (
         <div className="pointer-events-none absolute bottom-3 left-3 z-20 flex max-w-[46vw] flex-wrap gap-1.5 sm:bottom-4 sm:left-4">
           {hud.wideOn && <EffectChip keyVal="wide" label="ШИРЕ" good />}
           {hud.fireOn && <EffectChip keyVal="fire" label="ОГНЬ" good />}
+          {hud.magnetOn && <EffectChip keyVal="magnet" label="МАГНИТ" good />}
           {hud.slowOn && <EffectChip keyVal="slow" label="МЕДЛЕННЕЕ" good />}
           {hud.fastOn && <EffectChip keyVal="fast" label="БЫСТРЕЕ" good={false} />}
           {hud.shrinkOn && <EffectChip keyVal="shrink" label="УЗКАЯ" good={false} />}
@@ -336,7 +352,7 @@ export default function App() {
               </div>
               <h1 className="font-display leading-[0.95]">
                 <span className="title-glow block text-6xl text-foam sm:text-7xl lg:text-8xl">ШАРО</span>
-                <span className="block text-6xl text-cyan-neon title-glow sm:text-7xl lg:text-8xl">
+                <span className="title-glow block text-6xl text-cyan-neon sm:text-7xl lg:text-8xl">
                   БОЙ<span className="text-punch">!</span>
                 </span>
               </h1>
@@ -377,6 +393,9 @@ export default function App() {
                 <span className="hud-chip px-3 py-1.5">
                   <b className="text-coral">красные</b> — 3 удара
                 </span>
+                <span className="hud-chip px-3 py-1.5">
+                  <b className="text-mint">с шариками внутри</b> — рассыпаются
+                </span>
               </div>
             </div>
 
@@ -386,7 +405,7 @@ export default function App() {
                   <div className="hud-label mb-3">Рекорды кампании</div>
                   <ol className="space-y-1.5">
                     {hud.top.map((s, i) => (
-                      <li key={`${s}-${i}`} className="flex items-center font-display text-sm">
+                      <li key={`c-${s}-${i}`} className="flex items-center font-display text-sm">
                         <span
                           className={
                             i === 0 ? "text-gold" : i === 1 ? "text-foam" : i === 2 ? "text-coral" : "text-dim"
@@ -422,25 +441,46 @@ export default function App() {
                 </div>
               )}
               <ControlsPanel />
-              <div className="hud-chip mt-3 p-4 sm:p-5">
-                <div className="hud-label mb-3">Выпадает из мишеней</div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px] leading-snug text-foam/90">
-                  <span><b className="text-[#4dff9e]">«ШИР»</b> — шире ракетка</span>
-                  <span><b className="text-[#4dff9e]">«×3»</b> — тройной шар</span>
-                  <span><b className="text-[#4dff9e]">«+1»</b> — жизнь</span>
-                  <span><b className="text-[#4dff9e]">«СК↓»</b> — медленный шар</span>
-                  <span><b className="text-[#4dff9e]">«ЩИТ»</b> — экран внизу ×3</span>
-                  <span><b className="text-[#4dff9e]">«ЛАЗ»</b> — лазеры (пробел)</span>
-                  <span><b className="text-[#4dff9e]">«РКТ»</b> — ракеты (пробел)</span>
-                  <span className="col-span-2">
-                    <b className="text-[#4dff9e]">«ОГНЬ»</b> — ядро прожигает блоки насквозь
+              <div className="hud-chip mt-3 p-4">
+                <div className="hud-label mb-2">Бонусы и анти-бонусы</div>
+                <div className="grid grid-cols-1 gap-1.5 text-sm text-foam/90 sm:grid-cols-2">
+                  <span>
+                    <b className="text-[#4dff9e]">«ШИР»</b> — шире ракетка
                   </span>
-                  <span className="col-span-2 mt-1 border-t border-line pt-2 text-dim">Анти-бонусы — красные:</span>
-                  <span><b className="text-[#ff5347]">«СК↑»</b> — шар быстрее</span>
-                  <span><b className="text-[#ff5347]">«УЗК»</b> — узкая ракетка</span>
+                  <span>
+                    <b className="text-[#4dff9e]">«×3»</b> — тройной шар
+                  </span>
+                  <span>
+                    <b className="text-[#4dff9e]">«+1»</b> — жизнь
+                  </span>
+                  <span>
+                    <b className="text-[#4dff9e]">«СК↓»</b> — медленнее
+                  </span>
+                  <span>
+                    <b className="text-[#4dff9e]">«ЩИТ»</b> — экран внизу
+                  </span>
+                  <span>
+                    <b className="text-[#4dff9e]">«ЛАЗ»</b> — луч на 2 с, выстрел — пробел
+                  </span>
+                  <span>
+                    <b className="text-[#4dff9e]">«РКТ»</b> — ракеты (пробел)
+                  </span>
+                  <span>
+                    <b className="text-[#4dff9e]">«ОГНЬ»</b> — ядро прожигает блоки
+                  </span>
+                  <span className="col-span-2 mt-1 border-t border-line pt-2 text-dim">
+                    Анти-бонусы — красные:
+                  </span>
+                  <span>
+                    <b className="text-[#ff5347]">«СК↑»</b> — шар быстрее
+                  </span>
+                  <span>
+                    <b className="text-[#ff5347]">«УЗК»</b> — узкая ракетка
+                  </span>
                 </div>
                 <div className="mt-3 border-t border-line pt-2.5 text-xs text-dim">
                   Тёмные <b className="text-coral">бомбы с фитилём</b> детонируют по площади — собирай цепочки!
+                  Поле периодически пополняется и дрейфует.
                 </div>
               </div>
             </div>
@@ -456,7 +496,10 @@ export default function App() {
               <div className="hud-label mb-1">Пауза</div>
               <h2 className="font-display title-glow text-4xl text-foam">СТОП-КАДР</h2>
               <div className="mt-6 flex flex-col gap-3">
-                <button className="btn-arcade flex items-center justify-center gap-2 px-6 py-3.5" onClick={() => g()?.togglePause()}>
+                <button
+                  className="btn-arcade flex items-center justify-center gap-2 px-6 py-3.5"
+                  onClick={() => g()?.togglePause()}
+                >
                   <IconPlay /> Продолжить
                 </button>
                 <button
@@ -493,21 +536,25 @@ export default function App() {
                 НОВЫЙ РЕКОРД!
               </div>
             )}
-            <div className="mt-6 flex justify-center gap-3">
-              <div className="hud-chip px-6 py-3">
-                <div className="hud-label">Счёт</div>
-                <div className="font-display text-3xl text-foam tabular-nums">{hud.score.toLocaleString("ru-RU")}</div>
-              </div>
-              <div className="hud-chip px-6 py-3">
-                <div className="hud-label">Рекорд</div>
-                <div className="font-display text-3xl text-gold tabular-nums">{hud.best.toLocaleString("ru-RU")}</div>
-              </div>
-            </div>
             {hud.mode === "endless" && (
               <div className="mt-4 font-display text-sm tracking-wider text-cyan-neon">
                 ДОСТИГНУТА ВОЛНА {hud.wave}
               </div>
             )}
+            <div className="mt-6 flex justify-center gap-3">
+              <div className="hud-chip px-6 py-3">
+                <div className="hud-label">Счёт</div>
+                <div className="font-display text-3xl text-foam tabular-nums">
+                  {hud.score.toLocaleString("ru-RU")}
+                </div>
+              </div>
+              <div className="hud-chip px-6 py-3">
+                <div className="hud-label">Рекорд</div>
+                <div className="font-display text-3xl text-gold tabular-nums">
+                  {hud.best.toLocaleString("ru-RU")}
+                </div>
+              </div>
+            </div>
             {hud.mode === "endless" && hud.topEndless.length > 0 && (
               <div className="hud-chip mx-auto mt-4 max-w-xs p-3 text-left">
                 <div className="hud-label mb-2">Лучшие результаты</div>
@@ -541,7 +588,7 @@ export default function App() {
       {hud.phase === "won" && (
         <div className="absolute inset-0 z-40 flex items-center justify-center p-6">
           <div className="anim-pop w-full max-w-md text-center">
-            <div className="hud-label mb-2 tracking-[0.35em]">Все шары лопнули</div>
+            <div className="hud-label mb-2 tracking-[0.35em]">Царь-шар повержен</div>
             <h2
               className="font-display text-6xl text-mint sm:text-7xl"
               style={{ textShadow: "0 0 30px rgba(93,255,176,0.7), 0 4px 0 rgba(4,18,26,0.9)" }}
@@ -561,11 +608,15 @@ export default function App() {
             <div className="mt-6 flex justify-center gap-3">
               <div className="hud-chip px-6 py-3">
                 <div className="hud-label">Счёт</div>
-                <div className="font-display text-3xl text-foam tabular-nums">{hud.score.toLocaleString("ru-RU")}</div>
+                <div className="font-display text-3xl text-foam tabular-nums">
+                  {hud.score.toLocaleString("ru-RU")}
+                </div>
               </div>
               <div className="hud-chip px-6 py-3">
                 <div className="hud-label">Рекорд</div>
-                <div className="font-display text-3xl text-gold tabular-nums">{hud.best.toLocaleString("ru-RU")}</div>
+                <div className="font-display text-3xl text-gold tabular-nums">
+                  {hud.best.toLocaleString("ru-RU")}
+                </div>
               </div>
             </div>
             <div className="mt-7 flex flex-wrap justify-center gap-3">

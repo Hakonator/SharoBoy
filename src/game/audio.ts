@@ -1,86 +1,90 @@
-/* Крошечный WebAudio-синтезатор для аркадных блипов. Без внешних файлов. */
-
+/** Крошечный WebAudio-синтезатор: короткие блипы на каждое действие. */
 export class SFX {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private noiseBuf: AudioBuffer | null = null;
   muted = false;
 
   ensure() {
     if (!this.ctx) {
-      const AC: typeof AudioContext =
-        window.AudioContext ??
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AC =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AC) return;
       this.ctx = new AC();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.5;
+      this.master.gain.value = 0.42;
       this.master.connect(this.ctx.destination);
+      const len = Math.floor(this.ctx.sampleRate * 0.4);
+      this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noiseBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
   }
 
-  setMuted(m: boolean) {
-    this.muted = m;
-    if (this.master && this.ctx) {
-      this.master.gain.setTargetAtTime(m ? 0 : 0.5, this.ctx.currentTime, 0.02);
-    }
-  }
-
   private blip(
     freq: number,
-    dur = 0.09,
-    type: OscillatorType = "square",
-    vol = 0.22,
+    dur: number,
+    type: OscillatorType,
+    vol: number,
     slideTo?: number,
     delay = 0
   ) {
     if (!this.ctx || !this.master || this.muted) return;
-    const t0 = this.ctx.currentTime + delay;
+    const t = this.ctx.currentTime + delay;
     const osc = this.ctx.createOscillator();
     const g = this.ctx.createGain();
     osc.type = type;
-    osc.frequency.setValueAtTime(freq, t0);
-    if (slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), t0 + dur);
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.connect(g).connect(this.master);
-    osc.start(t0);
-    osc.stop(t0 + dur + 0.02);
+    osc.frequency.setValueAtTime(Math.max(1, freq), t);
+    if (slideTo !== undefined) {
+      osc.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), t + dur);
+    }
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.001, vol), t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g);
+    g.connect(this.master);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
   }
 
-  private noise(dur = 0.12, vol = 0.16, delay = 0) {
-    if (!this.ctx || !this.master || this.muted) return;
-    const t0 = this.ctx.currentTime + delay;
-    const len = Math.floor(this.ctx.sampleRate * dur);
-    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  private noise(dur: number, vol: number, delay = 0) {
+    if (!this.ctx || !this.master || this.muted || !this.noiseBuf) return;
+    const t = this.ctx.currentTime + delay;
     const src = this.ctx.createBufferSource();
-    src.buffer = buf;
+    src.buffer = this.noiseBuf;
     const g = this.ctx.createGain();
-    g.gain.setValueAtTime(vol, t0);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    src.connect(g).connect(this.master);
-    src.start(t0);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(g);
+    g.connect(this.master);
+    src.start(t);
+    src.stop(t + dur + 0.02);
   }
 
-  ui() {
-    this.blip(660, 0.06, "square", 0.14);
-  }
-  paddle() {
-    this.blip(240, 0.07, "triangle", 0.26, 330);
+  paddle(intensity: number) {
+    this.blip(240 + intensity * 140, 0.06, "square", 0.22, 340);
   }
   wall() {
-    this.blip(180, 0.05, "sine", 0.16, 150);
+    this.blip(190, 0.04, "triangle", 0.14, 150);
   }
-  blockHit(combo: number) {
-    this.blip(360 + Math.min(combo, 14) * 42, 0.07, "square", 0.18, 300);
+  brick(hp: number) {
+    this.blip(420 + hp * 90, 0.07, "square", 0.2, 300 + hp * 60);
+    this.noise(0.05, 0.1);
   }
-  blockBreak(combo: number) {
-    const f = 420 + Math.min(combo, 14) * 55;
-    this.blip(f, 0.1, "square", 0.22, f * 1.6);
-    this.noise(0.09, 0.1);
+  destroy(tier: number) {
+    this.blip(660 + tier * 120, 0.09, "square", 0.22, 990 + tier * 140);
+    this.blip(330, 0.12, "triangle", 0.14, 220, 0.02);
+    this.noise(0.09, 0.14);
+  }
+  launch() {
+    this.blip(300, 0.12, "sawtooth", 0.16, 640);
+  }
+  loseLife() {
+    this.blip(320, 0.14, "sawtooth", 0.22, 180);
+    this.blip(220, 0.18, "sawtooth", 0.2, 90, 0.1);
+    this.noise(0.2, 0.16, 0.05);
   }
   power() {
     this.blip(520, 0.08, "square", 0.2, 780);
@@ -105,23 +109,9 @@ export class SFX {
     this.blip(520, 0.12, "sine", 0.24, 880);
     this.blip(880, 0.1, "sine", 0.16, 440, 0.05);
   }
-  launch() {
-    this.blip(200, 0.14, "sawtooth", 0.2, 520);
-  }
-  loseLife() {
-    this.blip(300, 0.3, "sawtooth", 0.24, 70);
-    this.noise(0.3, 0.14, 0.02);
-  }
-  levelClear() {
-    [523, 659, 784, 1047].forEach((f, i) => this.blip(f, 0.14, "square", 0.2, undefined, i * 0.09));
-  }
-  gameOver() {
-    [392, 311, 262, 196].forEach((f, i) => this.blip(f, 0.22, "sawtooth", 0.18, undefined, i * 0.16));
-  }
-  win() {
-    [523, 659, 784, 1047, 1319, 1568].forEach((f, i) =>
-      this.blip(f, 0.16, "square", 0.2, undefined, i * 0.1)
-    );
+  coin() {
+    this.blip(1568, 0.06, "square", 0.16, 2093);
+    this.blip(2093, 0.12, "square", 0.14, 2637, 0.05);
   }
   burn() {
     this.blip(980, 0.09, "sawtooth", 0.13, 240);
@@ -130,5 +120,19 @@ export class SFX {
   bossDie() {
     [520, 392, 311, 233, 155].forEach((f, i) => this.blip(f, 0.2, "sawtooth", 0.2, undefined, i * 0.09));
     this.noise(0.5, 0.2, 0.1);
+  }
+  gameOver() {
+    [392, 311, 233, 155].forEach((f, i) => this.blip(f, 0.22, "sawtooth", 0.2, undefined, i * 0.12));
+  }
+  win() {
+    [523, 659, 784, 1047, 1319, 1568].forEach((f, i) =>
+      this.blip(f, 0.16, "square", 0.2, undefined, i * 0.1)
+    );
+  }
+  levelClear() {
+    [523, 659, 784, 1047].forEach((f, i) => this.blip(f, 0.14, "square", 0.2, undefined, i * 0.09));
+  }
+  ui() {
+    this.blip(880, 0.05, "square", 0.12, 660);
   }
 }
