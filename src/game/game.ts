@@ -418,9 +418,9 @@ export class Game {
   private laserArmedUntil = 0;
 
   /** таймер периодического появления новых блоков */
-  private spawnTimer = 16;
+  private spawnTimer = 18;
   /** таймер периодического «небесного» сброса бонусов */
-  private skyDropTimer = 10;
+  private skyDropTimer = 8;
   private magnetUntil = 0;
   /** таймер редкого смещения всего поля */
   private shiftTimer = 14;
@@ -1076,8 +1076,8 @@ export class Game {
         squash: 0,
         sinceHit: 0,    };
     this.balls = [ball];
-    this.spawnTimer = rand(14, 20);
-    this.skyDropTimer = rand(9, 14);
+    this.spawnTimer = rand(16, 22);
+    this.skyDropTimer = rand(6, 9);
     this.shiftTimer = rand(12, 18);
     this.fieldShift = null;
     this.pushHud();
@@ -1576,7 +1576,7 @@ export class Game {
     if (this.boss) return;
     this.spawnTimer -= dt;
     if (this.spawnTimer > 0) return;
-    this.spawnTimer = rand(14, 20);
+    this.spawnTimer = rand(16, 22);
     const cap = Math.min(this.blocksInitial + 12, 150);
     if (this.blocks.length >= cap) return;
     const kinds = ["circle", "eh", "ev"] as const;
@@ -1597,8 +1597,9 @@ export class Game {
         }
       }
       if (overlaps) continue;
+      // спавн — в основном одноразовые блоки, чтобы не затягивать зачистку
       const roll = Math.random();
-      const hp = (roll < 0.35 ? 1 : roll < 0.75 ? 2 : 3) as 1 | 2 | 3;
+      const hp = (roll < 0.78 ? 1 : roll < 0.95 ? 2 : 3) as 1 | 2 | 3;
       this.blocks.push({
         x,
         y,
@@ -1617,7 +1618,7 @@ export class Game {
         swayFreq: rand(0.5, 1) * (Math.random() < 0.5 ? 1 : -1),
         swayPh: rand(0, Math.PI * 2),
         bomb: false,
-        splits: Math.random() < 0.05,
+        splits: false,
       });
       this.rings.push({ x, y, r: 6, maxR: 66, color: "rgba(124,245,255,0.7)", t: 0 });
       this.popups.push({ x, y: y - ry - 8, text: "ПОПОЛНЕНИЕ!", color: "#7cf5ff", t: 0, size: 14 });
@@ -1735,7 +1736,7 @@ export class Game {
   /** Общая таблица дропа; при дефиците целей вес лазеров/ракет растёт. */
   private pickPowerType(): PowerType {
     const scarcity = clamp(1 - this.blocks.length / this.blocksInitial, 0, 1);
-    const boost = scarcity > 0.6 ? 1 + (scarcity - 0.6) * 5 : 1; // до ×3 на зачищенном поле
+    const boost = scarcity > 0.5 ? 1 + (scarcity - 0.5) * 14 : 1; // до ×8 на почти зачищенном поле
     const table: [PowerType, number][] = [
       ["life", 6],
       ["wide", 9],
@@ -1771,18 +1772,20 @@ export class Game {
   private periodicPowerDrop(dt: number) {
     if (this.boss && this.blocks.length > 0) {
       // у босса свой темп: небо не спамит
-      this.skyDropTimer -= dt * 0.4;
+      this.skyDropTimer -= dt * 0.55;
     } else {
       this.skyDropTimer -= dt;
     }
     if (this.skyDropTimer > 0) return;
-    this.skyDropTimer = rand(9, 14);
+    this.skyDropTimer = rand(6, 9);
     if (this.powers.length >= 6) return;
     const x = rand(36, this.w - 36);
     this.dropPower(x, -22);
-    this.rings.push({ x, y: 18, r: 4, maxR: 52, color: "rgba(124,245,255,0.6)", t: 0 });
-    this.popups.push({ x, y: 40, text: "С НЕБА!", color: "#7cf5ff", t: 0, size: 13 });
-    this.sfx.ui();
+    // заметные сигналы: крупное кольцо, яркая подпись и звонкий звук
+    this.rings.push({ x, y: 20, r: 6, maxR: 84, color: "rgba(124,245,255,0.85)", t: 0 });
+    this.burst(x, 26, "#7cf5ff", 8, 150);
+    this.popups.push({ x, y: 46, text: "С НЕБА!", color: "#eaffff", t: 0, size: 18 });
+    this.sfx.power();
   }
 
   private explode(x: number, y: number) {
@@ -2573,6 +2576,15 @@ export class Game {
   private drawPowers() {
     const { ctx } = this;
     for (const pw of this.powers) {
+      // столб света сверху в первые мгновения падения — дроп невозможно пропустить
+      if (pw.t < 0.5) {
+        const a = (0.5 - pw.t) / 0.5;
+        const tint = pw.type === "coin" ? "#ffc94d" : POWER_META[pw.type].color;
+        ctx.fillStyle = tint + "30";
+        ctx.fillRect(pw.x - 4, 0, 8, Math.max(0, pw.y));
+        ctx.fillStyle = `rgba(240,255,255,${0.5 * a})`;
+        ctx.fillRect(pw.x - 1.2, 0, 2.4, Math.max(0, pw.y));
+      }
       if (pw.type === "coin") {
         this.drawCoin(pw.x, pw.y, pw.t);
         continue;
