@@ -4,7 +4,8 @@
  * Как включить (5 минут):
  *   1. Создайте бесплатный проект на https://supabase.com
  *   2. SQL Editor → выполните SQL из README (раздел «Мировая таблица рекордов»)
- *   3. Project Settings → API: скопируйте Project URL и anon public key сюда:
+ *   3. Project Settings → API: скопируйте Project URL (без /rest/v1 — SDK
+ *      добавит его сам) и anon public key сюда:
  *
  * Ключ «anon» публичный по дизайну: он безопасен в клиентском коде,
  * права доступа определяются RLS-политиками таблицы (см. SQL в README) —
@@ -12,7 +13,7 @@
  *
  * Пока поля пустые, игра работает как раньше: рекорды хранятся локально.
  */
-export const SUPABASE_URL = "https://wbidprepvccgxtujqsjy.supabase.co/rest/v1/";
+export const SUPABASE_URL = "https://wbidprepvccgxtujqsjy.supabase.co";
 export const SUPABASE_ANON_KEY = "sb_publishable_af_ESvQDUWkDxBWzQ7fJ3w_VEK-f8Uk";
 
 export const LEADERBOARD_ENABLED = SUPABASE_URL.trim() !== "" && SUPABASE_ANON_KEY.trim() !== "";

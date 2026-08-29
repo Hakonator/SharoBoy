@@ -22,7 +22,8 @@
 Как включить:
 1.  Создайте бесплатный проект на https://supabase.com
 2.  SQL Editor → выполните скрипт ниже
-3.  Project Settings → API → Project URL и anon public key вставьте в `src/config.ts`
+3.  Project Settings → API → Project URL (**без `/rest/v1`** — SDK добавит его сам)
+    и anon public key вставьте в `src/config.ts`
 4.  Пуш в main — сайт пересоберётся автоматически
 
 ```sql
