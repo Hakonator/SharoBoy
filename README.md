@@ -7,6 +7,12 @@
     npm install
     npm run dev      # http://localhost:3000
     npm run build    # продакшен-сборка в dist/
+    npm run preview  # локальный предпросмотр продакшен-сборки
+
+## Играть онлайн
+Сайт публикуется автоматически на GitHub Pages при каждом пуше в main
+(см. .github/workflows/deploy.yml):
+    https://hakonator.github.io/SharoBoy/
 
 ## Структура
     index.html                заставка + точка входа
