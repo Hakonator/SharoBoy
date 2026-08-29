@@ -1,0 +1,25 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ШАРОБОЙ: запустить игру (dev-сервер)",
+      "type": "npm",
+      "script": "dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always" }
+    },
+    {
+      "label": "ШАРОБОЙ: продакшен-сборка",
+      "type": "npm",
+      "script": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "ШАРОБОЙ: проверка типов",
+      "type": "npm",
+      "script": "typecheck",
+      "problemMatcher": []
+    }
+  ]
+}

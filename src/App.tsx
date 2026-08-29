@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Game, type HudData } from "./game/game";
 
+/* Исходники для ZIP-архива грузятся лениво (отдельный чанк archive-sources),
+   чтобы стартовая страница была компактной и запускалась надёжно. */
+
 const INITIAL_HUD: HudData = {
   phase: "menu",
   score: 0,
   best: 0,
   lives: 3,
   level: 1,
-  levelCount: 4,
+  levelCount: 3,
   levelName: "СТРЕЛА",
+  mode: "campaign",
+  wave: 0,
   combo: 0,
   blocksLeft: 0,
   muted: false,
@@ -25,11 +30,9 @@ const INITIAL_HUD: HudData = {
   rocketOn: false,
   fireOn: false,
   magnetOn: false,
+  coins: 0,
   top: [],
   topEndless: [],
-  mode: "campaign",
-  wave: 0,
-  coins: 0,
 };
 
 /* ---------- inline icons ---------- */
@@ -78,6 +81,13 @@ const IconBall = ({ color, className }: { color: string; className?: string }) =
     <circle cx="10" cy="10" r="8.5" fill={`url(#g-${color.replace("#", "")})`} />
   </svg>
 );
+const IconDownload = () => (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3v11" />
+    <path d="m7 10 5 5 5-5" />
+    <path d="M4 19h16" />
+  </svg>
+);
 
 const Key = ({ children, wide }: { children: React.ReactNode; wide?: boolean }) => (
   <span
@@ -90,16 +100,17 @@ const Key = ({ children, wide }: { children: React.ReactNode; wide?: boolean }) 
   </span>
 );
 
-const EffectChip = ({ keyVal, label, good }: { keyVal: string; label: string; good: boolean }) => (
-  <div
-    key={keyVal}
-    className={`hud-chip px-2.5 py-1 font-display text-[11px] tracking-wider ${
-      good ? "text-[#7dffb9]" : "text-[#ff8d84]"
-    }`}
-  >
-    {label}
-  </div>
-);
+function EffectChip({ label, good }: { label: string; good: boolean }) {
+  return (
+    <span
+      className={`hud-chip px-2.5 py-1 font-display text-[10px] tracking-widest ${
+        good ? "text-[#7dffb9]" : "text-[#ff9d94]"
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
 
 function ControlsPanel() {
   return (
@@ -125,7 +136,7 @@ function ControlsPanel() {
         </li>
         <li className="flex items-center gap-3">
           <Key wide>ПРОБЕЛ</Key>
-          <span>запуск шара, выстрел ракетами и лазером</span>
+          <span>запуск шара и стрельба оружием</span>
         </li>
         <li className="flex items-center gap-3">
           <span className="flex gap-1">
@@ -172,34 +183,246 @@ function FloatingBalls() {
   );
 }
 
+/* ---------- ZIP-экспорт проекта (store, без сжатия) ---------- */
+function crc32(data: Uint8Array): number {
+  let c: number;
+  const table: number[] = [];
+  for (let n = 0; n < 256; n++) {
+    c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  let crc = 0xffffffff;
+  for (let i = 0; i < data.length; i++) crc = table[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function makeZip(files: { path: string; content: string }[]): Blob {
+  const enc = new TextEncoder();
+  const parts: Uint8Array[] = [];
+  const central: Uint8Array[] = [];
+  let offset = 0;
+  const dosDate = ((2024 - 1980) << 9) | (1 << 5) | 1;
+  for (const f of files) {
+    const nameB = enc.encode(f.path);
+    const data = enc.encode(f.content);
+    const crc = crc32(data);
+    const lh = new Uint8Array(30 + nameB.length);
+    const dv = new DataView(lh.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0x0800, true);
+    dv.setUint16(8, 0, true);
+    dv.setUint16(10, 0, true);
+    dv.setUint16(12, dosDate, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, data.length, true);
+    dv.setUint32(22, data.length, true);
+    dv.setUint16(26, nameB.length, true);
+    dv.setUint16(28, 0, true);
+    lh.set(nameB, 30);
+    parts.push(lh, data);
+    const ch = new Uint8Array(46 + nameB.length);
+    const cv = new DataView(ch.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, 0, true);
+    cv.setUint16(14, dosDate, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, data.length, true);
+    cv.setUint32(24, data.length, true);
+    cv.setUint16(28, nameB.length, true);
+    cv.setUint32(42, offset, true);
+    ch.set(nameB, 46);
+    central.push(ch);
+    offset += lh.length + data.length;
+  }
+  const cdSize = central.reduce((s, c) => s + c.length, 0);
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, cdSize, true);
+  ev.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end] as BlobPart[], { type: "application/zip" });
+}
+
+const PROJECT_README = `# ШАРОБОЙ
+
+Аркадный разбиватель: вместо кирпичей — шары и овалы, ракетка с закруглёнными углами.
+Кампания из 4 уровней (финал — босс «Царь-шар») + бесконечный режим с сидом дня.
+
+## Запуск
+    npm install
+    npm run dev      # http://localhost:3000
+    npm run build    # продакшен-сборка в dist/
+
+## Структура
+    index.html            заставка + точка входа
+    src/main.tsx          монтирование React
+    src/index.css         тема (Tailwind v4)
+    src/App.tsx           HUD и экраны
+    src/game/audio.ts     синтезатор звуков (WebAudio)
+    src/game/game.ts      игровой движок: физика, уровни, босс, бонусы
+
+package-lock.json намеренно не включён — npm install создаст его заново.
+`;
+
+async function prepareProjectArchive(): Promise<{ url: string; size: number; name: string }> {
+  {
+    let files: { path: string; content: string }[] | null = null;
+    let chunkErr = "";
+
+    // Способ 1: исходники, скомпилированные в ленивый чанк (работает в статической сборке)
+    try {
+      const mod = await import("./archive-sources");
+      files = [...mod.ARCHIVE_FILES, { path: "sharoboy/README.md", content: PROJECT_README }];
+    } catch (e) {
+      chunkErr = "чанк: " + String((e as Error)?.message || e);
+    }
+
+    // Способ 2: дев-сервер отдаёт файлы проекта — читаем их напрямую
+    if (!files) {
+      try {
+        const base = import.meta.env.BASE_URL || "/";
+        const map: [string, string][] = [
+          ["sharoboy/index.html", "index.html"],
+          ["sharoboy/package.json", "package.json"],
+          ["sharoboy/tsconfig.json", "tsconfig.json"],
+          ["sharoboy/vite.config.js", "vite.config.js"],
+          ["sharoboy/src/main.tsx", "src/main.tsx"],
+          ["sharoboy/src/index.css", "src/index.css"],
+          ["sharoboy/src/App.tsx", "src/App.tsx"],
+          ["sharoboy/src/game/audio.ts", "src/game/audio.ts"],
+          ["sharoboy/src/game/game.ts", "src/game/game.ts"],
+        ];
+        const got: { path: string; content: string }[] = [];
+        for (const [zipPath, file] of map) {
+          const res = await fetch(base + file);
+          if (!res.ok) throw new Error(`${file} → HTTP ${res.status}`);
+          got.push({ path: zipPath, content: await res.text() });
+        }
+        got.push({ path: "sharoboy/README.md", content: PROJECT_README });
+        files = got;
+      } catch (e) {
+        throw new Error(
+          "Архив недоступен. " +
+            (chunkErr ? chunkErr + " | " : "") +
+            "файлы: " +
+            String((e as Error)?.message || e)
+        );
+      }
+    }
+
+    const blob = makeZip(files);
+    return { url: URL.createObjectURL(blob), size: blob.size, name: "sharoboy.zip" };
+  }
+}
+
 /* ---------- app ---------- */
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
   const [hud, setHud] = useState<HudData>(INITIAL_HUD);
+  const [bootError, setBootError] = useState<string | null>(null);
+  const [archive, setArchive] = useState<{ url: string; size: number; name: string } | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState(false);
 
   const onHud = useCallback((h: HudData) => setHud(h), []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const game = new Game(canvas, onHud);
-    gameRef.current = game;
-    game.attach();
-    return () => game.destroy();
+    try {
+      const game = new Game(canvas, onHud);
+      gameRef.current = game;
+      game.attach();
+      return () => game.destroy();
+    } catch (err) {
+      console.error("[ШАРОБОЙ] сбой инициализации движка:", err);
+      setBootError(String((err as Error)?.stack || err));
+    }
   }, [onHud]);
 
   const g = () => gameRef.current;
   const inGame = hud.phase === "playing" || hud.phase === "paused";
 
+  const openArchive = async (btn: HTMLButtonElement) => {
+    gameRef.current?.sfx.ensure();
+    gameRef.current?.sfx.ui();
+    const orig = btn.textContent;
+    btn.textContent = "Готовлю архив…";
+    setArchiveBusy(true);
+    try {
+      const a = await prepareProjectArchive();
+      setArchive(a);
+    } catch (e) {
+      const msg = String((e as Error)?.message || e);
+      console.error("[ШАРОБОЙ] архив:", msg);
+      btn.textContent = msg.length > 42 ? msg.slice(0, 40) + "…" : msg;
+      setTimeout(() => {
+        btn.textContent = orig;
+      }, 6000);
+    } finally {
+      setArchiveBusy(false);
+    }
+  };
+
+  const closeArchive = () => {
+    if (archive) URL.revokeObjectURL(archive.url);
+    setArchive(null);
+  };
+
   return (
     <div className="relative h-full w-full overflow-hidden font-body">
+      {bootError && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-abyss p-6">
+          <div className="hud-chip max-w-xl p-6">
+            <div className="hud-label mb-2">Сбой инициализации движка</div>
+            <pre className="whitespace-pre-wrap break-words font-mono text-sm text-coral">{bootError}</pre>
+            <button className="btn-ghost mt-5 px-6 py-2.5" onClick={() => window.location.reload()}>
+              Перезагрузить
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ================= ПАНЕЛЬ АРХИВА ================= */}
+      {archive && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-abyss/80 p-6">
+          <div className="anim-pop hud-chip w-full max-w-md p-7 text-center">
+            <div className="hud-label mb-2">Архив готов</div>
+            <h2 className="font-display title-glow text-3xl text-foam">ШАРОБОЙ.ZIP</h2>
+            <p className="mt-2 text-sm text-dim">
+              {Math.max(1, Math.round(archive.size / 1024))} КБ · все исходники игры + README
+            </p>
+            <a
+              href={archive.url}
+              download={archive.name}
+              className="btn-arcade mt-6 inline-flex items-center justify-center gap-2.5 px-8 py-3.5 text-lg"
+            >
+              <IconDownload /> Скачать архив
+            </a>
+            <p className="mt-4 text-xs leading-relaxed text-dim">
+              Если файл не скачивается сам — кликните по кнопке правой кнопкой мыши и выберите
+              «Сохранить ссылку как…».
+            </p>
+            <button className="btn-ghost mt-5 px-7 py-2.5" onClick={closeArchive}>
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
       <canvas ref={canvasRef} className="absolute inset-0" />
 
       {/* ================= HUD ================= */}
       {inGame && (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-3 sm:p-4">
-          <div className="flex items-start gap-2">
+          <div className="flex flex-wrap items-start gap-2">
             <div className="hud-chip px-3.5 py-2">
               <div className="hud-label">Счёт</div>
               <div className="font-display text-xl leading-none text-foam tabular-nums sm:text-2xl">
@@ -221,9 +444,7 @@ export default function App() {
             {hud.coins > 0 && (
               <div className="hud-chip px-3.5 py-2">
                 <div className="hud-label">Монеты</div>
-                <div className="font-display text-xl leading-none text-gold tabular-nums sm:text-2xl">
-                  {hud.coins}
-                </div>
+                <div className="font-display text-xl leading-none text-gold tabular-nums sm:text-2xl">{hud.coins}</div>
               </div>
             )}
             {hud.shield > 0 && (
@@ -243,9 +464,7 @@ export default function App() {
 
           <div className="hud-chip stripe-hazard hidden px-5 py-2 text-center md:block">
             <div className="hud-label">
-              {hud.mode === "endless"
-                ? `Волна ${hud.wave} · ∞`
-                : `Уровень ${hud.level}/${hud.levelCount} · ${hud.levelName}`}
+              {hud.mode === "endless" ? `Волна ${hud.wave} · ∞` : `Уровень ${hud.level}/${hud.levelCount} · ${hud.levelName}`}
             </div>
             <div className="font-display text-lg leading-tight text-cyan-neon">
               ЦЕЛИ: <span className="text-foam tabular-nums">{hud.blocksLeft}</span>
@@ -283,17 +502,27 @@ export default function App() {
         </div>
       )}
 
-      {/* mobile level chip */}
       {inGame && (
         <div className="pointer-events-none absolute left-1/2 top-[68px] z-20 -translate-x-1/2 md:hidden">
           <div className="hud-chip px-3 py-1 font-display text-xs text-cyan-neon">
-            {hud.mode === "endless" ? `ВОЛНА ${hud.wave}` : `УР. ${hud.level}/${hud.levelCount}`} · ЦЕЛИ{" "}
-            {hud.blocksLeft}
+            {hud.mode === "endless" ? `ВОЛНА ${hud.wave}` : `УР. ${hud.level}/${hud.levelCount}`} · ЦЕЛИ {hud.blocksLeft}
           </div>
         </div>
       )}
 
-      {/* подсказки: оружие и запуск */}
+      {/* активные эффекты */}
+      {inGame && (hud.wideOn || hud.slowOn || hud.fastOn || hud.shrinkOn || hud.magnetOn || hud.fireOn) && (
+        <div className="pointer-events-none absolute bottom-3 left-3 z-20 flex max-w-[46vw] flex-wrap gap-1.5 sm:bottom-4 sm:left-4">
+          {hud.wideOn && <EffectChip label="ШИРЕ" good />}
+          {hud.fireOn && <EffectChip label="ОГНЬ" good />}
+          {hud.magnetOn && <EffectChip label="МАГНИТ" good />}
+          {hud.slowOn && <EffectChip label="МЕДЛЕННЕЕ" good />}
+          {hud.fastOn && <EffectChip label="БЫСТРЕЕ" good={false} />}
+          {hud.shrinkOn && <EffectChip label="УЗКАЯ" good={false} />}
+        </div>
+      )}
+
+      {/* подсказки оружия и запуска */}
       {hud.phase === "playing" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-[96px] z-20 flex flex-col items-center gap-2 sm:bottom-[102px]">
           {hud.laserArmed && (
@@ -314,24 +543,12 @@ export default function App() {
         </div>
       )}
 
-      {/* активные эффекты */}
-      {inGame && (hud.wideOn || hud.slowOn || hud.fastOn || hud.shrinkOn || hud.fireOn) && (
-        <div className="pointer-events-none absolute bottom-3 left-3 z-20 flex max-w-[46vw] flex-wrap gap-1.5 sm:bottom-4 sm:left-4">
-          {hud.wideOn && <EffectChip keyVal="wide" label="ШИРЕ" good />}
-          {hud.fireOn && <EffectChip keyVal="fire" label="ОГНЬ" good />}
-          {hud.magnetOn && <EffectChip keyVal="magnet" label="МАГНИТ" good />}
-          {hud.slowOn && <EffectChip keyVal="slow" label="МЕДЛЕННЕЕ" good />}
-          {hud.fastOn && <EffectChip keyVal="fast" label="БЫСТРЕЕ" good={false} />}
-          {hud.shrinkOn && <EffectChip keyVal="shrink" label="УЗКАЯ" good={false} />}
-        </div>
-      )}
-
-      {/* level banner */}
+      {/* баннер уровня */}
       {hud.banner && inGame && (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
           <div className="anim-banner px-6 text-center">
             <div
-              className="font-display text-3xl tracking-wide text-foam title-glow sm:text-5xl"
+              className="font-display text-3xl tracking-wide text-foam sm:text-5xl"
               style={{ textShadow: "0 0 24px rgba(53,224,255,0.8), 0 4px 0 rgba(4,18,26,0.9)" }}
             >
               {hud.banner}
@@ -346,10 +563,6 @@ export default function App() {
           <FloatingBalls />
           <div className="relative flex min-h-full flex-col items-start justify-center gap-8 p-6 md:flex-row md:items-center md:gap-16 md:p-16 lg:p-24">
             <div className="anim-rise max-w-xl">
-              <div className="mb-3 inline-flex items-center gap-2 border border-line bg-deep/80 px-3 py-1.5">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-mint" />
-                <span className="font-display text-[11px] tracking-[0.3em] text-dim">МОРСКАЯ АРКАДА</span>
-              </div>
               <h1 className="font-display leading-[0.95]">
                 <span className="title-glow block text-6xl text-foam sm:text-7xl lg:text-8xl">ШАРО</span>
                 <span className="title-glow block text-6xl text-cyan-neon sm:text-7xl lg:text-8xl">
@@ -358,7 +571,7 @@ export default function App() {
               </h1>
               <p className="mt-5 max-w-md text-base leading-relaxed text-foam/80 sm:text-lg">
                 Вместо кирпичей — <b className="text-mint">шары</b> и <b className="text-gold">овалы</b> разной
-                величины. Отбивай ядром, собирай серии, лови бонусы, одолей{" "}
+                величины. Отбивай ракеткой, собирай серии, лови бонусы, одолей{" "}
                 <b className="text-cyan-neon">4 уровня с боссом</b> — или выживай в{" "}
                 <b className="text-punch">бесконечных волнах</b>.
               </p>
@@ -372,6 +585,14 @@ export default function App() {
                   onClick={() => g()?.startEndless()}
                 >
                   Бесконечный
+                </button>
+                <button
+                  className="btn-ghost flex items-center gap-2.5 px-5 py-4 font-display text-sm"
+                  onClick={(e) => void openArchive(e.currentTarget)}
+                  title="Скачать весь проект одним ZIP-архивом"
+                  disabled={archiveBusy}
+                >
+                  <IconDownload /> Проект (.zip)
                 </button>
                 {hud.best > 0 && (
                   <div className="hud-chip px-4 py-3">
@@ -405,12 +626,8 @@ export default function App() {
                   <div className="hud-label mb-3">Рекорды кампании</div>
                   <ol className="space-y-1.5">
                     {hud.top.map((s, i) => (
-                      <li key={`c-${s}-${i}`} className="flex items-center font-display text-sm">
-                        <span
-                          className={
-                            i === 0 ? "text-gold" : i === 1 ? "text-foam" : i === 2 ? "text-coral" : "text-dim"
-                          }
-                        >
+                      <li key={`${s}-${i}`} className="flex items-center font-display text-sm">
+                        <span className={i === 0 ? "text-gold" : i === 1 ? "text-foam" : i === 2 ? "text-coral" : "text-dim"}>
                           {i + 1}.
                         </span>
                         <span className="mx-3 flex-1 border-b border-dotted border-line" />
@@ -426,11 +643,7 @@ export default function App() {
                   <ol className="space-y-1.5">
                     {hud.topEndless.map((s, i) => (
                       <li key={`e-${s}-${i}`} className="flex items-center font-display text-sm">
-                        <span
-                          className={
-                            i === 0 ? "text-gold" : i === 1 ? "text-foam" : i === 2 ? "text-coral" : "text-dim"
-                          }
-                        >
+                        <span className={i === 0 ? "text-gold" : i === 1 ? "text-foam" : i === 2 ? "text-coral" : "text-dim"}>
                           {i + 1}.
                         </span>
                         <span className="mx-3 flex-1 border-b border-dotted border-line" />
@@ -442,45 +655,19 @@ export default function App() {
               )}
               <ControlsPanel />
               <div className="hud-chip mt-3 p-4">
-                <div className="hud-label mb-2">Бонусы и анти-бонусы</div>
-                <div className="grid grid-cols-1 gap-1.5 text-sm text-foam/90 sm:grid-cols-2">
-                  <span>
-                    <b className="text-[#4dff9e]">«ШИР»</b> — шире ракетка
-                  </span>
-                  <span>
-                    <b className="text-[#4dff9e]">«×3»</b> — тройной шар
-                  </span>
-                  <span>
-                    <b className="text-[#4dff9e]">«+1»</b> — жизнь
-                  </span>
-                  <span>
-                    <b className="text-[#4dff9e]">«СК↓»</b> — медленнее
-                  </span>
-                  <span>
-                    <b className="text-[#4dff9e]">«ЩИТ»</b> — экран внизу
-                  </span>
-                  <span>
-                    <b className="text-[#4dff9e]">«ЛАЗ»</b> — луч на 2 с, выстрел — пробел
-                  </span>
-                  <span>
-                    <b className="text-[#4dff9e]">«РКТ»</b> — ракеты (пробел)
-                  </span>
-                  <span>
-                    <b className="text-[#4dff9e]">«ОГНЬ»</b> — ядро прожигает блоки
-                  </span>
-                  <span className="col-span-2 mt-1 border-t border-line pt-2 text-dim">
-                    Анти-бонусы — красные:
-                  </span>
-                  <span>
-                    <b className="text-[#ff5347]">«СК↑»</b> — шар быстрее
-                  </span>
-                  <span>
-                    <b className="text-[#ff5347]">«УЗК»</b> — узкая ракетка
-                  </span>
+                <div className="hud-label mb-2">Бонусы</div>
+                <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-foam/90">
+                  <span><b className="text-[#4dff9e]">«ШИР»</b> — шире ракетка</span>
+                  <span><b className="text-[#4dff9e]">«×3»</b> — тройной шар</span>
+                  <span><b className="text-[#4dff9e]">«+1»</b> — жизнь</span>
+                  <span><b className="text-[#4dff9e]">«МАГ»</b> — магнит шара</span>
+                  <span><b className="text-[#4dff9e]">«ОГНЬ»</b> — прожигает блоки</span>
+                  <span><b className="text-[#4dff9e]">«ЩИТ/ЛАЗ/РКТ»</b> — экран и оружие</span>
+                  <span><b className="text-[#4dff9e]">«ЛАЗ»</b> — луч на 2 с, выстрел — пробел</span>
+                  <span><b className="text-coral">«СК↑/УЗК»</b> — анти-бонусы</span>
                 </div>
                 <div className="mt-3 border-t border-line pt-2.5 text-xs text-dim">
                   Тёмные <b className="text-coral">бомбы с фитилём</b> детонируют по площади — собирай цепочки!
-                  Поле периодически пополняется и дрейфует.
                 </div>
               </div>
             </div>
@@ -496,10 +683,7 @@ export default function App() {
               <div className="hud-label mb-1">Пауза</div>
               <h2 className="font-display title-glow text-4xl text-foam">СТОП-КАДР</h2>
               <div className="mt-6 flex flex-col gap-3">
-                <button
-                  className="btn-arcade flex items-center justify-center gap-2 px-6 py-3.5"
-                  onClick={() => g()?.togglePause()}
-                >
+                <button className="btn-arcade flex items-center justify-center gap-2 px-6 py-3.5" onClick={() => g()?.togglePause()}>
                   <IconPlay /> Продолжить
                 </button>
                 <button
@@ -511,9 +695,6 @@ export default function App() {
                 <button className="btn-ghost px-6 py-3" onClick={() => g()?.toMenu()}>
                   В меню
                 </button>
-              </div>
-              <div className="mt-6 border-t border-line pt-4">
-                <ControlsPanel />
               </div>
             </div>
           </div>
@@ -544,28 +725,13 @@ export default function App() {
             <div className="mt-6 flex justify-center gap-3">
               <div className="hud-chip px-6 py-3">
                 <div className="hud-label">Счёт</div>
-                <div className="font-display text-3xl text-foam tabular-nums">
-                  {hud.score.toLocaleString("ru-RU")}
-                </div>
+                <div className="font-display text-3xl text-foam tabular-nums">{hud.score.toLocaleString("ru-RU")}</div>
               </div>
               <div className="hud-chip px-6 py-3">
                 <div className="hud-label">Рекорд</div>
-                <div className="font-display text-3xl text-gold tabular-nums">
-                  {hud.best.toLocaleString("ru-RU")}
-                </div>
+                <div className="font-display text-3xl text-gold tabular-nums">{hud.best.toLocaleString("ru-RU")}</div>
               </div>
             </div>
-            {hud.mode === "endless" && hud.topEndless.length > 0 && (
-              <div className="hud-chip mx-auto mt-4 max-w-xs p-3 text-left">
-                <div className="hud-label mb-2">Лучшие результаты</div>
-                {hud.topEndless.map((s, i) => (
-                  <div key={`eo-${s}-${i}`} className="flex justify-between font-display text-xs text-foam/85">
-                    <span className={i === 0 ? "text-gold" : "text-dim"}>{i + 1}.</span>
-                    <span className="tabular-nums">{s.toLocaleString("ru-RU")}</span>
-                  </div>
-                ))}
-              </div>
-            )}
             <div className="mt-7 flex flex-wrap justify-center gap-3">
               <button
                 className="btn-arcade px-8 py-3.5 text-lg"
@@ -588,7 +754,7 @@ export default function App() {
       {hud.phase === "won" && (
         <div className="absolute inset-0 z-40 flex items-center justify-center p-6">
           <div className="anim-pop w-full max-w-md text-center">
-            <div className="hud-label mb-2 tracking-[0.35em]">Царь-шар повержен</div>
+            <div className="hud-label mb-2 tracking-[0.35em]">Все шары лопнули</div>
             <h2
               className="font-display text-6xl text-mint sm:text-7xl"
               style={{ textShadow: "0 0 30px rgba(93,255,176,0.7), 0 4px 0 rgba(4,18,26,0.9)" }}
@@ -608,15 +774,11 @@ export default function App() {
             <div className="mt-6 flex justify-center gap-3">
               <div className="hud-chip px-6 py-3">
                 <div className="hud-label">Счёт</div>
-                <div className="font-display text-3xl text-foam tabular-nums">
-                  {hud.score.toLocaleString("ru-RU")}
-                </div>
+                <div className="font-display text-3xl text-foam tabular-nums">{hud.score.toLocaleString("ru-RU")}</div>
               </div>
               <div className="hud-chip px-6 py-3">
                 <div className="hud-label">Рекорд</div>
-                <div className="font-display text-3xl text-gold tabular-nums">
-                  {hud.best.toLocaleString("ru-RU")}
-                </div>
+                <div className="font-display text-3xl text-gold tabular-nums">{hud.best.toLocaleString("ru-RU")}</div>
               </div>
             </div>
             <div className="mt-7 flex flex-wrap justify-center gap-3">

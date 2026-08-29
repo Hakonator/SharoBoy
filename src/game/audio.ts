@@ -6,21 +6,27 @@ export class SFX {
   muted = false;
 
   ensure() {
-    if (!this.ctx) {
-      const AC =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AC) return;
-      this.ctx = new AC();
-      this.master = this.ctx.createGain();
-      this.master.gain.value = 0.42;
-      this.master.connect(this.ctx.destination);
-      const len = Math.floor(this.ctx.sampleRate * 0.4);
-      this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-      const data = this.noiseBuf.getChannelData(0);
-      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    try {
+      if (!this.ctx) {
+        const AC =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AC) return;
+        this.ctx = new AC();
+        this.master = this.ctx.createGain();
+        this.master.gain.value = 0.42;
+        this.master.connect(this.ctx.destination);
+        const len = Math.floor(this.ctx.sampleRate * 0.4);
+        this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+        const data = this.noiseBuf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      }
+      if (this.ctx.state === "suspended") void this.ctx.resume();
+    } catch {
+      /* нет доступа к WebAudio — игра работает без звука */
+      this.ctx = null;
+      this.master = null;
     }
-    if (this.ctx.state === "suspended") void this.ctx.resume();
   }
 
   private blip(
@@ -109,10 +115,6 @@ export class SFX {
     this.blip(520, 0.12, "sine", 0.24, 880);
     this.blip(880, 0.1, "sine", 0.16, 440, 0.05);
   }
-  coin() {
-    this.blip(1568, 0.06, "square", 0.16, 2093);
-    this.blip(2093, 0.12, "square", 0.14, 2637, 0.05);
-  }
   burn() {
     this.blip(980, 0.09, "sawtooth", 0.13, 240);
     this.noise(0.06, 0.06);
@@ -120,6 +122,10 @@ export class SFX {
   bossDie() {
     [520, 392, 311, 233, 155].forEach((f, i) => this.blip(f, 0.2, "sawtooth", 0.2, undefined, i * 0.09));
     this.noise(0.5, 0.2, 0.1);
+  }
+  coin() {
+    this.blip(1320, 0.07, "triangle", 0.2, 1980);
+    this.blip(1980, 0.09, "triangle", 0.16, 2640, 0.05);
   }
   gameOver() {
     [392, 311, 233, 155].forEach((f, i) => this.blip(f, 0.22, "sawtooth", 0.2, undefined, i * 0.12));

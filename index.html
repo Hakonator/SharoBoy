@@ -1,25 +1,163 @@
 <!doctype html>
 <html lang="ru">
   <head>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>ШАРОБОЙ — аркадный разбиватель шаров</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Russo+One&family=Rubik:wght@400;500;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Russo+One&family=Rubik:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
     <style>
-      html,
-      body {
-        margin: 0;
-        background: #04121c;
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #04121c; }
+      #boot-splash {
+        position: fixed; inset: 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 26px;
+        background: radial-gradient(120% 90% at 50% 0%, #0e3a4e 0%, #082434 46%, #04121c 100%);
+        font-family: "Russo One", "Rubik", sans-serif;
+        padding: 24px; box-sizing: border-box; overflow: auto;
       }
+      #boot-splash .boot-title {
+        font-size: clamp(34px, 7vw, 64px); letter-spacing: 0.06em; color: #eaf7ff;
+        text-shadow: 0 0 18px rgba(53,224,255,0.6), 0 0 60px rgba(53,224,255,0.3), 0 4px 0 rgba(4,18,26,0.9);
+      }
+      #boot-splash .boot-title span { color: #35e0ff; }
+      #boot-splash .boot-balls { display: flex; gap: 22px; }
+      #boot-splash .boot-ball { width: 26px; height: 26px; border-radius: 50%; animation: boot-hop 0.9s cubic-bezier(0.35,0,0.25,1) infinite; }
+      #boot-splash .b1 { background: radial-gradient(circle at 32% 28%, #fff, #5dffb0 55%, #0f8f5b); box-shadow: 0 0 20px rgba(93,255,176,0.6); }
+      #boot-splash .b2 { background: radial-gradient(circle at 32% 28%, #fff, #ffc94d 55%, #b0720a); box-shadow: 0 0 20px rgba(255,201,77,0.6); animation-delay: 0.15s; }
+      #boot-splash .b3 { background: radial-gradient(circle at 32% 28%, #fff, #ff6a5c 55%, #9c1f12); box-shadow: 0 0 20px rgba(255,106,92,0.6); animation-delay: 0.3s; }
+      @keyframes boot-hop {
+        0%, 100% { transform: translateY(0) scale(1, 1); }
+        30% { transform: translateY(-26px) scale(0.94, 1.06); }
+        55% { transform: translateY(0) scale(1.12, 0.88); }
+        70% { transform: translateY(-6px) scale(1, 1); }
+      }
+      #boot-splash .boot-note {
+        font-family: "Rubik", sans-serif; font-size: 13px; letter-spacing: 0.22em;
+        text-transform: uppercase; color: #7fa6ba; animation: boot-pulse 1.4s ease-in-out infinite;
+        user-select: text; -webkit-user-select: text;
+      }
+      @keyframes boot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+      #boot-diag {
+        max-width: 640px; width: 100%; margin-top: 6px; padding: 12px 16px; font-family: ui-monospace, monospace;
+        font-size: 12px; line-height: 1.55; color: #ff9d94; white-space: pre-wrap; word-break: break-word;
+        background: rgba(7,26,38,0.92); border: 1px solid #1d4a61; display: none;
+        user-select: text; -webkit-user-select: text; cursor: text;
+        max-height: 38vh; overflow: auto; box-sizing: border-box;
+      }
+      #boot-copy {
+        display: none; margin-top: 4px; padding: 10px 22px; cursor: pointer;
+        font-family: "Russo One", sans-serif; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase;
+        color: #04121c; background: linear-gradient(180deg, #7cf5ff, #35e0ff 45%, #12b8d8);
+        border: 1px solid #9df2ff; border-radius: 4px;
+      }
+      #boot-copy:active { transform: translateY(2px); }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot-splash">
+        <div class="boot-title">ШАРО<span>БОЙ</span></div>
+        <div class="boot-balls">
+          <div class="boot-ball b1"></div>
+          <div class="boot-ball b2"></div>
+          <div class="boot-ball b3"></div>
+        </div>
+        <div class="boot-note" id="boot-note">Загрузка…</div>
+        <div id="boot-diag"></div>
+        <button id="boot-copy" type="button">Скопировать диагностику</button>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var note = document.getElementById("boot-note");
+        var diag = document.getElementById("boot-diag");
+        var copyBtn = document.getElementById("boot-copy");
+        var errors = [];
+        function show(msg) {
+          if (!note) return;
+          note.textContent = msg;
+          note.style.color = "#ff9d94";
+          note.style.animation = "none";
+        }
+        window.addEventListener("error", function (e) {
+          var msg = e.message || "unknown error";
+          if (e.error && e.error.stack) msg = e.error.stack;
+          else if (e.filename) msg += " (" + e.filename + (e.lineno ? ":" + e.lineno : "") + ")";
+          errors.push(msg);
+          show("Ошибка при запуске игры");
+        });
+        window.addEventListener("unhandledrejection", function (e) {
+          errors.push("promise: " + String((e.reason && e.reason.stack) || e.reason));
+        });
+        if (copyBtn) {
+          copyBtn.addEventListener("click", function () {
+            var text = diag ? diag.textContent : "";
+            function ok() { copyBtn.textContent = "Скопировано!"; }
+            function fallback() {
+              var ta = document.createElement("textarea");
+              ta.value = text;
+              ta.style.position = "fixed";
+              ta.style.opacity = "0";
+              document.body.appendChild(ta);
+              ta.select();
+              try { document.execCommand("copy"); ok(); } catch (err2) {}
+              ta.remove();
+            }
+            try {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(ok, fallback);
+              } else fallback();
+            } catch (err) { fallback(); }
+          });
+        }
+        setTimeout(function () {
+          if (window.__sharoboy_booted) return;
+          var list = [];
+          var entrySeen = false;
+          var extAssets = 0;
+          for (var i = 0; i < document.scripts.length; i++) {
+            var s = document.scripts[i];
+            if (s.src) {
+              list.push("[внешний] " + s.src);
+              if (s.src.indexOf("main.tsx") >= 0) entrySeen = true;
+              if (s.src.indexOf("/assets/") >= 0) extAssets++;
+            } else {
+              list.push("[встроенный] " + (s.textContent || "").length + " симв.");
+            }
+          }
+          var lines = [];
+          lines.push("Диагностика запуска ШАРОБОЯ:");
+          lines.push("Адрес: " + location.href);
+          lines.push("Скриптов: " + document.scripts.length);
+          for (var k = 0; k < list.length; k++) lines.push("  " + list[k]);
+          lines.push("");
+          if (extAssets > 0) {
+            lines.push("ВЕРДИКТ: показана старая статическая сборка — файлы ассетов недоступны.");
+          } else if (entrySeen) {
+            lines.push("ВЕРДИКТ: входной модуль src/main.tsx не выполнился (дед-сервер или браузер отклонил запрос).");
+          } else if (errors.length === 0) {
+            lines.push("ВЕРДИКТ: приложение не стартовало, явных ошибок нет.");
+          } else {
+            lines.push("ВЕРДИКТ: приложение упало при запуске.");
+          }
+          if (errors.length) {
+            lines.push("");
+            lines.push("Пойманные ошибки:");
+            for (var j = 0; j < errors.length; j++) lines.push("[" + (j + 1) + "] " + errors[j]);
+          }
+          lines.push("");
+          lines.push("Отправьте этот текст разработчику игры.");
+          if (diag) { diag.style.display = "block"; diag.textContent = lines.join("\n"); }
+          if (copyBtn) copyBtn.style.display = "inline-block";
+          show("Не удалось запустить игру");
+        }, 5000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
