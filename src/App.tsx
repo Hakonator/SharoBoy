@@ -393,20 +393,20 @@ export default function App() {
     }
     setSubmitState("sending");
     setSubmitError(null);
-    const ok = await submitScore(
+    const err = await submitScore(
       check.nick,
       hud.score,
       hud.mode,
       hud.mode === "endless" ? hud.wave : 0
     );
-    if (ok) {
+    if (!err) {
       setSubmitState("done");
       const [c, e] = await Promise.all([fetchTop("campaign"), fetchTop("endless")]);
       setGlobalTop(c);
       setGlobalTopEndless(e);
     } else {
       setSubmitState("error");
-      setSubmitError("Не удалось отправить — проверьте интернет и попробуйте ещё раз");
+      setSubmitError("Не удалось отправить: " + err);
     }
   };
 

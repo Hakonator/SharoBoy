@@ -64,23 +64,23 @@ export async function fetchTop(mode: "campaign" | "endless", limit = 10): Promis
   }
 }
 
-/** Добавить очки в мировой топ. true — успех. */
+/** Добавить очки в мировой топ. Возвращает null при успехе или текст ошибки. */
 export async function submitScore(
   nick: string,
   score: number,
   mode: "campaign" | "endless",
   wave: number
-): Promise<boolean> {
+): Promise<string | null> {
   try {
     const client = await getClient();
-    if (!client) return false;
+    if (!client) return "Таблица рекордов не подключена";
     const { error } = await client
       .from("sharoboy_scores")
       .insert({ nick, score, mode, wave });
-    if (error) throw new Error(error.message);
-    return true;
+    if (error) return error.message;
+    return null;
   } catch (e) {
-    console.warn("[ШАРОБОЙ] не удалось отправить очки:", e);
-    return false;
+    console.error("[ШАРОБОЙ] не удалось отправить очки:", e);
+    return e instanceof Error ? e.message : String(e);
   }
 }
