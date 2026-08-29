@@ -417,7 +417,9 @@ export default function App() {
           </div>
         </div>
       )}
-      <canvas ref={canvasRef} className="absolute inset-0" />
+      {/* h-full/w-full обязательны: canvas — replaced-элемент, absolute inset-0 его
+          не растягивает, и при devicePixelRatio > 1 он вылезал за пределы экрана */}
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
       {/* ================= HUD ================= */}
       {inGame && (
