@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Game, type HudData } from "./game/game";
+import { LEADERBOARD_ENABLED } from "./config";
+import { fetchTop, submitScore, type GlobalScore } from "./game/leaderboard";
+import { validateNick } from "./game/profanity";
 
 /* Исходники для ZIP-архива грузятся лениво (отдельный чанк archive-sources),
    чтобы стартовая страница была компактной и запускалась надёжно. */
@@ -332,21 +335,112 @@ export default function App() {
   const [archive, setArchive] = useState<{ url: string; size: number; name: string } | null>(null);
   const [archiveBusy, setArchiveBusy] = useState(false);
 
+  const [globalTop, setGlobalTop] = useState<GlobalScore[]>([]);
+  const [globalTopEndless, setGlobalTopEndless] = useState<GlobalScore[]>([]);
+  const [nick, setNick] = useState<string>(() => {
+    try {
+      return localStorage.getItem("sharoboy-nick") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [submitState, setSubmitState] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const onHud = useCallback((h: HudData) => setHud(h), []);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    try {
-      const game = new Game(canvas, onHud);
-      gameRef.current = game;
-      game.attach();
-      return () => game.destroy();
-    } catch (err) {
-      console.error("[ШАРОБОЙ] сбой инициализации движка:", err);
-      setBootError(String((err as Error)?.stack || err));
+    if (!LEADERBOARD_ENABLED) return;
+    void (async () => {
+      const [c, e] = await Promise.all([fetchTop("campaign"), fetchTop("endless")]);
+      setGlobalTop(c);
+      setGlobalTopEndless(e);
+    })();
+  }, []);
+
+  /* новая игра — форма отправки очков сбрасывается */
+  useEffect(() => {
+    if (hud.phase === "playing" || hud.phase === "menu") {
+      setSubmitState("idle");
+      setSubmitError(null);
     }
-  }, [onHud]);
+  }, [hud.phase]);
+
+  const handleTopSubmit = async () => {
+    if (submitState === "sending" || submitState === "done") return;
+    const check = validateNick(nick);
+    if (!check.ok) {
+      setSubmitState("error");
+      setSubmitError(check.error);
+      return;
+    }
+    setNick(check.nick);
+    try {
+      localStorage.setItem("sharoboy-nick", check.nick);
+    } catch {
+      /* приватный режим — ник просто не сохранится */
+    }
+    setSubmitState("sending");
+    setSubmitError(null);
+    const ok = await submitScore(
+      check.nick,
+      hud.score,
+      hud.mode,
+      hud.mode === "endless" ? hud.wave : 0
+    );
+    if (ok) {
+      setSubmitState("done");
+      const [c, e] = await Promise.all([fetchTop("campaign"), fetchTop("endless")]);
+      setGlobalTop(c);
+      setGlobalTopEndless(e);
+    } else {
+      setSubmitState("error");
+      setSubmitError("Не удалось отправить — проверьте интернет и попробуйте ещё раз");
+    }
+  };
+
+  /* форма «попасть в мировой топ» — показывается на экранах поражения и победы */
+  const topSubmit =
+    LEADERBOARD_ENABLED && (hud.phase === "over" || hud.phase === "won") && hud.score > 0 ? (
+      <div className="mx-auto mt-4 w-full max-w-md">
+        {submitState === "done" ? (
+          <div className="hud-chip px-4 py-2.5 text-center font-display text-sm text-mint">
+            Записано в мировой топ! ✓
+          </div>
+        ) : (
+          <div className="hud-chip p-4 text-left">
+            <div className="hud-label mb-2">🌍 Попасть в мировой топ</div>
+            <div className="flex gap-2">
+              <input
+                value={nick}
+                maxLength={16}
+                placeholder="Ваш ник"
+                onChange={(e) => setNick(e.target.value)}
+                onKeyDown={(e) => {
+                  /* не даём движку ловить пробел/латиницу как управление */
+                  e.stopPropagation();
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleTopSubmit();
+                  }
+                }}
+                className="h-10 min-w-0 flex-1 border border-line bg-deep px-3 font-display text-sm text-foam outline-none placeholder:text-dim/60 focus:border-cyan-neon"
+              />
+              <button
+                className="btn-arcade px-4 py-2 text-sm"
+                onClick={() => void handleTopSubmit()}
+                disabled={submitState === "sending" || nick.trim().length === 0}
+              >
+                {submitState === "sending" ? "…" : "В топ!"}
+              </button>
+            </div>
+            {submitState === "error" && submitError && (
+              <div className="mt-2 text-xs text-coral">{submitError}</div>
+            )}
+          </div>
+        )}
+      </div>
+    ) : null;
 
   const g = () => gameRef.current;
   const inGame = hud.phase === "playing" || hud.phase === "paused";
@@ -604,6 +698,12 @@ export default function App() {
                     </div>
                   </div>
                 )}
+                {nick.trim().length > 0 && (
+                  <div className="hud-chip px-4 py-3">
+                    <div className="hud-label">Игрок</div>
+                    <div className="max-w-36 truncate font-display text-xl text-foam">{nick.trim()}</div>
+                  </div>
+                )}
               </div>
 
               <div className="mt-7 flex flex-wrap gap-2 text-xs text-dim">
@@ -650,6 +750,41 @@ export default function App() {
                         </span>
                         <span className="mx-3 flex-1 border-b border-dotted border-line" />
                         <span className="text-foam tabular-nums">{s.toLocaleString("ru-RU")}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {LEADERBOARD_ENABLED && globalTop.length > 0 && (
+                <div className="hud-chip mb-3 p-4 sm:p-5">
+                  <div className="hud-label mb-3">🌍 Мировой топ — кампания</div>
+                  <ol className="space-y-1.5">
+                    {globalTop.map((s, i) => (
+                      <li key={`g-${i}`} className="flex items-center font-display text-sm">
+                        <span className={i === 0 ? "text-gold" : i === 1 ? "text-foam" : i === 2 ? "text-coral" : "text-dim"}>
+                          {i + 1}.
+                        </span>
+                        <span className="ml-2 min-w-0 truncate text-foam">{s.nick}</span>
+                        <span className="mx-3 flex-1 border-b border-dotted border-line" />
+                        <span className="text-foam tabular-nums">{s.score.toLocaleString("ru-RU")}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {LEADERBOARD_ENABLED && globalTopEndless.length > 0 && (
+                <div className="hud-chip mb-3 p-4 sm:p-5">
+                  <div className="hud-label mb-3">🌍 Мировой топ — бесконечный</div>
+                  <ol className="space-y-1.5">
+                    {globalTopEndless.map((s, i) => (
+                      <li key={`ge-${i}`} className="flex items-center font-display text-sm">
+                        <span className={i === 0 ? "text-gold" : i === 1 ? "text-foam" : i === 2 ? "text-coral" : "text-dim"}>
+                          {i + 1}.
+                        </span>
+                        <span className="ml-2 min-w-0 truncate text-foam">{s.nick}</span>
+                        {s.wave > 0 && <span className="ml-1.5 text-[10px] text-dim">волна {s.wave}</span>}
+                        <span className="mx-3 flex-1 border-b border-dotted border-line" />
+                        <span className="text-foam tabular-nums">{s.score.toLocaleString("ru-RU")}</span>
                       </li>
                     ))}
                   </ol>
@@ -734,6 +869,7 @@ export default function App() {
                 <div className="font-display text-3xl text-gold tabular-nums">{hud.best.toLocaleString("ru-RU")}</div>
               </div>
             </div>
+            {topSubmit}
             <div className="mt-7 flex flex-wrap justify-center gap-3">
               <button
                 className="btn-arcade px-8 py-3.5 text-lg"
@@ -783,6 +919,7 @@ export default function App() {
                 <div className="font-display text-3xl text-gold tabular-nums">{hud.best.toLocaleString("ru-RU")}</div>
               </div>
             </div>
+            {topSubmit}
             <div className="mt-7 flex flex-wrap justify-center gap-3">
               <button className="btn-arcade px-8 py-3.5 text-lg" onClick={() => g()?.startGame()}>
                 Сыграть снова
