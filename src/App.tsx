@@ -349,6 +349,17 @@ export default function App() {
 
   const onHud = useCallback((h: HudData) => setHud(h), []);
 
+  /* Инициализация движка: без этого gameRef.current остаётся null,
+     и кнопки меню (Кампания / Бесконечный) не запускают игру. */
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const game = new Game(canvas, onHud);
+    gameRef.current = game;
+    game.attach();
+    return () => game.destroy();
+  }, []);
+
   useEffect(() => {
     if (!LEADERBOARD_ENABLED) return;
     void (async () => {
