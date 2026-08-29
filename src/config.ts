@@ -12,8 +12,7 @@
  *
  * Пока поля пустые, игра работает как раньше: рекорды хранятся локально.
  */
-export const SUPABASE_URL = "";
-export const SUPABASE_ANON_KEY = "";
+export const SUPABASE_URL = "https://wbidprepvccgxtujqsjy.supabase.co/rest/v1/";
+export const SUPABASE_ANON_KEY = "sb_publishable_af_ESvQDUWkDxBWzQ7fJ3w_VEK-f8Uk";
 
-export const LEADERBOARD_ENABLED =
-  SUPABASE_URL.trim() !== "" && SUPABASE_ANON_KEY.trim() !== "";
+export const LEADERBOARD_ENABLED = SUPABASE_URL.trim() !== "" && SUPABASE_ANON_KEY.trim() !== "";
