@@ -561,6 +561,11 @@ export class Game {
     this.canvas.width = Math.floor(this.w * this.dpr);
     this.canvas.height = Math.floor(this.h * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    // Экранный размер канваса задаём явно: canvas — replaced-элемент, без явных
+    // CSS-размеров он берёт размер атрибутов (w*dpr × h*dpr) и при
+    // devicePixelRatio != 1 (масштаб ОС 125%/150%, Retina) вылезает за экран.
+    this.canvas.style.width = `${this.w}px`;
+    this.canvas.style.height = `${this.h}px`;
     this.paddle.baseW = clamp(this.w * 0.18, 110, 200);
     this.paddle.y = this.h - 34;
     this.paddle.x = clamp(this.paddle.x, this.paddle.w / 2 + 4, this.w - this.paddle.w / 2 - 4);
