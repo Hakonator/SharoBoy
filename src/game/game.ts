@@ -507,6 +507,8 @@ export class Game {
     document.addEventListener("pointerlockchange", this.handleLockChange);
     document.addEventListener("pointerlockerror", this.handleLockError);
     this.canvas.addEventListener("pointerdown", this.handlePointerDown);
+    this.canvas.addEventListener("pointerup", this.handlePointerUp);
+    this.canvas.addEventListener("pointercancel", this.handlePointerUp);
     for (let i = 0; i < 26; i++) {
       this.bubbles.push({
         x: Math.random() * this.w,
@@ -533,6 +535,8 @@ export class Game {
     document.removeEventListener("pointerlockchange", this.handleLockChange);
     document.removeEventListener("pointerlockerror", this.handleLockError);
     this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
+    this.canvas.removeEventListener("pointerup", this.handlePointerUp);
+    this.canvas.removeEventListener("pointercancel", this.handlePointerUp);
   }
 
   private loop = (t: number) => {
@@ -641,13 +645,24 @@ export class Game {
   private handlePointerDown = (e: PointerEvent) => {
     this.sfx.ensure();
     this.tapFire = true;
-    // Ракетку в точку касания НЕ перекидываем: палец/мышь могут быть далеко
-    // от ракетки (на телефоне тап для запуска шара делается чаще всего не над
-    // ракеткой), и ракетка «уезжала» к месту тапа. Ракетка следует только за
-    // движением указателя (pointermove), а не за позицией самого касания.
+    // Ракетку в точку касания НЕ перекидываем — палец/мышь могут быть далеко
+    // от ракетки, и ракетка «уезжала» к месту тапа.
     if (this.phase === "playing") {
+      if (e.pointerType === "touch") {
+        // Тач: сначала ведём ракетку пальцем в нужное место, шар запускается
+        // при отпускании (handlePointerUp).
+        return;
+      }
+      // Мышь/стилус: запуск сразу + pointer lock, как раньше.
       this.launch();
       this.requestLock();
+    }
+  };
+
+  /* Отпускание пальца на таче = запуск шара (если он на ракетке). */
+  private handlePointerUp = (e: PointerEvent) => {
+    if (this.phase === "playing" && (e.pointerType === "touch" || e.pointerType === "pen")) {
+      this.launch();
     }
   };
 

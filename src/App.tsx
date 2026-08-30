@@ -114,7 +114,7 @@ function ControlsPanel() {
             <IconMouse />
           </span>
           <span>
-            Мышь / палец — двигать ракетку, <b className="text-cyan-neon">клик</b> — запуск
+            Мышь / палец — двигать ракетку, <b className="text-cyan-neon">клик</b> — запуск (на таче: веди пальцем и отпусти)
           </span>
         </li>
         <li className="flex items-center gap-3">
@@ -439,7 +439,7 @@ export default function App() {
           )}
           {hud.stuck && (
             <div className="anim-blink hud-chip px-4 py-2 font-display text-sm tracking-wider text-cyan-neon">
-              КЛИК / ПРОБЕЛ — ЗАПУСК
+              ТАП / КЛИК / ПРОБЕЛ — ЗАПУСК
             </div>
           )}
         </div>
