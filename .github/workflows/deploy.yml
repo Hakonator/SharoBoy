@@ -18,17 +18,47 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # --- Стабильная версия (main) → корень сайта ---
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-src
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Установка зависимостей
+          cache-dependency-path: main-src/package-lock.json
+      - name: Установка зависимостей (main)
+        working-directory: main-src
         run: npm ci
-      - name: Проверка типов
+      - name: Проверка типов (main)
+        working-directory: main-src
         run: npm run typecheck
-      - name: Сборка
+      - name: Сборка стабильной версии (main)
+        working-directory: main-src
         run: npm run build
+      - name: Перенос в корень сайта
+        run: mv main-src/dist site
+
+      # --- Бета-версия (beta) → подкаталог /beta/ ---
+      - uses: actions/checkout@v4
+        with:
+          ref: beta
+          path: beta-src
+      - name: Установка зависимостей (beta)
+        working-directory: beta-src
+        run: npm ci
+      - name: Проверка типов (beta)
+        working-directory: beta-src
+        run: npm run typecheck
+      - name: Сборка бета-версии (beta)
+        working-directory: beta-src
+        env:
+          GH_PAGES_BASE: /SharoBoy/beta/
+        run: npm run build
+      - name: Перенос в подкаталог /beta/
+        run: mv beta-src/dist site/beta
+
       - name: Настройка Pages
         uses: actions/configure-pages@v5
         with:
@@ -36,7 +66,7 @@ jobs:
       - name: Загрузка артефакта
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: site
 
   deploy:
     needs: build
