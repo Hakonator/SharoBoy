@@ -612,21 +612,39 @@ export class Game {
     if (this.phase === "playing") this.togglePause();
   };
 
+  /* Координата указателя (clientX) → игровая координата X.
+     Canvas растянут на весь экран, но прямоугольник считаем через
+     getBoundingClientRect, чтобы компенсировать любые смещения/масштабы. */
+  private clientToGameX(clientX: number): number {
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width > 0) return ((clientX - rect.left) / rect.width) * this.w;
+    return clientX - rect.left;
+  }
+
+  /* Сколько игровых пикселей приходится на один CSS-пиксель канваса
+     (для дельты movementX в режиме pointer lock). */
+  private worldPerCssPx(): number {
+    const rect = this.canvas.getBoundingClientRect();
+    return rect.width > 0 ? this.w / rect.width : 1;
+  }
+
   private handlePointerMove = (e: PointerEvent | MouseEvent) => {
     if (this.locked) {
-      const vx = (this.virtualX ?? this.paddle.x) + e.movementX;
+      const vx = (this.virtualX ?? this.paddle.x) + e.movementX * this.worldPerCssPx();
       this.virtualX = clamp(vx, 0, this.w);
       this.pointerX = this.virtualX;
       return;
     }
-    this.pointerX = e.clientX;
+    this.pointerX = this.clientToGameX(e.clientX);
   };
 
   private handlePointerDown = (e: PointerEvent) => {
     this.sfx.ensure();
-    this.pointerX = e.clientX;
-    this.virtualX = e.clientX;
     this.tapFire = true;
+    // Ракетку в точку касания НЕ перекидываем: палец/мышь могут быть далеко
+    // от ракетки (на телефоне тап для запуска шара делается чаще всего не над
+    // ракеткой), и ракетка «уезжала» к месту тапа. Ракетка следует только за
+    // движением указателя (pointermove), а не за позицией самого касания.
     if (this.phase === "playing") {
       this.launch();
       this.requestLock();
