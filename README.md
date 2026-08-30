@@ -10,8 +10,8 @@
     npm run preview  # локальный предпросмотр продакшен-сборки
 
 ## Играть онлайн
-Сайт публикуется автоматически на GitHub Pages при каждом пуше в main
-(см. .github/workflows/deploy.yml):
+Сайт публикуется автоматически на GitHub Pages при каждом пуше в `beta`
+(тестовая версия) или в `main` (стабильная версия), см. `.github/workflows/deploy.yml`:
     https://hakonator.github.io/SharoBoy/
 
 ## 🌍 Мировая таблица рекордов
