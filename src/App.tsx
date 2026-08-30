@@ -4,9 +4,6 @@ import { LEADERBOARD_ENABLED } from "./config";
 import { fetchTop, submitScore, type GlobalScore } from "./game/leaderboard";
 import { validateNick } from "./game/profanity";
 
-/* Исходники для ZIP-архива грузятся лениво (отдельный чанк archive-sources),
-   чтобы стартовая страница была компактной и запускалась надёжно. */
-
 const INITIAL_HUD: HudData = {
   phase: "menu",
   score: 0,
@@ -84,14 +81,6 @@ const IconBall = ({ color, className }: { color: string; className?: string }) =
     <circle cx="10" cy="10" r="8.5" fill={`url(#g-${color.replace("#", "")})`} />
   </svg>
 );
-const IconDownload = () => (
-  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 3v11" />
-    <path d="m7 10 5 5 5-5" />
-    <path d="M4 19h16" />
-  </svg>
-);
-
 const Key = ({ children, wide }: { children: React.ReactNode; wide?: boolean }) => (
   <span
     className={`inline-flex h-8 items-center justify-center border border-line bg-deep px-2 font-display text-[11px] text-cyan-neon shadow-[0_3px_0_rgba(3,14,21,0.9),inset_0_1px_0_rgba(141,220,255,0.15)] ${
@@ -186,154 +175,12 @@ function FloatingBalls() {
   );
 }
 
-/* ---------- ZIP-экспорт проекта (store, без сжатия) ---------- */
-function crc32(data: Uint8Array): number {
-  let c: number;
-  const table: number[] = [];
-  for (let n = 0; n < 256; n++) {
-    c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    table[n] = c >>> 0;
-  }
-  let crc = 0xffffffff;
-  for (let i = 0; i < data.length; i++) crc = table[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
-function makeZip(files: { path: string; content: string }[]): Blob {
-  const enc = new TextEncoder();
-  const parts: Uint8Array[] = [];
-  const central: Uint8Array[] = [];
-  let offset = 0;
-  const dosDate = ((2024 - 1980) << 9) | (1 << 5) | 1;
-  for (const f of files) {
-    const nameB = enc.encode(f.path);
-    const data = enc.encode(f.content);
-    const crc = crc32(data);
-    const lh = new Uint8Array(30 + nameB.length);
-    const dv = new DataView(lh.buffer);
-    dv.setUint32(0, 0x04034b50, true);
-    dv.setUint16(4, 20, true);
-    dv.setUint16(6, 0x0800, true);
-    dv.setUint16(8, 0, true);
-    dv.setUint16(10, 0, true);
-    dv.setUint16(12, dosDate, true);
-    dv.setUint32(14, crc, true);
-    dv.setUint32(18, data.length, true);
-    dv.setUint32(22, data.length, true);
-    dv.setUint16(26, nameB.length, true);
-    dv.setUint16(28, 0, true);
-    lh.set(nameB, 30);
-    parts.push(lh, data);
-    const ch = new Uint8Array(46 + nameB.length);
-    const cv = new DataView(ch.buffer);
-    cv.setUint32(0, 0x02014b50, true);
-    cv.setUint16(4, 20, true);
-    cv.setUint16(6, 20, true);
-    cv.setUint16(8, 0x0800, true);
-    cv.setUint16(10, 0, true);
-    cv.setUint16(12, 0, true);
-    cv.setUint16(14, dosDate, true);
-    cv.setUint32(16, crc, true);
-    cv.setUint32(20, data.length, true);
-    cv.setUint32(24, data.length, true);
-    cv.setUint16(28, nameB.length, true);
-    cv.setUint32(42, offset, true);
-    ch.set(nameB, 46);
-    central.push(ch);
-    offset += lh.length + data.length;
-  }
-  const cdSize = central.reduce((s, c) => s + c.length, 0);
-  const end = new Uint8Array(22);
-  const ev = new DataView(end.buffer);
-  ev.setUint32(0, 0x06054b50, true);
-  ev.setUint16(8, files.length, true);
-  ev.setUint16(10, files.length, true);
-  ev.setUint32(12, cdSize, true);
-  ev.setUint32(16, offset, true);
-  return new Blob([...parts, ...central, end] as BlobPart[], { type: "application/zip" });
-}
-
-const PROJECT_README = `# ШАРОБОЙ
-
-Аркадный разбиватель: вместо кирпичей — шары и овалы, ракетка с закруглёнными углами.
-Кампания из 4 уровней (финал — босс «Царь-шар») + бесконечный режим с сидом дня.
-
-## Запуск
-    npm install
-    npm run dev      # http://localhost:3000
-    npm run build    # продакшен-сборка в dist/
-
-## Структура
-    index.html            заставка + точка входа
-    src/main.tsx          монтирование React
-    src/index.css         тема (Tailwind v4)
-    src/App.tsx           HUD и экраны
-    src/game/audio.ts     синтезатор звуков (WebAudio)
-    src/game/game.ts      игровой движок: физика, уровни, босс, бонусы
-
-package-lock.json намеренно не включён — npm install создаст его заново.
-`;
-
-async function prepareProjectArchive(): Promise<{ url: string; size: number; name: string }> {
-  {
-    let files: { path: string; content: string }[] | null = null;
-    let chunkErr = "";
-
-    // Способ 1: исходники, скомпилированные в ленивый чанк (работает в статической сборке)
-    try {
-      const mod = await import("./archive-sources");
-      files = [...mod.ARCHIVE_FILES, { path: "sharoboy/README.md", content: PROJECT_README }];
-    } catch (e) {
-      chunkErr = "чанк: " + String((e as Error)?.message || e);
-    }
-
-    // Способ 2: дев-сервер отдаёт файлы проекта — читаем их напрямую
-    if (!files) {
-      try {
-        const base = import.meta.env.BASE_URL || "/";
-        const map: [string, string][] = [
-          ["sharoboy/index.html", "index.html"],
-          ["sharoboy/package.json", "package.json"],
-          ["sharoboy/tsconfig.json", "tsconfig.json"],
-          ["sharoboy/vite.config.js", "vite.config.js"],
-          ["sharoboy/src/main.tsx", "src/main.tsx"],
-          ["sharoboy/src/index.css", "src/index.css"],
-          ["sharoboy/src/App.tsx", "src/App.tsx"],
-          ["sharoboy/src/game/audio.ts", "src/game/audio.ts"],
-          ["sharoboy/src/game/game.ts", "src/game/game.ts"],
-        ];
-        const got: { path: string; content: string }[] = [];
-        for (const [zipPath, file] of map) {
-          const res = await fetch(base + file);
-          if (!res.ok) throw new Error(`${file} → HTTP ${res.status}`);
-          got.push({ path: zipPath, content: await res.text() });
-        }
-        got.push({ path: "sharoboy/README.md", content: PROJECT_README });
-        files = got;
-      } catch (e) {
-        throw new Error(
-          "Архив недоступен. " +
-            (chunkErr ? chunkErr + " | " : "") +
-            "файлы: " +
-            String((e as Error)?.message || e)
-        );
-      }
-    }
-
-    const blob = makeZip(files);
-    return { url: URL.createObjectURL(blob), size: blob.size, name: "sharoboy.zip" };
-  }
-}
-
 /* ---------- app ---------- */
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
   const [hud, setHud] = useState<HudData>(INITIAL_HUD);
   const [bootError, setBootError] = useState<string | null>(null);
-  const [archive, setArchive] = useState<{ url: string; size: number; name: string } | null>(null);
-  const [archiveBusy, setArchiveBusy] = useState(false);
 
   const [globalTop, setGlobalTop] = useState<GlobalScore[]>([]);
   const [globalTopEndless, setGlobalTopEndless] = useState<GlobalScore[]>([]);
@@ -456,32 +303,6 @@ export default function App() {
   const g = () => gameRef.current;
   const inGame = hud.phase === "playing" || hud.phase === "paused";
 
-  const openArchive = async (btn: HTMLButtonElement) => {
-    gameRef.current?.sfx.ensure();
-    gameRef.current?.sfx.ui();
-    const orig = btn.textContent;
-    btn.textContent = "Готовлю архив…";
-    setArchiveBusy(true);
-    try {
-      const a = await prepareProjectArchive();
-      setArchive(a);
-    } catch (e) {
-      const msg = String((e as Error)?.message || e);
-      console.error("[ШАРОБОЙ] архив:", msg);
-      btn.textContent = msg.length > 42 ? msg.slice(0, 40) + "…" : msg;
-      setTimeout(() => {
-        btn.textContent = orig;
-      }, 6000);
-    } finally {
-      setArchiveBusy(false);
-    }
-  };
-
-  const closeArchive = () => {
-    if (archive) URL.revokeObjectURL(archive.url);
-    setArchive(null);
-  };
-
   return (
     <div className="relative h-full w-full overflow-hidden font-body">
       {bootError && (
@@ -496,32 +317,6 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= ПАНЕЛЬ АРХИВА ================= */}
-      {archive && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-abyss/80 p-6">
-          <div className="anim-pop hud-chip w-full max-w-md p-7 text-center">
-            <div className="hud-label mb-2">Архив готов</div>
-            <h2 className="font-display title-glow text-3xl text-foam">ШАРОБОЙ.ZIP</h2>
-            <p className="mt-2 text-sm text-dim">
-              {Math.max(1, Math.round(archive.size / 1024))} КБ · все исходники игры + README
-            </p>
-            <a
-              href={archive.url}
-              download={archive.name}
-              className="btn-arcade mt-6 inline-flex items-center justify-center gap-2.5 px-8 py-3.5 text-lg"
-            >
-              <IconDownload /> Скачать архив
-            </a>
-            <p className="mt-4 text-xs leading-relaxed text-dim">
-              Если файл не скачивается сам — кликните по кнопке правой кнопкой мыши и выберите
-              «Сохранить ссылку как…».
-            </p>
-            <button className="btn-ghost mt-5 px-7 py-2.5" onClick={closeArchive}>
-              Закрыть
-            </button>
-          </div>
-        </div>
-      )}
       {/* h-full/w-full обязательны: canvas — replaced-элемент, absolute inset-0 его
           не растягивает, и при devicePixelRatio > 1 он вылезал за пределы экрана */}
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
@@ -692,14 +487,6 @@ export default function App() {
                   onClick={() => g()?.startEndless()}
                 >
                   Бесконечный
-                </button>
-                <button
-                  className="btn-ghost flex items-center gap-2.5 px-5 py-4 font-display text-sm"
-                  onClick={(e) => void openArchive(e.currentTarget)}
-                  title="Скачать весь проект одним ZIP-архивом"
-                  disabled={archiveBusy}
-                >
-                  <IconDownload /> Проект (.zip)
                 </button>
                 {hud.best > 0 && (
                   <div className="hud-chip px-4 py-3">

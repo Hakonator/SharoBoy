@@ -64,7 +64,6 @@ RLS-политики разрешают только чтение и встав�
     src/App.tsx               HUD и экраны
     src/game/audio.ts         синтезатор звуков (WebAudio)
     src/game/game.ts          игровой движок: физика, уровни, босс, бонусы
-    src/archive-sources.ts    исходники для кнопки «Скачать проект» (ленивый чанк)
     src/vite-env.d.ts         типы Vite (import.meta.env)
 
 package-lock.json намеренно не включён — npm install создаст его заново.
