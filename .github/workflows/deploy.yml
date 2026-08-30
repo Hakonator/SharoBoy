@@ -36,6 +36,8 @@ jobs:
         run: npm run typecheck
       - name: Сборка стабильной версии (main)
         working-directory: main-src
+        env:
+          GH_PAGES_BASE: /SharoBoy/
         run: npm run build
       - name: Перенос в корень сайта
         run: mv main-src/dist site
@@ -45,6 +47,11 @@ jobs:
         with:
           ref: beta
           path: beta-src
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: beta-src/package-lock.json
       - name: Установка зависимостей (beta)
         working-directory: beta-src
         run: npm ci
