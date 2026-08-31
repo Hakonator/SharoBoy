@@ -17,3 +17,16 @@ export const SUPABASE_URL = "https://wbidprepvccgxtujqsjy.supabase.co";
 export const SUPABASE_ANON_KEY = "sb_publishable_af_ESvQDUWkDxBWzQ7fJ3w_VEK-f8Uk";
 
 export const LEADERBOARD_ENABLED = SUPABASE_URL.trim() !== "" && SUPABASE_ANON_KEY.trim() !== "";
+
+/**
+ * Секрет для подписи очков (анти-накрутка).
+ *
+ * Перед записью в мировой топ клиент считает сигнатуру
+ *   client_sig = hash(nick + score + wave + mode + SCORE_SECRET)
+ * и сохраняет её в таблице. При чтении топа записи с неверной подписью
+ * отбрасываются, а в SQL добавлен CHECK-констрейнт на длину сигнатуры.
+ *
+ * Это не панацея (секрет виден в коде сайта), но закрывает «фейковые»
+ * записи через консоль для обычных игроков. Смените секрет перед релизом.
+ */
+export const SCORE_SECRET = "sharoboy-bump-2026-change-me";

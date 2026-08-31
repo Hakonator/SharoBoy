@@ -16,6 +16,28 @@
 - 🟢 **Стабильная версия** (`main`): https://hakonator.github.io/SharoBoy/
 - 🟠 **Бета-версия** (`beta`): https://hakonator.github.io/SharoBoy/beta/
 
+## Мировая таблица рекордов (Supabase)
+
+Клиент пишет очки в таблицу `public.sharoboy_scores` и читает топ по периодам
+(день / неделя / всё время). Для защиты от фейковых записей очки дополняются
+клиентской подписью `client_sig` (см. `SCORE_SECRET` в `src/config.ts`):
+при чтении топа записи с неверной подписью отбрасываются.
+
+Если таблица уже создана, выполните в Supabase → SQL Editor миграцию:
+
+```sql
+alter table public.sharoboy_scores
+  add column if not exists client_sig text not null default '';
+
+-- 0 = старые записи до миграции (будут скрыты из топа), 8 = валидная подпись
+alter table public.sharoboy_scores
+  add constraint sharoboy_scores_sig_len check (char_length(client_sig) in (0, 8));
+```
+
+Новые записи будут попадать в таблицу только с валидной подписью. Подписи
+не защищают от накрутки на 100% (секрет виден в клиентском коде) — это
+защита от случайных злоупотреблений через консоль.
+
 ## Структура
     index.html                заставка + точка входа
     src/main.tsx              монтирование React

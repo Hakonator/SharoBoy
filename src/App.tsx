@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Game, UPGRADES_ENABLED, UPGRADE_DEFS, type HudData } from "./game/game";
 import { LEADERBOARD_ENABLED } from "./config";
-import { fetchTop, submitScore, type GlobalScore } from "./game/leaderboard";
+import { fetchTop, submitScore, type GlobalScore, type LeadPeriod } from "./game/leaderboard";
 import { validateNick } from "./game/profanity";
 
 const INITIAL_HUD: HudData = {
@@ -185,6 +185,23 @@ export default function App() {
 
   const [globalTop, setGlobalTop] = useState<GlobalScore[]>([]);
   const [globalTopEndless, setGlobalTopEndless] = useState<GlobalScore[]>([]);
+  const [period, setPeriod] = useState<LeadPeriod>("all");
+
+  interface PlayerStats {
+    games: number;
+    wins: number;
+    bestScore: number;
+    bestWave: number;
+    topLevel: number;
+  }
+  const [stats, setStats] = useState<PlayerStats>(() => {
+    try {
+      const raw = localStorage.getItem("sharoboy-stats");
+      return raw ? { games: 0, wins: 0, bestScore: 0, bestWave: 0, topLevel: 0, ...JSON.parse(raw) } : { games: 0, wins: 0, bestScore: 0, bestWave: 0, topLevel: 0 };
+    } catch {
+      return { games: 0, wins: 0, bestScore: 0, bestWave: 0, topLevel: 0 };
+    }
+  });
   const [nick, setNick] = useState<string>(() => {
     try {
       return localStorage.getItem("sharoboy-nick") ?? "";
@@ -211,11 +228,34 @@ export default function App() {
   useEffect(() => {
     if (!LEADERBOARD_ENABLED) return;
     void (async () => {
-      const [c, e] = await Promise.all([fetchTop("campaign"), fetchTop("endless")]);
+      const [c, e] = await Promise.all([
+        fetchTop("campaign", period),
+        fetchTop("endless", period),
+      ]);
       setGlobalTop(c);
       setGlobalTopEndless(e);
     })();
-  }, []);
+  }, [period]);
+
+  /* пересчёт личной статистики по итогам партии */
+  useEffect(() => {
+    if (hud.phase !== "over" && hud.phase !== "won") return;
+    setStats((prev) => {
+      const next: PlayerStats = {
+        games: prev.games + 1,
+        wins: prev.wins + (hud.phase === "won" ? 1 : 0),
+        bestScore: Math.max(prev.bestScore, hud.score),
+        bestWave: Math.max(prev.bestWave, hud.wave),
+        topLevel: Math.max(prev.topLevel, hud.level),
+      };
+      try {
+        localStorage.setItem("sharoboy-stats", JSON.stringify(next));
+      } catch {
+        /* приватный режим — статистика не сохранится */
+      }
+      return next;
+    });
+  }, [hud.phase]);
 
   /* новая игра — форма отправки очков сбрасывается */
   useEffect(() => {
@@ -249,7 +289,10 @@ export default function App() {
     );
     if (!err) {
       setSubmitState("done");
-      const [c, e] = await Promise.all([fetchTop("campaign"), fetchTop("endless")]);
+      const [c, e] = await Promise.all([
+        fetchTop("campaign", period),
+        fetchTop("endless", period),
+      ]);
       setGlobalTop(c);
       setGlobalTopEndless(e);
     } else {
@@ -552,6 +595,53 @@ export default function App() {
                       </li>
                     ))}
                   </ol>
+                </div>
+              )}
+              {stats.games > 0 && (
+                <div className="hud-chip mb-3 p-4 sm:p-5">
+                  <div className="hud-label mb-3">👤 Моя статистика</div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-2">
+                    <div>
+                      <div className="hud-label">Игр</div>
+                      <div className="font-display text-xl text-foam tabular-nums">{stats.games}</div>
+                    </div>
+                    <div>
+                      <div className="hud-label">Побед</div>
+                      <div className="font-display text-xl text-mint tabular-nums">{stats.wins}</div>
+                    </div>
+                    <div>
+                      <div className="hud-label">Лучший счёт</div>
+                      <div className="font-display text-xl text-gold tabular-nums">
+                        {stats.bestScore.toLocaleString("ru-RU")}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="hud-label">{stats.bestWave > 0 ? "Лучшая волна" : "Уровень"}</div>
+                      <div className="font-display text-xl text-cyan-neon tabular-nums">
+                        {stats.bestWave > 0 ? stats.bestWave : stats.topLevel}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {LEADERBOARD_ENABLED && (
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <span className="hud-label">🌍 Мировой топ</span>
+                  <div className="flex gap-1">
+                    {(["day", "week", "all"] as LeadPeriod[]).map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => setPeriod(p)}
+                        className={`rounded border px-2 py-0.5 font-display text-[11px] transition ${
+                          period === p
+                            ? "border-cyan-neon/60 bg-cyan-neon/15 text-cyan-neon"
+                            : "border-line/60 bg-deep/50 text-dim hover:text-foam"
+                        }`}
+                      >
+                        {p === "day" ? "День" : p === "week" ? "Неделя" : "Всё время"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               {LEADERBOARD_ENABLED && globalTop.length > 0 && (
