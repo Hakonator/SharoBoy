@@ -127,6 +127,10 @@ export class SFX {
     this.blip(1320, 0.07, "triangle", 0.2, 1980);
     this.blip(1980, 0.09, "triangle", 0.16, 2640, 0.05);
   }
+  achievement() {
+    [523, 784, 1047, 1568].forEach((f, i) => this.blip(f, 0.14, "square", 0.18, undefined, i * 0.08));
+    this.blip(2093, 0.2, "triangle", 0.14, undefined, 0.34);
+  }
   gameOver() {
     [392, 311, 233, 155].forEach((f, i) => this.blip(f, 0.22, "sawtooth", 0.2, undefined, i * 0.12));
   }

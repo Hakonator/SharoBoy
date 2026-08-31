@@ -1,4 +1,5 @@
 import { SFX } from "./audio";
+import { evaluateAch } from "./achievements";
 
 export type Phase = "menu" | "playing" | "paused" | "over" | "won";
 
@@ -15,6 +16,8 @@ export interface HudData {
   combo: number;
   blocksLeft: number;
   muted: boolean;
+  /** id достижений, открытых с прошлой отправки HUD (очередь для тостов). */
+  newAchievements: string[];
   banner: string | null;
   stuck: boolean;
   newRecord: boolean;
@@ -395,6 +398,11 @@ export class Game {
   private level = 1;
   private combo = 0;
   private newRecord = false;
+  /** статистика текущей партии — для достижений */
+  private runBossKills = 0;
+  private runLivesLost = 0;
+  /** очередь открытых достижений до следующей отправки HUD */
+  private achQueue: string[] = [];
 
   private mode: "campaign" | "endless" = "campaign";
   private wave = 0;
@@ -763,6 +771,8 @@ export class Game {
     this.combo = 0;
     this.level = 1;
     this.newRecord = false;
+    this.runBossKills = 0;
+    this.runLivesLost = 0;
     this.particles = [];
     this.rings = [];
     this.popups = [];
@@ -804,6 +814,8 @@ export class Game {
     this.combo = 0;
     this.level = 1;
     this.newRecord = false;
+    this.runBossKills = 0;
+    this.runLivesLost = 0;
     this.particles = [];
     this.rings = [];
     this.popups = [];
@@ -2013,6 +2025,7 @@ export class Game {
     const bo = this.boss;
     if (!bo) return;
     this.boss = null;
+    this.runBossKills++;
     this.score += 1500;
     this.hitStop = Math.max(this.hitStop, 0.5);
     this.flash = 1;
@@ -2088,6 +2101,7 @@ export class Game {
 
   private loseLife() {
     this.lives--;
+    this.runLivesLost++;
     this.levelLostBall = true;
     this.combo = 0;
     this.shake = 10;
@@ -2168,6 +2182,21 @@ export class Game {
   }
 
   private pushHud() {
+    const fresh = evaluateAch({
+      score: this.score,
+      combo: this.combo,
+      wave: this.wave,
+      won: this.phase === "won",
+      bossKills: this.runBossKills,
+      livesLost: this.runLivesLost,
+      coins: this.coins,
+      upgradeLevels: Object.values(this.upgrades).reduce((a, b) => a + b, 0),
+      upgradesMaxed: UPGRADE_DEFS.every((d) => (this.upgrades[d.id] ?? 0) >= d.max),
+    });
+    if (fresh.length) {
+      this.achQueue.push(...fresh.map((a) => a.id));
+      this.sfx.achievement();
+    }
     this.onHud({
       phase: this.phase,
       score: this.score,
@@ -2198,6 +2227,7 @@ export class Game {
       upgrades: { ...this.upgrades },
       top: this.top,
       topEndless: this.topEndless,
+      newAchievements: this.achQueue.splice(0),
     });
   }
 

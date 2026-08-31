@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Game, UPGRADES_ENABLED, UPGRADE_DEFS, type HudData } from "./game/game";
 import { LEADERBOARD_ENABLED } from "./config";
+import { ACHIEVEMENTS, loadUnlocked, type AchievementDef } from "./game/achievements";
 import { fetchTop, submitScore, type GlobalScore, type LeadPeriod } from "./game/leaderboard";
 import { validateNick } from "./game/profanity";
 
@@ -17,6 +18,7 @@ const INITIAL_HUD: HudData = {
   combo: 0,
   blocksLeft: 0,
   muted: false,
+  newAchievements: [],
   banner: null,
   stuck: true,
   newRecord: false,
@@ -212,6 +214,10 @@ export default function App() {
   const [submitState, setSubmitState] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  /* достижения: открытые (id -> время) + очередь тостов */
+  const [unlocked, setUnlocked] = useState<Record<string, number>>(() => loadUnlocked());
+  const [achToasts, setAchToasts] = useState<{ key: number; def: AchievementDef }[]>([]);
+
   const onHud = useCallback((h: HudData) => setHud(h), []);
 
   /* Инициализация движка: без этого gameRef.current остаётся null,
@@ -264,6 +270,31 @@ export default function App() {
       setSubmitError(null);
     }
   }, [hud.phase]);
+
+  /* новые достижения из движка -> состояние + тосты */
+  useEffect(() => {
+    const ids = hud.newAchievements ?? [];
+    if (!ids.length) return;
+    setUnlocked((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const id of ids) {
+        if (!next[id]) {
+          next[id] = Date.now();
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    const fresh = ACHIEVEMENTS.filter((d) => ids.includes(d.id));
+    const items = fresh.map((def) => ({ key: Date.now() + Math.random(), def }));
+    setAchToasts((prev) => [...prev, ...items].slice(-3));
+    const keys = items.map((t) => t.key);
+    const timer = setTimeout(() => {
+      setAchToasts((prev) => prev.filter((t) => !keys.includes(t.key)));
+    }, 4600);
+    return () => clearTimeout(timer);
+  }, [hud.newAchievements]);
 
   const handleTopSubmit = async () => {
     if (submitState === "sending" || submitState === "done") return;
@@ -364,6 +395,24 @@ export default function App() {
       {/* h-full/w-full обязательны: canvas — replaced-элемент, absolute inset-0 его
           не растягивает, и при devicePixelRatio > 1 он вылезал за пределы экрана */}
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+
+      {/* ================= ТОСТЫ ДОСТИЖЕНИЙ ================= */}
+      {achToasts.length > 0 && (
+        <div className="pointer-events-none absolute left-1/2 top-14 z-50 flex w-full max-w-xs -translate-x-1/2 flex-col gap-2 px-4 sm:max-w-sm sm:top-16">
+          {achToasts.map((t) => (
+            <div
+              key={t.key}
+              className="anim-pop rounded-xl border-2 border-gold/70 bg-deep/95 px-4 py-2.5 text-center shadow-[0_0_32px_rgba(255,201,77,0.28)]"
+            >
+              <div className="hud-label text-gold">🏅 Достижение открыто</div>
+              <div className="font-display text-lg leading-tight text-foam">
+                {t.def.icon} {t.def.name}
+              </div>
+              <div className="text-xs text-dim">{t.def.desc}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ================= HUD ================= */}
       {inGame && (
@@ -624,6 +673,34 @@ export default function App() {
                   </div>
                 </div>
               )}
+              <div className="hud-chip mb-3 p-4 sm:p-5">
+                <div className="hud-label mb-3">
+                  🏅 Достижения — {Object.keys(unlocked).length}/{ACHIEVEMENTS.length}
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {ACHIEVEMENTS.map((d) => {
+                    const got = !!unlocked[d.id];
+                    return (
+                      <div
+                        key={d.id}
+                        className={`rounded-lg border p-2.5 ${
+                          got ? "border-gold/50 bg-gold/10" : "border-line/50 bg-deep/40 opacity-70"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl leading-none">{got ? d.icon : "🔒"}</span>
+                          <div className="min-w-0">
+                            <div className={`font-display text-sm ${got ? "text-gold" : "text-dim"}`}>
+                              {d.name}
+                            </div>
+                            <div className="truncate text-xs text-dim">{d.desc}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
               {LEADERBOARD_ENABLED && (
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <span className="hud-label">🌍 Мировой топ</span>
