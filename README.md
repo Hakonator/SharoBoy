@@ -10,12 +10,28 @@
     npm run dev      # http://localhost:3000
     npm run build    # продакшен-сборка в dist/
     npm run preview  # локальный предпросмотр продакшен-сборки
+    npm test         # тесты (vitest): фильтр ников
+    npm run icons    # перегенерация PWA-иконок (scripts/make-icons.mjs)
 
 ## Играть онлайн
 Сборка публикуется на GitHub Pages при каждом пуше в `beta` или `main`:
 
 - 🟢 **Стабильная версия** (`main`): https://hakonator.github.io/SharoBoy/
 - 🟠 **Бета-версия** (`beta`): https://hakonator.github.io/SharoBoy/beta/
+
+## PWA (офлайн и установка)
+
+Игра — полноценное PWA-приложение:
+
+- `public/manifest.webmanifest` — метаданные (иконки, цвета, `display: fullscreen`);
+- `public/sw.js` — сервис-воркер: страница и ассеты кэшируются, при офлайне
+  игра открывается из кэша; ассеты обновляются в фоне (stale-while-revalidate);
+- иконки генерируются скриптом `scripts/make-icons.mjs` (чистый Node, без
+  зависимостей) и лежат в `public/`.
+
+«Установить на телефон/компьютер» — через меню браузера («Добавить на главный
+экран» / «Установить приложение»). Сервис-воркер регистрируется только в
+продакшен-сборке, в dev-режиме он отключён.
 
 ## Мировая таблица рекордов (Supabase)
 
@@ -40,8 +56,10 @@ alter table public.sharoboy_scores
 защита от случайных злоупотреблений через консоль.
 
 ## Структура
-    index.html                заставка + точка входа
-    src/main.tsx              монтирование React
+    index.html                заставка + точка входа (+ мета-теги PWA)
+    public/                   manifest.webmanifest, sw.js, иконки
+    scripts/make-icons.mjs    генератор PWA-иконок (node scripts/make-icons.mjs)
+    src/main.tsx              монтирование React + регистрация сервис-воркера
     src/index.css             тема (Tailwind v4)
     src/App.tsx               HUD и экраны (в т.ч. магазин прокачки)
     src/config.ts             URL/ключ Supabase (рекордборд)
@@ -50,6 +68,5 @@ alter table public.sharoboy_scores
     src/game/achievements.ts  12 достижений (условия, localStorage)
     src/game/leaderboard.ts   клиент мировой таблицы рекордов
     src/game/profanity.ts     фильтр запрещённых ников
+    src/game/profanity.test.ts  тесты фильтра (vitest, npm test)
     src/vite-env.d.ts         типы Vite (import.meta.env)
-
-package-lock.json намеренно не включён — npm install создаст его заново.

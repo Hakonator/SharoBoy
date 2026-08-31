@@ -13,7 +13,7 @@
 const LOOKALIKE: Record<string, string> = {
   a: "а", b: "в", c: "с", e: "е", h: "н", k: "к", m: "м", o: "о",
   p: "р", t: "т", x: "х", y: "у", "@": "а", "4": "а", "6": "б",
-  "8": "в", "3": "е", "0": "о", "$": "с", "!": "и", "1": "и",
+  "8": "в", "3": "е", "0": "о", "$": "с", "!": "и", "1": "и", "5": "s",
 };
 
 /** корни запрещённых слов (проверка подстрокой после нормализации) */
@@ -30,10 +30,13 @@ const BLOCKED = [
   "fuck", "fuk", "fck", "phuck", "bitch", "shit", "cunt",
   "asshole", "bastard", "nigg", "faggot", "fag", "whore", "slut",
   "dick", "cock", "pussy", "wanker", "retard",
+  // русские корни латиницей и cyrillic-lookalike-написания (xyй, huy, nax…)
+  "xyu", "xyi", "xya", "xye", "xyo", "huy", "naxy", "naxuy", "nahuy",
 ];
 
-/** привести ник к «проверочной» форме: ломает регистр, leet и разделители */
-export function normalizeForCheck(raw: string): string {
+/** общий «скелет» ника: регистр, leet-подмены, разделители;
+ *  collapse=false оставляет удвоенные буквы («asshole», «nigg», «ссаный») */
+function skeleton(raw: string, collapse: boolean): string {
   const lower = raw.toLowerCase().replace(/ё/g, "е");
   let out = "";
   for (const ch of lower) {
@@ -42,13 +45,43 @@ export function normalizeForCheck(raw: string): string {
     out += c;
   }
   // «пприивеет» → «привет»: схлопываем повторяющиеся буквы (2+ подряд)
-  return out.replace(/(.)\1+/g, "$1");
+  return collapse ? out.replace(/(.)\1+/g, "$1") : out;
+}
+
+/** визуальные двойники кириллицы → латиница (вторая проверочная форма) */
+const TO_LATIN: Record<string, string> = {
+  а: "a", в: "b", с: "c", е: "e", н: "h", к: "k", м: "m", о: "o",
+  р: "p", т: "t", х: "x", у: "y", и: "i",
+};
+
+function toLatin(s: string): string {
+  let out = "";
+  for (const ch of s) out += TO_LATIN[ch] ?? ch;
+  return out;
+}
+
+/**
+ * Фильтр проверяет ник в четырёх формах сразу:
+ *  - кириллической схлопнутой («fuuuck» → «fuck»),
+ *  - латинской схлопнутой (кириллические двойники → латиница),
+ *  - кириллической несхлопнутой («asshole», «nigg», «ссаный»),
+ *  - латинской несхлопнутой.
+ * Так ловятся и «хуй»/«xyй», и «fuck»/«f.u.c.k»/«5h1t»/«fuuuck».
+ */
+export function normalizeForCheck(raw: string): string {
+  return skeleton(raw, true);
 }
 
 export function containsProfanity(raw: string): boolean {
-  const n = normalizeForCheck(raw);
-  if (!n) return true;
-  return BLOCKED.some((stem) => n.includes(stem));
+  const cyr = skeleton(raw, true);
+  if (!cyr) return true;
+  const cyrFull = skeleton(raw, false);
+  const lat = toLatin(cyr);
+  const latFull = toLatin(cyrFull);
+  return BLOCKED.some(
+    (stem) =>
+      cyr.includes(stem) || lat.includes(stem) || cyrFull.includes(stem) || latFull.includes(stem)
+  );
 }
 
 export interface NickCheck {

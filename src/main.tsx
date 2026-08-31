@@ -91,3 +91,13 @@ if (rootEl) {
     </React.StrictMode>
   );
 }
+
+// PWA: сервис-воркер только в продакшен-сборке (в dev он мешает HMR).
+// BASE_URL учитывает путь GitHub Pages («/SharoBoy/» или «/SharoBoy/beta/»).
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`)
+      .catch((err) => console.warn("[ШАРОБОЙ] сервис-воркер не зарегистрирован:", err));
+  });
+}
