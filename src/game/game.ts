@@ -29,6 +29,7 @@ export interface HudData {
   fireOn: boolean;
   magnetOn: boolean;
   coins: number;
+  upgrades: Record<string, number>;
   top: number[];
   topEndless: number[];
 }
@@ -168,10 +169,10 @@ const POWER_META: Record<PowerType, { label: string; good: boolean; color: strin
   shrink: { label: "УЗК", good: false, color: "#ff5347", edge: "#ffd0cb" },
 };
 
-/* ---------- Скелет системы прокачки (пока ВЫКЛЮЧЕН) ----------
-   Задумка: из мишеней изредка выпадают монеты; за них покупаются
-   ПОСТОЯННЫЕ улучшения, действующие между уровнями. */
-export const UPGRADES_ENABLED = false;
+/* ---------- Система прокачки (ПОСТОЯННЫЕ улучшения, действуют между партиями) ----------
+   Монеты выпадают из блоков и бонусов; за них покупаются улучшения.
+   Уровни апгрейдов хранятся в localStorage и применяются на старте партии. */
+export const UPGRADES_ENABLED = true;
 
 export interface UpgradeDef {
   id: string;
@@ -181,7 +182,43 @@ export interface UpgradeDef {
   cost: (level: number) => number;
 }
 
-export const UPGRADE_DEFS: UpgradeDef[] = [];
+export const UPGRADE_DEFS: UpgradeDef[] = [
+  {
+    id: "paddle",
+    name: "Широкий размах",
+    desc: "Ракетка на +12% за уровень — легче отбивать под острым углом.",
+    max: 3,
+    cost: (lvl) => [12, 35, 90][lvl] ?? 999,
+  },
+  {
+    id: "life",
+    name: "Запас прочности",
+    desc: "+1 жизнь на старте партии.",
+    max: 2,
+    cost: (lvl) => [25, 70][lvl] ?? 999,
+  },
+  {
+    id: "magnet",
+    name: "Магнитный старт",
+    desc: "В начале партии шар прилипает к ракетке на 4 сек за уровень.",
+    max: 2,
+    cost: (lvl) => [15, 45][lvl] ?? 999,
+  },
+  {
+    id: "coin",
+    name: "Монетный дождь",
+    desc: "Каждая монета приносит ×2 за уровень.",
+    max: 2,
+    cost: (lvl) => [10, 30][lvl] ?? 999,
+  },
+  {
+    id: "laser",
+    name: "Лазер наготове",
+    desc: "Начинайте партию с заряженным лазером.",
+    max: 1,
+    cost: (lvl) => [60][lvl] ?? 999,
+  },
+];
 
 /* ==================================================================== */
 
@@ -364,6 +401,8 @@ export class Game {
   private waveSpec: { name: string; speed: number } | null = null;
 
   private paddle = { x: 480, y: 600, w: 150, baseW: 150, h: 18, vx: 0, squash: 0 };
+  /** Множитель ширины ракетки от прокачки (апгрейд «paddle»). */
+  private paddleWidthMult = 1;
   private balls: Ball[] = [];
   private blocks: Block[] = [];
   private powers: PowerUp[] = [];
@@ -465,7 +504,8 @@ export class Game {
   }
 
   private addCoins(n: number) {
-    this.coins += n;
+    const mult = 1 + (this.upgrades.coin ?? 0);
+    this.coins += n * mult;
     this.saveProgress();
     this.pushHud();
   }
@@ -488,10 +528,9 @@ export class Game {
   }
 
   private applyUpgrades() {
-    for (const def of UPGRADE_DEFS) {
-      const lvl = this.upgrades[def.id] ?? 0;
-      if (lvl <= 0) continue;
-    }
+    const paddleLvl = this.upgrades.paddle ?? 0;
+    this.paddleWidthMult = 1 + 0.12 * paddleLvl;
+    this.paddle.baseW = clamp(this.w * 0.18, 110, 200) * this.paddleWidthMult;
   }
 
   /* ---------- жизненный цикл ---------- */
@@ -570,7 +609,7 @@ export class Game {
     // devicePixelRatio != 1 (масштаб ОС 125%/150%, Retina) вылезает за экран.
     this.canvas.style.width = `${this.w}px`;
     this.canvas.style.height = `${this.h}px`;
-    this.paddle.baseW = clamp(this.w * 0.18, 110, 200);
+    this.paddle.baseW = clamp(this.w * 0.18, 110, 200) * this.paddleWidthMult;
     this.paddle.y = this.h - 34;
     this.paddle.x = clamp(this.paddle.x, this.paddle.w / 2 + 4, this.w - this.paddle.w / 2 - 4);
     if (ow && oh && this.blocks.length && (ow !== this.w || oh !== this.h)) {
@@ -720,7 +759,7 @@ export class Game {
     this.boss = null;
     this.boomQueue = [];
     this.score = 0;
-    this.lives = 3;
+    this.lives = 3 + (this.upgrades.life ?? 0);
     this.combo = 0;
     this.level = 1;
     this.newRecord = false;
@@ -744,6 +783,8 @@ export class Game {
     this.transition = 0;
     this.buildLevel(1);
     this.applyUpgrades();
+    this.magnetUntil = this.time + 4 * (this.upgrades.magnet ?? 0);
+    this.laserArmed = (this.upgrades.laser ?? 0) > 0;
     this.serveBall();
     this.phase = "playing";
     this.setBanner(`УРОВЕНЬ 1 — ${LEVELS[0].name}`);
@@ -759,7 +800,7 @@ export class Game {
     this.boss = null;
     this.boomQueue = [];
     this.score = 0;
-    this.lives = 3;
+    this.lives = 3 + (this.upgrades.life ?? 0);
     this.combo = 0;
     this.level = 1;
     this.newRecord = false;
@@ -783,6 +824,8 @@ export class Game {
     this.transition = 0;
     this.buildWave(1);
     this.applyUpgrades();
+    this.magnetUntil = this.time + 4 * (this.upgrades.magnet ?? 0);
+    this.laserArmed = (this.upgrades.laser ?? 0) > 0;
     this.serveBall();
     this.phase = "playing";
     this.setBanner("БЕСКОНЕЧНЫЙ РЕЖИМ — ВОЛНА 1");
@@ -2152,6 +2195,7 @@ export class Game {
       fireOn: this.time < this.fireUntil,
       magnetOn: this.time < this.magnetUntil,
       coins: this.coins,
+      upgrades: { ...this.upgrades },
       top: this.top,
       topEndless: this.topEndless,
     });

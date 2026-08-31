@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Game, type HudData } from "./game/game";
+import { Game, UPGRADES_ENABLED, UPGRADE_DEFS, type HudData } from "./game/game";
 import { LEADERBOARD_ENABLED } from "./config";
 import { fetchTop, submitScore, type GlobalScore } from "./game/leaderboard";
 import { validateNick } from "./game/profanity";
@@ -31,6 +31,7 @@ const INITIAL_HUD: HudData = {
   fireOn: false,
   magnetOn: false,
   coins: 0,
+  upgrades: {},
   top: [],
   topEndless: [],
 };
@@ -586,6 +587,63 @@ export default function App() {
                       </li>
                     ))}
                   </ol>
+                </div>
+              )}
+              {UPGRADES_ENABLED && (
+                <div className="hud-chip mb-3 p-4 sm:p-5">
+                  <div className="mb-2 flex items-baseline justify-between gap-2">
+                    <span className="hud-label">🛠 Прокачка</span>
+                    <span className="font-display text-lg text-gold tabular-nums">🪙 {hud.coins}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {UPGRADE_DEFS.map((u) => {
+                      const lvl = hud.upgrades[u.id] ?? 0;
+                      const maxed = lvl >= u.max;
+                      const price = maxed ? null : u.cost(lvl);
+                      const afford = price !== null && hud.coins >= price;
+                      return (
+                        <div
+                          key={u.id}
+                          className="flex items-center gap-2.5 rounded border border-line/60 bg-deep/70 px-2.5 py-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="font-display text-sm text-foam">{u.name}</div>
+                            <div className="text-[11px] leading-tight text-dim">{u.desc}</div>
+                            <div className="mt-1 flex items-center gap-1">
+                              {Array.from({ length: u.max }, (_, i) => (
+                                <span
+                                  key={i}
+                                  className={`h-1.5 w-4 rounded-sm ${i < lvl ? "bg-mint" : "bg-line/70"}`}
+                                />
+                              ))}
+                              <span className="ml-1 text-[10px] text-dim">
+                                {lvl}/{u.max}
+                              </span>
+                            </div>
+                          </div>
+                          {maxed ? (
+                            <span className="shrink-0 rounded border border-line/70 px-2 py-1 font-display text-[11px] text-dim">
+                              МАКС
+                            </span>
+                          ) : (
+                            <button
+                              className="btn-arcade shrink-0 px-3 py-1.5 text-xs"
+                              disabled={!afford}
+                              onClick={(e) => {
+                                e.currentTarget.blur();
+                                g()?.buyUpgrade(u.id);
+                              }}
+                            >
+                              🪙 {price}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-[10px] leading-snug text-dim">
+                    Монеты выпадают из блоков и бонусов. Прокачка действует между партиями и сохраняется.
+                  </p>
                 </div>
               )}
               <ControlsPanel />
