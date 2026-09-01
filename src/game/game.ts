@@ -1,6 +1,7 @@
 import { SFX } from "./audio"
 import { InputController } from "./input"
 import { evaluateAch } from "./achievements"
+import { Effects } from "./effects"
 import { buildBossArena, gridBlocks, layoutBlocks } from "./levelBuilder"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
 import { POWER_META, TIER } from "./palette"
@@ -24,13 +25,10 @@ import type {
   BossState,
   Bubble,
   PaddleState,
-  Particle,
   Phase,
-  Popup,
   PowerType,
   PowerUp,
   Projectile,
-  Ring,
 } from "./types"
 import type { HudData } from "./types"
 import { clamp, daySeed, fitTilt, lsGet, lsSet, mulberry32, rand, rotatedExtents } from "./utils"
@@ -79,9 +77,7 @@ export class Game {
   private blocks: Block[] = []
   private powers: PowerUp[] = []
   private projectiles: Projectile[] = []
-  private particles: Particle[] = []
-  private rings: Ring[] = []
-  private popups: Popup[] = []
+  private fx = new Effects()
   private bubbles: Bubble[] = []
 
   private input: InputController
@@ -309,9 +305,7 @@ export class Game {
     this.newRecord = false
     this.runBossKills = 0
     this.runLivesLost = 0
-    this.particles = []
-    this.rings = []
-    this.popups = []
+    this.fx.clear()
     this.powers = []
     this.projectiles = []
     this.wideUntil = 0
@@ -352,9 +346,7 @@ export class Game {
     this.newRecord = false
     this.runBossKills = 0
     this.runLivesLost = 0
-    this.particles = []
-    this.rings = []
-    this.popups = []
+    this.fx.clear()
     this.powers = []
     this.projectiles = []
     this.wideUntil = 0
@@ -391,9 +383,7 @@ export class Game {
     this.boss = null
     this.boomQueue = []
     this.banner = null
-    this.popups = []
-    this.particles = []
-    this.rings = []
+    this.fx.clear()
     this.shake = 0
     this.flash = 0
     this.hitStop = 0
@@ -543,20 +533,7 @@ export class Game {
   private update(dt: number) {
     this.shake = Math.max(0, this.shake - dt * 26)
 
-    for (const p of this.particles) {
-      p.life -= dt
-      p.x += p.vx * dt
-      p.y += p.vy * dt
-      p.vy += p.grav * dt
-    }
-    this.particles = this.particles.filter((p) => p.life > 0)
-    for (const r of this.rings) r.t += dt * 2.4
-    this.rings = this.rings.filter((r) => r.t < 1)
-    for (const p of this.popups) {
-      p.t += dt
-      p.y -= dt * 46
-    }
-    this.popups = this.popups.filter((p) => p.t < 1)
+    this.fx.step(dt)
 
     for (const b of this.bubbles) {
       b.y -= b.vy * dt
@@ -721,8 +698,8 @@ export class Game {
         ball.squash = 1
         ball.sinceHit = 0
         this.sfx.shieldHit()
-        this.burst(ball.x, this.h - 14, "#4dff9e", 14, 220)
-        this.rings.push({
+        this.fx.burst(ball.x, this.h - 14, "#4dff9e", 14, 220)
+        this.fx.rings.push({
           x: ball.x,
           y: this.h - 14,
           r: 8,
@@ -751,7 +728,7 @@ export class Game {
 
     // искры огненного ядра
     if (this.time < this.fireUntil && Math.random() < 0.75) {
-      this.particles.push({
+      this.fx.particles.push({
         x: ball.x + rand(-5, 5),
         y: ball.y + rand(-5, 5),
         vx: rand(-30, 30),
@@ -811,7 +788,7 @@ export class Game {
         ball.squash = 1
         ball.sinceHit = 0
         this.sfx.paddle(Math.abs(rel))
-        this.burst(ball.x, top, "#4dff9e", 8, 140)
+        this.fx.burst(ball.x, top, "#4dff9e", 8, 140)
         return
       }
       const ang = -Math.PI / 2 + rel * 1.05 + clamp(p.vx * 0.0004, -0.3, 0.3)
@@ -824,7 +801,7 @@ export class Game {
       p.squash = 1
       this.combo = 0
       this.sfx.paddle(Math.abs(rel))
-      this.burst(ball.x, top, "#7cf5ff", 6, 130)
+      this.fx.burst(ball.x, top, "#7cf5ff", 6, 130)
       this.pushHud()
     }
   }
@@ -900,7 +877,7 @@ export class Game {
     b.flash = 1
     if (b.hp > 0) {
       this.sfx.brick(b.tier)
-      this.burst(b.x, b.y, TIER[b.tier].base, 5, 130)
+      this.fx.burst(b.x, b.y, TIER[b.tier].base, 5, 130)
       this.combo++
       this.addScore(10 * this.comboMult(), b.x, b.y, "#9fd6ea", 12)
       if (b.tier === 3) this.hitStop = Math.max(this.hitStop, 0.03)
@@ -918,8 +895,8 @@ export class Game {
     const mult = this.comboMult()
     this.addScore((30 + b.tier * 20) * mult, b.x, b.y, TIER[b.tier].base, 14 + b.tier * 2)
     this.sfx.destroy(b.tier)
-    this.burst(b.x, b.y, TIER[b.tier].base, 10 + b.tier * 4, 190 + b.tier * 40)
-    this.rings.push({
+    this.fx.burst(b.x, b.y, TIER[b.tier].base, 10 + b.tier * 4, 190 + b.tier * 40)
+    this.fx.rings.push({
       x: b.x,
       y: b.y,
       r: 6,
@@ -933,7 +910,7 @@ export class Game {
     // вехи серии
     if (this.combo === 5 || this.combo === 10 || this.combo === 15) {
       const word = this.combo === 5 ? "ГОРЯЧО!" : this.combo === 10 ? "НЕУДЕРЖИМО!" : "БЕЗУМИЕ!"
-      this.popups.push({
+      this.fx.popups.push({
         x: this.w / 2,
         y: this.h * 0.3,
         text: `${word} ×${this.combo}`,
@@ -941,7 +918,7 @@ export class Game {
         t: 0,
         size: 30,
       })
-      this.rings.push({
+      this.fx.rings.push({
         x: this.w / 2,
         y: this.h * 0.3,
         r: 10,
@@ -973,7 +950,7 @@ export class Game {
       this.newRecord = true
       lsSet("sharoboy-best", String(this.best))
     }
-    this.popups.push({ x, y, text: `+${Math.round(n)}`, color, t: 0, size })
+    this.fx.popups.push({ x, y, text: `+${Math.round(n)}`, color, t: 0, size })
   }
 
   /** «Матрёшка»: вокруг разбитого блока рассыпаются 3–10 крупных шаров. */
@@ -1007,9 +984,9 @@ export class Game {
         splits: false,
       })
     }
-    this.popups.push({ x: b.x, y: b.y, text: "РАССЫПЬ!", color: "#5dffb0", t: 0, size: 16 })
-    this.rings.push({ x: b.x, y: b.y, r: 8, maxR: 90, color: "rgba(93,255,176,0.7)", t: 0 })
-    this.burst(b.x, b.y, "#5dffb0", 10, 200)
+    this.fx.popups.push({ x: b.x, y: b.y, text: "РАССЫПЬ!", color: "#5dffb0", t: 0, size: 16 })
+    this.fx.rings.push({ x: b.x, y: b.y, r: 8, maxR: 90, color: "rgba(93,255,176,0.7)", t: 0 })
+    this.fx.burst(b.x, b.y, "#5dffb0", 10, 200)
   }
 
   /** Периодически в верхней зоне появляются новые блоки (в основном одноразовые). */
@@ -1066,8 +1043,15 @@ export class Game {
         bomb: false,
         splits: Math.random() < 0.05,
       })
-      this.rings.push({ x: cx, y: cy, r: 4, maxR: 60, color: "rgba(124,245,255,0.7)", t: 0 })
-      this.popups.push({ x: cx, y: cy - 20, text: "ПОПОЛНЕНИЕ!", color: "#7cf5ff", t: 0, size: 12 })
+      this.fx.rings.push({ x: cx, y: cy, r: 4, maxR: 60, color: "rgba(124,245,255,0.7)", t: 0 })
+      this.fx.popups.push({
+        x: cx,
+        y: cy - 20,
+        text: "ПОПОЛНЕНИЕ!",
+        color: "#7cf5ff",
+        t: 0,
+        size: 12,
+      })
       break
     }
   }
@@ -1098,7 +1082,7 @@ export class Game {
     if (minY + dy < 6) dy = 6 - minY
     if (maxY + dy > this.h * 0.8) dy = this.h * 0.8 - maxY
     this.fieldShift = { t: 0, dur: rand(0.6, 0.9), dx: dx * 2.2, dy: dy * 2.2 }
-    this.popups.push({
+    this.fx.popups.push({
       x: this.w / 2,
       y: this.h * 0.25,
       text: "СДВИГ ПОЛЯ",
@@ -1159,8 +1143,8 @@ export class Game {
     const type = this.pickPowerType()
     const x = rand(60, this.w - 60)
     this.powers.push({ x, y: -24, vy: 170, type, t: 0 })
-    this.rings.push({ x, y: 20, r: 6, maxR: 90, color: "rgba(234,247,255,0.7)", t: 0 })
-    this.popups.push({ x, y: 60, text: "С НЕБА!", color: "#eaf7ff", t: 0, size: 18 })
+    this.fx.rings.push({ x, y: 20, r: 6, maxR: 90, color: "rgba(234,247,255,0.7)", t: 0 })
+    this.fx.popups.push({ x, y: 60, text: "С НЕБА!", color: "#eaf7ff", t: 0, size: 18 })
     this.sfx.power()
   }
 
@@ -1189,7 +1173,7 @@ export class Game {
     const meta = POWER_META[type]
     this.sfx.power()
     const popup = (text: string) =>
-      this.popups.push({
+      this.fx.popups.push({
         x: this.paddle.x,
         y: this.paddle.y - 40,
         text,
@@ -1263,7 +1247,7 @@ export class Game {
         this.addCoins(1)
         popup("+1 МОНЕТА")
         this.sfx.coin()
-        this.burst(this.paddle.x, this.paddle.y - 12, "#ffd66b", 10, 170)
+        this.fx.burst(this.paddle.x, this.paddle.y - 12, "#ffd66b", 10, 170)
         break
       case "fast":
         this.fastUntil = this.time + 7
@@ -1278,7 +1262,7 @@ export class Game {
         popup("УЗКАЯ РАКЕТКА!")
         break
     }
-    this.burst(this.paddle.x, this.paddle.y - 10, meta.color, 12, 190)
+    this.fx.burst(this.paddle.x, this.paddle.y - 10, meta.color, 12, 190)
     this.pushHud()
   }
 
@@ -1296,7 +1280,7 @@ export class Game {
     this.projectiles.push({ x: p.x, y: p.y - p.h - 6, vy: -560, kind: "rocket", r: 7, dead: false })
     this.sfx.rocket()
     this.weaponCd = 0.32
-    this.burst(p.x, p.y - p.h, "#ffc94d", 5, 120)
+    this.fx.burst(p.x, p.y - p.h, "#ffc94d", 5, 120)
     if (this.projectiles.length > 48) this.projectiles.splice(0, this.projectiles.length - 48)
     p.squash = Math.max(p.squash, 0.35)
   }
@@ -1338,8 +1322,8 @@ export class Game {
     }
     if (best) {
       this.damageBlock(best, 3)
-      this.burst(px, best.y + bestHH, "#7cf5ff", 8, 180)
-      this.rings.push({
+      this.fx.burst(px, best.y + bestHH, "#7cf5ff", 8, 180)
+      this.fx.rings.push({
         x: px,
         y: best.y + bestHH,
         r: 4,
@@ -1355,7 +1339,7 @@ export class Game {
       this.boss.y + this.boss.r < pylonY
     ) {
       this.damageBoss(2, true)
-      this.burst(px, this.boss.y + this.boss.r, "#7cf5ff", 8, 180)
+      this.fx.burst(px, this.boss.y + this.boss.r, "#7cf5ff", 8, 180)
     }
   }
 
@@ -1367,7 +1351,7 @@ export class Game {
         continue
       }
       if (Math.random() < 0.5) {
-        this.particles.push({
+        this.fx.particles.push({
           x: pr.x + rand(-2, 2),
           y: pr.y + 10,
           vx: rand(-20, 20),
@@ -1402,9 +1386,9 @@ export class Game {
     this.sfx.explosion()
     this.shake = Math.min(this.shake + 5, 12)
     this.flash = Math.max(this.flash, 0.4)
-    this.rings.push({ x, y, r: 12, maxR: 150, color: "rgba(255,138,61,0.85)", t: 0 })
-    this.burst(x, y, "#ffc94d", 14, 270)
-    this.burst(x, y, "#ff8a3d", 10, 210)
+    this.fx.rings.push({ x, y, r: 12, maxR: 150, color: "rgba(255,138,61,0.85)", t: 0 })
+    this.fx.burst(x, y, "#ffc94d", 14, 270)
+    this.fx.burst(x, y, "#ff8a3d", 10, 210)
     const R = 90
     for (const b of [...this.blocks]) {
       if (b.dead) continue
@@ -1454,7 +1438,7 @@ export class Game {
     bo.hp -= dmg
     bo.flash = 1
     this.sfx.brick(3)
-    this.burst(
+    this.fx.burst(
       bo.x + rand(-bo.r * 0.5, bo.r * 0.5),
       bo.y + rand(-bo.r * 0.3, bo.r * 0.3),
       "#ff5ca8",
@@ -1479,10 +1463,10 @@ export class Game {
     this.flash = 1
     this.shake = Math.min(this.shake + 14, 18)
     this.sfx.bossDie()
-    this.burst(bo.x, bo.y, "#ff5ca8", 40, 420)
-    this.burst(bo.x, bo.y, "#ffc94d", 24, 330)
-    this.rings.push({ x: bo.x, y: bo.y, r: 20, maxR: 300, color: "rgba(255,92,168,0.85)", t: 0 })
-    this.popups.push({ x: bo.x, y: bo.y, text: "+1500", color: "#ffc94d", t: 0, size: 30 })
+    this.fx.burst(bo.x, bo.y, "#ff5ca8", 40, 420)
+    this.fx.burst(bo.x, bo.y, "#ffc94d", 24, 330)
+    this.fx.rings.push({ x: bo.x, y: bo.y, r: 20, maxR: 300, color: "rgba(255,92,168,0.85)", t: 0 })
+    this.fx.popups.push({ x: bo.x, y: bo.y, text: "+1500", color: "#ffc94d", t: 0, size: 30 })
     // миньоны и бомбы разлетаются цепочкой взрывов
     let i = 0
     for (const b of [...this.blocks]) {
@@ -1511,7 +1495,7 @@ export class Game {
         this.newRecord = true
         lsSet("sharoboy-best", String(this.best))
       }
-      this.popups.push({
+      this.fx.popups.push({
         x: this.w / 2,
         y: this.h * 0.42,
         text: "ЧИСТО! +500",
@@ -1692,25 +1676,6 @@ export class Game {
     this.transition = 0.5
   }
 
-  private burst(x: number, y: number, color: string, count: number, speed: number) {
-    if (this.particles.length > 420) return
-    for (let i = 0; i < count; i++) {
-      const a = rand(0, Math.PI * 2)
-      const v = rand(speed * 0.3, speed)
-      this.particles.push({
-        x,
-        y,
-        vx: Math.cos(a) * v,
-        vy: Math.sin(a) * v,
-        life: rand(0.3, 0.7),
-        maxLife: 0.7,
-        size: rand(2, 5),
-        color,
-        grav: 300,
-      })
-    }
-  }
-
   /* ---------- отрисовка ---------- */
 
   private draw() {
@@ -1726,7 +1691,7 @@ export class Game {
     drawShieldLine(ctx, w, h, this.time, this.shield, this.phase === "menu")
     drawBlocks(ctx, this.blocks, this.time)
     drawBoss(ctx, this.boss, this.balls)
-    drawRings(ctx, this.rings)
+    drawRings(ctx, this.fx.rings)
     drawPowers(ctx, this.powers)
     drawLaserBeams(ctx, {
       time: this.time,
@@ -1756,8 +1721,8 @@ export class Game {
         magnetUntil: this.magnetUntil,
       })
     }
-    drawParticles(ctx, this.particles)
-    drawPopups(ctx, this.popups)
+    drawParticles(ctx, this.fx.particles)
+    drawPopups(ctx, this.fx.popups)
 
     ctx.restore()
 
