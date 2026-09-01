@@ -1,4 +1,5 @@
 import { SFX } from "./audio"
+import { BossSystem } from "./boss"
 import { InputController } from "./input"
 import { evaluateAch } from "./achievements"
 import { Effects } from "./effects"
@@ -22,7 +23,6 @@ import {
 import type {
   Ball,
   Block,
-  BossState,
   Bubble,
   PaddleState,
   Phase,
@@ -97,8 +97,7 @@ export class Game {
   private weaponCd = 0
   private shield = 0
 
-  private boss: BossState | null = null
-  private bossHitCd = 0
+  private readonly bossSys: BossSystem
   private boomQueue: { x: number; y: number; at: number }[] = []
 
   private spawnTimer = 18
@@ -147,6 +146,54 @@ export class Game {
       onBlur: () => {
         if (this.phase === "playing") this.togglePause()
       },
+    })
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- геттерам хоста нужно живое замыкание на Game
+    const g = this
+    this.bossSys = new BossSystem({
+      get w() {
+        return g.w
+      },
+      get h() {
+        return g.h
+      },
+      get time() {
+        return g.time
+      },
+      get shake() {
+        return g.shake
+      },
+      set shake(v) {
+        g.shake = v
+      },
+      get hitStop() {
+        return g.hitStop
+      },
+      set hitStop(v) {
+        g.hitStop = v
+      },
+      get flash() {
+        return g.flash
+      },
+      set flash(v) {
+        g.flash = v
+      },
+      get blocks() {
+        return g.blocks
+      },
+      set blocks(v) {
+        g.blocks = v
+      },
+      get powers() {
+        return g.powers
+      },
+      get boomQueue() {
+        return g.boomQueue
+      },
+      fx: g.fx,
+      sfx: g.sfx,
+      addRawScore: (n) => g.addRawScore(n),
+      onBossKilled: () => g.onBossKilled(),
+      pushHud: () => g.pushHud(),
     })
     this.best = Number(lsGet("sharoboy-best") || 0) || 0
     try {
@@ -296,7 +343,7 @@ export class Game {
     this.mode = "campaign"
     this.wave = 0
     this.waveSpec = null
-    this.boss = null
+    this.bossSys.clear()
     this.boomQueue = []
     this.score = 0
     this.lives = 3 + (this.upgrades.life ?? 0)
@@ -337,7 +384,7 @@ export class Game {
     this.mode = "endless"
     this.wave = 1
     this.waveSpec = { name: "ВОЛНА 1", speed: 400 }
-    this.boss = null
+    this.bossSys.clear()
     this.boomQueue = []
     this.score = 0
     this.lives = 3 + (this.upgrades.life ?? 0)
@@ -380,7 +427,7 @@ export class Game {
     this.blocks = []
     this.powers = []
     this.projectiles = []
-    this.boss = null
+    this.bossSys.clear()
     this.boomQueue = []
     this.banner = null
     this.fx.clear()
@@ -435,7 +482,7 @@ export class Game {
 
   private buildFromSpec(spec: LevelSpec) {
     this.levelLostBall = false
-    this.boss = null
+    this.bossSys.clear()
     this.boomQueue = []
     this.fieldShift = null
     if ("boss" in spec) {
@@ -446,7 +493,7 @@ export class Game {
         this.w,
         this.h
       )
-      this.boss = boss
+      this.bossSys.spawn(boss)
       this.blocks = blocks
     } else if ("layout" in spec) {
       this.blocks = layoutBlocks(spec, this.w, this.h)
@@ -484,7 +531,7 @@ export class Game {
 
   private buildBossLevel(hp: number, minions: number, bombs: number) {
     const { boss, blocks } = buildBossArena(hp, minions, bombs, this.w, this.h)
-    this.boss = boss
+    this.bossSys.spawn(boss)
     this.blocks = blocks
     this.blocksInitial = Math.max(1, blocks.length)
   }
@@ -596,7 +643,7 @@ export class Game {
     this.periodicSpawn(dt)
     this.periodicPowerDrop(dt)
     this.tryFieldShift(dt)
-    if (this.boss) this.updateBoss(dt)
+    this.bossSys.step(dt)
     if (this.boomQueue.length) {
       const due = this.boomQueue.filter((q) => this.time >= q.at)
       if (due.length) {
@@ -620,7 +667,7 @@ export class Game {
 
     if (
       this.blocks.length === 0 &&
-      !this.boss &&
+      !this.bossSys.boss &&
       this.transition <= 0 &&
       this.phase === "playing"
     ) {
@@ -849,7 +896,7 @@ export class Game {
   }
 
   private collideBoss(ball: Ball) {
-    const bo = this.boss
+    const bo = this.bossSys.boss
     if (!bo || ball.stuck) return
     const dx = ball.x - bo.x
     const dy = ball.y - bo.y
@@ -867,7 +914,7 @@ export class Game {
     }
     ball.squash = 1
     ball.sinceHit = 0
-    this.damageBoss(this.time < this.fireUntil ? 2 : 1, false)
+    this.bossSys.damage(this.time < this.fireUntil ? 2 : 1, false)
   }
 
   /* ---------- разрушения ---------- */
@@ -991,7 +1038,7 @@ export class Game {
 
   /** Периодически в верхней зоне появляются новые блоки (в основном одноразовые). */
   private periodicSpawn(dt: number) {
-    if (this.boss) return
+    if (this.bossSys.boss) return
     this.spawnTimer -= dt
     if (this.spawnTimer > 0) return
     this.spawnTimer = rand(16, 22)
@@ -1132,7 +1179,7 @@ export class Game {
 
   /** Периодический «небесный» сброс бонусов с верхней границы поля. */
   private periodicPowerDrop(dt: number) {
-    if (this.boss) {
+    if (this.bossSys.boss) {
       this.skyDropTimer -= dt * 0.55
     } else {
       this.skyDropTimer -= dt
@@ -1334,12 +1381,12 @@ export class Game {
       return
     }
     if (
-      this.boss &&
-      Math.abs(this.boss.x - px) < this.boss.r &&
-      this.boss.y + this.boss.r < pylonY
+      this.bossSys.boss &&
+      Math.abs(this.bossSys.boss.x - px) < this.bossSys.boss.r &&
+      this.bossSys.boss.y + this.bossSys.boss.r < pylonY
     ) {
-      this.damageBoss(2, true)
-      this.fx.burst(px, this.boss.y + this.boss.r, "#7cf5ff", 8, 180)
+      this.bossSys.damage(2, true)
+      this.fx.burst(px, this.bossSys.boss.y + this.bossSys.boss.r, "#7cf5ff", 8, 180)
     }
   }
 
@@ -1372,8 +1419,11 @@ export class Game {
           break
         }
       }
-      if (!pr.dead && this.boss) {
-        if (Math.hypot(pr.x - this.boss.x, pr.y - this.boss.y) < this.boss.r + pr.r + 4) {
+      if (!pr.dead && this.bossSys.boss) {
+        if (
+          Math.hypot(pr.x - this.bossSys.boss.x, pr.y - this.bossSys.boss.y) <
+          this.bossSys.boss.r + pr.r + 4
+        ) {
           pr.dead = true
           this.explode(pr.x, pr.y)
         }
@@ -1394,95 +1444,23 @@ export class Game {
       if (b.dead) continue
       if (Math.hypot(b.x - x, b.y - y) < R + Math.max(b.rx, b.ry)) this.damageBlock(b, 3)
     }
-    if (this.boss && Math.hypot(this.boss.x - x, this.boss.y - y) < R + this.boss.r)
-      this.damageBoss(3, true)
-  }
-
-  /* ---------- босс ---------- */
-
-  private updateBoss(dt: number) {
-    const bo = this.boss
-    if (!bo) return
-    bo.t += dt
-    bo.flash = Math.max(0, bo.flash - dt * 4)
-    const angry = bo.hp < bo.maxHp * 0.4
-    const amp = clamp(this.w * 0.26, 120, 420)
-    bo.x = this.w / 2 + Math.sin(bo.t * (angry ? 1.1 : 0.6)) * amp
-    bo.y = bo.baseY + Math.sin(bo.t * 1.7) * 22
-    for (const b of this.blocks) {
-      const m = b.minionOrbit
-      if (!m) continue
-      m.ang += m.dir * m.speed * dt * (angry ? 1.6 : 1)
-      b.x = clamp(bo.x + Math.cos(m.ang) * m.rad, b.rx + 4, this.w - b.rx - 4)
-      b.y = clamp(bo.y + Math.sin(m.ang) * m.rad * 0.55, b.ry + 4, this.h * 0.8)
-    }
-    bo.dropTimer -= dt
-    if (bo.dropTimer <= 0) {
-      bo.dropTimer = angry ? 3.6 : 5
-      const types: PowerType[] = ["wide", "shield", "laser", "rocket", "multi"]
-      this.powers.push({
-        x: bo.x,
-        y: bo.y + bo.r + 10,
-        vy: 150,
-        type: types[Math.floor(Math.random() * types.length)],
-        t: 0,
-      })
-    }
-  }
-
-  private damageBoss(dmg: number, fromWeapon: boolean) {
-    const bo = this.boss
-    if (!bo) return
-    if (fromWeapon && this.time < this.bossHitCd) return
-    this.bossHitCd = this.time + 0.08
-    bo.hp -= dmg
-    bo.flash = 1
-    this.sfx.brick(3)
-    this.fx.burst(
-      bo.x + rand(-bo.r * 0.5, bo.r * 0.5),
-      bo.y + rand(-bo.r * 0.3, bo.r * 0.3),
-      "#ff5ca8",
-      8,
-      200
+    if (
+      this.bossSys.boss &&
+      Math.hypot(this.bossSys.boss.x - x, this.bossSys.boss.y - y) < R + this.bossSys.boss.r
     )
-    this.score += 5
-    if (bo.hp <= 0) {
-      this.killBoss()
-    } else {
-      this.pushHud()
-    }
+      this.bossSys.damage(3, true)
   }
 
-  private killBoss() {
-    const bo = this.boss
-    if (!bo) return
-    this.boss = null
+  /* ---------- хост для BossSystem ---------- */
+
+  /** Начисление очков без попапа и проверки рекорда (как было в damageBoss/killBoss). */
+  private addRawScore(n: number) {
+    this.score += n
+  }
+
+  /** Смерть босса засчитана в статистику партии (для достижений). */
+  private onBossKilled() {
     this.runBossKills++
-    this.score += 1500
-    this.hitStop = Math.max(this.hitStop, 0.5)
-    this.flash = 1
-    this.shake = Math.min(this.shake + 14, 18)
-    this.sfx.bossDie()
-    this.fx.burst(bo.x, bo.y, "#ff5ca8", 40, 420)
-    this.fx.burst(bo.x, bo.y, "#ffc94d", 24, 330)
-    this.fx.rings.push({ x: bo.x, y: bo.y, r: 20, maxR: 300, color: "rgba(255,92,168,0.85)", t: 0 })
-    this.fx.popups.push({ x: bo.x, y: bo.y, text: "+1500", color: "#ffc94d", t: 0, size: 30 })
-    // миньоны и бомбы разлетаются цепочкой взрывов
-    let i = 0
-    for (const b of [...this.blocks]) {
-      if (b.minionOrbit || b.bomb) {
-        this.boomQueue.push({ x: b.x, y: b.y, at: this.time + 0.12 + i * 0.1 })
-        b.hp = 0
-        b.dead = true
-        i++
-      }
-    }
-    this.blocks = this.blocks.filter((b) => !b.dead)
-    this.powers.push(
-      { x: bo.x - 40, y: bo.y, vy: 150, type: "multi", t: 0 },
-      { x: bo.x + 40, y: bo.y, vy: 150, type: "shield", t: 0 }
-    )
-    this.pushHud()
   }
 
   /* ---------- переходы ---------- */
@@ -1690,7 +1668,7 @@ export class Game {
     drawBackground(ctx, w, h, this.combo, this.bubbles)
     drawShieldLine(ctx, w, h, this.time, this.shield, this.phase === "menu")
     drawBlocks(ctx, this.blocks, this.time)
-    drawBoss(ctx, this.boss, this.balls)
+    drawBoss(ctx, this.bossSys.boss, this.balls)
     drawRings(ctx, this.fx.rings)
     drawPowers(ctx, this.powers)
     drawLaserBeams(ctx, {
@@ -1699,7 +1677,7 @@ export class Game {
       laserUntil: this.laserUntil,
       paddle: this.paddle,
       blocks: this.blocks,
-      boss: this.boss,
+      boss: this.bossSys.boss,
     })
     drawProjectiles(ctx, this.projectiles, this.time)
     drawBalls(ctx, this.balls, {
