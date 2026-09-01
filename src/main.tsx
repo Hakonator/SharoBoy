@@ -1,23 +1,24 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import "./index.css";
-import App from "./App.tsx";
+import React from "react"
+import ReactDOM from "react-dom/client"
+
+import "./index.css"
+import App from "./App.tsx"
 
 // Модуль выполнился — сторожевой скрипт в index.html увидит этот флаг
 // и не будет показывать диагностическое сообщение.
-(window as unknown as { __sharoboy_booted?: boolean }).__sharoboy_booted = true;
+;(window as unknown as { __sharoboy_booted?: boolean }).__sharoboy_booted = true
 
 /** Страховочный экран: если приложение упало при загрузке/рендере,
  *  показываем причину вместо чёрного экрана. */
 class BootBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
+  state = { error: null as Error | null }
 
   static getDerivedStateFromError(error: Error) {
-    return { error };
+    return { error }
   }
 
   componentDidCatch(error: Error) {
-    console.error("[ШАРОБОЙ] ошибка при запуске:", error);
+    console.error("[ШАРОБОЙ] ошибка при запуске:", error)
   }
 
   render() {
@@ -29,7 +30,8 @@ class BootBoundary extends React.Component<{ children: React.ReactNode }, { erro
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "radial-gradient(120% 90% at 50% 0%, #0e3a4e 0%, #082434 46%, #04121c 100%)",
+            background:
+              "radial-gradient(120% 90% at 50% 0%, #0e3a4e 0%, #082434 46%, #04121c 100%)",
             color: "#eaf7ff",
             padding: 24,
             fontFamily: "Rubik, sans-serif",
@@ -75,13 +77,13 @@ class BootBoundary extends React.Component<{ children: React.ReactNode }, { erro
             </button>
           </div>
         </div>
-      );
+      )
     }
-    return this.props.children;
+    return this.props.children
   }
 }
 
-const rootEl = document.getElementById("root");
+const rootEl = document.getElementById("root")
 if (rootEl) {
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>
@@ -89,7 +91,7 @@ if (rootEl) {
         <App />
       </BootBoundary>
     </React.StrictMode>
-  );
+  )
 }
 
 // PWA: сервис-воркер только в продакшен-сборке (в dev он мешает HMR).
@@ -98,6 +100,6 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register(`${import.meta.env.BASE_URL}sw.js`)
-      .catch((err) => console.warn("[ШАРОБОЙ] сервис-воркер не зарегистрирован:", err));
-  });
+      .catch((err) => console.warn("[ШАРОБОЙ] сервис-воркер не зарегистрирован:", err))
+  })
 }

@@ -7,10 +7,10 @@
  */
 
 export interface AchievementDef {
-  id: string;
-  icon: string;
-  name: string;
-  desc: string;
+  id: string
+  icon: string
+  name: string
+  desc: string
 }
 
 export const ACHIEVEMENTS: AchievementDef[] = [
@@ -26,49 +26,49 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "coins-100", icon: "🪙", name: "Коллекционер", desc: "Собрать 100 монет суммарно" },
   { id: "upgrade-1", icon: "🛠", name: "Инженер", desc: "Купить первое улучшение" },
   { id: "upgrade-all", icon: "🧰", name: "Конструктор", desc: "Все улучшения на максимум" },
-];
+]
 
 /** Контекст текущей партии/прогресса — заполняется движком. */
 export interface AchContext {
-  score: number;
-  combo: number;
-  wave: number;
-  won: boolean;
-  bossKills: number;
-  livesLost: number;
-  coins: number;
-  upgradeLevels: number;
-  upgradesMaxed: boolean;
+  score: number
+  combo: number
+  wave: number
+  won: boolean
+  bossKills: number
+  livesLost: number
+  coins: number
+  upgradeLevels: number
+  upgradesMaxed: boolean
 }
 
-const LS_KEY = "sharoboy-achievements";
+const LS_KEY = "sharoboy-achievements"
 
 function lsGet(k: string): string | null {
   try {
-    return localStorage.getItem(k);
+    return localStorage.getItem(k)
   } catch {
-    return null;
+    return null
   }
 }
 
 /** Разблокированные достижения: id → время открытия. */
 export function loadUnlocked(): Record<string, number> {
   try {
-    const parsed = JSON.parse(lsGet(LS_KEY) || "{}") as unknown;
-    if (!parsed || typeof parsed !== "object") return {};
-    const out: Record<string, number> = {};
+    const parsed = JSON.parse(lsGet(LS_KEY) || "{}") as unknown
+    if (!parsed || typeof parsed !== "object") return {}
+    const out: Record<string, number> = {}
     for (const [id, ts] of Object.entries(parsed as Record<string, unknown>)) {
-      if (typeof ts === "number") out[id] = ts;
+      if (typeof ts === "number") out[id] = ts
     }
-    return out;
+    return out
   } catch {
-    return {};
+    return {}
   }
 }
 
 function persist(map: Record<string, number>) {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(map));
+    localStorage.setItem(LS_KEY, JSON.stringify(map))
   } catch {
     /* приватный режим — достижения не сохранятся */
   }
@@ -79,30 +79,30 @@ function persist(map: Record<string, number>) {
  * и возвращает их определения (пусто — если ничего нового).
  */
 export function evaluateAch(ctx: AchContext): AchievementDef[] {
-  const unlocked = loadUnlocked();
-  const now = Date.now();
-  const fresh: AchievementDef[] = [];
+  const unlocked = loadUnlocked()
+  const now = Date.now()
+  const fresh: AchievementDef[] = []
 
   const tryUnlock = (id: string, ok: boolean) => {
-    if (!ok || unlocked[id]) return;
-    unlocked[id] = now;
-    const def = ACHIEVEMENTS.find((d) => d.id === id);
-    if (def) fresh.push(def);
-  };
+    if (!ok || unlocked[id]) return
+    unlocked[id] = now
+    const def = ACHIEVEMENTS.find((d) => d.id === id)
+    if (def) fresh.push(def)
+  }
 
-  tryUnlock("first-win", ctx.won);
-  tryUnlock("flawless", ctx.won && ctx.livesLost === 0);
-  tryUnlock("boss-slayer", ctx.bossKills > 0);
-  tryUnlock("score-1k", ctx.score >= 1000);
-  tryUnlock("score-5k", ctx.score >= 5000);
-  tryUnlock("combo-10", ctx.combo >= 10);
-  tryUnlock("combo-15", ctx.combo >= 15);
-  tryUnlock("wave-5", ctx.wave >= 5);
-  tryUnlock("wave-10", ctx.wave >= 10);
-  tryUnlock("coins-100", ctx.coins >= 100);
-  tryUnlock("upgrade-1", ctx.upgradeLevels >= 1);
-  tryUnlock("upgrade-all", ctx.upgradesMaxed);
+  tryUnlock("first-win", ctx.won)
+  tryUnlock("flawless", ctx.won && ctx.livesLost === 0)
+  tryUnlock("boss-slayer", ctx.bossKills > 0)
+  tryUnlock("score-1k", ctx.score >= 1000)
+  tryUnlock("score-5k", ctx.score >= 5000)
+  tryUnlock("combo-10", ctx.combo >= 10)
+  tryUnlock("combo-15", ctx.combo >= 15)
+  tryUnlock("wave-5", ctx.wave >= 5)
+  tryUnlock("wave-10", ctx.wave >= 10)
+  tryUnlock("coins-100", ctx.coins >= 100)
+  tryUnlock("upgrade-1", ctx.upgradeLevels >= 1)
+  tryUnlock("upgrade-all", ctx.upgradesMaxed)
 
-  if (fresh.length) persist(unlocked);
-  return fresh;
+  if (fresh.length) persist(unlocked)
+  return fresh
 }
