@@ -1,5 +1,6 @@
 import { SFX } from "./audio"
 import { evaluateAch } from "./achievements"
+import { buildBossArena, gridBlocks, layoutBlocks } from "./levelBuilder"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
 import { POWER_META, TIER } from "./palette"
 import {
@@ -577,122 +578,21 @@ export class Game {
     this.boomQueue = []
     this.fieldShift = null
     if ("boss" in spec) {
-      this.buildBossLevel(spec.boss.hp, spec.boss.minions, spec.boss.bombs)
-      return
-    }
-    const margin = clamp(this.w * 0.055, 22, 72)
-    const top = clamp(this.h * 0.14, 86, 160)
-    const blocks: Block[] = []
-
-    if ("layout" in spec) {
-      // авторская раскладка в нормализованных координатах
-      const zoneH = clamp(this.h * 0.42, 220, 420)
-      let minX = Infinity
-      let maxX = -Infinity
-      let maxY = 0
-      for (const it of spec.layout) {
-        minX = Math.min(minX, it.x - it.rx)
-        maxX = Math.max(maxX, it.x + it.rx)
-        maxY = Math.max(maxY, it.y + (it.ry ?? it.rx))
-      }
-      const unit = Math.min(
-        (this.w - margin * 2) / (maxX - minX || 1),
-        zoneH / (maxY || 1),
-        Math.min(this.w, this.h) * 0.075
+      const { boss, blocks } = buildBossArena(
+        spec.boss.hp,
+        spec.boss.minions,
+        spec.boss.bombs,
+        this.w,
+        this.h
       )
-      const offsetX = -((minX + maxX) / 2) * unit
-      for (const it of spec.layout) {
-        const rx = Math.max(it.rx * unit, 8)
-        const ry = Math.max((it.ry ?? it.rx) * unit, 8)
-        const cx = clamp(
-          this.w / 2 + offsetX + it.x * unit,
-          margin * 0.5 + rx,
-          this.w - margin * 0.5 - rx
-        )
-        blocks.push({
-          x: cx,
-          y: top + it.y * unit,
-          rx,
-          ry,
-          rot: it.rot ?? 0,
-          circle: Math.abs(rx - ry) < 0.6 && !it.rot,
-          hp: it.hp,
-          maxHp: it.hp,
-          tier: it.hp,
-          flash: 0,
-          seed: rand(0, Math.PI * 2),
-          dead: false,
-          x0: cx,
-          swayAmp: 0,
-          swayFreq: 0,
-          swayPh: 0,
-          bomb: it.bomb ?? false,
-          splits: it.splits ?? false,
-        })
-      }
+      this.boss = boss
       this.blocks = blocks
-      this.blocksInitial = Math.max(1, blocks.length)
-      return
+    } else if ("layout" in spec) {
+      this.blocks = layoutBlocks(spec, this.w, this.h)
+    } else {
+      this.blocks = gridBlocks(spec, this.w, this.h)
     }
-
-    // процедурная сетка
-    const zoneH = clamp(this.h * 0.42, 220, 420)
-    const gap = clamp(zoneH / spec.rows, 46, 78)
-    for (let r = 0; r < spec.rows; r++) {
-      let count = spec.counts[r % spec.counts.length]
-      while ((this.w - margin * 2) / count < 60 && count > 3) count--
-      const slot = (this.w - margin * 2) / count
-      for (let i = 0; i < count; i++) {
-        const kind = spec.shape(r, i)
-        const isBomb = Math.random() < 0.07
-        const isSplit = !isBomb && Math.random() < 0.09
-        const hp = (isBomb ? 1 : spec.hp(r, i)) as 1 | 2 | 3
-        const cx = clamp(
-          margin + slot * (i + 0.5) + rand(-1, 1) * slot * 0.02,
-          margin + slot * 0.3,
-          this.w - margin - slot * 0.3
-        )
-        const cy = top + gap * (r + 0.5) + rand(-1, 1) * gap * 0.02
-        let rx: number
-        let ry: number
-        if (kind === "circle" || isBomb) {
-          const rr = clamp(Math.min(slot * 0.5, gap * 0.44) * rand(0.9, 1), 12, 42)
-          rx = ry = rr
-        } else if (kind === "eh") {
-          rx = clamp(slot * 0.52 * rand(0.9, 1), 18, 60)
-          ry = clamp(gap * 0.3 * rand(0.9, 1), 11, 27)
-        } else {
-          rx = clamp(slot * 0.27 * rand(0.9, 1), 10, 26)
-          ry = clamp(gap * 0.47 * rand(0.9, 1), 15, 46)
-        }
-        const rot =
-          kind !== "circle" && !isBomb && Math.random() < 0.65
-            ? fitTilt(rx, ry, slot / 2 - 4, gap / 2 - 4)
-            : 0
-        blocks.push({
-          x: cx,
-          y: cy,
-          rx,
-          ry,
-          rot,
-          circle: kind === "circle" || isBomb,
-          hp,
-          maxHp: hp,
-          tier: hp,
-          flash: 0,
-          seed: rand(0, Math.PI * 2),
-          x0: cx,
-          swayAmp: rand(5, 13),
-          swayFreq: rand(0.5, 1.0) * (r % 2 === 0 ? 1 : -1),
-          swayPh: rand(0, Math.PI * 2),
-          bomb: isBomb,
-          splits: isSplit,
-          dead: false,
-        })
-      }
-    }
-    this.blocks = blocks
-    this.blocksInitial = Math.max(1, blocks.length)
+    this.blocksInitial = Math.max(1, this.blocks.length)
   }
 
   private buildWave(n: number) {
@@ -722,72 +622,8 @@ export class Game {
   }
 
   private buildBossLevel(hp: number, minions: number, bombs: number) {
-    const top = clamp(this.h * 0.14, 86, 160)
-    const r = clamp(Math.min(this.w, this.h) * 0.1, 52, 84)
-    const baseY = top + r + 34
-    this.boss = { x: this.w / 2, y: baseY, baseY, r, hp, maxHp: hp, t: 0, flash: 0, dropTimer: 5 }
-    const blocks: Block[] = []
-    const orbit = clamp(r * 2.5, 110, Math.min(this.w * 0.3, 280))
-    for (let i = 0; i < minions; i++) {
-      blocks.push({
-        x: this.w / 2,
-        y: baseY,
-        rx: 15,
-        ry: 15,
-        rot: 0,
-        circle: true,
-        hp: 2,
-        maxHp: 2,
-        tier: 2,
-        flash: 0,
-        seed: rand(0, Math.PI * 2),
-        dead: false,
-        x0: this.w / 2,
-        swayAmp: 0,
-        swayFreq: 0,
-        swayPh: 0,
-        bomb: false,
-        splits: false,
-        minionOrbit: {
-          ang: (i * Math.PI * 2) / minions,
-          rad: orbit,
-          dir: i % 2 ? 1 : -1,
-          speed: 1.05,
-        },
-      })
-    }
-    const spots = [
-      [0.13, 0.16],
-      [0.87, 0.16],
-      [0.13, 0.55],
-      [0.87, 0.55],
-      [0.5, 0.7],
-    ]
-    for (let i = 0; i < bombs; i++) {
-      const [fx, fy] = spots[i % spots.length]
-      const bx = clamp(this.w * fx, 40, this.w - 40)
-      const by = top + fy * clamp(this.h * 0.42, 220, 420)
-      blocks.push({
-        x: bx,
-        y: by,
-        rx: 20,
-        ry: 20,
-        rot: 0,
-        circle: true,
-        hp: 1,
-        maxHp: 1,
-        tier: 1,
-        flash: 0,
-        seed: rand(0, Math.PI * 2),
-        dead: false,
-        x0: bx,
-        swayAmp: 0,
-        swayFreq: 0,
-        swayPh: 0,
-        bomb: true,
-        splits: false,
-      })
-    }
+    const { boss, blocks } = buildBossArena(hp, minions, bombs, this.w, this.h)
+    this.boss = boss
     this.blocks = blocks
     this.blocksInitial = Math.max(1, blocks.length)
   }

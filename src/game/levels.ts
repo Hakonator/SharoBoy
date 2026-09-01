@@ -17,7 +17,7 @@ export interface LayoutItem {
   splits?: boolean
   rot?: number
 }
-interface LayoutSpec extends BaseSpec {
+export interface LayoutSpec extends BaseSpec {
   layout: LayoutItem[]
 }
 export interface PatternSpec extends BaseSpec {
