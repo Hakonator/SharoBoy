@@ -1,4 +1,5 @@
 import { SFX } from "./audio"
+import { InputController } from "./input"
 import { evaluateAch } from "./achievements"
 import { buildBossArena, gridBlocks, layoutBlocks } from "./levelBuilder"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
@@ -83,12 +84,7 @@ export class Game {
   private popups: Popup[] = []
   private bubbles: Bubble[] = []
 
-  private keys = { left: false, right: false, space: false }
-  private pointerX: number | null = null
-  private locked = false
-  private lockFailed = false
-  private virtualX: number | null = null
-  private tapFire = false
+  private input: InputController
   private shake = 0
 
   private wideUntil = 0
@@ -138,6 +134,24 @@ export class Game {
     if (!ctx) throw new Error("no 2d context")
     this.ctx = ctx
     this.onHud = onHud
+    this.input = new InputController(canvas, {
+      paddleX: () => this.paddle.x,
+      worldWidth: () => this.w,
+      sfxEnsure: () => this.sfx.ensure(),
+      isPlaying: () => this.phase === "playing",
+      primaryAction: () => {
+        if (this.phase === "menu" || this.phase === "over" || this.phase === "won") this.startGame()
+        else if (this.phase === "playing") this.launch()
+      },
+      launchIfPlaying: () => {
+        if (this.phase === "playing") this.launch()
+      },
+      togglePause: () => this.togglePause(),
+      toggleMute: () => this.toggleMute(),
+      onBlur: () => {
+        if (this.phase === "playing") this.togglePause()
+      },
+    })
     this.best = Number(lsGet("sharoboy-best") || 0) || 0
     try {
       const parsed = JSON.parse(lsGet("sharoboy-top") || "[]") as unknown
@@ -211,16 +225,7 @@ export class Game {
   attach() {
     this.handleResize()
     window.addEventListener("resize", this.handleResize)
-    window.addEventListener("keydown", this.handleKeyDown)
-    window.addEventListener("keyup", this.handleKeyUp)
-    window.addEventListener("blur", this.handleBlur)
-    window.addEventListener("pointermove", this.handlePointerMove)
-    window.addEventListener("mousemove", this.handlePointerMove)
-    document.addEventListener("pointerlockchange", this.handleLockChange)
-    document.addEventListener("pointerlockerror", this.handleLockError)
-    this.canvas.addEventListener("pointerdown", this.handlePointerDown)
-    this.canvas.addEventListener("pointerup", this.handlePointerUp)
-    this.canvas.addEventListener("pointercancel", this.handlePointerUp)
+    this.input.attach()
     for (let i = 0; i < 26; i++) {
       this.bubbles.push({
         x: Math.random() * this.w,
@@ -239,16 +244,7 @@ export class Game {
     this.destroyed = true
     cancelAnimationFrame(this.raf)
     window.removeEventListener("resize", this.handleResize)
-    window.removeEventListener("keydown", this.handleKeyDown)
-    window.removeEventListener("keyup", this.handleKeyUp)
-    window.removeEventListener("blur", this.handleBlur)
-    window.removeEventListener("pointermove", this.handlePointerMove)
-    window.removeEventListener("mousemove", this.handlePointerMove)
-    document.removeEventListener("pointerlockchange", this.handleLockChange)
-    document.removeEventListener("pointerlockerror", this.handleLockError)
-    this.canvas.removeEventListener("pointerdown", this.handlePointerDown)
-    this.canvas.removeEventListener("pointerup", this.handlePointerUp)
-    this.canvas.removeEventListener("pointercancel", this.handlePointerUp)
+    this.input.destroy()
   }
 
   private loop = (t: number) => {
@@ -294,131 +290,6 @@ export class Game {
         b.y = clamp(b.y * sy, b.ry + 6, this.h * 0.75)
       }
     }
-  }
-
-  /* ---------- ввод ---------- */
-
-  private handleKeyDown = (e: KeyboardEvent) => {
-    const c = e.code
-    if (c === "ArrowLeft" || c === "KeyA") this.keys.left = true
-    if (c === "ArrowRight" || c === "KeyD") this.keys.right = true
-    if (c === "Space") e.preventDefault()
-    if (c === "Space" || c === "Enter") {
-      if (this.phase === "menu" || this.phase === "over" || this.phase === "won") this.startGame()
-      else if (this.phase === "playing") this.launch()
-    }
-    if (c === "Space") this.keys.space = true
-    if (c === "KeyP" || c === "Escape") {
-      if (this.phase === "playing" || this.phase === "paused") this.togglePause()
-    }
-    if (c === "KeyM") this.toggleMute()
-  }
-
-  private handleKeyUp = (e: KeyboardEvent) => {
-    if (e.code === "ArrowLeft" || e.code === "KeyA") this.keys.left = false
-    if (e.code === "ArrowRight" || e.code === "KeyD") this.keys.right = false
-    if (e.code === "Space") this.keys.space = false
-  }
-
-  private handleBlur = () => {
-    this.keys.left = false
-    this.keys.right = false
-    this.keys.space = false
-    this.pointerX = null
-    if (this.phase === "playing") this.togglePause()
-  }
-
-  /* Координата указателя (clientX) → игровая координата X.
-     Canvas растянут на весь экран, но прямоугольник считаем через
-     getBoundingClientRect, чтобы компенсировать любые смещения/масштабы. */
-  private clientToGameX(clientX: number): number {
-    const rect = this.canvas.getBoundingClientRect()
-    if (rect.width > 0) return ((clientX - rect.left) / rect.width) * this.w
-    return clientX - rect.left
-  }
-
-  /* Сколько игровых пикселей приходится на один CSS-пиксель канваса
-     (для дельты movementX в режиме pointer lock). */
-  private worldPerCssPx(): number {
-    const rect = this.canvas.getBoundingClientRect()
-    return rect.width > 0 ? this.w / rect.width : 1
-  }
-
-  private handlePointerMove = (e: PointerEvent | MouseEvent) => {
-    if (this.locked) {
-      const vx = (this.virtualX ?? this.paddle.x) + e.movementX * this.worldPerCssPx()
-      this.virtualX = clamp(vx, 0, this.w)
-      this.pointerX = this.virtualX
-      return
-    }
-    this.pointerX = this.clientToGameX(e.clientX)
-  }
-
-  private handlePointerDown = (e: PointerEvent) => {
-    this.sfx.ensure()
-    this.tapFire = true
-    // Ракетку в точку касания НЕ перекидываем — палец/мышь могут быть далеко
-    // от ракетки, и ракетка «уезжала» к месту тапа.
-    if (this.phase === "playing") {
-      if (e.pointerType === "touch") {
-        // Тач: сначала ведём ракетку пальцем в нужное место, шар запускается
-        // при отпускании (handlePointerUp).
-        return
-      }
-      // Мышь/стилус: запуск сразу + pointer lock, как раньше.
-      this.launch()
-      this.requestLock()
-    }
-  }
-
-  /* Отпускание пальца на таче = запуск шара (если он на ракетке). */
-  private handlePointerUp = (e: PointerEvent) => {
-    if (this.phase === "playing" && (e.pointerType === "touch" || e.pointerType === "pen")) {
-      this.launch()
-    }
-  }
-
-  private requestLock() {
-    if (this.locked) return
-    try {
-      const el = this.canvas as HTMLCanvasElement & {
-        requestPointerLock?: () => Promise<void> | void
-      }
-      if (typeof el.requestPointerLock !== "function") {
-        this.lockFailed = true
-        return
-      }
-      const res = el.requestPointerLock()
-      if (res && typeof (res as Promise<void>).catch === "function") {
-        ;(res as Promise<void>).catch(() => {
-          this.lockFailed = true
-        })
-      }
-    } catch {
-      this.lockFailed = true
-    }
-  }
-
-  private releaseLock() {
-    try {
-      if (document.pointerLockElement) document.exitPointerLock?.()
-    } catch {
-      /* ignore */
-    }
-  }
-
-  private handleLockChange = () => {
-    this.locked = document.pointerLockElement === this.canvas
-    if (this.locked) {
-      this.lockFailed = false
-      this.virtualX = this.pointerX ?? this.paddle.x
-    } else if (this.virtualX !== null) {
-      this.pointerX = this.virtualX
-    }
-  }
-
-  private handleLockError = () => {
-    this.lockFailed = true
   }
 
   /* ---------- управление игрой ---------- */
@@ -511,7 +382,7 @@ export class Game {
 
   toMenu() {
     this.sfx.ui()
-    this.releaseLock()
+    this.input.releaseLock()
     this.phase = "menu"
     this.balls = []
     this.blocks = []
@@ -532,8 +403,8 @@ export class Game {
   togglePause() {
     if (this.phase === "playing") {
       this.phase = "paused"
-      this.keys.space = false
-      this.releaseLock()
+      this.input.keys.space = false
+      this.input.releaseLock()
       this.sfx.ui()
     } else if (this.phase === "paused") {
       this.phase = "playing"
@@ -759,8 +630,7 @@ export class Game {
 
     const frozen = this.transition > 0 || this.bannerTimer > 1.1 || this.countdown > 0
     if (!frozen) {
-      const fire = this.keys.space || this.tapFire
-      this.tapFire = false
+      const fire = this.input.keys.space || this.input.consumeTapFire()
       this.updateLaser(fire)
       this.tryFire(dt, fire)
       this.updateProjectiles(dt)
@@ -789,15 +659,15 @@ export class Game {
     const targetW = p.baseW * wMult
     p.w += (targetW - p.w) * Math.min(1, dt * 10)
 
-    if (this.keys.left || this.keys.right) {
-      const dir = (this.keys.right ? 1 : 0) - (this.keys.left ? 1 : 0)
+    if (this.input.keys.left || this.input.keys.right) {
+      const dir = (this.input.keys.right ? 1 : 0) - (this.input.keys.left ? 1 : 0)
       p.vx += dir * 5200 * dt
       p.vx = clamp(p.vx, -900, 900)
-      this.pointerX = null
-    } else if (this.pointerX !== null) {
-      const k = 1 - Math.exp(-dt * (this.locked ? 44 : 26))
-      p.vx = (this.pointerX - p.x) * k * 30
-      p.x += (this.pointerX - p.x) * k
+      this.input.pointerX = null
+    } else if (this.input.pointerX !== null) {
+      const k = 1 - Math.exp(-dt * (this.input.locked ? 44 : 26))
+      p.vx = (this.input.pointerX - p.x) * k * 30
+      p.x += (this.input.pointerX - p.x) * k
     } else {
       p.vx *= Math.exp(-dt * 10)
     }
@@ -1668,7 +1538,7 @@ export class Game {
     }
     if (this.level >= LEVELS.length) {
       this.phase = "won"
-      this.releaseLock()
+      this.input.releaseLock()
       this.sfx.win()
       this.saveTop()
       this.pushHud()
@@ -1705,7 +1575,7 @@ export class Game {
     this.projectiles = []
     if (this.lives <= 0) {
       this.phase = "over"
-      this.releaseLock()
+      this.input.releaseLock()
       this.sfx.gameOver()
       this.saveTop()
       this.pushHud()
