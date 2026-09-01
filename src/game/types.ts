@@ -111,6 +111,16 @@ export interface PowerUp {
   t: number
 }
 
+export interface PaddleState {
+  x: number
+  y: number
+  w: number
+  baseW: number
+  h: number
+  vx: number
+  squash: number
+}
+
 export interface Projectile {
   x: number
   y: number
