@@ -31,9 +31,15 @@ jobs:
       - name: Установка зависимостей (main)
         working-directory: main-src
         run: npm ci
+      - name: Линт (main)
+        working-directory: main-src
+        run: npm run lint:check --if-present
+      - name: Тесты (main)
+        working-directory: main-src
+        run: npm run test --if-present
       - name: Проверка типов (main)
         working-directory: main-src
-        run: npm run typecheck
+        run: npm run typecheck --if-present
       - name: Сборка стабильной версии (main)
         working-directory: main-src
         env:
@@ -55,6 +61,12 @@ jobs:
       - name: Установка зависимостей (beta)
         working-directory: beta-src
         run: npm ci
+      - name: Линт (beta)
+        working-directory: beta-src
+        run: npm run lint:check
+      - name: Тесты (beta)
+        working-directory: beta-src
+        run: npm run test
       - name: Проверка типов (beta)
         working-directory: beta-src
         run: npm run typecheck

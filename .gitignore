@@ -3,3 +3,8 @@ node_modules/
 dist/
 build/
 *.log
+
+# Environment variables (Supabase keys, etc.)
+.env
+.env.*
+!.env.example
