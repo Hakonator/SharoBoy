@@ -2,6 +2,7 @@ import { SFX } from "./audio"
 import { BossSystem } from "./boss"
 import { Physics } from "./physics"
 import { PowersSystem } from "./powers"
+import { WeaponsSystem } from "./weapons"
 import { InputController } from "./input"
 import { evaluateAch } from "./achievements"
 import { Effects } from "./effects"
@@ -23,7 +24,7 @@ import {
 } from "./render"
 import type { Ball, Block, Bubble, PaddleState, Phase, PowerUp, Projectile } from "./types"
 import type { HudData } from "./types"
-import { clamp, daySeed, lsGet, lsSet, mulberry32, rand, rotatedExtents } from "./utils"
+import { clamp, daySeed, lsGet, lsSet, mulberry32, rand } from "./utils"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "./upgrades"
 
 export { UPGRADES_ENABLED, UPGRADE_DEFS } from "./upgrades"
@@ -92,6 +93,7 @@ export class Game {
   private readonly bossSys: BossSystem
   private readonly physics: Physics
   private readonly powersSys: PowersSystem
+  private readonly weaponsSys: WeaponsSystem
   private boomQueue: { x: number; y: number; at: number }[] = []
 
   private spawnTimer = 18
@@ -388,6 +390,76 @@ export class Game {
       dropPower: (x, y) => g.powersSys.dropPower(x, y),
       damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
       pushHud: () => g.pushHud(),
+    })
+    this.weaponsSys = new WeaponsSystem({
+      get time() {
+        return g.time
+      },
+      paddle: g.paddle,
+      get blocks() {
+        return g.blocks
+      },
+      get boss() {
+        return g.bossSys.boss
+      },
+      get projectiles() {
+        return g.projectiles
+      },
+      set projectiles(v) {
+        g.projectiles = v
+      },
+      get rocketUntil() {
+        return g.rocketUntil
+      },
+      set rocketUntil(v) {
+        g.rocketUntil = v
+      },
+      get weaponCd() {
+        return g.weaponCd
+      },
+      set weaponCd(v) {
+        g.weaponCd = v
+      },
+      get laserArmed() {
+        return g.laserArmed
+      },
+      set laserArmed(v) {
+        g.laserArmed = v
+      },
+      get laserArmedUntil() {
+        return g.laserArmedUntil
+      },
+      set laserArmedUntil(v) {
+        g.laserArmedUntil = v
+      },
+      get laserUntil() {
+        return g.laserUntil
+      },
+      set laserUntil(v) {
+        g.laserUntil = v
+      },
+      get laserWasOn() {
+        return g.laserWasOn
+      },
+      set laserWasOn(v) {
+        g.laserWasOn = v
+      },
+      get shake() {
+        return g.shake
+      },
+      set shake(v) {
+        g.shake = v
+      },
+      get flash() {
+        return g.flash
+      },
+      set flash(v) {
+        g.flash = v
+      },
+      fx: g.fx,
+      sfx: g.sfx,
+      damageBlock: (b, dmg) => g.physics.damageBlock(b, dmg),
+      damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
     })
     this.best = Number(lsGet("sharoboy-best") || 0) || 0
     try {
@@ -842,16 +914,16 @@ export class Game {
       const due = this.boomQueue.filter((q) => this.time >= q.at)
       if (due.length) {
         this.boomQueue = this.boomQueue.filter((q) => this.time < q.at)
-        for (const q of due) this.explode(q.x, q.y)
+        for (const q of due) this.weaponsSys.explode(q.x, q.y)
       }
     }
 
     const frozen = this.transition > 0 || this.bannerTimer > 1.1 || this.countdown > 0
     if (!frozen) {
       const fire = this.input.keys.space || this.input.consumeTapFire()
-      this.updateLaser(fire)
-      this.tryFire(dt, fire)
-      this.updateProjectiles(dt)
+      this.weaponsSys.updateLaser(fire)
+      this.weaponsSys.tryFire(dt, fire)
+      this.weaponsSys.updateProjectiles(dt)
       for (const ball of this.balls) this.physics.updateBall(ball, dt)
       this.balls = this.balls.filter((b) => !b.lost)
       if (this.balls.length === 0) this.loseLife()
@@ -877,144 +949,6 @@ export class Game {
       lsSet("sharoboy-best", String(this.best))
     }
     this.fx.popups.push({ x, y, text: `+${Math.round(n)}`, color, t: 0, size })
-  }
-
-  /* ---------- оружие ---------- */
-
-  private tryFire(dt: number, fire: boolean) {
-    const rocketOn = this.time < this.rocketUntil
-    if (!rocketOn || !fire) {
-      this.weaponCd = 0
-      return
-    }
-    this.weaponCd -= dt
-    if (this.weaponCd > 0) return
-    const p = this.paddle
-    this.projectiles.push({ x: p.x, y: p.y - p.h - 6, vy: -560, kind: "rocket", r: 7, dead: false })
-    this.sfx.rocket()
-    this.weaponCd = 0.32
-    this.fx.burst(p.x, p.y - p.h, "#ffc94d", 5, 120)
-    if (this.projectiles.length > 48) this.projectiles.splice(0, this.projectiles.length - 48)
-    p.squash = Math.max(p.squash, 0.35)
-  }
-
-  /** Лазер-луч: взводится бонусом, залп по пробелу/клику, импульсы ~2 с. */
-  private updateLaser(fire: boolean) {
-    if (this.laserArmed && this.time > this.laserArmedUntil) this.laserArmed = false
-    if (this.laserArmed && fire) {
-      this.laserArmed = false
-      this.laserUntil = this.time + 2
-      this.laserWasOn = false
-    }
-    const active = this.time < this.laserUntil
-    const cyc = this.time % 0.3
-    const on = active && cyc < 0.17
-    if (on && !this.laserWasOn) {
-      this.sfx.laser()
-      const p = this.paddle
-      this.beamHit(p.x - p.w * 0.36)
-      this.beamHit(p.x + p.w * 0.36)
-      p.squash = Math.max(p.squash, 0.25)
-    }
-    this.laserWasOn = on
-  }
-
-  private beamHit(px: number) {
-    const pylonY = this.paddle.y - this.paddle.h / 2 - 8
-    let best: Block | null = null
-    let bestHH = 0
-    for (const b of this.blocks) {
-      if (b.dead) continue
-      const e = rotatedExtents(b.rx, b.ry, b.rot)
-      if (Math.abs(b.x - px) > e.hw + 3) continue
-      if (b.y + e.hh >= pylonY) continue
-      if (!best || b.y > best.y) {
-        best = b
-        bestHH = e.hh
-      }
-    }
-    if (best) {
-      this.physics.damageBlock(best, 3)
-      this.fx.burst(px, best.y + bestHH, "#7cf5ff", 8, 180)
-      this.fx.rings.push({
-        x: px,
-        y: best.y + bestHH,
-        r: 4,
-        maxR: 44,
-        color: "rgba(124,245,255,0.85)",
-        t: 0,
-      })
-      return
-    }
-    if (
-      this.bossSys.boss &&
-      Math.abs(this.bossSys.boss.x - px) < this.bossSys.boss.r &&
-      this.bossSys.boss.y + this.bossSys.boss.r < pylonY
-    ) {
-      this.bossSys.damage(2, true)
-      this.fx.burst(px, this.bossSys.boss.y + this.bossSys.boss.r, "#7cf5ff", 8, 180)
-    }
-  }
-
-  private updateProjectiles(dt: number) {
-    for (const pr of this.projectiles) {
-      pr.y += pr.vy * dt
-      if (pr.y < -30) {
-        pr.dead = true
-        continue
-      }
-      if (Math.random() < 0.5) {
-        this.fx.particles.push({
-          x: pr.x + rand(-2, 2),
-          y: pr.y + 10,
-          vx: rand(-20, 20),
-          vy: rand(40, 90),
-          life: 0.25,
-          maxLife: 0.25,
-          size: rand(1.5, 3),
-          color: "#ff8a3d",
-          grav: 0,
-        })
-      }
-      for (const b of this.blocks) {
-        if (b.dead) continue
-        const e = rotatedExtents(b.rx, b.ry, b.rot)
-        if (Math.abs(pr.x - b.x) < e.hw + pr.r && Math.abs(pr.y - b.y) < e.hh + pr.r) {
-          pr.dead = true
-          if (pr.kind === "rocket") this.explode(pr.x, pr.y)
-          break
-        }
-      }
-      if (!pr.dead && this.bossSys.boss) {
-        if (
-          Math.hypot(pr.x - this.bossSys.boss.x, pr.y - this.bossSys.boss.y) <
-          this.bossSys.boss.r + pr.r + 4
-        ) {
-          pr.dead = true
-          this.explode(pr.x, pr.y)
-        }
-      }
-    }
-    this.projectiles = this.projectiles.filter((pr) => !pr.dead)
-  }
-
-  private explode(x: number, y: number) {
-    this.sfx.explosion()
-    this.shake = Math.min(this.shake + 5, 12)
-    this.flash = Math.max(this.flash, 0.4)
-    this.fx.rings.push({ x, y, r: 12, maxR: 150, color: "rgba(255,138,61,0.85)", t: 0 })
-    this.fx.burst(x, y, "#ffc94d", 14, 270)
-    this.fx.burst(x, y, "#ff8a3d", 10, 210)
-    const R = 90
-    for (const b of [...this.blocks]) {
-      if (b.dead) continue
-      if (Math.hypot(b.x - x, b.y - y) < R + Math.max(b.rx, b.ry)) this.physics.damageBlock(b, 3)
-    }
-    if (
-      this.bossSys.boss &&
-      Math.hypot(this.bossSys.boss.x - x, this.bossSys.boss.y - y) < R + this.bossSys.boss.r
-    )
-      this.bossSys.damage(3, true)
   }
 
   /* ---------- хост для BossSystem ---------- */
