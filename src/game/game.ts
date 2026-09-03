@@ -731,7 +731,7 @@ export class Game {
       this.tryFire(dt, fire)
       this.updateProjectiles(dt)
       for (const ball of this.balls) this.physics.updateBall(ball, dt)
-      this.balls = this.balls.filter((b) => !(b as Ball & { lost?: boolean }).lost)
+      this.balls = this.balls.filter((b) => !b.lost)
       if (this.balls.length === 0) this.loseLife()
     }
 

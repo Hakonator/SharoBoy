@@ -87,6 +87,8 @@ export interface Ball {
   trail: { x: number; y: number }[]
   squash: number
   sinceHit: number
+  /** шар вылетел за нижнюю границу и должен быть убран в этом же кадре */
+  lost?: boolean
 }
 
 export type PowerType =

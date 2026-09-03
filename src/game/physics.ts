@@ -142,7 +142,7 @@ export class Physics {
         continue
       }
       if (ball.y > g.h + ball.r * 2) {
-        ;(ball as Ball & { lost?: boolean }).lost = true
+        ball.lost = true
         return
       }
 
