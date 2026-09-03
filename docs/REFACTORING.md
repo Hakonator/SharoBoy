@@ -3,12 +3,18 @@
 > Файл-состояние для продолжения работы в следующих сессиях.
 > Обновляй после каждого завершённого шага.
 
+> **СТАТУС: РЕФАКТОРИНГ ЗАВЕРШЁН.** Монолит `game.ts` (2841 строки) разобран на
+> системы, UI-монолит `App.tsx` (932 строки) — на `ui/screens.tsx` + `ui/icons.tsx`.
+> Дальнейшая работа — баги и фичи поверх этой базы.
+
 ## Цель
 
 Разрезать монолит `src/game/game.ts` (изначально 2841 строку) на независимые
-модули без изменения поведения. Публичный API для `App.tsx` не меняется:
-`game.ts` ре-экспортирует `UPGRADES_ENABLED`, `UPGRADE_DEFS` и типы
-`Block, HudData, Phase, PowerType` (строки 38–39 game.ts) — не удалять.
+модули без изменения поведения, затем разрезать `App.tsx` на UI-компоненты.
+Публичный API для `App.tsx` не меняется: `game.ts` ре-экспортирует
+`UPGRADES_ENABLED`, `UPGRADE_DEFS` и типы `Block, HudData, Phase, PowerType` —
+не удалять (при этом `ui/screens.tsx` берёт `UPGRADE_*` напрямую из
+`game/upgrades.ts`, а `LEADERBOARD_ENABLED` — из `config.ts`).
 
 ## Выполнено (ветка `beta`)
 
@@ -26,8 +32,12 @@
 | `8cbe7b7` | Явное поле `lost?: boolean` у `Ball` вместо расширения типа `(ball as Ball & { lost?: boolean })` — касты убраны                                                                                                                  |
 | `6e393a4` | Бонусы/спавн → `PowersSystem` (`powers.ts`): `periodicSpawn`, `tryFieldShift`, `pickPowerType`, `dropPower`, `periodicPowerDrop`, `updatePowers`, `applyPower`; заодно явное `taken?: boolean` у `PowerUp` (второй «каст-хвост»)  |
 | `8200c3c` | Оружие → `WeaponsSystem` (`weapons.ts`): `tryFire`, `updateLaser`, `beamHit`, `updateProjectiles`, `explode`; урон боссу/блокам делегируется хосту                                                                                |
+| `fdfdd55` | game.ts: хосты систем собраны в фабричные методы вместо инлайновых литералов; старт партии унифицирован через `resetRun()`                                                                                                        |
+| `c670354` | UI: иконки и мелкие компоненты → `ui/icons.tsx` (`IconBall`, `IconPlay`, `Key`, `EffectChip`, `ControlsPanel`, `FloatingBalls` и др.)                                                                                             |
+| `e968ba4` | UI: экраны и оверлеи → `ui/screens.tsx` (`BootErrorScreen`, `AchToasts`, `HudOverlay`, `MenuScreen`, `PauseScreen`, `GameOverScreen`, `WinScreen`, `TopSubmit`); `App.tsx` — только оркестрация состояния                         |
 
-Текущий размер: **game.ts 1244 строки** (этой сессией: 1465 → 1244; изначально 2841).
+Текущий размер: **game.ts 1253 строки** (изначально 2841), **App.tsx 274 строки**
+(изначально 932), `ui/screens.tsx` 821, `ui/icons.tsx` 182.
 Тесты 45/45, lint/typecheck/build чистые.
 
 ## Паттерн «система + хост» (так выносим подсистемы)
@@ -56,17 +66,15 @@ npm run build
 husky pre-commit сам гоняет `eslint --fix` + `prettier --write` на staged
 (шумный вывод lint-staged — норма, не ошибка).
 
-## Что осталось в game.ts (кандидаты, по порядку)
-
-Номера строк не привожу — с каждым шагом сдвигаются; ищи по именам.
+## Финальная структура: что осознанно осталось в game.ts
 
 1. **Жизненный цикл партии** (`startGame`, `startEndless`, `toMenu`, `launch`,
    `serveBall`, `onLevelCleared`, `loseLife`, `clearAllEffects`, `saveTop`) —
-   толстая склейка с состоянием; выносить только если выгода очевидна.
+   толстая склейка с состоянием; решено не выносить (выгода не окупает связность).
 2. **Прогресс/апгрейды** (`loadProgress`, `saveProgress`, `addCoins`,
-   `buyUpgrade`, `applyUpgrades`) — маленький блок, можно оставить.
+   `buyUpgrade`, `applyUpgrades`) — маленький блок, оставлен.
 3. `pushHud`, `syncEffectsHud`, `setBanner`, `addScore`, `draw()` — тонкая
-   склейка с состоянием; **оставить в game.ts** (как оркестратор).
+   склейка с состоянием; оставлены (game.ts — оркестратор партии).
 
 ## Известные технические хвосты
 
