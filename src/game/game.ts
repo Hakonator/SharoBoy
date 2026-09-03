@@ -64,6 +64,9 @@ export class Game {
   private waveSpec: { name: string; speed: number } | null = null
 
   private paddle: PaddleState = { x: 480, y: 600, w: 150, baseW: 150, h: 18, vx: 0, squash: 0 }
+  /** Режим тача: ракетка поднята выше, чтобы управляющий палец её не закрывал. */
+  private touchMode =
+    typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches
   /** Множитель ширины ракетки от прокачки (апгрейд «paddle»). */
   private paddleWidthMult = 1
   private balls: Ball[] = []
@@ -137,6 +140,7 @@ export class Game {
       launchIfPlaying: () => {
         if (this.phase === "playing") this.launch()
       },
+      onTouchInput: () => this.enableTouchMode(),
       togglePause: () => this.togglePause(),
       toggleMute: () => this.toggleMute(),
       onBlur: () => {
@@ -616,7 +620,7 @@ export class Game {
     this.canvas.style.width = `${this.w}px`
     this.canvas.style.height = `${this.h}px`
     this.paddle.baseW = clamp(this.w * 0.18, 110, 200) * this.paddleWidthMult
-    this.paddle.y = this.h - 34
+    this.paddle.y = this.h - this.paddleBottomOffset()
     this.paddle.x = clamp(this.paddle.x, this.paddle.w / 2 + 4, this.w - this.paddle.w / 2 - 4)
     if (ow && oh && this.blocks.length && (ow !== this.w || oh !== this.h)) {
       const sx = this.w / ow
@@ -627,6 +631,18 @@ export class Game {
         b.y = clamp(b.y * sy, b.ry + 6, this.h * 0.75)
       }
     }
+  }
+
+  /** Отступ ракетки от нижнего края: на таче выше — палец не закрывает ракетку. */
+  private paddleBottomOffset(): number {
+    return this.touchMode ? 100 : 34
+  }
+
+  /** Первый тач-ввод (в т.ч. на гибридных устройствах) — поднимаем ракетку. */
+  private enableTouchMode() {
+    if (this.touchMode) return
+    this.touchMode = true
+    this.paddle.y = this.h - this.paddleBottomOffset()
   }
 
   /* ---------- управление игрой ---------- */

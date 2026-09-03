@@ -274,11 +274,14 @@ export class PowersSystem {
         popup("МАГНИТ!")
         break
       case "multi": {
-        const donors = g.balls.filter((b) => !b.stuck).slice(0, 2)
+        // ×3: добавляем ровно ДВА дополнительных шара (раньше клонировался
+        // каждый свободный шар, и при одном шаре в игре появлялся лишь один).
+        const donors = g.balls.filter((b) => !b.stuck)
         const base = donors[0] ?? g.balls[0]
         if (base) {
-          for (const d of [base, ...donors.slice(1)]) {
+          for (let i = 0; i < 2; i++) {
             if (g.balls.length >= 6) break
+            const d = donors[i] ?? base
             const ang = rand(-Math.PI * 0.85, -Math.PI * 0.15)
             g.balls.push({
               x: d.x,

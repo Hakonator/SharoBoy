@@ -26,6 +26,8 @@ export interface InputHost {
   primaryAction(): void
   /** Клик/тап: запуск шара, если партия идёт. */
   launchIfPlaying(): void
+  /** Первый тач-ввод: хост адаптируется (поднимает ракетку над пальцем). */
+  onTouchInput(): void
   /** Пауза/снятие паузы (клавиши P/Esc). */
   togglePause(): void
   /** Переключение звука (клавиша M). */
@@ -166,6 +168,7 @@ export class InputController {
 
   private handlePointerDown = (e: PointerEvent) => {
     this.host.sfxEnsure()
+    if (e.pointerType === "touch") this.host.onTouchInput()
     this.tapFire = true
     // Ракетку в точку касания НЕ перекидываем — палец/мышь могут быть далеко
     // от ракетки, и ракетка «уезжала» к месту тапа.
