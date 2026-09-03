@@ -23,8 +23,12 @@
 | `361f052` | Эффекты → `Effects` (`effects.ts`) + юнит-тесты (`effects.test.ts`, +6 тестов)                                                                                                                                                    |
 | `d6e0def` | Босс → `BossSystem` (`boss.ts`): update/damage/kill, спавн миньонов/бомб; наружу только `addRawScore` и `onBossKilled`                                                                                                            |
 | `efc1b20` | Физика → `Physics` (`physics.ts`): `updatePaddle`, `updateBall`, `collidePaddle/Blocks/Boss`, `damageBlock`, `spawnScatter`, приватный `comboMult`                                                                                |
+| `8cbe7b7` | Явное поле `lost?: boolean` у `Ball` вместо расширения типа `(ball as Ball & { lost?: boolean })` — касты убраны                                                                                                                  |
+| `6e393a4` | Бонусы/спавн → `PowersSystem` (`powers.ts`): `periodicSpawn`, `tryFieldShift`, `pickPowerType`, `dropPower`, `periodicPowerDrop`, `updatePowers`, `applyPower`; заодно явное `taken?: boolean` у `PowerUp` (второй «каст-хвост»)  |
+| `8200c3c` | Оружие → `WeaponsSystem` (`weapons.ts`): `tryFire`, `updateLaser`, `beamHit`, `updateProjectiles`, `explode`; урон боссу/блокам делегируется хосту                                                                                |
 
-Текущий размер: **game.ts 1465 строк** (было 2841). Тесты 45/45, lint/typecheck/build чистые.
+Текущий размер: **game.ts 1244 строки** (этой сессией: 1465 → 1244; изначально 2841).
+Тесты 45/45, lint/typecheck/build чистые.
 
 ## Паттерн «система + хост» (так выносим подсистемы)
 
@@ -54,27 +58,18 @@ husky pre-commit сам гоняет `eslint --fix` + `prettier --write` на st
 
 ## Что осталось в game.ts (кандидаты, по порядку)
 
-Номера строк на момент `efc1b20`, сдвигаются после правок.
+Номера строк не привожу — с каждым шагом сдвигаются; ищи по именам.
 
-1. **Бонусы/спавн → `powers.ts`** (~790–1040): `periodicSpawn`, `tryFieldShift`,
-   `pickPowerType`, `dropPower`, `periodicPowerDrop`, `updatePowers`,
-   `applyPower`. Много чтения таймеров — предикаты в хосте.
-2. **Оружие → `weapons.ts`** (~1040–1180): `tryFire`, `updateLaser`,
-   `beamHit`, `updateProjectiles`, `explode`. Используют `physics.damageBlock()`
-   и `physics.spawnScatter()` — они уже публичные.
-3. **Жизненный цикл партии** (`startGame`, `startEndless`, `toMenu`, `launch`,
+1. **Жизненный цикл партии** (`startGame`, `startEndless`, `toMenu`, `launch`,
    `serveBall`, `onLevelCleared`, `loseLife`, `clearAllEffects`, `saveTop`) —
    толстая склейка с состоянием; выносить только если выгода очевидна.
-4. **Прогресс/апгрейды** (`loadProgress`, `saveProgress`, `addCoins`,
+2. **Прогресс/апгрейды** (`loadProgress`, `saveProgress`, `addCoins`,
    `buyUpgrade`, `applyUpgrades`) — маленький блок, можно оставить.
-5. `pushHud`, `syncEffectsHud`, `setBanner`, `addScore`, `draw()` — тонкая
+3. `pushHud`, `syncEffectsHud`, `setBanner`, `addScore`, `draw()` — тонкая
    склейка с состоянием; **оставить в game.ts** (как оркестратор).
 
 ## Известные технические хвосты
 
-- **lost-флаг шара**: в `physics.ts` ставится расширением типа
-  `(ball as Ball & { lost?: boolean })` — оформить явным полем `lost?: boolean`
-  в интерфейсе `Ball` (`types.ts`) и убрать касты.
 - `render.ts` дублирует view-типы вместо общих — приемлемо, чинить не обязательно.
 - Подпись очков (`signScore`) считается в клиенте: `VITE_SCORE_SECRET` попадает
   в бандл при заполненном `.env` — осознанный компромисс, будущее решение —
