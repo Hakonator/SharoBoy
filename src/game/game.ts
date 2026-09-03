@@ -1,8 +1,8 @@
 import { SFX } from "./audio"
-import { BossSystem } from "./boss"
-import { Physics } from "./physics"
-import { PowersSystem } from "./powers"
-import { WeaponsSystem } from "./weapons"
+import { BossSystem, type BossHost } from "./boss"
+import { Physics, type PhysicsWorld } from "./physics"
+import { PowersSystem, type PowersWorld } from "./powers"
+import { WeaponsSystem, type WeaponsWorld } from "./weapons"
 import { InputController } from "./input"
 import { evaluateAch } from "./achievements"
 import { Effects } from "./effects"
@@ -143,9 +143,37 @@ export class Game {
         if (this.phase === "playing") this.togglePause()
       },
     })
+    this.bossSys = new BossSystem(this.makeBossHost())
+    this.powersSys = new PowersSystem(this.makePowersHost())
+    this.physics = new Physics(this.makePhysicsHost())
+    this.weaponsSys = new WeaponsSystem(this.makeWeaponsHost())
+    this.best = Number(lsGet("sharoboy-best") || 0) || 0
+    try {
+      const parsed = JSON.parse(lsGet("sharoboy-top") || "[]") as unknown
+      this.top = Array.isArray(parsed)
+        ? (parsed as number[]).filter((n) => typeof n === "number")
+        : []
+    } catch {
+      this.top = []
+    }
+    try {
+      const parsedE = JSON.parse(lsGet("sharoboy-top-endless") || "[]") as unknown
+      this.topEndless = Array.isArray(parsedE)
+        ? (parsedE as number[]).filter((n) => typeof n === "number")
+        : []
+    } catch {
+      this.topEndless = []
+    }
+    this.loadProgress()
+  }
+
+  /* ---------- хосты систем ---------- */
+
+  /** Хост для BossSystem: геттеры реактивных полей и колбэки последствий. */
+  private makeBossHost(): BossHost {
     // eslint-disable-next-line @typescript-eslint/no-this-alias -- геттерам хоста нужно живое замыкание на Game
     const g = this
-    this.bossSys = new BossSystem({
+    return {
       get w() {
         return g.w
       },
@@ -190,8 +218,14 @@ export class Game {
       addRawScore: (n) => g.addRawScore(n),
       onBossKilled: () => g.onBossKilled(),
       pushHud: () => g.pushHud(),
-    })
-    this.powersSys = new PowersSystem({
+    }
+  }
+
+  /** Хост для PowersSystem: таймеры спавна, поля эффектов и последствия. */
+  private makePowersHost(): PowersWorld {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- геттерам хоста нужно живое замыкание на Game
+    const g = this
+    return {
       get w() {
         return g.w
       },
@@ -320,8 +354,14 @@ export class Game {
       sfx: g.sfx,
       addCoins: (n) => g.addCoins(n),
       pushHud: () => g.pushHud(),
-    })
-    this.physics = new Physics({
+    }
+  }
+
+  /** Хост для Physics: кинематика ракетки/шара, предикаты эффектов, колбэки. */
+  private makePhysicsHost(): PhysicsWorld {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- геттерам хоста нужно живое замыкание на Game
+    const g = this
+    return {
       get w() {
         return g.w
       },
@@ -390,8 +430,14 @@ export class Game {
       dropPower: (x, y) => g.powersSys.dropPower(x, y),
       damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
       pushHud: () => g.pushHud(),
-    })
-    this.weaponsSys = new WeaponsSystem({
+    }
+  }
+
+  /** Хост для WeaponsSystem: снаряды, поля лазера и урон делегируется системам. */
+  private makeWeaponsHost(): WeaponsWorld {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- геттерам хоста нужно живое замыкание на Game
+    const g = this
+    return {
       get time() {
         return g.time
       },
@@ -460,25 +506,7 @@ export class Game {
       sfx: g.sfx,
       damageBlock: (b, dmg) => g.physics.damageBlock(b, dmg),
       damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
-    })
-    this.best = Number(lsGet("sharoboy-best") || 0) || 0
-    try {
-      const parsed = JSON.parse(lsGet("sharoboy-top") || "[]") as unknown
-      this.top = Array.isArray(parsed)
-        ? (parsed as number[]).filter((n) => typeof n === "number")
-        : []
-    } catch {
-      this.top = []
     }
-    try {
-      const parsedE = JSON.parse(lsGet("sharoboy-top-endless") || "[]") as unknown
-      this.topEndless = Array.isArray(parsedE)
-        ? (parsedE as number[]).filter((n) => typeof n === "number")
-        : []
-    } catch {
-      this.topEndless = []
-    }
-    this.loadProgress()
   }
 
   /* ---------- сохранение валюты/прокачки ---------- */
@@ -609,31 +637,7 @@ export class Game {
     this.mode = "campaign"
     this.wave = 0
     this.waveSpec = null
-    this.bossSys.clear()
-    this.boomQueue = []
-    this.score = 0
-    this.lives = 3 + (this.upgrades.life ?? 0)
-    this.combo = 0
-    this.level = 1
-    this.newRecord = false
-    this.runBossKills = 0
-    this.runLivesLost = 0
-    this.fx.clear()
-    this.powers = []
-    this.projectiles = []
-    this.wideUntil = 0
-    this.slowUntil = 0
-    this.fastUntil = 0
-    this.shrinkUntil = 0
-    this.laserUntil = 0
-    this.laserArmed = false
-    this.rocketUntil = 0
-    this.fireUntil = 0
-    this.magnetUntil = 0
-    this.shield = 0
-    this.weaponCd = 0
-    this.effectsKey = ""
-    this.transition = 0
+    this.resetRun()
     this.buildLevel(1)
     this.applyUpgrades()
     this.magnetUntil = this.time + 4 * (this.upgrades.magnet ?? 0)
@@ -650,31 +654,7 @@ export class Game {
     this.mode = "endless"
     this.wave = 1
     this.waveSpec = { name: "ВОЛНА 1", speed: 400 }
-    this.bossSys.clear()
-    this.boomQueue = []
-    this.score = 0
-    this.lives = 3 + (this.upgrades.life ?? 0)
-    this.combo = 0
-    this.level = 1
-    this.newRecord = false
-    this.runBossKills = 0
-    this.runLivesLost = 0
-    this.fx.clear()
-    this.powers = []
-    this.projectiles = []
-    this.wideUntil = 0
-    this.slowUntil = 0
-    this.fastUntil = 0
-    this.shrinkUntil = 0
-    this.laserUntil = 0
-    this.laserArmed = false
-    this.rocketUntil = 0
-    this.fireUntil = 0
-    this.magnetUntil = 0
-    this.shield = 0
-    this.weaponCd = 0
-    this.effectsKey = ""
-    this.transition = 0
+    this.resetRun()
     this.buildWave(1)
     this.applyUpgrades()
     this.magnetUntil = this.time + 4 * (this.upgrades.magnet ?? 0)
@@ -721,6 +701,35 @@ export class Game {
     this.sfx.muted = !this.sfx.muted
     if (!this.sfx.muted) this.sfx.ui()
     this.pushHud()
+  }
+
+  /** Полный сброс состояния партии перед стартом кампании/бесконечного режима. */
+  private resetRun() {
+    this.bossSys.clear()
+    this.boomQueue = []
+    this.score = 0
+    this.lives = 3 + (this.upgrades.life ?? 0)
+    this.combo = 0
+    this.level = 1
+    this.newRecord = false
+    this.runBossKills = 0
+    this.runLivesLost = 0
+    this.fx.clear()
+    this.powers = []
+    this.projectiles = []
+    this.wideUntil = 0
+    this.slowUntil = 0
+    this.fastUntil = 0
+    this.shrinkUntil = 0
+    this.laserUntil = 0
+    this.laserArmed = false
+    this.rocketUntil = 0
+    this.fireUntil = 0
+    this.magnetUntil = 0
+    this.shield = 0
+    this.weaponCd = 0
+    this.effectsKey = ""
+    this.transition = 0
   }
 
   private launch() {
