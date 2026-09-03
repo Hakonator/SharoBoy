@@ -146,9 +146,8 @@ export async function fetchTop(
 
 /**
  * Добавить очки в мировой топ. Возвращает null при успехе или текст ошибки.
- * Повторные попытки не плодят дубли: сервер (триггер из
- * scripts/supabase-leaderboard-dedup.sql) хранит только лучший результат
- * игрока в каждом режиме.
+ * Повторные попытки не плодят дубли: сервер (триггер sharoboy_scores_best_only
+ * в Supabase) хранит только лучший результат игрока в каждом режиме.
  */
 export async function submitScore(
   nick: string,
