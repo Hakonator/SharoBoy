@@ -111,6 +111,8 @@ export interface PowerUp {
   vy: number
   type: PowerType
   t: number
+  /** бонус подобран в этом кадре — убрать при ближайшей фильтрации */
+  taken?: boolean
 }
 
 export interface PaddleState {

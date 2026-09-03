@@ -1,12 +1,12 @@
 import { SFX } from "./audio"
 import { BossSystem } from "./boss"
 import { Physics } from "./physics"
+import { PowersSystem } from "./powers"
 import { InputController } from "./input"
 import { evaluateAch } from "./achievements"
 import { Effects } from "./effects"
 import { buildBossArena, gridBlocks, layoutBlocks } from "./levelBuilder"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
-import { POWER_META } from "./palette"
 import {
   drawBackground,
   drawBalls,
@@ -21,18 +21,9 @@ import {
   drawRings,
   drawShieldLine,
 } from "./render"
-import type {
-  Ball,
-  Block,
-  Bubble,
-  PaddleState,
-  Phase,
-  PowerType,
-  PowerUp,
-  Projectile,
-} from "./types"
+import type { Ball, Block, Bubble, PaddleState, Phase, PowerUp, Projectile } from "./types"
 import type { HudData } from "./types"
-import { clamp, daySeed, fitTilt, lsGet, lsSet, mulberry32, rand, rotatedExtents } from "./utils"
+import { clamp, daySeed, lsGet, lsSet, mulberry32, rand, rotatedExtents } from "./utils"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "./upgrades"
 
 export { UPGRADES_ENABLED, UPGRADE_DEFS } from "./upgrades"
@@ -100,6 +91,7 @@ export class Game {
 
   private readonly bossSys: BossSystem
   private readonly physics: Physics
+  private readonly powersSys: PowersSystem
   private boomQueue: { x: number; y: number; at: number }[] = []
 
   private spawnTimer = 18
@@ -197,6 +189,136 @@ export class Game {
       onBossKilled: () => g.onBossKilled(),
       pushHud: () => g.pushHud(),
     })
+    this.powersSys = new PowersSystem({
+      get w() {
+        return g.w
+      },
+      get h() {
+        return g.h
+      },
+      get time() {
+        return g.time
+      },
+      paddle: g.paddle,
+      get balls() {
+        return g.balls
+      },
+      get blocks() {
+        return g.blocks
+      },
+      get boss() {
+        return g.bossSys.boss
+      },
+      get blocksInitial() {
+        return g.blocksInitial
+      },
+      get powers() {
+        return g.powers
+      },
+      set powers(v) {
+        g.powers = v
+      },
+      get fieldShift() {
+        return g.fieldShift
+      },
+      set fieldShift(v) {
+        g.fieldShift = v
+      },
+      get spawnTimer() {
+        return g.spawnTimer
+      },
+      set spawnTimer(v) {
+        g.spawnTimer = v
+      },
+      get skyDropTimer() {
+        return g.skyDropTimer
+      },
+      set skyDropTimer(v) {
+        g.skyDropTimer = v
+      },
+      get shiftTimer() {
+        return g.shiftTimer
+      },
+      set shiftTimer(v) {
+        g.shiftTimer = v
+      },
+      get wideUntil() {
+        return g.wideUntil
+      },
+      set wideUntil(v) {
+        g.wideUntil = v
+      },
+      get slowUntil() {
+        return g.slowUntil
+      },
+      set slowUntil(v) {
+        g.slowUntil = v
+      },
+      get fastUntil() {
+        return g.fastUntil
+      },
+      set fastUntil(v) {
+        g.fastUntil = v
+      },
+      get shrinkUntil() {
+        return g.shrinkUntil
+      },
+      set shrinkUntil(v) {
+        g.shrinkUntil = v
+      },
+      get rocketUntil() {
+        return g.rocketUntil
+      },
+      set rocketUntil(v) {
+        g.rocketUntil = v
+      },
+      get fireUntil() {
+        return g.fireUntil
+      },
+      set fireUntil(v) {
+        g.fireUntil = v
+      },
+      get magnetUntil() {
+        return g.magnetUntil
+      },
+      set magnetUntil(v) {
+        g.magnetUntil = v
+      },
+      get laserArmed() {
+        return g.laserArmed
+      },
+      set laserArmed(v) {
+        g.laserArmed = v
+      },
+      get laserArmedUntil() {
+        return g.laserArmedUntil
+      },
+      set laserArmedUntil(v) {
+        g.laserArmedUntil = v
+      },
+      get shield() {
+        return g.shield
+      },
+      set shield(v) {
+        g.shield = v
+      },
+      get lives() {
+        return g.lives
+      },
+      set lives(v) {
+        g.lives = v
+      },
+      get shake() {
+        return g.shake
+      },
+      set shake(v) {
+        g.shake = v
+      },
+      fx: g.fx,
+      sfx: g.sfx,
+      addCoins: (n) => g.addCoins(n),
+      pushHud: () => g.pushHud(),
+    })
     this.physics = new Physics({
       get w() {
         return g.w
@@ -263,7 +385,7 @@ export class Game {
       wideActive: () => g.time < g.wideUntil,
       shrinkActive: () => g.time < g.shrinkUntil,
       addScore: (n, x, y, color, size) => g.addScore(n, x, y, color, size),
-      dropPower: (x, y) => g.dropPower(x, y),
+      dropPower: (x, y) => g.powersSys.dropPower(x, y),
       damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
       pushHud: () => g.pushHud(),
     })
@@ -711,10 +833,10 @@ export class Game {
 
     this.syncEffectsHud()
     this.physics.updatePaddle(dt)
-    this.updatePowers(dt)
-    this.periodicSpawn(dt)
-    this.periodicPowerDrop(dt)
-    this.tryFieldShift(dt)
+    this.powersSys.updatePowers(dt)
+    this.powersSys.periodicSpawn(dt)
+    this.powersSys.periodicPowerDrop(dt)
+    this.powersSys.tryFieldShift(dt)
     this.bossSys.step(dt)
     if (this.boomQueue.length) {
       const due = this.boomQueue.filter((q) => this.time >= q.at)
@@ -755,283 +877,6 @@ export class Game {
       lsSet("sharoboy-best", String(this.best))
     }
     this.fx.popups.push({ x, y, text: `+${Math.round(n)}`, color, t: 0, size })
-  }
-
-  /** Периодически в верхней зоне появляются новые блоки (в основном одноразовые). */
-  private periodicSpawn(dt: number) {
-    if (this.bossSys.boss) return
-    this.spawnTimer -= dt
-    if (this.spawnTimer > 0) return
-    this.spawnTimer = rand(16, 22)
-    const cap = Math.min(this.blocksInitial + 12, 150)
-    if (this.blocks.length >= cap) return
-    for (let attempt = 0; attempt < 7; attempt++) {
-      const kind = Math.random() < 0.6 ? "circle" : Math.random() < 0.5 ? "eh" : "ev"
-      let rx: number
-      let ry: number
-      if (kind === "circle") {
-        rx = ry = rand(14, 24)
-      } else if (kind === "eh") {
-        rx = rand(24, 44)
-        ry = rand(12, 18)
-      } else {
-        rx = rand(12, 18)
-        ry = rand(20, 34)
-      }
-      const cx = rand(rx + 10, this.w - rx - 10)
-      const cy = rand(ry + 70, this.h * 0.5)
-      let overlaps = false
-      for (const b of this.blocks) {
-        if (Math.abs(b.x - cx) < b.rx + rx + 8 && Math.abs(b.y - cy) < b.ry + ry + 8) {
-          overlaps = true
-          break
-        }
-      }
-      if (overlaps) continue
-      const hroll = Math.random()
-      const hp = (hroll < 0.78 ? 1 : hroll < 0.95 ? 2 : 3) as 1 | 2 | 3
-      const rot = kind !== "circle" && Math.random() < 0.5 ? fitTilt(rx, ry, 60, 46) : 0
-      this.blocks.push({
-        x: cx,
-        y: cy,
-        rx,
-        ry,
-        rot,
-        circle: kind === "circle",
-        hp,
-        maxHp: hp,
-        tier: hp,
-        flash: 1,
-        seed: rand(0, Math.PI * 2),
-        dead: false,
-        x0: cx,
-        swayAmp: 0,
-        swayFreq: 0,
-        swayPh: 0,
-        bomb: false,
-        splits: Math.random() < 0.05,
-      })
-      this.fx.rings.push({ x: cx, y: cy, r: 4, maxR: 60, color: "rgba(124,245,255,0.7)", t: 0 })
-      this.fx.popups.push({
-        x: cx,
-        y: cy - 20,
-        text: "ПОПОЛНЕНИЕ!",
-        color: "#7cf5ff",
-        t: 0,
-        size: 12,
-      })
-      break
-    }
-  }
-
-  /** Редкое смещение всего поля (плавный дрейф). */
-  private tryFieldShift(dt: number) {
-    this.shiftTimer -= dt
-    if (this.shiftTimer > 0 || this.fieldShift) return
-    this.shiftTimer = rand(12, 18)
-    if (!this.blocks.length) return
-    const ang = rand(0, Math.PI * 2)
-    const mag = rand(22, 40)
-    let dx = Math.cos(ang) * mag
-    let dy = Math.sin(ang) * mag * 0.6
-    let minX = Infinity
-    let maxX = -Infinity
-    let minY = Infinity
-    let maxY = -Infinity
-    for (const b of this.blocks) {
-      if (b.minionOrbit) continue
-      minX = Math.min(minX, b.x - b.rx)
-      maxX = Math.max(maxX, b.x + b.rx)
-      minY = Math.min(minY, b.y - b.ry)
-      maxY = Math.max(maxY, b.y + b.ry)
-    }
-    if (minX + dx < 6) dx = 6 - minX
-    if (maxX + dx > this.w - 6) dx = this.w - 6 - maxX
-    if (minY + dy < 6) dy = 6 - minY
-    if (maxY + dy > this.h * 0.8) dy = this.h * 0.8 - maxY
-    this.fieldShift = { t: 0, dur: rand(0.6, 0.9), dx: dx * 2.2, dy: dy * 2.2 }
-    this.fx.popups.push({
-      x: this.w / 2,
-      y: this.h * 0.25,
-      text: "СДВИГ ПОЛЯ",
-      color: "#9fd6ea",
-      t: 0,
-      size: 20,
-    })
-    this.shake = Math.min(this.shake + 1.5, 5)
-  }
-
-  /* ---------- бонусы ---------- */
-
-  private pickPowerType(): PowerType {
-    const fewBlocks = this.blocks.length <= Math.max(5, this.blocksInitial * 0.3)
-    const table: [PowerType, number][] = [
-      ["wide", 12],
-      ["multi", 12],
-      ["life", 6],
-      ["slow", 10],
-      ["shield", 10],
-      ["laser", fewBlocks ? 72 : 9],
-      ["rocket", fewBlocks ? 64 : 8],
-      ["fire", 8],
-      ["fast", 14],
-      ["shrink", 10],
-    ]
-    let sum = 0
-    for (const [, w] of table) sum += w
-    let roll = Math.random() * sum
-    for (const [t, w] of table) {
-      roll -= w
-      if (roll <= 0) return t
-    }
-    return "wide"
-  }
-
-  private dropPower(x: number, y: number) {
-    if (Math.random() < 0.24) {
-      const type = this.pickPowerType()
-      const skip =
-        (type === "multi" && this.balls.length >= 4) ||
-        (type === "life" && this.lives >= 5) ||
-        (type === "shield" && this.shield >= 5)
-      if (!skip) this.powers.push({ x, y, vy: 150, type, t: 0 })
-    }
-  }
-
-  /** Периодический «небесный» сброс бонусов с верхней границы поля. */
-  private periodicPowerDrop(dt: number) {
-    if (this.bossSys.boss) {
-      this.skyDropTimer -= dt * 0.55
-    } else {
-      this.skyDropTimer -= dt
-    }
-    if (this.skyDropTimer > 0) return
-    this.skyDropTimer = rand(18, 27)
-    if (this.powers.length >= 6) return
-    const type = this.pickPowerType()
-    const x = rand(60, this.w - 60)
-    this.powers.push({ x, y: -24, vy: 170, type, t: 0 })
-    this.fx.rings.push({ x, y: 20, r: 6, maxR: 90, color: "rgba(234,247,255,0.7)", t: 0 })
-    this.fx.popups.push({ x, y: 60, text: "С НЕБА!", color: "#eaf7ff", t: 0, size: 18 })
-    this.sfx.power()
-  }
-
-  private updatePowers(dt: number) {
-    const p = this.paddle
-    for (const pw of this.powers) {
-      pw.t += dt
-      pw.y += pw.vy * dt
-      pw.x += Math.sin(pw.t * 4) * 14 * dt
-      if (
-        pw.y > p.y - p.h / 2 - 12 &&
-        pw.y < p.y + p.h / 2 + 12 &&
-        pw.x > p.x - p.w / 2 - 14 &&
-        pw.x < p.x + p.w / 2 + 14
-      ) {
-        ;(pw as PowerUp & { taken?: boolean }).taken = true
-        this.applyPower(pw.type)
-      }
-    }
-    this.powers = this.powers.filter(
-      (pw) => !(pw as PowerUp & { taken?: boolean }).taken && pw.y < this.h + 40
-    )
-  }
-
-  private applyPower(type: PowerType) {
-    const meta = POWER_META[type]
-    this.sfx.power()
-    const popup = (text: string) =>
-      this.fx.popups.push({
-        x: this.paddle.x,
-        y: this.paddle.y - 40,
-        text,
-        color: meta.color,
-        t: 0,
-        size: 18,
-      })
-    switch (type) {
-      case "wide":
-        this.wideUntil = this.time + 12
-        this.shrinkUntil = 0
-        popup("ШИРОКАЯ РАКЕТКА")
-        break
-      case "slow":
-        this.slowUntil = this.time + 8
-        this.fastUntil = 0
-        popup("ЗАМЕДЛЕНИЕ")
-        break
-      case "shield":
-        this.shield = Math.min(5, this.shield + 3)
-        popup("ЗАЩИТНЫЙ ЭКРАН")
-        break
-      case "laser":
-        // луч не стреляет сам: бонус взводит лазер, залп — по пробелу/клику
-        this.laserArmed = true
-        this.laserArmedUntil = this.time + 4
-        popup("ЛАЗЕР ГОТОВ — ПРОБЕЛ")
-        break
-      case "rocket":
-        this.rocketUntil = this.time + 12
-        popup("РАКЕТЫ — ПРОБЕЛ")
-        break
-      case "fire":
-        this.fireUntil = this.time + 8
-        popup("ОГНЕННОЕ ЯДРО!")
-        break
-      case "magnet":
-        this.magnetUntil = this.time + 7
-        popup("МАГНИТ!")
-        break
-      case "multi": {
-        const donors = this.balls.filter((b) => !b.stuck).slice(0, 2)
-        const base = donors[0] ?? this.balls[0]
-        if (base) {
-          for (const d of [base, ...donors.slice(1)]) {
-            if (this.balls.length >= 6) break
-            const ang = rand(-Math.PI * 0.85, -Math.PI * 0.15)
-            this.balls.push({
-              x: d.x,
-              y: d.y,
-              vx: Math.cos(ang) * d.speed,
-              vy: Math.sin(ang) * d.speed,
-              r: d.r,
-              speed: d.speed,
-              stuck: false,
-              stuckOffset: 0,
-              trail: [],
-              squash: 0,
-              sinceHit: 0,
-            })
-          }
-        }
-        popup("×3 ШАРА!")
-        break
-      }
-      case "life":
-        this.lives = Math.min(5, this.lives + 1)
-        popup("+1 ЖИЗНЬ")
-        break
-      case "coin":
-        this.addCoins(1)
-        popup("+1 МОНЕТА")
-        this.sfx.coin()
-        this.fx.burst(this.paddle.x, this.paddle.y - 12, "#ffd66b", 10, 170)
-        break
-      case "fast":
-        this.fastUntil = this.time + 7
-        this.slowUntil = 0
-        this.sfx.powerBad()
-        popup("УСКОРЕНИЕ!")
-        break
-      case "shrink":
-        this.shrinkUntil = this.time + 9
-        this.wideUntil = 0
-        this.sfx.powerBad()
-        popup("УЗКАЯ РАКЕТКА!")
-        break
-    }
-    this.fx.burst(this.paddle.x, this.paddle.y - 10, meta.color, 12, 190)
-    this.pushHud()
   }
 
   /* ---------- оружие ---------- */
