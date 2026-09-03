@@ -297,6 +297,10 @@ export function drawRings(ctx: Ctx, rings: Ring[]) {
     ctx.lineWidth = 3 * a + 1
     ctx.stroke()
   }
+  /* Обязательно сбрасываем: кольца рисуются до бонусов/шара/ракетки, и
+     «протёкший» globalAlpha гасил бы их до конца кадра (мигание после
+     касаний — ring живёт ~0.4 с и его альфа затухает от 1 до 0). */
+  ctx.globalAlpha = 1
 }
 
 function drawCoin(ctx: Ctx, pw: PowerUp) {

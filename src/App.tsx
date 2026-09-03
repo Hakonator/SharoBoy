@@ -50,6 +50,9 @@ const INITIAL_HUD: HudData = {
   topEndless: [],
 }
 
+/** Сколько времени тост достижения висит на экране (мс). */
+const ACH_TOAST_MS = 4600
+
 /* ---------- app ---------- */
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -83,7 +86,9 @@ export default function App() {
 
   /* достижения: открытые (id -> время) + очередь тостов */
   const [unlocked, setUnlocked] = useState<Record<string, number>>(() => loadUnlocked())
-  const [achToasts, setAchToasts] = useState<{ key: number; def: AchievementDef }[]>([])
+  const [achToasts, setAchToasts] = useState<{ key: number; def: AchievementDef; until: number }[]>(
+    []
+  )
 
   const onHud = useCallback((h: HudData) => setHud(h), [])
 
@@ -155,14 +160,28 @@ export default function App() {
       return changed ? next : prev
     })
     const fresh = ACHIEVEMENTS.filter((d) => ids.includes(d.id))
-    const items = fresh.map((def) => ({ key: Date.now() + Math.random(), def }))
+    const born = Date.now()
+    const items = fresh.map((def) => ({
+      key: born + Math.random(),
+      def,
+      until: born + ACH_TOAST_MS,
+    }))
     setAchToasts((prev) => [...prev, ...items].slice(-3))
-    const keys = items.map((t) => t.key)
-    const timer = setTimeout(() => {
-      setAchToasts((prev) => prev.filter((t) => !keys.includes(t.key)))
-    }, 4600)
-    return () => clearTimeout(timer)
   }, [hud.newAchievements])
+
+  /* Удаление тостов по истечении ACH_TOAST_MS — отдельным эффектом по
+     achToasts. Раньше таймер жил в эффекте выше: hud.newAchievements — новый
+     массив при каждой отправке HUD (десятки раз в секунду), его cleanup
+     отменял таймер почти сразу после установки, и тосты не исчезали. */
+  useEffect(() => {
+    if (!achToasts.length) return
+    const delay = Math.max(0, Math.min(...achToasts.map((t) => t.until)) - Date.now())
+    const timer = setTimeout(() => {
+      const now = Date.now()
+      setAchToasts((prev) => prev.filter((t) => t.until > now))
+    }, delay)
+    return () => clearTimeout(timer)
+  }, [achToasts])
 
   const handleTopSubmit = async () => {
     if (submitState === "sending" || submitState === "done") return
