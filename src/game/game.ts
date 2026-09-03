@@ -733,6 +733,10 @@ export class Game {
     this.fx.clear()
     this.powers = []
     this.projectiles = []
+    /* Ракетка начинает партию по центру: шар клеится на неё в serveBall,
+       и они появляются вместе, а не в разных концах поля. */
+    this.paddle.x = this.w / 2
+    this.paddle.vx = 0
     this.wideUntil = 0
     this.slowUntil = 0
     this.fastUntil = 0
@@ -930,6 +934,9 @@ export class Game {
 
     this.syncEffectsHud()
     this.physics.updatePaddle(dt)
+    /* Прилипший шар следует за ракеткой даже пока мир заморожен баннером/отсчётом:
+       иначе на старте партии шар оставался на точке спавна, а ракетка уезжала к курсору. */
+    for (const ball of this.balls) this.physics.stickToPaddle(ball)
     this.powersSys.updatePowers(dt)
     this.powersSys.periodicSpawn(dt)
     this.powersSys.periodicPowerDrop(dt)

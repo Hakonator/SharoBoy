@@ -81,12 +81,19 @@ export class Physics {
     p.squash = Math.max(0, p.squash - dt * 5)
   }
 
+  /** Прилипший шар держится на ракетке — даже пока мир «заморожен» баннером/отсчётом. */
+  stickToPaddle(ball: Ball) {
+    if (!ball.stuck) return
+    const g = this.g
+    ball.x = g.paddle.x + ball.stuckOffset
+    ball.y = g.paddle.y - g.paddle.h / 2 - ball.r - 2
+  }
+
   /** Интеграция движения шара с подшагами: стены, щит, потери, столкновения. */
   updateBall(ball: Ball, dt: number) {
     const g = this.g
     if (ball.stuck) {
-      ball.x = g.paddle.x + ball.stuckOffset
-      ball.y = g.paddle.y - g.paddle.h / 2 - ball.r - 2
+      this.stickToPaddle(ball)
       return
     }
 
