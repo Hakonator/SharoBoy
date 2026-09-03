@@ -91,8 +91,26 @@ function periodFromIso(period: LeadPeriod): string | null {
 }
 
 /**
+ * Одна позиция топа на игрока: повторные попытки схлопываются в лучший
+ * результат. Требует строки, отсортированные по score по убыванию, —
+ * тогда первая встретившаяся строка ника и есть его рекорд.
+ * Регистр ника не учитывается.
+ */
+export function dedupeTop(rows: GlobalScore[]): GlobalScore[] {
+  const seen = new Set<string>()
+  return rows.filter((r) => {
+    const key = r.nick.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+/**
  * Топ мировых рекордов по режиму и периоду.
- * Записи с невалидной подписью отбрасываются. Ошибки не роняют игру — возвращаем [].
+ * Записи с невалидной подписью отбрасываются, повторные попытки одного
+ * игрока занимают одну позицию — его лучший результат.
+ * Ошибки не роняют игру — возвращаем [].
  */
 export async function fetchTop(
   mode: "campaign" | "endless",
@@ -110,7 +128,7 @@ export async function fetchTop(
       const { data, error } = await q.order("score", { ascending: false }).limit(lim)
       if (error) throw new Error(error.message)
       const rows = (data ?? []) as GlobalScore[]
-      return rows.filter((r) => isSigValid(r, mode)).slice(0, limit)
+      return dedupeTop(rows.filter((r) => isSigValid(r, mode))).slice(0, limit)
     } catch {
       /* Миграция с колонкой client_sig ещё не применена — читаем без подписи,
          чтобы топ не пропадал в переходный период. */
@@ -126,7 +144,12 @@ export async function fetchTop(
   }
 }
 
-/** Добавить очки в мировой топ. Возвращает null при успехе или текст ошибки. */
+/**
+ * Добавить очки в мировой топ. Возвращает null при успехе или текст ошибки.
+ * Повторные попытки не плодят дубли: сервер (триггер из
+ * scripts/supabase-leaderboard-dedup.sql) хранит только лучший результат
+ * игрока в каждом режиме.
+ */
 export async function submitScore(
   nick: string,
   score: number,

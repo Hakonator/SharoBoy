@@ -6,6 +6,7 @@
 и 12 достижений с тостами в игре и витриной в меню.
 
 ## Запуск
+
     npm install
     npm run dev      # http://localhost:3000
     npm run build    # продакшен-сборка в dist/
@@ -14,6 +15,7 @@
     npm run icons    # перегенерация PWA-иконок (scripts/make-icons.mjs)
 
 ## Играть онлайн
+
 Сборка публикуется на GitHub Pages при каждом пуше в `beta` или `main`:
 
 - 🟢 **Стабильная версия** (`main`): https://hakonator.github.io/SharoBoy/
@@ -55,10 +57,21 @@ alter table public.sharoboy_scores
 не защищают от накрутки на 100% (секрет виден в клиентском коде) — это
 защита от случайных злоупотреблений через консоль.
 
+### Одна запись на игрока
+
+Каждая попытка писалась отдельной строкой, и один игрок мог занять несколько
+мест в топе. `fetchTop` схлопывает повторные попытки в лучший результат,
+а скрипт `scripts/supabase-leaderboard-dedup.sql` (Supabase → SQL Editor)
+чистит накопленные дубли и ставит триггер: в каждом режиме остаётся только
+лучшая попытка игрока. Нюанс: топы «День»/«Неделя» показывают игрока, только
+если его рекорд установлен в пределах периода.
+
 ## Структура
+
     index.html                заставка + точка входа (+ мета-теги PWA)
     public/                   manifest.webmanifest, sw.js, иконки
     scripts/make-icons.mjs    генератор PWA-иконок (node scripts/make-icons.mjs)
+    scripts/supabase-leaderboard-dedup.sql  миграция топа: одна запись на игрока
     src/main.tsx              монтирование React + регистрация сервис-воркера
     src/index.css             тема (Tailwind v4)
     src/App.tsx               HUD и экраны (в т.ч. магазин прокачки)

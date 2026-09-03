@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { isSigValid, signScore, type GlobalScore } from "./leaderboard"
+import { dedupeTop, isSigValid, signScore, type GlobalScore } from "./leaderboard"
 
 describe("signScore — подпись очков", () => {
   it("возвращает 8-символьную hex-строку", () => {
@@ -70,5 +70,24 @@ describe("isSigValid — проверка подписи строки резул
 
   it("отклоняет подпись из другого режима", () => {
     expect(isSigValid(row({}), "endless")).toBe(false)
+  })
+})
+
+describe("dedupeTop — одна позиция топа на игрока", () => {
+  const row = (nick: string, score: number): GlobalScore => ({ nick, score, wave: 0 })
+
+  it("оставляет лучший результат игрока при сортировке по score по убыванию", () => {
+    const rows = [row("Игрок", 300), row("Соперник", 200), row("Игрок", 100)]
+    expect(dedupeTop(rows)).toEqual([row("Игрок", 300), row("Соперник", 200)])
+  })
+
+  it("считает одним игроком ник в разном регистре", () => {
+    const rows = [row("AAA", 500), row("bbb", 450), row("aaa", 400)]
+    expect(dedupeTop(rows)).toEqual([row("AAA", 500), row("bbb", 450)])
+  })
+
+  it("не меняет список без повторов", () => {
+    const rows = [row("Аня", 300), row("Боря", 200), row("Вера", 100)]
+    expect(dedupeTop(rows)).toEqual(rows)
   })
 })
