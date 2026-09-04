@@ -3,7 +3,14 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Game, type HudData } from "./game/game"
 import { LEADERBOARD_ENABLED } from "./config"
 import { ACHIEVEMENTS, loadUnlocked, type AchievementDef } from "./game/achievements"
-import { fetchTop, submitScore, type GlobalScore, type LeadPeriod } from "./game/leaderboard"
+import {
+  fetchTop,
+  screenClass,
+  submitScore,
+  type GlobalScore,
+  type LeadPeriod,
+  type ScreenFilter,
+} from "./game/leaderboard"
 import { validateNick } from "./game/profanity"
 import {
   BootErrorScreen,
@@ -63,6 +70,9 @@ export default function App() {
   const [globalTop, setGlobalTop] = useState<GlobalScore[]>([])
   const [globalTopEndless, setGlobalTopEndless] = useState<GlobalScore[]>([])
   const [period, setPeriod] = useState<LeadPeriod>("all")
+  const [screen, setScreen] = useState<ScreenFilter>(() =>
+    screenClass(window.innerWidth || 960, window.innerHeight || 640)
+  )
 
   const [stats, setStats] = useState<PlayerStats>(() => {
     try {
@@ -116,12 +126,16 @@ export default function App() {
 
   useEffect(() => {
     if (!LEADERBOARD_ENABLED) return
+    const s = screen === "all" ? undefined : screen
     void (async () => {
-      const [c, e] = await Promise.all([fetchTop("campaign", period), fetchTop("endless", period)])
+      const [c, e] = await Promise.all([
+        fetchTop("campaign", period, 10, s),
+        fetchTop("endless", period, 10, s),
+      ])
       setGlobalTop(c)
       setGlobalTopEndless(e)
     })()
-  }, [period])
+  }, [period, screen])
 
   /* пересчёт личной статистики по итогам партии */
   useEffect(() => {
@@ -210,11 +224,16 @@ export default function App() {
       check.nick,
       hud.score,
       hud.mode,
-      hud.mode === "endless" ? hud.wave : 0
+      hud.mode === "endless" ? hud.wave : 0,
+      screenClass(window.innerWidth || 960, window.innerHeight || 640)
     )
     if (!err) {
       setSubmitState("done")
-      const [c, e] = await Promise.all([fetchTop("campaign", period), fetchTop("endless", period)])
+      const s = screen === "all" ? undefined : screen
+      const [c, e] = await Promise.all([
+        fetchTop("campaign", period, 10, s),
+        fetchTop("endless", period, 10, s),
+      ])
       setGlobalTop(c)
       setGlobalTopEndless(e)
     } else {
@@ -261,10 +280,12 @@ export default function App() {
           stats={stats}
           nick={nick}
           period={period}
+          screen={screen}
           globalTop={globalTop}
           globalTopEndless={globalTopEndless}
           unlocked={unlocked}
           onPeriod={setPeriod}
+          onScreen={setScreen}
           onCampaign={() => g()?.startGame()}
           onEndless={() => g()?.startEndless()}
           onBuyUpgrade={(id) => g()?.buyUpgrade(id)}

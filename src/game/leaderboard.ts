@@ -10,10 +10,31 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY, LEADERBOARD_ENABLED, SCORE_SECRET } fr
 
 export type LeadPeriod = "all" | "day" | "week"
 
+/** Категория экрана для разделения мирового топа: очки сравнимы только внутри категории. */
+export type ScreenClass = "mobile" | "fhd" | "4k"
+
+/** Фильтр мирового топа: "all" — без разделения, иначе — категория экрана. */
+export type ScreenFilter = ScreenClass | "all"
+
+/**
+ * Класс экрана по разрешению (по диагонали в CSS-пикселях), согласован с
+ * плотностью расстановки блоков в levelBuilder.densityFactor:
+ * - мобильные (≤≈1700) — телефоны и планшеты;
+ * - FHD (≤≈3800) — HD/FullHD/2K и ультраширокие;
+ * - 4K (>≈3800) — 4K и выше.
+ */
+export function screenClass(w: number, h: number): ScreenClass {
+  const diag = Math.hypot(w, h)
+  if (diag <= 1700) return "mobile"
+  if (diag <= 3800) return "fhd"
+  return "4k"
+}
+
 export interface GlobalScore {
   nick: string
   score: number
   wave: number
+  screen_class?: ScreenClass | string | null
   client_sig?: string | null
 }
 
@@ -60,20 +81,32 @@ function fnv1a(str: string): string {
   return h.toString(16).padStart(8, "0")
 }
 
-/** Сигнатура записи — защита от фейковых очков через консоль. */
+/** Сигнатура записи — защита от фейковых очков через консоль.
+ *  Опциональный `screen` включает категорию экрана в подпись (новые записи);
+ *  без него — формат без категории, совместимый со старыми записями. */
 export function signScore(
   nick: string,
   score: number,
   mode: "campaign" | "endless",
-  wave: number
+  wave: number,
+  screen?: ScreenClass
 ): string {
-  return fnv1a(`${nick}:${score}:${mode}:${wave}:${SCORE_SECRET}`)
+  return screen
+    ? fnv1a(`${nick}:${score}:${mode}:${wave}:${screen}:${SCORE_SECRET}`)
+    : fnv1a(`${nick}:${score}:${mode}:${wave}:${SCORE_SECRET}`)
 }
 
-/** Проверяем подпись строки результата (без сигнатуры или с битой — мимо). */
-export function isSigValid(row: GlobalScore, mode: "campaign" | "endless"): boolean {
+/** Проверяем подпись строки результата (без сигнатуры или с битой — мимо).
+ *  Принимаются и подписи с категорией экрана, и старые — без неё. */
+export function isSigValid(
+  row: GlobalScore,
+  mode: "campaign" | "endless",
+  screen?: ScreenClass
+): boolean {
   if (!row.client_sig || row.client_sig.length !== 8) return false
-  return row.client_sig === signScore(row.nick, row.score, mode, row.wave ?? 0)
+  const wave = row.wave ?? 0
+  if (screen && row.client_sig === signScore(row.nick, row.score, mode, wave, screen)) return true
+  return row.client_sig === signScore(row.nick, row.score, mode, wave)
 }
 
 /** Граница для фильтра по периоду. */
@@ -107,7 +140,7 @@ export function dedupeTop(rows: GlobalScore[]): GlobalScore[] {
 }
 
 /**
- * Топ мировых рекордов по режиму и периоду.
+ * Топ мировых рекордов по режиму и периоду (и, опционально, категории экрана).
  * Записи с невалидной подписью отбрасываются, повторные попытки одного
  * игрока занимают одну позицию — его лучший результат.
  * Ошибки не роняют игру — возвращаем [].
@@ -115,7 +148,8 @@ export function dedupeTop(rows: GlobalScore[]): GlobalScore[] {
 export async function fetchTop(
   mode: "campaign" | "endless",
   period: LeadPeriod = "all",
-  limit = 10
+  limit = 10,
+  screen?: ScreenClass
 ): Promise<GlobalScore[]> {
   try {
     const client = await getClient()
@@ -123,16 +157,20 @@ export async function fetchTop(
     const from = periodFromIso(period)
     const lim = Math.min(limit * 3, 60)
     try {
-      let q = client.from("sharoboy_scores").select("nick,score,wave,client_sig").eq("mode", mode)
+      let q = client.from("sharoboy_scores").select("nick,score,wave,screen_class,client_sig")
+      q = q.eq("mode", mode)
+      if (screen) q = q.eq("screen_class", screen)
       if (from) q = q.gte("created_at", from)
       const { data, error } = await q.order("score", { ascending: false }).limit(lim)
       if (error) throw new Error(error.message)
       const rows = (data ?? []) as GlobalScore[]
-      return dedupeTop(rows.filter((r) => isSigValid(r, mode))).slice(0, limit)
+      return dedupeTop(rows.filter((r) => isSigValid(r, mode, screen))).slice(0, limit)
     } catch {
       /* Миграция с колонкой client_sig ещё не применена — читаем без подписи,
          чтобы топ не пропадал в переходный период. */
-      let q = client.from("sharoboy_scores").select("nick,score,wave").eq("mode", mode)
+      let q = client.from("sharoboy_scores").select("nick,score,wave,screen_class")
+      q = q.eq("mode", mode)
+      if (screen) q = q.eq("screen_class", screen)
       if (from) q = q.gte("created_at", from)
       const { data, error } = await q.order("score", { ascending: false }).limit(limit)
       if (error) throw new Error(error.message)
@@ -153,15 +191,16 @@ export async function submitScore(
   nick: string,
   score: number,
   mode: "campaign" | "endless",
-  wave: number
+  wave: number,
+  screen: ScreenClass
 ): Promise<string | null> {
   try {
     const client = await getClient()
     if (!client) return "Таблица рекордов не подключена"
-    const client_sig = signScore(nick, score, mode, wave)
+    const client_sig = signScore(nick, score, mode, wave, screen)
     const { error } = await client
       .from("sharoboy_scores")
-      .insert({ nick, score, mode, wave, client_sig })
+      .insert({ nick, score, mode, wave, screen_class: screen, client_sig })
     if (error) return error.message
     return null
   } catch (e) {

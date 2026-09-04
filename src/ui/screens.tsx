@@ -7,7 +7,7 @@ import { type ReactNode } from "react"
 import { LEADERBOARD_ENABLED } from "../config"
 import type { AchievementDef } from "../game/achievements"
 import { ACHIEVEMENTS } from "../game/achievements"
-import type { GlobalScore, LeadPeriod } from "../game/leaderboard"
+import type { GlobalScore, LeadPeriod, ScreenFilter } from "../game/leaderboard"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "../game/upgrades"
 import type { HudData } from "../game/types"
 
@@ -308,10 +308,12 @@ export function MenuScreen({
   stats,
   nick,
   period,
+  screen,
   globalTop,
   globalTopEndless,
   unlocked,
   onPeriod,
+  onScreen,
   onCampaign,
   onEndless,
   onBuyUpgrade,
@@ -320,10 +322,12 @@ export function MenuScreen({
   stats: PlayerStats
   nick: string
   period: LeadPeriod
+  screen: ScreenFilter
   globalTop: GlobalScore[]
   globalTopEndless: GlobalScore[]
   unlocked: Record<string, number>
   onPeriod: (p: LeadPeriod) => void
+  onScreen: (s: ScreenFilter) => void
   onCampaign: () => void
   onEndless: () => void
   onBuyUpgrade: (id: string) => void
@@ -507,24 +511,51 @@ export function MenuScreen({
             </div>
           </div>
           {LEADERBOARD_ENABLED && (
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <span className="hud-label">🌍 Мировой топ</span>
-              <div className="flex gap-1">
-                {(["day", "week", "all"] as LeadPeriod[]).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => onPeriod(p)}
-                    className={`rounded border px-2 py-0.5 font-display text-[11px] transition ${
-                      period === p
-                        ? "border-cyan-neon/60 bg-cyan-neon/15 text-cyan-neon"
-                        : "border-line/60 bg-deep/50 text-dim hover:text-foam"
-                    }`}
-                  >
-                    {p === "day" ? "День" : p === "week" ? "Неделя" : "Всё время"}
-                  </button>
-                ))}
+            <>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="hud-label">🌍 Мировой топ</span>
+                <div className="flex flex-wrap gap-1">
+                  {(
+                    [
+                      ["all", "Все"],
+                      ["mobile", "📱 Моб"],
+                      ["fhd", "🖥 FHD"],
+                      ["4k", "4K"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      onClick={() => onScreen(value)}
+                      className={`rounded border px-2 py-0.5 font-display text-[11px] transition ${
+                        screen === value
+                          ? "border-cyan-neon/60 bg-cyan-neon/15 text-cyan-neon"
+                          : "border-line/60 bg-deep/50 text-dim hover:text-foam"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <span className="hud-label">Период</span>
+                <div className="flex gap-1">
+                  {(["day", "week", "all"] as LeadPeriod[]).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => onPeriod(p)}
+                      className={`rounded border px-2 py-0.5 font-display text-[11px] transition ${
+                        period === p
+                          ? "border-cyan-neon/60 bg-cyan-neon/15 text-cyan-neon"
+                          : "border-line/60 bg-deep/50 text-dim hover:text-foam"
+                      }`}
+                    >
+                      {p === "day" ? "День" : p === "week" ? "Неделя" : "Всё время"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
           {LEADERBOARD_ENABLED && globalTop.length > 0 && (
             <div className="hud-chip mb-3 p-4 sm:p-5">

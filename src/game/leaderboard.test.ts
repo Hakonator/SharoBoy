@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest"
 
-import { dedupeTop, isSigValid, signScore, type GlobalScore } from "./leaderboard"
+import { dedupeTop, isSigValid, screenClass, signScore, type GlobalScore } from "./leaderboard"
+
+describe("screenClass — категория экрана", () => {
+  it("мобильные экраны относятся к mobile", () => {
+    expect(screenClass(390, 844)).toBe("mobile")
+    expect(screenClass(768, 1024)).toBe("mobile")
+  })
+
+  it("HD/FHD/2K относятся к fhd", () => {
+    expect(screenClass(1920, 1080)).toBe("fhd")
+    expect(screenClass(2560, 1440)).toBe("fhd")
+  })
+
+  it("4K и выше относятся к 4k", () => {
+    expect(screenClass(3840, 2160)).toBe("4k")
+    expect(screenClass(5120, 2880)).toBe("4k")
+  })
+})
 
 describe("signScore — подпись очков", () => {
   it("возвращает 8-символьную hex-строку", () => {
@@ -25,6 +42,15 @@ describe("signScore — подпись очков", () => {
   it("не склеивает поля: разные комбинации дают разные строки хеширования", () => {
     // nick="a", score=12 → "a:12:endless:3:S"  vs  nick="a:12", score=0 → "a:12:0:endless:3:S"
     expect(signScore("a", 12, "endless", 3)).not.toBe(signScore("a:12", 0, "endless", 3))
+  })
+
+  it("разные категории экрана дают разные подписи", () => {
+    const base = signScore("Шарик", 777, "endless", 2)
+    const mobile = signScore("Шарик", 777, "endless", 2, "mobile")
+    const fhd = signScore("Шарик", 777, "endless", 2, "fhd")
+    expect(mobile).not.toBe(base)
+    expect(fhd).not.toBe(base)
+    expect(mobile).not.toBe(fhd)
   })
 })
 
@@ -70,6 +96,33 @@ describe("isSigValid — проверка подписи строки резул
 
   it("отклоняет подпись из другого режима", () => {
     expect(isSigValid(row({}), "endless")).toBe(false)
+  })
+
+  it("принимает подпись с категорией экрана", () => {
+    const withScreen: GlobalScore = {
+      nick: "Игрок",
+      score: 1234,
+      wave: 5,
+      screen_class: "fhd",
+      client_sig: signScore("Игрок", 1234, "campaign", 5, "fhd"),
+    }
+    expect(isSigValid(withScreen, "campaign", "fhd")).toBe(true)
+  })
+
+  it("отклоняет подпись с чужой категорией экрана", () => {
+    const withMobile: GlobalScore = {
+      nick: "Игрок",
+      score: 1234,
+      wave: 5,
+      screen_class: "mobile",
+      client_sig: signScore("Игрок", 1234, "campaign", 5, "mobile"),
+    }
+    expect(isSigValid(withMobile, "campaign", "fhd")).toBe(false)
+  })
+
+  it("принимает старую подпись без категории даже при фильтре", () => {
+    // старые записи (без screen_class) не должны пропадать из топа
+    expect(isSigValid(row({}), "campaign", "fhd")).toBe(true)
   })
 })
 
