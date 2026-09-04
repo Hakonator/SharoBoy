@@ -38,13 +38,17 @@
 ## Мировая таблица рекордов (Supabase)
 
 Клиент пишет очки в таблицу `public.sharoboy_scores` и читает топ по периодам
-(день / неделя / всё время). Для защиты от фейковых записей очки дополняются
+(день / месяц / всё время). Для защиты от фейковых записей очки дополняются
 клиентской подписью `client_sig` (см. `SCORE_SECRET` в `src/config.ts`):
 при чтении топа записи с неверной подписью отбрасываются.
 
 Если таблица уже создана, выполните в Supabase → SQL Editor миграцию:
 
 ```sql
+-- дата и время записи (используется для периодов «День»/«Месяц»)
+alter table public.sharoboy_scores
+  add column if not exists created_at timestamptz not null default now();
+
 alter table public.sharoboy_scores
   add column if not exists client_sig text not null default '';
 

@@ -543,7 +543,7 @@ export function MenuScreen({
               <div className="mb-3 flex items-center justify-between gap-2">
                 <span className="hud-label">Период</span>
                 <div className="flex gap-1">
-                  {(["day", "week", "all"] as LeadPeriod[]).map((p) => (
+                  {(["day", "month", "all"] as LeadPeriod[]).map((p) => (
                     <button
                       key={p}
                       onClick={() => onPeriod(p)}
@@ -553,7 +553,7 @@ export function MenuScreen({
                           : "border-line/60 bg-deep/50 text-dim hover:text-foam"
                       }`}
                     >
-                      {p === "day" ? "День" : p === "week" ? "Неделя" : "Всё время"}
+                      {p === "day" ? "День" : p === "month" ? "Месяц" : "Всё время"}
                     </button>
                   ))}
                 </div>

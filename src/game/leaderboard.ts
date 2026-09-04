@@ -8,7 +8,7 @@
  */
 import { SUPABASE_URL, SUPABASE_ANON_KEY, LEADERBOARD_ENABLED, SCORE_SECRET } from "../config"
 
-export type LeadPeriod = "all" | "day" | "week"
+export type LeadPeriod = "all" | "day" | "month"
 
 /** Категория экрана для разделения мирового топа: очки сравнимы только внутри категории. */
 export type ScreenClass = "mobile" | "fhd" | "4k"
@@ -115,9 +115,8 @@ function periodFromIso(period: LeadPeriod): string | null {
   const now = new Date()
   if (period === "day") {
     now.setHours(0, 0, 0, 0)
-  } else {
-    const day = now.getDay() === 0 ? 7 : now.getDay() // пн=1..вс=7
-    now.setDate(now.getDate() - (day - 1))
+  } else if (period === "month") {
+    now.setDate(1)
     now.setHours(0, 0, 0, 0)
   }
   return now.toISOString()
