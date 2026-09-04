@@ -6,7 +6,7 @@ import { WeaponsSystem, type WeaponsWorld } from "./weapons"
 import { InputController } from "./input"
 import { evaluateAch } from "./achievements"
 import { Effects } from "./effects"
-import { buildBossArena, gridBlocks, layoutBlocks } from "./levelBuilder"
+import { buildBossArena, densityFactor, gridBlocks, layoutBlocks } from "./levelBuilder"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
 import {
   drawBackground,
@@ -820,9 +820,9 @@ export class Game {
       this.bossSys.spawn(boss)
       this.blocks = blocks
     } else if ("layout" in spec) {
-      this.blocks = layoutBlocks(spec, this.w, this.h)
+      this.blocks = layoutBlocks(spec, this.w, this.h, densityFactor(this.w, this.h))
     } else {
-      this.blocks = gridBlocks(spec, this.w, this.h)
+      this.blocks = gridBlocks(spec, this.w, this.h, densityFactor(this.w, this.h))
     }
     this.blocksInitial = Math.max(1, this.blocks.length)
   }
