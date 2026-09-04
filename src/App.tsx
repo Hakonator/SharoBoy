@@ -98,14 +98,21 @@ export default function App() {
     const canvas = canvasRef.current
     if (!canvas) return
     try {
-      const game = new Game(canvas, onHud)
+      const game = new Game(canvas, onHud, nick)
       gameRef.current = game
       game.attach()
       return () => game.destroy()
     } catch (e) {
       setBootError(e instanceof Error ? e.message : String(e))
     }
-  }, [onHud])
+  }, [onHud, nick])
+
+  /* Синхронизация ника с движком при изменении. */
+  useEffect(() => {
+    if (gameRef.current) {
+      gameRef.current.setNick(nick)
+    }
+  }, [nick])
 
   useEffect(() => {
     if (!LEADERBOARD_ENABLED) return

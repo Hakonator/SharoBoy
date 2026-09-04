@@ -398,7 +398,7 @@ export function MenuScreen({
               <div className="hud-label mb-3">Рекорды кампании</div>
               <ol className="space-y-1.5">
                 {hud.top.map((s, i) => (
-                  <li key={`${s}-${i}`} className="flex items-center font-display text-sm">
+                  <li key={`${s.score}-${i}`} className="flex items-center font-display text-sm">
                     <span
                       className={
                         i === 0
@@ -412,8 +412,11 @@ export function MenuScreen({
                     >
                       {i + 1}.
                     </span>
+                    <span className="ml-2 min-w-0 truncate text-foam">{s.nick || "—"}</span>
                     <span className="mx-3 flex-1 border-b border-dotted border-line" />
-                    <span className="text-foam tabular-nums">{s.toLocaleString("ru-RU")}</span>
+                    <span className="text-foam tabular-nums">
+                      {s.score.toLocaleString("ru-RU")}
+                    </span>
                   </li>
                 ))}
               </ol>
@@ -424,7 +427,7 @@ export function MenuScreen({
               <div className="hud-label mb-3">Рекорды — бесконечный</div>
               <ol className="space-y-1.5">
                 {hud.topEndless.map((s, i) => (
-                  <li key={`e-${s}-${i}`} className="flex items-center font-display text-sm">
+                  <li key={`e-${s.score}-${i}`} className="flex items-center font-display text-sm">
                     <span
                       className={
                         i === 0
@@ -438,8 +441,11 @@ export function MenuScreen({
                     >
                       {i + 1}.
                     </span>
+                    <span className="ml-2 min-w-0 truncate text-foam">{s.nick || "—"}</span>
                     <span className="mx-3 flex-1 border-b border-dotted border-line" />
-                    <span className="text-foam tabular-nums">{s.toLocaleString("ru-RU")}</span>
+                    <span className="text-foam tabular-nums">
+                      {s.score.toLocaleString("ru-RU")}
+                    </span>
                   </li>
                 ))}
               </ol>
