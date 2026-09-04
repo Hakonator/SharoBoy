@@ -312,6 +312,7 @@ export function MenuScreen({
   globalTop,
   globalTopEndless,
   unlocked,
+  topSubmit,
   onPeriod,
   onScreen,
   onCampaign,
@@ -326,6 +327,7 @@ export function MenuScreen({
   globalTop: GlobalScore[]
   globalTopEndless: GlobalScore[]
   unlocked: Record<string, number>
+  topSubmit: ReactNode
   onPeriod: (p: LeadPeriod) => void
   onScreen: (s: ScreenFilter) => void
   onCampaign: () => void
@@ -397,6 +399,7 @@ export function MenuScreen({
         </div>
 
         <div className="anim-rise w-full max-w-sm" style={{ animationDelay: "0.12s" }}>
+          {topSubmit}
           {hud.top.length > 0 && (
             <div className="hud-chip mb-3 p-4 sm:p-5">
               <div className="hud-label mb-3">Рекорды кампании</div>
