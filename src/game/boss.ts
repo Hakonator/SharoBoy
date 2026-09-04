@@ -131,10 +131,6 @@ export class BossSystem {
       }
     }
     this.g.blocks = this.g.blocks.filter((b) => !b.dead)
-    this.g.powers.push(
-      { x: bo.x - 40, y: bo.y, vy: 150, type: "shrink", t: 0 },
-      { x: bo.x + 40, y: bo.y, vy: 150, type: "fast", t: 0 }
-    )
     this.g.pushHud()
   }
 }
