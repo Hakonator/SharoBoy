@@ -166,10 +166,11 @@ export class PowersSystem {
       ["fast", 14],
       ["shrink", 10],
     ]
+    const filtered = g.boss ? table.filter(([t]) => t !== "laser" && t !== "rocket") : table
     let sum = 0
-    for (const [, w] of table) sum += w
+    for (const [, w] of filtered) sum += w
     let roll = Math.random() * sum
-    for (const [t, w] of table) {
+    for (const [t, w] of filtered) {
       roll -= w
       if (roll <= 0) return t
     }
@@ -191,11 +192,8 @@ export class PowersSystem {
   /** Периодический «небесный» сброс бонусов с верхней границы поля. */
   periodicPowerDrop(dt: number) {
     const g = this.g
-    if (g.boss) {
-      g.skyDropTimer -= dt * 0.55
-    } else {
-      g.skyDropTimer -= dt
-    }
+    if (g.boss) return
+    g.skyDropTimer -= dt
     if (g.skyDropTimer > 0) return
     g.skyDropTimer = rand(18, 27)
     if (g.powers.length >= 6) return

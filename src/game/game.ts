@@ -638,6 +638,11 @@ export class Game {
     return this.touchMode ? 100 : 34
   }
 
+  /** Маленький экран (смартфон в portrait): на нём шар замедляется вдвое. */
+  private get isSmallScreen(): boolean {
+    return this.w <= 600
+  }
+
   /** Первый тач-ввод (в т.ч. на гибридных устройствах) — поднимаем ракетку. */
   private enableTouchMode() {
     if (this.touchMode) return
@@ -849,13 +854,14 @@ export class Game {
       540,
       1140
     )
+    const speed = this.isSmallScreen ? base * 0.5 : base
     const ball: Ball = {
       x: this.paddle.x,
       y: this.paddle.y - this.paddle.h / 2 - 9 - 2,
       vx: 0,
       vy: 0,
       r: 9,
-      speed: base,
+      speed: speed,
       stuck: true,
       stuckOffset: 0,
       trail: [],
