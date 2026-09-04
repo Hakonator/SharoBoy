@@ -712,6 +712,7 @@ export class Game {
   toMenu() {
     this.sfx.ui()
     this.input.releaseLock()
+    this.saveTop()
     this.phase = "menu"
     this.balls = []
     this.blocks = []
