@@ -1133,11 +1133,18 @@ export class Game {
   private saveTop() {
     if (this.score <= 0) return
     const entry: ScoreEntry = { score: this.score, nick: this.nick }
+    /* записи, сделанные до появления ника, считаем рекордами текущего игрока */
+    const withNick = (list: ScoreEntry[]): ScoreEntry[] =>
+      this.nick ? list.map((e) => (e.nick ? e : { ...e, nick: this.nick })) : list
     if (this.mode === "endless") {
-      this.topEndless = [...this.topEndless, entry].sort((a, b) => b.score - a.score).slice(0, 5)
+      this.topEndless = withNick([...this.topEndless, entry])
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5)
       lsSet("sharoboy-top-endless", JSON.stringify(this.topEndless))
     } else {
-      this.top = [...this.top, entry].sort((a, b) => b.score - a.score).slice(0, 5)
+      this.top = withNick([...this.top, entry])
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5)
       lsSet("sharoboy-top", JSON.stringify(this.top))
     }
   }

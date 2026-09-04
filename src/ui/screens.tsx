@@ -313,6 +313,7 @@ export function MenuScreen({
   globalTopEndless,
   unlocked,
   topSubmit,
+  onNickChange,
   onPeriod,
   onScreen,
   onCampaign,
@@ -328,6 +329,7 @@ export function MenuScreen({
   globalTopEndless: GlobalScore[]
   unlocked: Record<string, number>
   topSubmit: ReactNode
+  onNickChange: (v: string) => void
   onPeriod: (p: LeadPeriod) => void
   onScreen: (s: ScreenFilter) => void
   onCampaign: () => void
@@ -372,14 +374,23 @@ export function MenuScreen({
                 </div>
               </div>
             )}
-            {nick.trim().length > 0 && (
-              <div className="hud-chip px-4 py-3">
-                <div className="hud-label">Игрок</div>
-                <div className="max-w-36 truncate font-display text-xl text-foam">
-                  {nick.trim()}
-                </div>
-              </div>
-            )}
+          </div>
+
+          {/* Ник доступен всегда — он подписывает и локальные рекорды,
+              и отправку в мировой топ (не зависит от подключения Supabase). */}
+          <div className="hud-chip mt-4 w-full max-w-64 p-3">
+            <div className="hud-label mb-2">Ник для рекордов</div>
+            <input
+              value={nick}
+              maxLength={16}
+              placeholder="Без ника"
+              onChange={(e) => onNickChange(e.target.value)}
+              onKeyDown={(e) => {
+                /* не даём движку ловить пробел/латиницу как управление */
+                e.stopPropagation()
+              }}
+              className="h-10 w-full border border-line bg-deep px-3 font-display text-sm text-foam outline-none placeholder:text-dim/60 focus:border-cyan-neon"
+            />
           </div>
 
           <div className="mt-7 flex flex-wrap gap-2 text-xs text-dim">

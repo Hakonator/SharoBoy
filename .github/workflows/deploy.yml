@@ -44,6 +44,9 @@ jobs:
         working-directory: main-src
         env:
           GH_PAGES_BASE: /SharoBoy/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SCORE_SECRET: ${{ secrets.VITE_SCORE_SECRET }}
         run: npm run build
       - name: Перенос в корень сайта
         run: mv main-src/dist site
@@ -74,6 +77,9 @@ jobs:
         working-directory: beta-src
         env:
           GH_PAGES_BASE: /SharoBoy/beta/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SCORE_SECRET: ${{ secrets.VITE_SCORE_SECRET }}
         run: npm run build
       - name: Перенос в подкаталог /beta/
         run: mv beta-src/dist site/beta

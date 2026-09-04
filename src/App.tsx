@@ -104,6 +104,17 @@ export default function App() {
 
   const onHud = useCallback((h: HudData) => setHud(h), [])
 
+  /* Ник редактируется в меню и в форме топа: сразу пишем в localStorage,
+     движок синхронизируется эффектом по [nick] ниже (game.setNick). */
+  const handleNickChange = useCallback((v: string) => {
+    setNick(v)
+    try {
+      localStorage.setItem("sharoboy-nick", v)
+    } catch {
+      /* приватный режим — ник просто не сохранится */
+    }
+  }, [])
+
   /* Инициализация движка: без этого gameRef.current остаётся null,
      и кнопки меню (Кампания / Бесконечный) не запускают игру. */
   useEffect(() => {
@@ -254,12 +265,7 @@ export default function App() {
       setSubmitError(check.error)
       return
     }
-    setNick(check.nick)
-    try {
-      localStorage.setItem("sharoboy-nick", check.nick)
-    } catch {
-      /* приватный режим — ник просто не сохранится */
-    }
+    handleNickChange(check.nick)
     setSubmitState("sending")
     setSubmitError(null)
     const err = await submitScore(
@@ -303,7 +309,7 @@ export default function App() {
       state={submitState}
       error={submitError}
       nick={nick}
-      onNickChange={setNick}
+      onNickChange={handleNickChange}
       onSubmit={() => void handleTopSubmit()}
     />
   )
@@ -339,6 +345,7 @@ export default function App() {
           globalTopEndless={globalTopEndless}
           unlocked={unlocked}
           topSubmit={topSubmit}
+          onNickChange={handleNickChange}
           onPeriod={setPeriod}
           onScreen={setScreen}
           onCampaign={() => g()?.startGame()}
