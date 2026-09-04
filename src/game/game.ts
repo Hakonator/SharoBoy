@@ -1192,6 +1192,12 @@ export class Game {
     const { ctx, w, h } = this
     ctx.clearRect(0, 0, w, h)
 
+    /* Страховка от «мигания»: если какой-то кадр упал посреди отрисовки
+       (ошибка гасится в loop), глобальное состояние контекста могло остаться
+       грязным — начинаем каждый кадр с заведомо полной альфой, иначе после
+       сбоя шар/ракетка рисовались бы призрачными до ближайшего сброса. */
+    ctx.globalAlpha = 1
+
     ctx.save()
     if (this.shake > 0) {
       ctx.translate(rand(-this.shake, this.shake), rand(-this.shake, this.shake))
