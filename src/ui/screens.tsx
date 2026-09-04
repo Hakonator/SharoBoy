@@ -314,6 +314,7 @@ export function MenuScreen({
   onPeriod,
   onCampaign,
   onEndless,
+  onBuyUpgrade,
 }: {
   hud: HudData
   stats: PlayerStats
@@ -325,6 +326,7 @@ export function MenuScreen({
   onPeriod: (p: LeadPeriod) => void
   onCampaign: () => void
   onEndless: () => void
+  onBuyUpgrade: (id: string) => void
 }) {
   return (
     <div className="absolute inset-0 z-40 overflow-y-auto">
@@ -614,6 +616,14 @@ export function MenuScreen({
                         </div>
                         {!maxed && !afford && (
                           <div className="text-[10px] text-coral">не хватает</div>
+                        )}
+                        {!maxed && afford && (
+                          <button
+                            className="mt-1 rounded bg-gold/90 px-2 py-0.5 font-display text-xs text-deep transition hover:bg-gold active:scale-95"
+                            onClick={() => onBuyUpgrade(u.id)}
+                          >
+                            🪙 Купить
+                          </button>
                         )}
                       </div>
                     </div>

@@ -260,6 +260,7 @@ export default function App() {
           onPeriod={setPeriod}
           onCampaign={() => g()?.startGame()}
           onEndless={() => g()?.startEndless()}
+          onBuyUpgrade={(id) => g()?.buyUpgrade(id)}
         />
       )}
 
