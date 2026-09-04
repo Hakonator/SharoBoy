@@ -643,6 +643,11 @@ export class Game {
     return this.w <= 600
   }
 
+  /** 4K экран (ширина >= 3840 или высота >= 2160): на нём шар ускоряется на 50%. */
+  private get is4KScreen(): boolean {
+    return this.w >= 3840 || this.h >= 2160
+  }
+
   /** Первый тач-ввод (в т.ч. на гибридных устройствах) — поднимаем ракетку. */
   private enableTouchMode() {
     if (this.touchMode) return
@@ -854,7 +859,7 @@ export class Game {
       540,
       1140
     )
-    const speed = this.isSmallScreen ? base * 0.5 : base
+    const speed = this.isSmallScreen ? base * 0.5 : this.is4KScreen ? base * 1.5 : base
     const ball: Ball = {
       x: this.paddle.x,
       y: this.paddle.y - this.paddle.h / 2 - 9 - 2,
