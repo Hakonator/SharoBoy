@@ -25,6 +25,7 @@ import {
 import type { Ball, Block, Bubble, PaddleState, Phase, PowerUp, Projectile } from "./types"
 import type { HudData, ScoreEntry } from "./types"
 import { clamp, daySeed, lsGet, lsSet, mulberry32, rand } from "./utils"
+import { computeScale } from "./viewport"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "./upgrades"
 
 export { UPGRADES_ENABLED, UPGRADE_DEFS } from "./upgrades"
@@ -42,9 +43,12 @@ export class Game {
   private destroyed = false
   private time = 0
 
+  /** Размер мира в «эталонных» единицах: окно 1920×1080 соответствует масштабу 1. */
   private w = 960
   private h = 640
   private dpr = 1
+  /** Мировые единицы → CSS-пиксели: весь мир масштабируется одним коэффициентом. */
+  private scale = 1
 
   private phase: Phase = "menu"
   private score = 0
@@ -600,18 +604,24 @@ export class Game {
 
   private handleResize = () => {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const cssW = window.innerWidth
+    const cssH = window.innerHeight
     const ow = this.w
     const oh = this.h
-    this.w = window.innerWidth
-    this.h = window.innerHeight
-    this.canvas.width = Math.floor(this.w * this.dpr)
-    this.canvas.height = Math.floor(this.h * this.dpr)
-    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
+    /* Единый масштаб мира (viewport.ts): логика считает в «эталонных» единицах
+       (окно 1920×1080 = масштаб 1), а канвас рисует весь мир одним трансформом.
+       Поэтому размеры/скорости сущностей одинаковы на телефоне, FHD и 4K. */
+    this.scale = computeScale(cssW, cssH)
+    this.w = cssW / this.scale
+    this.h = cssH / this.scale
+    this.canvas.width = Math.floor(cssW * this.dpr)
+    this.canvas.height = Math.floor(cssH * this.dpr)
+    this.ctx.setTransform(this.dpr * this.scale, 0, 0, this.dpr * this.scale, 0, 0)
     // Экранный размер канваса задаём явно: canvas — replaced-элемент, без явных
     // CSS-размеров он берёт размер атрибутов (w*dpr × h*dpr) и при
     // devicePixelRatio != 1 (масштаб ОС 125%/150%, Retina) вылезает за экран.
-    this.canvas.style.width = `${this.w}px`
-    this.canvas.style.height = `${this.h}px`
+    this.canvas.style.width = `${cssW}px`
+    this.canvas.style.height = `${cssH}px`
     this.paddle.baseW = clamp(this.w * 0.18, 110, 200) * this.paddleWidthMult
     this.paddle.y = this.h - this.paddleBottomOffset()
     this.paddle.x = clamp(this.paddle.x, this.paddle.w / 2 + 4, this.w - this.paddle.w / 2 - 4)
@@ -626,19 +636,11 @@ export class Game {
     }
   }
 
-  /** Отступ ракетки от нижнего края: на таче выше — палец не закрывает ракетку. */
+  /** Отступ ракетки от нижнего края: на таче выше — палец не закрывает ракетку.
+   *  Задаётся в CSS-пикселях (размер пальца физический и от масштаба мира не
+   *  зависит), поэтому в мировые единицы переводим делением. */
   private paddleBottomOffset(): number {
-    return this.touchMode ? 100 : 34
-  }
-
-  /** Маленький экран (смартфон в portrait): на нём шар замедляется вдвое. */
-  private get isSmallScreen(): boolean {
-    return this.w <= 600
-  }
-
-  /** 4K экран (ширина >= 3840 или высота >= 2160): на нём шар ускоряется на 50%. */
-  private get is4KScreen(): boolean {
-    return this.w >= 3840 || this.h >= 2160
+    return (this.touchMode ? 100 : 34) / this.scale
   }
 
   /** Загрузка рекордов из localStorage с миграцией со старого формата (number[]). */
@@ -878,7 +880,9 @@ export class Game {
       540,
       1140
     )
-    const speed = this.isSmallScreen ? base * 0.5 : this.is4KScreen ? base * 1.5 : base
+    /* Единый масштаб мира (viewport.ts): скорость одна на всех экранах —
+       поле в мировых единицах имеет сопоставимые пропорции. */
+    const speed = base
     const ball: Ball = {
       x: this.paddle.x,
       y: this.paddle.y - this.paddle.h / 2 - 9 - 2,

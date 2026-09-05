@@ -23,44 +23,40 @@ function countOverlaps(blocks: Block[]): number {
   return n
 }
 
-describe("densityFactor", () => {
-  it("мобильные экраны дают малую плотность", () => {
-    expect(densityFactor(390, 844)).toBe(0.5)
-    expect(densityFactor(768, 1024)).toBe(0.7)
-  })
-
-  it("HD/FHD — эталонная плотность", () => {
+describe("densityFactor — мировые размеры поля", () => {
+  it("эталонное окно — плотность 1", () => {
     expect(densityFactor(1920, 1080)).toBe(1)
-    expect(densityFactor(2560, 1440)).toBe(1)
   })
 
-  it("4K и выше — значительно плотнее", () => {
-    expect(densityFactor(3840, 2160)).toBe(1.5)
-    expect(densityFactor(5120, 2880)).toBe(1.5)
+  it("телефон в мировых единицах (портрет и ландшафт) — около эталона", () => {
+    expect(densityFactor(927, 2005)).toBeCloseTo(1, 2)
+    expect(densityFactor(2005, 927)).toBeCloseTo(1, 2)
+  })
+
+  it("вытянутые поля мягко корректируются в пределах 0.65..1.35", () => {
+    expect(densityFactor(1250, 1000)).toBeCloseTo(0.727, 2)
+    expect(densityFactor(2560, 1080)).toBeCloseTo(1.261, 2)
+    expect(densityFactor(5000, 2000)).toBe(1.35)
+    expect(densityFactor(400, 400)).toBe(0.65)
   })
 })
 
 describe("gridBlocks", () => {
   const spec = LEVELS[1] as PatternSpec
 
-  it("маленький экран даёт заметно меньше блоков, чем FHD", () => {
-    const phone = gridBlocks(spec, 390, 844, densityFactor(390, 844))
+  it("узкое окно даёт меньше блоков, чем эталонное поле", () => {
+    const small = gridBlocks(spec, 1250, 1000, densityFactor(1250, 1000))
     const desktop = gridBlocks(spec, 1920, 1080, densityFactor(1920, 1080))
-    expect(phone.length).toBeLessThan(desktop.length)
-    expect(phone.length).toBeGreaterThan(3)
+    expect(small.length).toBeLessThan(desktop.length)
+    expect(small.length).toBeGreaterThan(3)
   })
 
-  it("4K даёт заметно больше блоков, чем FHD", () => {
-    const desktop = gridBlocks(spec, 1920, 1080, densityFactor(1920, 1080))
-    const uhd = gridBlocks(spec, 3840, 2160, densityFactor(3840, 2160))
-    expect(uhd.length).toBeGreaterThan(desktop.length * 1.3)
-  })
-
-  it("блоки не пересекаются ни на одном разрешении", () => {
+  it("блоки не пересекаются на любых пропорциях поля", () => {
     for (const [w, h] of [
-      [390, 844],
-      [1920, 1080],
-      [3840, 2160],
+      [927, 2005], // телефон, портрет (мировые единицы)
+      [2005, 927], // телефон, ландшафт
+      [1920, 1080], // эталон
+      [1250, 1000], // маленькое окно
     ] as const) {
       const blocks = gridBlocks(spec, w, h, densityFactor(w, h))
       expect(countOverlaps(blocks), `пересечения на ${w}x${h}`).toBe(0)
@@ -71,11 +67,28 @@ describe("gridBlocks", () => {
 describe("layoutBlocks", () => {
   const spec = LEVELS[0] as LayoutSpec
 
-  it("4K добавляет блоки-заполнители, FHD оставляет авторскую раскладку", () => {
+  it("на эталонном поле — авторская раскладка без дополнений", () => {
     const desktop = layoutBlocks(spec, 1920, 1080, densityFactor(1920, 1080))
-    const uhd = layoutBlocks(spec, 3840, 2160, densityFactor(3840, 2160))
     expect(desktop.length).toBe(spec.layout.length)
-    expect(uhd.length).toBeGreaterThan(spec.layout.length)
-    expect(countOverlaps(uhd)).toBe(0)
+  })
+
+  it("на плотных полях добавляются заполнители, и блоки расталкиваются", () => {
+    const dense = layoutBlocks(spec, 2560, 1080, densityFactor(2560, 1080))
+    expect(dense.length).toBeGreaterThan(spec.layout.length)
+    expect(countOverlaps(dense)).toBe(0)
+  })
+
+  it("на вытянутых полях раскладка вписывается в границы поля", () => {
+    for (const [w, h] of [
+      [927, 2005],
+      [2005, 927],
+    ] as const) {
+      const blocks = layoutBlocks(spec, w, h, densityFactor(w, h))
+      for (const b of blocks) {
+        expect(b.x - b.rx, `${w}x${h}: левый край блока`).toBeGreaterThanOrEqual(0)
+        expect(b.x + b.rx, `${w}x${h}: правый край блока`).toBeLessThanOrEqual(w)
+        expect(b.y + b.ry, `${w}x${h}: низ блока`).toBeLessThanOrEqual(h * 0.75)
+      }
+    }
   })
 })

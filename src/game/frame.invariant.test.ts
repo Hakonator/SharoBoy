@@ -226,6 +226,9 @@ function translated(paints: PaintEvent[], shake: [number, number]) {
   return paints.filter((p) => Math.abs(p.m[4] - shake[0]) + Math.abs(p.m[5] - shake[1]) > 0.5)
 }
 
+/* Матрица кадра включает единый масштаб мира (viewport.ts): локальный сдвиг
+   отрисовки в device-пикселях равен мировым координатам, умноженным на scale
+   (m[0]/m[3] — этот самый масштаб), поэтому ожидание сравнивает через него. */
 function paintedBall(
   paints: PaintEvent[],
   ball: { x: number; y: number; r: number },
@@ -233,8 +236,8 @@ function paintedBall(
 ) {
   return translated(paints, shake).some(
     (p) =>
-      Math.abs(p.m[4] - shake[0] - ball.x) < 2 &&
-      Math.abs(p.m[5] - shake[1] - ball.y) < 2 &&
+      Math.abs(p.m[4] - shake[0] - ball.x * p.m[0]) < 2 &&
+      Math.abs(p.m[5] - shake[1] - ball.y * p.m[3]) < 2 &&
       p.arcs.some((a) => Math.abs(a.r - ball.r) < 0.6) &&
       p.alpha === 1
   )
@@ -243,8 +246,8 @@ function paintedBall(
 function paintedPaddle(paints: PaintEvent[], p: { x: number; y: number }, shake: [number, number]) {
   return translated(paints, shake).some(
     (ev) =>
-      Math.abs(ev.m[4] - shake[0] - p.x) < 2 &&
-      Math.abs(ev.m[5] - shake[1] - p.y) < 2 &&
+      Math.abs(ev.m[4] - shake[0] - p.x * ev.m[0]) < 2 &&
+      Math.abs(ev.m[5] - shake[1] - p.y * ev.m[3]) < 2 &&
       ev.alpha === 1
   )
 }
