@@ -188,9 +188,10 @@ alter table public.sharoboy_scores
     src/game/powers.ts        бонусы (позитивные и негативные дропы)
     src/game/achievements.ts  12 достижений (условия, localStorage)
     src/game/leaderboard.ts   клиент мирового топа (вызывает Edge Function)
-    src/game/profanity.ts     фильтр запрещённых ников
+    src/game/profanity.ts     ре-экспорт фильтра ников (общий с Edge Function)
     src/ui/screens.tsx        React-экраны (меню, топ, магазин, достижения)
     src/vite-env.d.ts         типы Vite (import.meta.env)
     supabase/functions/scores Edge Function «scores»: запись и чтение топа
+                              (+ общий фильтр ников profanity.ts)
 
 См. также `docs/REFACTORING.md`.

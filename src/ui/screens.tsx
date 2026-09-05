@@ -8,6 +8,7 @@ import { LEADERBOARD_ENABLED } from "../config"
 import type { AchievementDef } from "../game/achievements"
 import { ACHIEVEMENTS } from "../game/achievements"
 import type { GlobalScore, LeadPeriod, ScreenFilter } from "../game/leaderboard"
+import { MAX_NICK } from "../game/profanity"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "../game/upgrades"
 import type { HudData } from "../game/types"
 
@@ -99,7 +100,7 @@ export function TopSubmitForm({
       <div className="flex gap-2">
         <input
           value={nick}
-          maxLength={16}
+          maxLength={MAX_NICK}
           placeholder="Ваш ник"
           onChange={(e) => onNickChange(e.target.value)}
           onKeyDown={(e) => {
@@ -393,7 +394,7 @@ export function MenuScreen({
             <div className="hud-label mb-2">Ник для рекордов</div>
             <input
               value={nick}
-              maxLength={16}
+              maxLength={MAX_NICK}
               placeholder="Без ника"
               onChange={(e) => onNickChange(e.target.value)}
               onKeyDown={(e) => {
