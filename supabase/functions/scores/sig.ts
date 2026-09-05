@@ -61,7 +61,7 @@ export function sigMatches(
   }
   // «Все»: подходит подпись с собственной screen_class строки (новые записи)
   // или без категории (старые записи до миграции).
-  const ownScreen = row.screen_class || undefined
+  const ownScreen = row.screen_class as SigScreen | undefined
   return (
     row.client_sig === sigFor(row.nick, row.score, mode, wave, ownScreen, secret) ||
     row.client_sig === sigFor(row.nick, row.score, mode, wave, undefined, secret)
