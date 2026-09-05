@@ -1,13 +1,21 @@
-import js from "@eslint/js";
-import ts from "typescript-eslint";
-import react from "eslint-plugin-react";
-import reactHooks from "eslint-plugin-react-hooks";
-import importPlugin from "eslint-plugin-import";
-import prettierConfig from "eslint-config-prettier";
+import js from "@eslint/js"
+import ts from "typescript-eslint"
+import react from "eslint-plugin-react"
+import reactHooks from "eslint-plugin-react-hooks"
+import importPlugin from "eslint-plugin-import"
+import prettierConfig from "eslint-config-prettier"
 
 export default ts.config(
   {
-    ignores: ["dist/", "node_modules/", "public/sw.js", "scripts/", "eslint.config.mjs", ".husky/"],
+    ignores: [
+      "dist/",
+      "node_modules/",
+      "public/sw.js",
+      "scripts/",
+      "supabase/",
+      "eslint.config.mjs",
+      ".husky/",
+    ],
   },
   {
     files: ["src/**/*.{ts,tsx}"],
@@ -77,5 +85,4 @@ export default ts.config(
       "no-undef": "off",
     },
   }
-);
-
+)

@@ -13,6 +13,7 @@ import type {
   Popup,
   PowerUp,
   Projectile,
+  RenderView,
   Ring,
 } from "./types"
 import { clamp, rotatedExtents } from "./utils"
@@ -379,9 +380,7 @@ export function drawPowers(ctx: Ctx, powers: PowerUp[]) {
 }
 
 /** Снимок данных для отрисовки лазерных лучей. */
-export interface LaserBeamView {
-  time: number
-  hidden: boolean
+export interface LaserBeamView extends RenderView {
   laserUntil: number
   paddle: PaddleState
   blocks: Block[]
@@ -469,9 +468,7 @@ export function drawProjectiles(ctx: Ctx, projectiles: Projectile[], time: numbe
 }
 
 /** Снимок данных для отрисовки шаров. */
-export interface BallView {
-  time: number
-  hidden: boolean
+export interface BallView extends RenderView {
   fire: boolean
   slow: boolean
   fast: boolean
@@ -529,9 +526,8 @@ export function drawBalls(ctx: Ctx, balls: Ball[], v: BallView) {
 }
 
 /** Снимок данных для отрисовки ракетки (положение + таймеры эффектов). */
-export interface PaddleView {
+export interface PaddleView extends RenderView {
   p: PaddleState
-  time: number
   wideUntil: number
   shrinkUntil: number
   laserUntil: number
