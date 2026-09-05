@@ -78,10 +78,6 @@ husky pre-commit сам гоняет `eslint --fix` + `prettier --write` на st
 
 ## Известные технические хвосты
 
-- `render.ts` дублирует view-типы вместо общих — приемлемо, чинить не обязательно.
-- Подпись очков (`signScore`) считается в клиенте: `VITE_SCORE_SECRET` попадает
-  в бандл при заполненном `.env` — осознанный компромисс, будущее решение —
-  Supabase Edge Function.
 - `npm test` в CI строгий только на beta; на main — с `--if-present`.
 
 ## Соглашения

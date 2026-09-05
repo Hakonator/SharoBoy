@@ -1,12 +1,15 @@
 /**
  * Мировая таблица рекордов.
  *
- * Хранилище — Supabase (таблица sharoboy_scores, см. SQL в README).
- * SDK грузится лениво и только если заполнен src/config.ts, поэтому
- * без конфигурации игра работает как раньше (локальные рекорды), а вес
- * стартового бандла не растёт.
+ * Хранилище — Supabase (таблица sharoboy_scores), но клиент не обращается к
+ * базе напрямую: запись и чтение идут через Edge Function «scores»
+ * (supabase/functions/scores). Секрет подписи очков (SCORE_SECRET) существует
+ * только в секретах функции — в клиентский бандл он больше не попадает.
+ *
+ * SDK не используется — обычный fetch, поэтому без конфигурации игра работает
+ * как раньше (локальные рекорды), а вес бандла не растёт.
  */
-import { SUPABASE_URL, SUPABASE_ANON_KEY, LEADERBOARD_ENABLED, SCORE_SECRET } from "../config"
+import { SUPABASE_URL, SUPABASE_ANON_KEY, LEADERBOARD_ENABLED } from "../config"
 
 export type LeadPeriod = "all" | "day" | "month"
 
@@ -35,78 +38,19 @@ export interface GlobalScore {
   score: number
   wave: number
   screen_class?: ScreenClass | string | null
-  client_sig?: string | null
 }
 
-/* минимальный тип клиента — чтобы не тянуть типы SDK в главный чанк */
-interface MinimalSelect {
-  eq: (col: string, val: string) => MinimalSelect
-  gte: (col: string, val: string) => MinimalSelect
-  order: (col: string, opts: { ascending: boolean }) => MinimalSelect
-  limit: (n: number) => Promise<{ data: unknown; error: { message: string } | null }>
-}
-interface MinimalTable {
-  select: (cols: string) => MinimalSelect
-  insert: (row: Record<string, unknown>) => Promise<{ error: { message: string } | null }>
-}
-interface MinimalClient {
-  from: (table: string) => MinimalTable
-}
+/** URL Edge Function «scores» — единственной точки входа в мировой топ. */
+const API_URL = `${SUPABASE_URL}/functions/v1/scores`
 
-let clientPromise: Promise<MinimalClient | null> | null = null
-
-async function getClient(): Promise<MinimalClient | null> {
-  if (!LEADERBOARD_ENABLED) return null
-  if (!clientPromise) {
-    clientPromise = import("@supabase/supabase-js")
-      .then(
-        ({ createClient }) =>
-          createClient(SUPABASE_URL, SUPABASE_ANON_KEY) as unknown as MinimalClient
-      )
-      .catch((e) => {
-        console.warn("[ШАРОБОЙ] Supabase недоступен:", e)
-        return null
-      })
+/** Заголовки запроса. Anon-ключ публичный по дизайну: он служит JWT для
+ *  проверки вызова функции (verify_jwt), прав к таблице у клиента нет. */
+function apiHeaders(): Record<string, string> {
+  return {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
   }
-  return clientPromise
-}
-
-/** Простой 32-битный FNV-1a хеш строки — для подписи очков. */
-function fnv1a(str: string): string {
-  let h = 0x811c9dc5
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i)
-    h = Math.imul(h, 0x01000193) >>> 0
-  }
-  return h.toString(16).padStart(8, "0")
-}
-
-/** Сигнатура записи — защита от фейковых очков через консоль.
- *  Опциональный `screen` включает категорию экрана в подпись (новые записи);
- *  без него — формат без категории, совместимый со старыми записями. */
-export function signScore(
-  nick: string,
-  score: number,
-  mode: "campaign" | "endless",
-  wave: number,
-  screen?: ScreenClass
-): string {
-  return screen
-    ? fnv1a(`${nick}:${score}:${mode}:${wave}:${screen}:${SCORE_SECRET}`)
-    : fnv1a(`${nick}:${score}:${mode}:${wave}:${SCORE_SECRET}`)
-}
-
-/** Проверяем подпись строки результата (без сигнатуры или с битой — мимо).
- *  Принимаются и подписи с категорией экрана, и старые — без неё. */
-export function isSigValid(
-  row: GlobalScore,
-  mode: "campaign" | "endless",
-  screen?: ScreenClass
-): boolean {
-  if (!row.client_sig || row.client_sig.length !== 8) return false
-  const wave = row.wave ?? 0
-  if (screen && row.client_sig === signScore(row.nick, row.score, mode, wave, screen)) return true
-  return row.client_sig === signScore(row.nick, row.score, mode, wave)
 }
 
 /** Граница для фильтра по периоду. */
@@ -140,8 +84,9 @@ export function dedupeTop(rows: GlobalScore[]): GlobalScore[] {
 
 /**
  * Топ мировых рекордов по режиму и периоду (и, опционально, категории экрана).
- * Записи с невалидной подписью отбрасываются, повторные попытки одного
- * игрока занимают одну позицию — его лучший результат.
+ * Строки запрашиваются у Edge Function «scores», которая сама отбрасывает
+ * записи с невалидной подписью; повторные попытки одного игрока занимают
+ * одну позицию — его лучший результат (строки отсортированы по score).
  * Ошибки не роняют игру — возвращаем [].
  */
 export async function fetchTop(
@@ -151,30 +96,18 @@ export async function fetchTop(
   screen?: ScreenClass
 ): Promise<GlobalScore[]> {
   try {
-    const client = await getClient()
-    if (!client) return []
+    if (!LEADERBOARD_ENABLED) return []
+    const params = new URLSearchParams({
+      mode,
+      limit: String(Math.min(limit * 3, 60)),
+    })
+    if (screen) params.set("screen", screen)
     const from = periodFromIso(period)
-    const lim = Math.min(limit * 3, 60)
-    try {
-      let q = client.from("sharoboy_scores").select("nick,score,wave,screen_class,client_sig")
-      q = q.eq("mode", mode)
-      if (screen) q = q.eq("screen_class", screen)
-      if (from) q = q.gte("created_at", from)
-      const { data, error } = await q.order("score", { ascending: false }).limit(lim)
-      if (error) throw new Error(error.message)
-      const rows = (data ?? []) as GlobalScore[]
-      return dedupeTop(rows.filter((r) => isSigValid(r, mode, screen))).slice(0, limit)
-    } catch {
-      /* Миграция с колонкой client_sig ещё не применена — читаем без подписи,
-         чтобы топ не пропадал в переходный период. */
-      let q = client.from("sharoboy_scores").select("nick,score,wave,screen_class")
-      q = q.eq("mode", mode)
-      if (screen) q = q.eq("screen_class", screen)
-      if (from) q = q.gte("created_at", from)
-      const { data, error } = await q.order("score", { ascending: false }).limit(limit)
-      if (error) throw new Error(error.message)
-      return (data ?? []) as GlobalScore[]
-    }
+    if (from) params.set("from", from)
+    const res = await fetch(`${API_URL}?${params}`, { headers: apiHeaders() })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = (await res.json()) as { rows?: GlobalScore[] }
+    return dedupeTop(data.rows ?? []).slice(0, limit)
   } catch (e) {
     console.warn("[ШАРОБОЙ] мировой топ недоступен:", e)
     return []
@@ -183,8 +116,9 @@ export async function fetchTop(
 
 /**
  * Добавить очки в мировой топ. Возвращает null при успехе или текст ошибки.
- * Повторные попытки не плодят дубли: сервер (триггер sharoboy_scores_best_only
- * в Supabase) хранит только лучший результат игрока в каждом режиме.
+ * Подпись ставит Edge Function «scores» своим серверным секретом; дубли не
+ * плодятся: триггер sharoboy_scores_best_only хранит только лучший результат
+ * игрока в каждом режиме.
  */
 export async function submitScore(
   nick: string,
@@ -194,13 +128,14 @@ export async function submitScore(
   screen: ScreenClass
 ): Promise<string | null> {
   try {
-    const client = await getClient()
-    if (!client) return "Таблица рекордов не подключена"
-    const client_sig = signScore(nick, score, mode, wave, screen)
-    const { error } = await client
-      .from("sharoboy_scores")
-      .insert({ nick, score, mode, wave, screen_class: screen, client_sig })
-    if (error) return error.message
+    if (!LEADERBOARD_ENABLED) return "Таблица рекордов не подключена"
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: apiHeaders(),
+      body: JSON.stringify({ nick, score, mode, wave, screen_class: screen }),
+    })
+    const data = (await res.json().catch(() => null)) as { error?: string } | null
+    if (!res.ok) return data?.error || `Ошибка отправки (${res.status})`
     return null
   } catch (e) {
     console.error("[ШАРОБОЙ] не удалось отправить очки:", e)

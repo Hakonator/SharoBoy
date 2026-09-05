@@ -18,7 +18,9 @@ SQL-миграции выполнены в Supabase. Для истории — �
       `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_SCORE_SECRET`.
       Значения совпадают с `.env` (особенно `SCORE_SECRET`, иначе подписи
       «не сойдутся» и записи будут скрыты из топа). Пуш в `beta` пересобирает
-      сайт — deploy.yml передаёт секреты в сборку.
+      сайт — deploy.yml передаёт секреты в сборку. После переезда подписи на
+      Edge Function секрет `VITE_SCORE_SECRET` из GitHub Secrets и из `.env`
+      можно удалить (см. раздел «Мировая таблица рекордов» ниже).
 - [x] **3. Выполнить миграции в Supabase → SQL Editor** (SQL — в разделе
       «Мировая таблица рекордов» ниже): `created_at`, `client_sig` + CHECK,
       `screen_class`. Без колонки `screen_class` вставка новой записи упадёт
@@ -54,10 +56,50 @@ SQL-миграции выполнены в Supabase. Для истории — �
 
 ## Мировая таблица рекордов (Supabase)
 
-Клиент пишет очки в таблицу `public.sharoboy_scores` и читает топ по периодам
-(день / месяц / всё время). Для защиты от фейковых записей очки дополняются
-клиентской подписью `client_sig` (см. `SCORE_SECRET` в `src/config.ts`):
-при чтении топа записи с неверной подписью отбрасываются.
+Клиент не обращается к базе напрямую: запись и чтение идут через Edge Function
+`scores` (`supabase/functions/scores`). Секрет подписи очков (`SCORE_SECRET`)
+хранится в секретах функции и в клиентский бандл не попадает; клиент знает
+только публичный Project URL и anon-ключ (он же — JWT для вызова функции).
+
+- **POST /functions/v1/scores** — отправка очков: функция валидирует данные
+  (границы очков и волн, длина ника), считает подпись `client_sig` (FNV-1a от
+  `nick:score:mode:wave:screen:secret`) и вставляет запись от имени service role;
+- **GET /functions/v1/scores?mode=&screen=&from=&limit=** — топ: функция
+  отбрасывает записи с неверной подписью (принимаются и старые — без категории
+  экрана) и возвращает строки без подписи. Периоды (день / месяц / всё время)
+  клиент задаёт параметром `from`, схлопывание повторов одного игрока —
+  `dedupeTop` на клиенте.
+
+### Деплой Edge Function
+
+Выполняется один раз, до пуша этого кода на сайт:
+
+    supabase login
+    supabase link --project-ref <PROJECT_REF>   # Supabase → Project Settings → General
+    supabase secrets set SCORE_SECRET=<тот же секрет, что был в .env>
+    supabase functions deploy scores
+
+Без CLI — то же в Dashboard: Supabase → _Edge Functions_ → Create function →
+вставить код `supabase/functions/scores/index.ts` и `sig.ts`; затем в
+_Edge Functions → Secrets_ добавить `SCORE_SECRET`. Значение должно совпадать
+с прежним `VITE_SCORE_SECRET` из `.env`, иначе подписи старых записей
+«не сойдутся» и они скроются из топа.
+
+Миграция, закрывающая таблицу от прямых записей (Supabase → SQL Editor):
+
+```sql
+-- писать может только Edge Function (service role); anon/authenticated — только чтение
+revoke insert, update, delete on table public.sharoboy_scores from anon;
+revoke insert, update, delete on table public.sharoboy_scores from authenticated;
+
+-- записи до эпохи подписей (client_sig = '') всегда скрывались клиентским
+-- фильтром; теперь проверка на сервере — удаляем их
+delete from public.sharoboy_scores where client_sig = '';
+```
+
+Подпись защищает от записей в обход функции (прямые вставки закрыты), но не от
+накрутки через саму функцию — против неё работают лимиты валидации в коде
+функции (границы очков и волн, длина ника).
 
 Если таблица уже создана, выполните в Supabase → SQL Editor миграцию:
 
@@ -124,9 +166,10 @@ alter table public.sharoboy_scores
     src/game/boss.ts          босс «Царь-шар» (фазы, негативные дропы)
     src/game/powers.ts        бонусы (позитивные и негативные дропы)
     src/game/achievements.ts  12 достижений (условия, localStorage)
-    src/game/leaderboard.ts   клиент мировой таблицы рекордов
+    src/game/leaderboard.ts   клиент мирового топа (вызывает Edge Function)
     src/game/profanity.ts     фильтр запрещённых ников
     src/ui/screens.tsx        React-экраны (меню, топ, магазин, достижения)
     src/vite-env.d.ts         типы Vite (import.meta.env)
+    supabase/functions/scores Edge Function «scores»: запись и чтение топа
 
 См. также `docs/REFACTORING.md`.
