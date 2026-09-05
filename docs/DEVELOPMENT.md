@@ -2,14 +2,17 @@
 
 Техническая информация: запуск, сборка, тесты, PWA, таблица рекордов, структура проекта.
 
-## ⚠️ TODO: доделать подключение мирового топа
+## Подключение мирового топа
 
-Сейчас Supabase не подключён (`.env` пуст) — рекорды только локальные, в
-Supabase записи не уходят. Код готов, осталось 3 шага:
+Шаг 1 выполнен (`.env` заполнен), код готов. Осталось два шага вне
+репозитория — до их выполнения рекорды останутся только локальными:
 
-- [ ] **1. Заполнить локальный `.env`** (файл уже создан, значения — из
-      Supabase → _Project Settings → API_): - `VITE_SUPABASE_URL` ← Project URL - `VITE_SUPABASE_ANON_KEY` ← anon public key - `VITE_SCORE_SECRET` ← любая случайная строка (анти-накрутка)
-      После заполнения перезапустить `npm run dev`.
+- [x] **1. Заполнить локальный `.env`** (значения — из Supabase → _Project
+      Settings → API_): `VITE_SUPABASE_URL` ← Project URL,
+      `VITE_SUPABASE_ANON_KEY` ← anon public key, `VITE_SCORE_SECRET` ← любая
+      случайная строка (анти-накрутка). После заполнения перезапустить
+      `npm run dev`. **Примечание:** сам `.env` не коммитится (секреты,
+      см. `.gitignore`) — поэтому этот шаг не отражается в git.
 - [ ] **2. Добавить те же 3 секрета в GitHub** — репозиторий → _Settings →
       Secrets and variables → Actions → New repository secret_:
       `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_SCORE_SECRET`.
