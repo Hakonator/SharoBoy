@@ -33,6 +33,10 @@ export class WeaponsSystem {
 
   tryFire(dt: number, fire: boolean) {
     const g = this.g
+    if (g.boss) {
+      g.weaponCd = 0
+      return
+    }
     const rocketOn = g.time < g.rocketUntil
     if (!rocketOn || !fire) {
       g.weaponCd = 0
@@ -52,6 +56,11 @@ export class WeaponsSystem {
   /** Лазер-луч: взводится бонусом, залп по пробелу/клику, импульсы ~2 с. */
   updateLaser(fire: boolean) {
     const g = this.g
+    if (g.boss) {
+      g.laserArmed = false
+      g.laserWasOn = false
+      return
+    }
     if (g.laserArmed && g.time > g.laserArmedUntil) g.laserArmed = false
     if (g.laserArmed && fire) {
       g.laserArmed = false

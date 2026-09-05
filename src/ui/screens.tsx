@@ -7,7 +7,7 @@ import { type ReactNode } from "react"
 import { LEADERBOARD_ENABLED } from "../config"
 import type { AchievementDef } from "../game/achievements"
 import { ACHIEVEMENTS } from "../game/achievements"
-import type { GlobalScore, LeadPeriod } from "../game/leaderboard"
+import type { GlobalScore, LeadPeriod, ScreenFilter } from "../game/leaderboard"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "../game/upgrades"
 import type { HudData } from "../game/types"
 
@@ -308,23 +308,33 @@ export function MenuScreen({
   stats,
   nick,
   period,
+  screen,
   globalTop,
   globalTopEndless,
   unlocked,
+  topSubmit,
+  onNickChange,
   onPeriod,
+  onScreen,
   onCampaign,
   onEndless,
+  onBuyUpgrade,
 }: {
   hud: HudData
   stats: PlayerStats
   nick: string
   period: LeadPeriod
+  screen: ScreenFilter
   globalTop: GlobalScore[]
   globalTopEndless: GlobalScore[]
   unlocked: Record<string, number>
+  topSubmit: ReactNode
+  onNickChange: (v: string) => void
   onPeriod: (p: LeadPeriod) => void
+  onScreen: (s: ScreenFilter) => void
   onCampaign: () => void
   onEndless: () => void
+  onBuyUpgrade: (id: string) => void
 }) {
   return (
     <div className="absolute inset-0 z-40 overflow-y-auto">
@@ -364,14 +374,23 @@ export function MenuScreen({
                 </div>
               </div>
             )}
-            {nick.trim().length > 0 && (
-              <div className="hud-chip px-4 py-3">
-                <div className="hud-label">Игрок</div>
-                <div className="max-w-36 truncate font-display text-xl text-foam">
-                  {nick.trim()}
-                </div>
-              </div>
-            )}
+          </div>
+
+          {/* Ник доступен всегда — он подписывает и локальные рекорды,
+              и отправку в мировой топ (не зависит от подключения Supabase). */}
+          <div className="hud-chip mt-4 w-full max-w-64 p-3">
+            <div className="hud-label mb-2">Ник для рекордов</div>
+            <input
+              value={nick}
+              maxLength={16}
+              placeholder="Без ника"
+              onChange={(e) => onNickChange(e.target.value)}
+              onKeyDown={(e) => {
+                /* не даём движку ловить пробел/латиницу как управление */
+                e.stopPropagation()
+              }}
+              className="h-10 w-full border border-line bg-deep px-3 font-display text-sm text-foam outline-none placeholder:text-dim/60 focus:border-cyan-neon"
+            />
           </div>
 
           <div className="mt-7 flex flex-wrap gap-2 text-xs text-dim">
@@ -391,12 +410,13 @@ export function MenuScreen({
         </div>
 
         <div className="anim-rise w-full max-w-sm" style={{ animationDelay: "0.12s" }}>
+          {topSubmit}
           {hud.top.length > 0 && (
             <div className="hud-chip mb-3 p-4 sm:p-5">
               <div className="hud-label mb-3">Рекорды кампании</div>
               <ol className="space-y-1.5">
                 {hud.top.map((s, i) => (
-                  <li key={`${s}-${i}`} className="flex items-center font-display text-sm">
+                  <li key={`${s.score}-${i}`} className="flex items-center font-display text-sm">
                     <span
                       className={
                         i === 0
@@ -410,8 +430,11 @@ export function MenuScreen({
                     >
                       {i + 1}.
                     </span>
+                    <span className="ml-2 min-w-0 truncate text-foam">{s.nick || "—"}</span>
                     <span className="mx-3 flex-1 border-b border-dotted border-line" />
-                    <span className="text-foam tabular-nums">{s.toLocaleString("ru-RU")}</span>
+                    <span className="text-foam tabular-nums">
+                      {s.score.toLocaleString("ru-RU")}
+                    </span>
                   </li>
                 ))}
               </ol>
@@ -422,7 +445,7 @@ export function MenuScreen({
               <div className="hud-label mb-3">Рекорды — бесконечный</div>
               <ol className="space-y-1.5">
                 {hud.topEndless.map((s, i) => (
-                  <li key={`e-${s}-${i}`} className="flex items-center font-display text-sm">
+                  <li key={`e-${s.score}-${i}`} className="flex items-center font-display text-sm">
                     <span
                       className={
                         i === 0
@@ -436,8 +459,11 @@ export function MenuScreen({
                     >
                       {i + 1}.
                     </span>
+                    <span className="ml-2 min-w-0 truncate text-foam">{s.nick || "—"}</span>
                     <span className="mx-3 flex-1 border-b border-dotted border-line" />
-                    <span className="text-foam tabular-nums">{s.toLocaleString("ru-RU")}</span>
+                    <span className="text-foam tabular-nums">
+                      {s.score.toLocaleString("ru-RU")}
+                    </span>
                   </li>
                 ))}
               </ol>
@@ -499,24 +525,51 @@ export function MenuScreen({
             </div>
           </div>
           {LEADERBOARD_ENABLED && (
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <span className="hud-label">🌍 Мировой топ</span>
-              <div className="flex gap-1">
-                {(["day", "week", "all"] as LeadPeriod[]).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => onPeriod(p)}
-                    className={`rounded border px-2 py-0.5 font-display text-[11px] transition ${
-                      period === p
-                        ? "border-cyan-neon/60 bg-cyan-neon/15 text-cyan-neon"
-                        : "border-line/60 bg-deep/50 text-dim hover:text-foam"
-                    }`}
-                  >
-                    {p === "day" ? "День" : p === "week" ? "Неделя" : "Всё время"}
-                  </button>
-                ))}
+            <>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="hud-label">🌍 Мировой топ</span>
+                <div className="flex flex-wrap gap-1">
+                  {(
+                    [
+                      ["all", "Все"],
+                      ["mobile", "📱 Моб"],
+                      ["fhd", "🖥 FHD"],
+                      ["4k", "4K"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      onClick={() => onScreen(value)}
+                      className={`rounded border px-2 py-0.5 font-display text-[11px] transition ${
+                        screen === value
+                          ? "border-cyan-neon/60 bg-cyan-neon/15 text-cyan-neon"
+                          : "border-line/60 bg-deep/50 text-dim hover:text-foam"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <span className="hud-label">Период</span>
+                <div className="flex gap-1">
+                  {(["day", "month", "all"] as LeadPeriod[]).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => onPeriod(p)}
+                      className={`rounded border px-2 py-0.5 font-display text-[11px] transition ${
+                        period === p
+                          ? "border-cyan-neon/60 bg-cyan-neon/15 text-cyan-neon"
+                          : "border-line/60 bg-deep/50 text-dim hover:text-foam"
+                      }`}
+                    >
+                      {p === "day" ? "День" : p === "month" ? "Месяц" : "Всё время"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
           {LEADERBOARD_ENABLED && globalTop.length > 0 && (
             <div className="hud-chip mb-3 p-4 sm:p-5">
@@ -614,6 +667,14 @@ export function MenuScreen({
                         </div>
                         {!maxed && !afford && (
                           <div className="text-[10px] text-coral">не хватает</div>
+                        )}
+                        {!maxed && afford && (
+                          <button
+                            className="mt-1 rounded bg-gold/90 px-2 py-0.5 font-display text-xs text-deep transition hover:bg-gold active:scale-95"
+                            onClick={() => onBuyUpgrade(u.id)}
+                          >
+                            🪙 Купить
+                          </button>
                         )}
                       </div>
                     </div>

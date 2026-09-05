@@ -3,7 +3,14 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Game, type HudData } from "./game/game"
 import { LEADERBOARD_ENABLED } from "./config"
 import { ACHIEVEMENTS, loadUnlocked, type AchievementDef } from "./game/achievements"
-import { fetchTop, submitScore, type GlobalScore, type LeadPeriod } from "./game/leaderboard"
+import {
+  fetchTop,
+  screenClass,
+  submitScore,
+  type GlobalScore,
+  type LeadPeriod,
+  type ScreenFilter,
+} from "./game/leaderboard"
 import { validateNick } from "./game/profanity"
 import {
   BootErrorScreen,
@@ -63,6 +70,9 @@ export default function App() {
   const [globalTop, setGlobalTop] = useState<GlobalScore[]>([])
   const [globalTopEndless, setGlobalTopEndless] = useState<GlobalScore[]>([])
   const [period, setPeriod] = useState<LeadPeriod>("all")
+  const [screen, setScreen] = useState<ScreenFilter>(() =>
+    screenClass(window.innerWidth || 960, window.innerHeight || 640)
+  )
 
   const [stats, setStats] = useState<PlayerStats>(() => {
     try {
@@ -83,6 +93,8 @@ export default function App() {
   })
   const [submitState, setSubmitState] = useState<"idle" | "sending" | "done" | "error">("idle")
   const [submitError, setSubmitError] = useState<string | null>(null)
+  /** защита от повторной автоотправки одного и того же забега при выходах в меню */
+  const endlessSubmitRef = useRef<Record<string, true>>({})
 
   /* достижения: открытые (id -> время) + очередь тостов */
   const [unlocked, setUnlocked] = useState<Record<string, number>>(() => loadUnlocked())
@@ -92,29 +104,51 @@ export default function App() {
 
   const onHud = useCallback((h: HudData) => setHud(h), [])
 
+  /* Ник редактируется в меню и в форме топа: сразу пишем в localStorage,
+     движок синхронизируется эффектом по [nick] ниже (game.setNick). */
+  const handleNickChange = useCallback((v: string) => {
+    setNick(v)
+    try {
+      localStorage.setItem("sharoboy-nick", v)
+    } catch {
+      /* приватный режим — ник просто не сохранится */
+    }
+  }, [])
+
   /* Инициализация движка: без этого gameRef.current остаётся null,
      и кнопки меню (Кампания / Бесконечный) не запускают игру. */
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     try {
-      const game = new Game(canvas, onHud)
+      const game = new Game(canvas, onHud, nick)
       gameRef.current = game
       game.attach()
       return () => game.destroy()
     } catch (e) {
       setBootError(e instanceof Error ? e.message : String(e))
     }
-  }, [onHud])
+  }, [onHud, nick])
+
+  /* Синхронизация ника с движком при изменении. */
+  useEffect(() => {
+    if (gameRef.current) {
+      gameRef.current.setNick(nick)
+    }
+  }, [nick])
 
   useEffect(() => {
     if (!LEADERBOARD_ENABLED) return
+    const s = screen === "all" ? undefined : screen
     void (async () => {
-      const [c, e] = await Promise.all([fetchTop("campaign", period), fetchTop("endless", period)])
+      const [c, e] = await Promise.all([
+        fetchTop("campaign", period, 10, s),
+        fetchTop("endless", period, 10, s),
+      ])
       setGlobalTop(c)
       setGlobalTopEndless(e)
     })()
-  }, [period])
+  }, [period, screen])
 
   /* пересчёт личной статистики по итогам партии */
   useEffect(() => {
@@ -136,13 +170,53 @@ export default function App() {
     })
   }, [hud.phase, hud.score, hud.wave, hud.level])
 
-  /* новая игра — форма отправки очков сбрасывается */
+  /* новая игра — форма отправки очков сбрасывается и забывается ключ забега */
   useEffect(() => {
-    if (hud.phase === "playing" || hud.phase === "menu") {
+    if (hud.phase === "playing") {
       setSubmitState("idle")
       setSubmitError(null)
+      endlessSubmitRef.current = {}
     }
   }, [hud.phase])
+
+  /* Выход из бесконечного режима в меню: очки уже сохранены локально
+     (saveTop в toMenu), теперь фиксируем их и в общей таблице рекордов —
+     режим различается колонкой mode, отдельная таблица не нужна.
+     При заданном нике отправляем автоматически; без ника — оставляем форму
+     «В топ!» прямо в меню, чтобы игрок мог ввести ник и отправить. */
+  useEffect(() => {
+    if (!LEADERBOARD_ENABLED) return
+    if (hud.phase !== "menu" || hud.mode !== "endless" || hud.score <= 0) return
+    if (submitState === "done") return // уже отправлено через экран поражения
+    const key = `${hud.score}:${hud.wave}`
+    if (endlessSubmitRef.current[key]) return
+    endlessSubmitRef.current[key] = true
+    const check = validateNick(nick)
+    if (!check.ok) return // ник не задан — форма на меню даст ввести его
+    setSubmitState("sending")
+    void (async () => {
+      const err = await submitScore(
+        check.nick,
+        hud.score,
+        "endless",
+        hud.wave,
+        screenClass(window.innerWidth || 960, window.innerHeight || 640)
+      )
+      if (!err) {
+        setSubmitState("done")
+        const s = screen === "all" ? undefined : screen
+        const [c, e] = await Promise.all([
+          fetchTop("campaign", period, 10, s),
+          fetchTop("endless", period, 10, s),
+        ])
+        setGlobalTop(c)
+        setGlobalTopEndless(e)
+      } else {
+        setSubmitState("error")
+        setSubmitError("Не удалось отправить: " + err)
+      }
+    })()
+  }, [hud.phase, hud.mode, hud.score, hud.wave, nick, submitState, period, screen])
 
   /* новые достижения из движка -> состояние + тосты */
   useEffect(() => {
@@ -191,23 +265,23 @@ export default function App() {
       setSubmitError(check.error)
       return
     }
-    setNick(check.nick)
-    try {
-      localStorage.setItem("sharoboy-nick", check.nick)
-    } catch {
-      /* приватный режим — ник просто не сохранится */
-    }
+    handleNickChange(check.nick)
     setSubmitState("sending")
     setSubmitError(null)
     const err = await submitScore(
       check.nick,
       hud.score,
       hud.mode,
-      hud.mode === "endless" ? hud.wave : 0
+      hud.mode === "endless" ? hud.wave : 0,
+      screenClass(window.innerWidth || 960, window.innerHeight || 640)
     )
     if (!err) {
       setSubmitState("done")
-      const [c, e] = await Promise.all([fetchTop("campaign", period), fetchTop("endless", period)])
+      const s = screen === "all" ? undefined : screen
+      const [c, e] = await Promise.all([
+        fetchTop("campaign", period, 10, s),
+        fetchTop("endless", period, 10, s),
+      ])
       setGlobalTop(c)
       setGlobalTopEndless(e)
     } else {
@@ -216,14 +290,26 @@ export default function App() {
     }
   }
 
-  /* форма «попасть в мировой топ» — показывается на экранах поражения и победы */
+  /* форма «попасть в мировой топ» — на поражении/победе, а также в меню
+   при выходе из бесконечного режима без заданного ника */
+  const pendingMenuEndlessSubmit =
+    LEADERBOARD_ENABLED &&
+    hud.phase === "menu" &&
+    hud.mode === "endless" &&
+    hud.score > 0 &&
+    submitState !== "done"
+
   const topSubmit = (
     <TopSubmit
-      show={LEADERBOARD_ENABLED && (hud.phase === "over" || hud.phase === "won") && hud.score > 0}
+      show={
+        LEADERBOARD_ENABLED &&
+        hud.score > 0 &&
+        (hud.phase === "over" || hud.phase === "won" || pendingMenuEndlessSubmit)
+      }
       state={submitState}
       error={submitError}
       nick={nick}
-      onNickChange={setNick}
+      onNickChange={handleNickChange}
       onSubmit={() => void handleTopSubmit()}
     />
   )
@@ -254,12 +340,17 @@ export default function App() {
           stats={stats}
           nick={nick}
           period={period}
+          screen={screen}
           globalTop={globalTop}
           globalTopEndless={globalTopEndless}
           unlocked={unlocked}
+          topSubmit={topSubmit}
+          onNickChange={handleNickChange}
           onPeriod={setPeriod}
+          onScreen={setScreen}
           onCampaign={() => g()?.startGame()}
           onEndless={() => g()?.startEndless()}
+          onBuyUpgrade={(id) => g()?.buyUpgrade(id)}
         />
       )}
 

@@ -63,7 +63,7 @@ export class BossSystem {
     bo.dropTimer -= dt
     if (bo.dropTimer <= 0) {
       bo.dropTimer = angry ? 3.6 : 5
-      const types: PowerType[] = ["wide", "shield", "laser", "rocket", "multi"]
+      const types: PowerType[] = ["fast", "shrink", "fast", "shrink", "fast"]
       this.g.powers.push({
         x: bo.x,
         y: bo.y + bo.r + 10,
@@ -131,10 +131,6 @@ export class BossSystem {
       }
     }
     this.g.blocks = this.g.blocks.filter((b) => !b.dead)
-    this.g.powers.push(
-      { x: bo.x - 40, y: bo.y, vy: 150, type: "multi", t: 0 },
-      { x: bo.x + 40, y: bo.y, vy: 150, type: "shield", t: 0 }
-    )
     this.g.pushHud()
   }
 }

@@ -35,8 +35,13 @@ export interface HudData {
   magnetOn: boolean
   coins: number
   upgrades: Record<string, number>
-  top: number[]
-  topEndless: number[]
+  top: ScoreEntry[]
+  topEndless: ScoreEntry[]
+}
+
+export interface ScoreEntry {
+  score: number
+  nick: string
 }
 
 export interface Block {

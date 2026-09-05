@@ -6,7 +6,7 @@ import { WeaponsSystem, type WeaponsWorld } from "./weapons"
 import { InputController } from "./input"
 import { evaluateAch } from "./achievements"
 import { Effects } from "./effects"
-import { buildBossArena, gridBlocks, layoutBlocks } from "./levelBuilder"
+import { buildBossArena, densityFactor, gridBlocks, layoutBlocks } from "./levelBuilder"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
 import {
   drawBackground,
@@ -23,12 +23,12 @@ import {
   drawShieldLine,
 } from "./render"
 import type { Ball, Block, Bubble, PaddleState, Phase, PowerUp, Projectile } from "./types"
-import type { HudData } from "./types"
+import type { HudData, ScoreEntry } from "./types"
 import { clamp, daySeed, lsGet, lsSet, mulberry32, rand } from "./utils"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "./upgrades"
 
 export { UPGRADES_ENABLED, UPGRADE_DEFS } from "./upgrades"
-export type { Block, HudData, Phase, PowerType } from "./types"
+export type { Block, HudData, Phase, PowerType, ScoreEntry } from "./types"
 
 /* ==================================================================== */
 
@@ -117,17 +117,20 @@ export class Game {
   private levelLostBall = false
   private effectsKey = ""
 
-  private top: number[] = []
-  private topEndless: number[] = []
+  private top: ScoreEntry[] = []
+  private topEndless: ScoreEntry[] = []
 
   sfx = new SFX()
 
-  constructor(canvas: HTMLCanvasElement, onHud: (h: HudData) => void) {
+  private nick = ""
+
+  constructor(canvas: HTMLCanvasElement, onHud: (h: HudData) => void, nick?: string) {
     this.canvas = canvas
     const ctx = canvas.getContext("2d")
     if (!ctx) throw new Error("no 2d context")
     this.ctx = ctx
     this.onHud = onHud
+    if (nick) this.nick = nick
     this.input = new InputController(canvas, {
       paddleX: () => this.paddle.x,
       worldWidth: () => this.w,
@@ -152,22 +155,8 @@ export class Game {
     this.physics = new Physics(this.makePhysicsHost())
     this.weaponsSys = new WeaponsSystem(this.makeWeaponsHost())
     this.best = Number(lsGet("sharoboy-best") || 0) || 0
-    try {
-      const parsed = JSON.parse(lsGet("sharoboy-top") || "[]") as unknown
-      this.top = Array.isArray(parsed)
-        ? (parsed as number[]).filter((n) => typeof n === "number")
-        : []
-    } catch {
-      this.top = []
-    }
-    try {
-      const parsedE = JSON.parse(lsGet("sharoboy-top-endless") || "[]") as unknown
-      this.topEndless = Array.isArray(parsedE)
-        ? (parsedE as number[]).filter((n) => typeof n === "number")
-        : []
-    } catch {
-      this.topEndless = []
-    }
+    this.top = this.loadScoreEntries("sharoboy-top")
+    this.topEndless = this.loadScoreEntries("sharoboy-top-endless")
     this.loadProgress()
   }
 
@@ -581,6 +570,10 @@ export class Game {
     this.pushHud()
   }
 
+  setNick(nick: string) {
+    this.nick = nick
+  }
+
   destroy() {
     this.destroyed = true
     cancelAnimationFrame(this.raf)
@@ -638,6 +631,41 @@ export class Game {
     return this.touchMode ? 100 : 34
   }
 
+  /** Маленький экран (смартфон в portrait): на нём шар замедляется вдвое. */
+  private get isSmallScreen(): boolean {
+    return this.w <= 600
+  }
+
+  /** 4K экран (ширина >= 3840 или высота >= 2160): на нём шар ускоряется на 50%. */
+  private get is4KScreen(): boolean {
+    return this.w >= 3840 || this.h >= 2160
+  }
+
+  /** Загрузка рекордов из localStorage с миграцией со старого формата (number[]). */
+  private loadScoreEntries(key: string): ScoreEntry[] {
+    try {
+      const parsed = JSON.parse(lsGet(key) || "[]") as unknown
+      if (!Array.isArray(parsed)) return []
+      return parsed
+        .map((item: unknown): ScoreEntry | null => {
+          if (typeof item === "number") {
+            return { score: item, nick: "" }
+          }
+          if (typeof item === "object" && item !== null && "score" in item) {
+            const entry = item as { score: unknown; nick?: unknown }
+            return {
+              score: typeof entry.score === "number" ? entry.score : 0,
+              nick: typeof entry.nick === "string" ? entry.nick : "",
+            }
+          }
+          return null
+        })
+        .filter((e): e is ScoreEntry => e !== null)
+    } catch {
+      return []
+    }
+  }
+
   /** Первый тач-ввод (в т.ч. на гибридных устройствах) — поднимаем ракетку. */
   private enableTouchMode() {
     if (this.touchMode) return
@@ -684,6 +712,7 @@ export class Game {
   toMenu() {
     this.sfx.ui()
     this.input.releaseLock()
+    this.saveTop()
     this.phase = "menu"
     this.balls = []
     this.blocks = []
@@ -791,9 +820,9 @@ export class Game {
       this.bossSys.spawn(boss)
       this.blocks = blocks
     } else if ("layout" in spec) {
-      this.blocks = layoutBlocks(spec, this.w, this.h)
+      this.blocks = layoutBlocks(spec, this.w, this.h, densityFactor(this.w, this.h))
     } else {
-      this.blocks = gridBlocks(spec, this.w, this.h)
+      this.blocks = gridBlocks(spec, this.w, this.h, densityFactor(this.w, this.h))
     }
     this.blocksInitial = Math.max(1, this.blocks.length)
   }
@@ -849,13 +878,14 @@ export class Game {
       540,
       1140
     )
+    const speed = this.isSmallScreen ? base * 0.5 : this.is4KScreen ? base * 1.5 : base
     const ball: Ball = {
       x: this.paddle.x,
       y: this.paddle.y - this.paddle.h / 2 - 9 - 2,
       vx: 0,
       vy: 0,
       r: 9,
-      speed: base,
+      speed: speed,
       stuck: true,
       stuckOffset: 0,
       trail: [],
@@ -1102,11 +1132,19 @@ export class Game {
 
   private saveTop() {
     if (this.score <= 0) return
+    const entry: ScoreEntry = { score: this.score, nick: this.nick }
+    /* записи, сделанные до появления ника, считаем рекордами текущего игрока */
+    const withNick = (list: ScoreEntry[]): ScoreEntry[] =>
+      this.nick ? list.map((e) => (e.nick ? e : { ...e, nick: this.nick })) : list
     if (this.mode === "endless") {
-      this.topEndless = [...this.topEndless, this.score].sort((a, b) => b - a).slice(0, 5)
+      this.topEndless = withNick([...this.topEndless, entry])
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5)
       lsSet("sharoboy-top-endless", JSON.stringify(this.topEndless))
     } else {
-      this.top = [...this.top, this.score].sort((a, b) => b - a).slice(0, 5)
+      this.top = withNick([...this.top, entry])
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5)
       lsSet("sharoboy-top", JSON.stringify(this.top))
     }
   }
