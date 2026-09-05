@@ -75,6 +75,22 @@ export function IconBall({ color, className }: { color: string; className?: stri
   )
 }
 
+export function IconChevron() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}
+
 export function Key({ children, wide }: { children: ReactNode; wide?: boolean }) {
   return (
     <span
@@ -102,44 +118,42 @@ export function EffectChip({ label, good }: { label: string; good: boolean }) {
   )
 }
 
+/** Содержимое панели управления (без карточки-обёртки) — вкладывается в секцию меню. */
 export function ControlsPanel() {
   return (
-    <div className="hud-chip p-4 sm:p-5">
-      <div className="hud-label mb-3">Управление</div>
-      <ul className="space-y-2.5 text-sm text-foam/90">
-        <li className="flex items-center gap-3">
-          <span className="text-cyan-neon">
-            <IconMouse />
-          </span>
-          <span>
-            Мышь / палец — двигать ракетку, <b className="text-cyan-neon">клик</b> — запуск (на
-            таче: веди пальцем и отпусти)
-          </span>
-        </li>
-        <li className="flex items-center gap-3">
-          <span className="flex gap-1">
-            <Key>←</Key>
-            <Key>→</Key>
-          </span>
-          <span>
-            или <Key>A</Key> <Key>D</Key> — движение
-          </span>
-        </li>
-        <li className="flex items-center gap-3">
-          <Key wide>ПРОБЕЛ</Key>
-          <span>запуск шара и стрельба оружием</span>
-        </li>
-        <li className="flex items-center gap-3">
-          <span className="flex gap-1">
-            <Key>P</Key>
-            <Key>ESC</Key>
-          </span>
-          <span>пауза</span>
-          <Key>M</Key>
-          <span>звук</span>
-        </li>
-      </ul>
-    </div>
+    <ul className="space-y-2.5 text-sm text-foam/90">
+      <li className="flex items-center gap-3">
+        <span className="text-cyan-neon">
+          <IconMouse />
+        </span>
+        <span>
+          Мышь / палец — двигать ракетку, <b className="text-cyan-neon">клик</b> — запуск (на таче:
+          веди пальцем и отпусти)
+        </span>
+      </li>
+      <li className="flex items-center gap-3">
+        <span className="flex gap-1">
+          <Key>←</Key>
+          <Key>→</Key>
+        </span>
+        <span>
+          или <Key>A</Key> <Key>D</Key> — движение
+        </span>
+      </li>
+      <li className="flex items-center gap-3">
+        <Key wide>ПРОБЕЛ</Key>
+        <span>запуск шара и стрельба оружием</span>
+      </li>
+      <li className="flex items-center gap-3">
+        <span className="flex gap-1">
+          <Key>P</Key>
+          <Key>ESC</Key>
+        </span>
+        <span>пауза</span>
+        <Key>M</Key>
+        <span>звук</span>
+      </li>
+    </ul>
   )
 }
 
