@@ -107,9 +107,16 @@ function makeBlock(opts: {
 }
 
 /** Авторская раскладка в нормализованных координатах → блоки в пикселях поля. */
-export function layoutBlocks(spec: LayoutSpec, w: number, h: number, density = 1): Block[] {
+export function layoutBlocks(
+  spec: LayoutSpec,
+  w: number,
+  h: number,
+  density = 1,
+  /** Верх зоны блоков в мировых единицах; по умолчанию — 14% высоты мира. */
+  topOverride?: number
+): Block[] {
   const margin = clamp(w * 0.055, 22, 72)
-  const top = clamp(h * 0.14, 86, 160)
+  const top = topOverride ?? clamp(h * 0.14, 86, 160)
   const zoneH = clamp(h * 0.42, 220, 420)
   let minX = Infinity
   let maxX = -Infinity
@@ -169,9 +176,16 @@ export function layoutBlocks(spec: LayoutSpec, w: number, h: number, density = 1
 }
 
 /** Процедурная сетка по описанию узора. */
-export function gridBlocks(spec: PatternSpec, w: number, h: number, density = 1): Block[] {
+export function gridBlocks(
+  spec: PatternSpec,
+  w: number,
+  h: number,
+  density = 1,
+  /** Верх зоны блоков в мировых единицах; по умолчанию — 14% высоты мира. */
+  topOverride?: number
+): Block[] {
   const margin = clamp(w * 0.055, 22, 72)
-  const top = clamp(h * 0.14, 86, 160)
+  const top = topOverride ?? clamp(h * 0.14, 86, 160)
   const zoneH = clamp(h * 0.42, 220, 420)
   const rows = Math.max(2, Math.round(spec.rows * density))
   const gap = clamp(zoneH / rows, 46, 78)
@@ -234,9 +248,11 @@ export function buildBossArena(
   minions: number,
   bombs: number,
   w: number,
-  h: number
+  h: number,
+  /** Верх зоны блоков в мировых единицах; по умолчанию — 14% высоты мира. */
+  topOverride?: number
 ): { boss: BossState; blocks: Block[] } {
-  const top = clamp(h * 0.14, 86, 160)
+  const top = topOverride ?? clamp(h * 0.14, 86, 160)
   const r = clamp(Math.min(w, h) * 0.1, 52, 84)
   const baseY = top + r + 34
   const boss: BossState = {

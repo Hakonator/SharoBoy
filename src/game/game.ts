@@ -25,7 +25,7 @@ import {
 import type { Ball, Block, Bubble, PaddleState, Phase, PowerUp, Projectile } from "./types"
 import type { HudData, ScoreEntry } from "./types"
 import { clamp, daySeed, lsGet, lsSet, mulberry32, rand } from "./utils"
-import { computeScale } from "./viewport"
+import { HUD_TOP_CSS, computeScale } from "./viewport"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "./upgrades"
 
 export { UPGRADES_ENABLED, UPGRADE_DEFS } from "./upgrades"
@@ -643,6 +643,13 @@ export class Game {
     return (this.touchMode ? 100 : 34) / this.scale
   }
 
+  /** Верх зоны блоков в мировых единицах: 14% высоты мира, но не выше нижней
+   *  границы HUD-плашек — на масштабах < 1 (телефоны) плашки занимают больше
+   *  «мира», и блоки опускаются ниже, чтобы плашки их не перекрывали. */
+  private blockTop(): number {
+    return Math.min(Math.max(this.h * 0.14, HUD_TOP_CSS / this.scale), this.h * 0.35)
+  }
+
   /** Загрузка рекордов из localStorage с миграцией со старого формата (number[]). */
   private loadScoreEntries(key: string): ScoreEntry[] {
     try {
@@ -811,20 +818,22 @@ export class Game {
     this.bossSys.clear()
     this.boomQueue = []
     this.fieldShift = null
+    const top = this.blockTop()
     if ("boss" in spec) {
       const { boss, blocks } = buildBossArena(
         spec.boss.hp,
         spec.boss.minions,
         spec.boss.bombs,
         this.w,
-        this.h
+        this.h,
+        top
       )
       this.bossSys.spawn(boss)
       this.blocks = blocks
     } else if ("layout" in spec) {
-      this.blocks = layoutBlocks(spec, this.w, this.h, densityFactor(this.w, this.h))
+      this.blocks = layoutBlocks(spec, this.w, this.h, densityFactor(this.w, this.h), top)
     } else {
-      this.blocks = gridBlocks(spec, this.w, this.h, densityFactor(this.w, this.h))
+      this.blocks = gridBlocks(spec, this.w, this.h, densityFactor(this.w, this.h), top)
     }
     this.blocksInitial = Math.max(1, this.blocks.length)
   }
@@ -856,7 +865,7 @@ export class Game {
   }
 
   private buildBossLevel(hp: number, minions: number, bombs: number) {
-    const { boss, blocks } = buildBossArena(hp, minions, bombs, this.w, this.h)
+    const { boss, blocks } = buildBossArena(hp, minions, bombs, this.w, this.h, this.blockTop())
     this.bossSys.spawn(boss)
     this.blocks = blocks
     this.blocksInitial = Math.max(1, blocks.length)

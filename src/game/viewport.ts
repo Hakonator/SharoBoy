@@ -18,6 +18,11 @@ export const REF_DIAG = Math.hypot(REF_W, REF_H)
 export const MIN_SCALE = 0.4
 export const MAX_SCALE = 3
 
+/** Высота верхней HUD-зоны в CSS-пикселях (плашки счёта/волн/жизней). Зона
+ *  блоков в мире начинается не выше этой границы: на масштабах < 1 (телефоны)
+ *  плашки занимают больше «мира», и блоки опускаются ниже (Game.blockTop). */
+export const HUD_TOP_CSS = 96
+
 /** Единый масштаб мира: диагональ окна относительно эталонной диагонали. */
 export function computeScale(cssW: number, cssH: number): number {
   return clamp(Math.hypot(cssW, cssH) / REF_DIAG, MIN_SCALE, MAX_SCALE)

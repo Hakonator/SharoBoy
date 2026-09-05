@@ -72,6 +72,12 @@ describe("layoutBlocks", () => {
     expect(desktop.length).toBe(spec.layout.length)
   })
 
+  it("topOverride опускает раскладку ниже — под HUD-плашки", () => {
+    const blocks = layoutBlocks(spec, 1920, 1080, 1, 300)
+    const minY = Math.min(...blocks.map((b) => b.y - b.ry))
+    expect(minY).toBeGreaterThanOrEqual(300)
+  })
+
   it("на плотных полях добавляются заполнители, и блоки расталкиваются", () => {
     const dense = layoutBlocks(spec, 2560, 1080, densityFactor(2560, 1080))
     expect(dense.length).toBeGreaterThan(spec.layout.length)

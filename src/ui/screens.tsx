@@ -160,13 +160,24 @@ export function HudOverlay({
   return (
     <>
       {inGame && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-3 sm:p-4">
-          <div className="flex flex-wrap items-start gap-2">
-            <div className="hud-chip px-3.5 py-2">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-1.5 p-2 sm:gap-2 sm:p-4">
+          <div className="flex flex-wrap items-start gap-1.5 sm:gap-2">
+            <div className="hud-chip px-3 py-1.5 sm:px-3.5 sm:py-2">
               <div className="hud-label">Счёт</div>
-              <div className="font-display text-xl leading-none text-foam tabular-nums sm:text-2xl">
+              <div className="font-display text-lg leading-none text-foam tabular-nums sm:text-2xl">
                 {hud.score.toLocaleString("ru-RU")}
               </div>
+            </div>
+            {/* Цели: на мобильных — в общем ряду HUD, на md+ — центральная плашка */}
+            <div className="hud-chip flex flex-col justify-center px-3 py-1 font-display text-[11px] leading-tight text-cyan-neon md:hidden">
+              <span className="text-dim">
+                {hud.mode === "endless"
+                  ? `ВОЛНА ${hud.wave}`
+                  : `УР. ${hud.level}/${hud.levelCount}`}
+              </span>
+              <span>
+                ЦЕЛИ: <span className="tabular-nums">{hud.blocksLeft}</span>
+              </span>
             </div>
             <div className="hud-chip hidden px-3.5 py-2 sm:block">
               <div className="hud-label">Рекорд</div>
@@ -175,23 +186,29 @@ export function HudOverlay({
               </div>
             </div>
             {hud.combo >= 2 && (
-              <div key={`combo-${hud.combo}`} className="hud-chip anim-combo px-3.5 py-2">
+              <div
+                key={`combo-${hud.combo}`}
+                className="hud-chip anim-combo px-3 py-1.5 sm:px-3.5 sm:py-2"
+              >
                 <div className="hud-label">Серия</div>
-                <div className="font-display text-xl leading-none text-punch sm:text-2xl">
+                <div className="font-display text-lg leading-none text-punch sm:text-2xl">
                   ×{hud.combo}
                 </div>
               </div>
             )}
             {hud.coins > 0 && (
-              <div className="hud-chip px-3.5 py-2">
+              <div className="hud-chip px-3 py-1.5 sm:px-3.5 sm:py-2">
                 <div className="hud-label">Монеты</div>
-                <div className="font-display text-xl leading-none text-gold tabular-nums sm:text-2xl">
+                <div className="font-display text-lg leading-none text-gold tabular-nums sm:text-2xl">
                   {hud.coins}
                 </div>
               </div>
             )}
             {hud.shield > 0 && (
-              <div key={`shield-${hud.shield}`} className="hud-chip anim-combo px-3.5 py-2">
+              <div
+                key={`shield-${hud.shield}`}
+                className="hud-chip anim-combo px-3 py-1.5 sm:px-3.5 sm:py-2"
+              >
                 <div className="hud-label">Щит</div>
                 <div className="mt-1 flex gap-1">
                   {Array.from({ length: hud.shield }).map((_, i) => (
@@ -216,41 +233,35 @@ export function HudOverlay({
             </div>
           </div>
 
-          <div className="flex items-start gap-2">
-            <div className="hud-chip px-3.5 py-2">
-              <div className="hud-label">Жизни</div>
-              <div className="mt-1 flex gap-1">
+          <div className="flex items-start gap-1.5 sm:gap-2">
+            <div className="hud-chip px-3 py-1.5 sm:px-3.5 sm:py-2">
+              <div className="hud-label hidden sm:block">Жизни</div>
+              <div className="flex gap-1 sm:mt-1">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <IconBall
                     key={i}
                     color="#35e0ff"
-                    className={`h-4 w-4 ${i < hud.lives ? "opacity-100" : "opacity-20 grayscale"}`}
+                    className={`h-3 w-3 sm:h-4 sm:w-4 ${
+                      i < hud.lives ? "opacity-100" : "opacity-20 grayscale"
+                    }`}
                   />
                 ))}
               </div>
             </div>
             <button
-              className="icon-btn pointer-events-auto flex h-10 w-10 items-center justify-center"
+              className="icon-btn pointer-events-auto flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
               onClick={onPause}
               aria-label="Пауза"
             >
               {hud.phase === "paused" ? <IconPlay /> : <IconPause />}
             </button>
             <button
-              className="icon-btn pointer-events-auto flex h-10 w-10 items-center justify-center"
+              className="icon-btn pointer-events-auto flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
               onClick={onMute}
               aria-label="Звук"
             >
               <IconSound off={hud.muted} />
             </button>
-          </div>
-        </div>
-      )}
-      {inGame && (
-        <div className="pointer-events-none absolute left-1/2 top-[68px] z-20 -translate-x-1/2 md:hidden">
-          <div className="hud-chip px-3 py-1 font-display text-xs text-cyan-neon">
-            {hud.mode === "endless" ? `ВОЛНА ${hud.wave}` : `УР. ${hud.level}/${hud.levelCount}`} ·
-            ЦЕЛИ {hud.blocksLeft}
           </div>
         </div>
       )}
@@ -525,7 +536,7 @@ export function MenuScreen({
             </div>
           </div>
           {LEADERBOARD_ENABLED && (
-            <>
+            <div className="hud-chip mb-3 p-4 sm:p-5">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="hud-label">🌍 Мировой топ</span>
                 <div className="flex flex-wrap gap-1">
@@ -569,67 +580,72 @@ export function MenuScreen({
                   ))}
                 </div>
               </div>
-            </>
-          )}
-          {LEADERBOARD_ENABLED && globalTop.length > 0 && (
-            <div className="hud-chip mb-3 p-4 sm:p-5">
-              <div className="hud-label mb-3">🌍 Мировой топ — кампания</div>
-              <ol className="space-y-1.5">
-                {globalTop.map((s, i) => (
-                  <li key={`g-${i}`} className="flex items-center font-display text-sm">
-                    <span
-                      className={
-                        i === 0
-                          ? "text-gold"
-                          : i === 1
-                            ? "text-foam"
-                            : i === 2
-                              ? "text-coral"
-                              : "text-dim"
-                      }
-                    >
-                      {i + 1}.
-                    </span>
-                    <span className="ml-2 min-w-0 truncate text-foam">{s.nick}</span>
-                    <span className="mx-3 flex-1 border-b border-dotted border-line" />
-                    <span className="text-foam tabular-nums">
-                      {s.score.toLocaleString("ru-RU")}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-          {LEADERBOARD_ENABLED && globalTopEndless.length > 0 && (
-            <div className="hud-chip mb-3 p-4 sm:p-5">
-              <div className="hud-label mb-3">🌍 Мировой топ — бесконечный</div>
-              <ol className="space-y-1.5">
-                {globalTopEndless.map((s, i) => (
-                  <li key={`ge-${i}`} className="flex items-center font-display text-sm">
-                    <span
-                      className={
-                        i === 0
-                          ? "text-gold"
-                          : i === 1
-                            ? "text-foam"
-                            : i === 2
-                              ? "text-coral"
-                              : "text-dim"
-                      }
-                    >
-                      {i + 1}.
-                    </span>
-                    <span className="ml-2 min-w-0 truncate text-foam">{s.nick}</span>
-                    {s.wave > 0 && (
-                      <span className="ml-1.5 text-[10px] text-dim">волна {s.wave}</span>
-                    )}
-                    <span className="mx-3 flex-1 border-b border-dotted border-line" />
-                    <span className="text-foam tabular-nums">
-                      {s.score.toLocaleString("ru-RU")}
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              {globalTop.length > 0 && (
+                <div className="mb-3">
+                  <div className="hud-label mb-2">Кампания</div>
+                  <ol className="space-y-1.5">
+                    {globalTop.map((s, i) => (
+                      <li key={`g-${i}`} className="flex items-center font-display text-sm">
+                        <span
+                          className={
+                            i === 0
+                              ? "text-gold"
+                              : i === 1
+                                ? "text-foam"
+                                : i === 2
+                                  ? "text-coral"
+                                  : "text-dim"
+                          }
+                        >
+                          {i + 1}.
+                        </span>
+                        <span className="ml-2 min-w-0 truncate text-foam">{s.nick}</span>
+                        <span className="mx-3 flex-1 border-b border-dotted border-line" />
+                        <span className="text-foam tabular-nums">
+                          {s.score.toLocaleString("ru-RU")}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {globalTopEndless.length > 0 && (
+                <div>
+                  <div className="hud-label mb-2">Бесконечный</div>
+                  <ol className="space-y-1.5">
+                    {globalTopEndless.map((s, i) => (
+                      <li key={`ge-${i}`} className="flex items-center font-display text-sm">
+                        <span
+                          className={
+                            i === 0
+                              ? "text-gold"
+                              : i === 1
+                                ? "text-foam"
+                                : i === 2
+                                  ? "text-coral"
+                                  : "text-dim"
+                          }
+                        >
+                          {i + 1}.
+                        </span>
+                        <span className="ml-2 min-w-0 truncate text-foam">{s.nick}</span>
+                        {s.wave > 0 && (
+                          <span className="ml-1.5 text-[10px] text-dim">волна {s.wave}</span>
+                        )}
+                        <span className="mx-3 flex-1 border-b border-dotted border-line" />
+                        <span className="text-foam tabular-nums">
+                          {s.score.toLocaleString("ru-RU")}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {globalTop.length === 0 && globalTopEndless.length === 0 && (
+                <div className="text-xs text-dim">
+                  Записей пока нет — сыграйте партию и попадите в топ!
+                </div>
+              )}
             </div>
           )}
           {UPGRADES_ENABLED && (
