@@ -44,7 +44,9 @@ export function sigFor(
 }
 
 /** Проверка подписи строки результата: нет подписи или бита — мимо.
- *  Принимаются и подписи с категорией экрана, и старые — без неё. */
+ *  Принимаются и подписи с категорией экрана, и старые — без неё.
+ *  При screen === undefined (топ «Все») проверяется подпись с собственной
+ *  категорией экрана строки (новые записи) и без неё (старые записи). */
 export function sigMatches(
   row: SigRow,
   mode: ScoreMode,
@@ -53,8 +55,15 @@ export function sigMatches(
 ): boolean {
   if (!row.client_sig || row.client_sig.length !== 8) return false
   const wave = row.wave ?? 0
-  if (screen && row.client_sig === sigFor(row.nick, row.score, mode, wave, screen, secret)) {
-    return true
+  if (screen) {
+    // Конкретная категория — только точное совпадение.
+    return row.client_sig === sigFor(row.nick, row.score, mode, wave, screen, secret)
   }
-  return row.client_sig === sigFor(row.nick, row.score, mode, wave, undefined, secret)
+  // «Все»: подходит подпись с собственной screen_class строки (новые записи)
+  // или без категории (старые записи до миграции).
+  const ownScreen = row.screen_class || undefined
+  return (
+    row.client_sig === sigFor(row.nick, row.score, mode, wave, ownScreen, secret) ||
+    row.client_sig === sigFor(row.nick, row.score, mode, wave, undefined, secret)
+  )
 }

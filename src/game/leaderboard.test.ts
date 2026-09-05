@@ -136,9 +136,26 @@ describe("sigMatches — серверная проверка подписи ст
     expect(sigMatches(withMobile, "campaign", "fhd", SECRET)).toBe(false)
   })
 
-  it("принимает старую подпись без категории даже при фильтре", () => {
-    // старые записи (без screen_class) не должны пропадать из топа
-    expect(sigMatches(row({}), "campaign", "fhd", SECRET)).toBe(true)
+  it("принимает новую запись с screen_class в топе «Все»", () => {
+    // новые записи (с screen_class) должны быть видны без фильтра по категории
+    const withScreen: SigRow = {
+      nick: "Игрок",
+      score: 1234,
+      wave: 5,
+      screen_class: "fhd",
+      client_sig: sigFor("Игрок", 1234, "campaign", 5, "fhd", SECRET),
+    }
+    expect(sigMatches(withScreen, "campaign", undefined, SECRET)).toBe(true)
+  })
+
+  it("принимает старую запись без screen_class в топе «Все»", () => {
+    // старые записи (без screen_class) не должны пропадать из топа «Все»
+    expect(sigMatches(row({}), "campaign", undefined, SECRET)).toBe(true)
+  })
+
+  it("не показывает старую запись без screen_class в конкретном фильтре", () => {
+    // старая запись (без screen_class) не должна попасть в фильтр по категории
+    expect(sigMatches(row({}), "campaign", "fhd", SECRET)).toBe(false)
   })
 })
 
