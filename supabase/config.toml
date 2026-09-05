@@ -1,0 +1,24 @@
+# Конфигурация Supabase CLI для проекта SharoBoy.
+# После создания можно выполнять команды из корня проекта без --project-ref:
+#   supabase secrets set SCORE_SECRET=…
+#   supabase functions deploy scores
+#   supabase migration up
+#
+# project_ref берётся из Supabase → Project Settings → Reference ID
+# (совпадает с поддоменом в Project URL).
+
+project_id = "wbidprepvccgxtujqsjy"
+
+[api]
+port = 54323
+
+[db]
+port = 54324
+
+[studio]
+port = 54325
+
+[functions.scores]
+# verify_jwt = true — вызовы требуют JWT (anon-ключ в качестве JWT).
+# Секреты задаются через: supabase secrets set SCORE_SECRET=…
+verify_jwt = true

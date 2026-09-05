@@ -18,6 +18,13 @@
  * публичный anon-ключ в заголовках apikey/Authorization.
  */
 
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined
+  }
+  serve(handler: (req: Request) => Promise<Response> | Response): void
+}
+
 import { validateNick } from "./profanity.ts"
 import { sigFor, sigMatches, type ScoreMode, type SigRow, type SigScreen } from "./sig.ts"
 
@@ -173,7 +180,7 @@ async function fetchTop(req: Request): Promise<Response> {
   })
 }
 
-Deno.serve((req: Request): Promise<Response> => {
+Deno.serve((req: Request): Promise<Response> | Response => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS })
   if (req.method === "POST") return submitScore(req)
   if (req.method === "GET") return fetchTop(req)

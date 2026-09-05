@@ -90,67 +90,53 @@ SQL-миграции выполнены в Supabase. Для истории — �
   клиент задаёт параметром `from`, схлопывание повторов одного игрока —
   `dedupeTop` на клиенте.
 
+### ⚠️ Важно: синхронизация SCORE_SECRET
+
+`SCORE_SECRET` в секретах Edge Function должен совпадать с прежним
+`VITE_SCORE_SECRET` из `.env`. Если секрет когда-либо будет перегенерирован —
+подписи старых записей «не сойдутся» и весь исторический топ станет невидимым.
+Храните текущее значение в надёжном месте (менеджер паролей / vault).
+
 ### Деплой Edge Function
 
-Выполняется один раз, до пуша этого кода на сайт:
+Выполняется один раз, до пуша этого кода на сайт. Конфиг Supabase CLI
+уже содержит `project_ref` (`supabase/config.toml`), поэтому `--project-ref`
+не нужен:
 
     supabase login
-    supabase link --project-ref <PROJECT_REF>   # Supabase → Project Settings → General
     supabase secrets set SCORE_SECRET=<тот же секрет, что был в .env>
     supabase functions deploy scores
 
 Без CLI — то же в Dashboard: Supabase → _Edge Functions_ → Create function →
 вставить код `supabase/functions/scores/index.ts` и `sig.ts`; затем в
-_Edge Functions → Secrets_ добавить `SCORE_SECRET`. Значение должно совпадать
-с прежним `VITE_SCORE_SECRET` из `.env`, иначе подписи старых записей
-«не сойдутся» и они скроются из топа.
+_Edge Functions → Secrets_ добавить `SCORE_SECRET`.
 
-Миграция, закрывающая таблицу от прямых записей (Supabase → SQL Editor):
+### Миграции базы данных
 
-```sql
--- писать может только Edge Function (service role); anon/authenticated — только чтение
-revoke insert, update, delete on table public.sharoboy_scores from anon;
-revoke insert, update, delete on table public.sharoboy_scores from authenticated;
+SQL-миграции версионируются в `supabase/migrations/` и применяются порядково:
 
--- записи до эпохи подписей (client_sig = '') всегда скрывались клиентским
--- фильтром; теперь проверка на сервере — удаляем их
-delete from public.sharoboy_scores where client_sig = '';
-```
+| Файл                                        | Что делает                                                              |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| `20250101000001_create_sharoboy_scores.sql` | Создание таблицы с базовыми колонками и индексом                        |
+| `20250101000002_add_client_sig.sql`         | Добавление `client_sig` + CHECK-ограничение (длина 0 или 8)             |
+| `20250101000003_add_screen_class.sql`       | Добавление `screen_class` (mobile/fhd/4k)                               |
+| `20250101000004_rls_and_cleanup.sql`        | RLS: только чтение для anon/authenticated; удаление записей без подписи |
+| `20250101000005_best_only_trigger.sql`      | Триггер: одна запись на игрока в каждом режиме                          |
+
+Применить миграции (после `supabase login` и линка проекта):
+
+    supabase migration up
 
 Подпись защищает от записей в обход функции (прямые вставки закрыты), но не от
 накрутки через саму функцию — против неё работают лимиты валидации в коде
 функции (границы очков и волн, длина ника).
-
-Если таблица уже создана, выполните в Supabase → SQL Editor миграцию:
-
-```sql
--- дата и время записи (используется для периодов «День»/«Месяц»)
-alter table public.sharoboy_scores
-  add column if not exists created_at timestamptz not null default now();
-
-alter table public.sharoboy_scores
-  add column if not exists client_sig text not null default '';
-
--- 0 = старые записи до миграции (будут скрыты из топа), 8 = валидная подпись
-alter table public.sharoboy_scores
-  add constraint sharoboy_scores_sig_len check (char_length(client_sig) in (0, 8));
-```
-
-Новые записи будут попадать в таблицу только с валидной подписью. Подписи
-не защищают от накрутки на 100% (секрет виден в клиентском коде) — это
-защита от случайных злоупотреблений через консоль.
 
 ### Рейтинг по типу экрана
 
 Мировой топ фильтруется по категории экрана: `mobile` (телефоны и планшеты),
 `fhd` (HD/FullHD/2K/ultrawide) и `4k` (4K и выше). Категория определяется
 автоматически по диагонали окна и пишется в колонку `screen_class`; очки
-сравнимы только внутри категории. Миграция:
-
-```sql
-alter table public.sharoboy_scores
-  add column if not exists screen_class text not null default '';
-```
+сравнимы только внутри категории.
 
 Подпись новых записей включает категорию экрана (формат
 `nick:score:mode:wave:screen_class:secret`); старые записи без категории
@@ -191,7 +177,9 @@ alter table public.sharoboy_scores
     src/game/profanity.ts     ре-экспорт фильтра ников (общий с Edge Function)
     src/ui/screens.tsx        React-экраны (меню, топ, магазин, достижения)
     src/vite-env.d.ts         типы Vite (import.meta.env)
-    supabase/functions/scores Edge Function «scores»: запись и чтение топа
+    supabase/config.toml         конфиг Supabase CLI (project_ref, порты)
+    supabase/migrations/         SQL-миграции базы данных (версионированные)
+    supabase/functions/scores    Edge Function «scores»: запись и чтение топа
                               (+ общий фильтр ников profanity.ts)
 
 См. также `docs/REFACTORING.md`.
