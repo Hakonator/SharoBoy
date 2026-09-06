@@ -111,6 +111,19 @@ SQL-миграции выполнены в Supabase. Для истории — �
 вставить код `supabase/functions/scores/index.ts` и `sig.ts`; затем в
 _Edge Functions → Secrets_ добавить `SCORE_SECRET`.
 
+### CI-автоматизация (deploy.yml)
+
+Пуш в `beta`/`main` пересобирает и публикует сайт. Дополнительно:
+
+- job `deploy-function` — деплой Edge Function «scores» при изменениях в
+  `supabase/functions/**` (секрет `SUPABASE_ACCESS_TOKEN`; ручной запуск
+  workflow деплоит функцию всегда);
+- job `apply-migrations` — применение SQL-миграций при изменениях в
+  `supabase/migrations/**` (секрет `SUPABASE_DB_PASSWORD`).
+
+Оба секрета добавляются в _Settings → Secrets and variables → Actions_; без
+них соответствующий job завершается предупреждением, не ломая деплой сайта.
+
 ### Миграции базы данных
 
 SQL-миграции версионируются в `supabase/migrations/` и применяются порядково:
@@ -122,10 +135,16 @@ SQL-миграции версионируются в `supabase/migrations/` и �
 | `20250101000003_add_screen_class.sql`       | Добавление `screen_class` (mobile/fhd/4k)                               |
 | `20250101000004_rls_and_cleanup.sql`        | RLS: только чтение для anon/authenticated; удаление записей без подписи |
 | `20250101000005_best_only_trigger.sql`      | Триггер: одна запись на игрока в каждом режиме                          |
+| `20250101000006_best_only_by_screen.sql`    | Триггер: рекорды одного игрока независимо по категориям экрана          |
 
-Применить миграции (после `supabase login` и линка проекта):
+Применение: CI делает это автоматически — job `apply-migrations` в deploy.yml
+срабатывает при изменениях в `supabase/migrations/**` (подключение через
+session-pooler, т.к. прямой хост БД — IPv6-only). Вручную — из корня проекта:
 
-    supabase migration up
+    supabase db push
+
+(`supabase migration up` целится в локальную базу Docker, для боевой нужен
+`db push`; пароль базы запрашивается интерактивно)
 
 Подпись защищает от записей в обход функции (прямые вставки закрыты), но не от
 накрутки через саму функцию — против неё работают лимиты валидации в коде

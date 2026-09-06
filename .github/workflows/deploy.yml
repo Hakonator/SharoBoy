@@ -146,3 +146,46 @@ jobs:
           fi
           echo "Деплой Edge Function «scores» в проект $REF…"
           supabase functions deploy scores --project-ref "$REF"
+
+  # --- Миграции: применение к боевой базе при изменениях в supabase/migrations ---
+  # Прямой хост db.<ref>.supabase.co — IPv6-only, поэтому подключаемся через
+  # session-pooler (IPv4). Нужен секрет SUPABASE_DB_PASSWORD (Supabase →
+  # Project Settings → Database → Database password; спецсимволы — в
+  # URL-кодировке). Без секрета job завершается предупреждением. Ручной запуск
+  # (workflow_dispatch) применяет миграции всегда.
+  apply-migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Есть ли новые миграции в этом пуше?
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/migrations | grep -q .; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Установка Supabase CLI
+        if: steps.changes.outputs.changed == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Применение миграций к боевой базе
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_POOLER_HOST: ${{ secrets.SUPABASE_POOLER_HOST }}
+        run: |
+          if [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "::warning::Секрет SUPABASE_DB_PASSWORD не задан — миграции пропущены. Добавьте его: Settings → Secrets and variables → Actions."
+            exit 0
+          fi
+          REF=$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' supabase/config.toml)
+          HOST="${SUPABASE_POOLER_HOST:-aws-0-eu-central-1.pooler.supabase.com}"
+          DB_URL="postgresql://postgres.${REF}:${SUPABASE_DB_PASSWORD}@${HOST}:5432/postgres"
+          echo "Применение миграций к проекту $REF через session-pooler…"
+          echo "y" | supabase db push --db-url "$DB_URL"
