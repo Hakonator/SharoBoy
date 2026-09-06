@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 # Деплой Supabase-ресурсов: Edge Function «scores» и SQL-миграции.
 # Вынесено из deploy.yml в отдельный workflow: очередь pages там работает с
 # cancel-in-progress (отменять пересборку сайта — нормально), а прерывать
