@@ -176,4 +176,16 @@ describe("dedupeTop — одна позиция топа на игрока", () 
     const rows = [row("Аня", 300), row("Боря", 200), row("Вера", 100)]
     expect(dedupeTop(rows)).toEqual(rows)
   })
+
+  it("хранит рекорды одного игрока в разных категориях экрана независимо", () => {
+    const rows: GlobalScore[] = [
+      { nick: "Игрок", score: 300, wave: 2, screen_class: "fhd" },
+      { nick: "игрок", score: 200, wave: 5, screen_class: "mobile" },
+      { nick: "Игрок", score: 100, wave: 1, screen_class: "mobile" },
+    ]
+    expect(dedupeTop(rows)).toEqual([
+      { nick: "Игрок", score: 300, wave: 2, screen_class: "fhd" },
+      { nick: "игрок", score: 200, wave: 5, screen_class: "mobile" },
+    ])
+  })
 })

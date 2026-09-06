@@ -316,6 +316,18 @@ export function HudOverlay({
   )
 }
 
+/** Короткая метка категории экрана для списка мирового топа «Все». */
+function screenTag(screenClass: string | null | undefined): string | null {
+  if (!screenClass) return null
+  return screenClass === "mobile"
+    ? "моб"
+    : screenClass === "fhd"
+      ? "FHD"
+      : screenClass === "4k"
+        ? "4K"
+        : null
+}
+
 /**
  * Раскрываемая секция меню: свёрнута по умолчанию, чтобы всё важное помещалось
  * в первый экран без прокрутки — и на вертикальном мобильном, и на FHD/4K.
@@ -696,6 +708,11 @@ export function MenuScreen({
                             {i + 1}.
                           </span>
                           <span className="ml-2 min-w-0 truncate text-foam">{s.nick}</span>
+                          {screen === "all" && screenTag(s.screen_class) && (
+                            <span className="ml-1.5 shrink-0 text-[10px] text-dim">
+                              {screenTag(s.screen_class)}
+                            </span>
+                          )}
                           <span className="mx-3 flex-1 border-b border-dotted border-line" />
                           <span className="text-foam tabular-nums">
                             {s.score.toLocaleString("ru-RU")}
@@ -727,6 +744,11 @@ export function MenuScreen({
                           <span className="ml-2 min-w-0 truncate text-foam">{s.nick}</span>
                           {s.wave > 0 && (
                             <span className="ml-1.5 text-[10px] text-dim">волна {s.wave}</span>
+                          )}
+                          {screen === "all" && screenTag(s.screen_class) && (
+                            <span className="ml-1.5 shrink-0 text-[10px] text-dim">
+                              {screenTag(s.screen_class)}
+                            </span>
                           )}
                           <span className="mx-3 flex-1 border-b border-dotted border-line" />
                           <span className="text-foam tabular-nums">
