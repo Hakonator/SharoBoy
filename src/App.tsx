@@ -70,9 +70,10 @@ export default function App() {
   const [globalTop, setGlobalTop] = useState<GlobalScore[]>([])
   const [globalTopEndless, setGlobalTopEndless] = useState<GlobalScore[]>([])
   const [period, setPeriod] = useState<LeadPeriod>("all")
-  const [screen, setScreen] = useState<ScreenFilter>(() =>
-    screenClass(window.innerWidth || 960, window.innerHeight || 640)
-  )
+  /* По умолчанию «Все»: рекорды других категорий (например, мобильный рекорд,
+     открытый с компьютера) видны сразу. Запись при отправке всё равно
+     помечается реальной категорией устройства — сузить список можно фильтром. */
+  const [screen, setScreen] = useState<ScreenFilter>("all")
 
   const [stats, setStats] = useState<PlayerStats>(() => {
     try {
