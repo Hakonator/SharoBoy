@@ -5,23 +5,16 @@
 import type { LayoutSpec, PatternSpec } from "./levels"
 import type { Block, BossState } from "./types"
 import { clamp, fitTilt, rand } from "./utils"
+import { REF_DIAG } from "./viewport"
 
 /**
- * Множитель плотности начальной расстановки блоков в зависимости от
- * разрешения экрана (по диагонали в CSS-пикселях):
- * - мобильные телефоны — существенно реже (0.5);
- * - планшеты/маленькие окна — чуть реже (0.7);
- * - HD/FHD — эталон (1);
- * - большие мониторы/ultrawide — плотнее (1.25);
- * - 4K и выше — значительно плотнее (1.5).
+ * Множитель плотности расстановки блоков. Мир масштабируется единообразно
+ * (см. viewport.ts), поэтому плотность зависит только от пропорций мирового
+ * поля: на эталонном окне 1920×1080 и «пропорциональных» ему экранах — 1,
+ * заметно вытянутые поля мягко корректируются (0.65 — реже, 1.35 — плотнее).
  */
 export function densityFactor(w: number, h: number): number {
-  const diag = Math.hypot(w, h)
-  if (diag <= 1200) return 0.5
-  if (diag <= 1700) return 0.7
-  if (diag <= 3000) return 1
-  if (diag <= 3800) return 1.25
-  return 1.5
+  return clamp(Math.hypot(w, h) / REF_DIAG, 0.65, 1.35)
 }
 
 /** Нормализованная проверка пересечения двух блоков (эллипсы/круги). */
@@ -114,9 +107,16 @@ function makeBlock(opts: {
 }
 
 /** Авторская раскладка в нормализованных координатах → блоки в пикселях поля. */
-export function layoutBlocks(spec: LayoutSpec, w: number, h: number, density = 1): Block[] {
+export function layoutBlocks(
+  spec: LayoutSpec,
+  w: number,
+  h: number,
+  density = 1,
+  /** Верх зоны блоков в мировых единицах; по умолчанию — 14% высоты мира. */
+  topOverride?: number
+): Block[] {
   const margin = clamp(w * 0.055, 22, 72)
-  const top = clamp(h * 0.14, 86, 160)
+  const top = topOverride ?? clamp(h * 0.14, 86, 160)
   const zoneH = clamp(h * 0.42, 220, 420)
   let minX = Infinity
   let maxX = -Infinity
@@ -176,9 +176,16 @@ export function layoutBlocks(spec: LayoutSpec, w: number, h: number, density = 1
 }
 
 /** Процедурная сетка по описанию узора. */
-export function gridBlocks(spec: PatternSpec, w: number, h: number, density = 1): Block[] {
+export function gridBlocks(
+  spec: PatternSpec,
+  w: number,
+  h: number,
+  density = 1,
+  /** Верх зоны блоков в мировых единицах; по умолчанию — 14% высоты мира. */
+  topOverride?: number
+): Block[] {
   const margin = clamp(w * 0.055, 22, 72)
-  const top = clamp(h * 0.14, 86, 160)
+  const top = topOverride ?? clamp(h * 0.14, 86, 160)
   const zoneH = clamp(h * 0.42, 220, 420)
   const rows = Math.max(2, Math.round(spec.rows * density))
   const gap = clamp(zoneH / rows, 46, 78)
@@ -241,9 +248,11 @@ export function buildBossArena(
   minions: number,
   bombs: number,
   w: number,
-  h: number
+  h: number,
+  /** Верх зоны блоков в мировых единицах; по умолчанию — 14% высоты мира. */
+  topOverride?: number
 ): { boss: BossState; blocks: Block[] } {
-  const top = clamp(h * 0.14, 86, 160)
+  const top = topOverride ?? clamp(h * 0.14, 86, 160)
   const r = clamp(Math.min(w, h) * 0.1, 52, 84)
   const baseY = top + r + 34
   const boss: BossState = {

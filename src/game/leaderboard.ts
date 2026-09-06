@@ -20,8 +20,8 @@ export type ScreenClass = "mobile" | "fhd" | "4k"
 export type ScreenFilter = ScreenClass | "all"
 
 /**
- * Класс экрана по разрешению (по диагонали в CSS-пикселях), согласован с
- * плотностью расстановки блоков в levelBuilder.densityFactor:
+ * Класс экрана по диагонали окна в CSS-пикселях — используется только для
+ * разделения мирового топа (очки сравнимы внутри категории):
  * - мобильные (≤≈1700) — телефоны и планшеты;
  * - FHD (≤≈3800) — HD/FullHD/2K и ультраширокие;
  * - 4K (>≈3800) — 4K и выше.
@@ -42,6 +42,22 @@ export interface GlobalScore {
 
 /** URL Edge Function «scores» — единственной точки входа в мировой топ. */
 const API_URL = `${SUPABASE_URL}/functions/v1/scores`
+
+/** Ограничение времени ожидания: зависший запрос (обрыв связи, холодный старт
+ *  функции) не должен навсегда блокировать кнопку «В топ!» и загрузку топа. */
+const FETCH_TIMEOUT_MS = 10_000
+const SUBMIT_TIMEOUT_MS = 15_000
+
+/** fetch с таймаутом через AbortController. */
+async function request(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 /** Заголовки запроса. Anon-ключ публичный по дизайну: он служит JWT для
  *  проверки вызова функции (verify_jwt), прав к таблице у клиента нет. */
@@ -67,15 +83,16 @@ function periodFromIso(period: LeadPeriod): string | null {
 }
 
 /**
- * Одна позиция топа на игрока: повторные попытки схлопываются в лучший
- * результат. Требует строки, отсортированные по score по убыванию, —
- * тогда первая встретившаяся строка ника и есть его рекорд.
- * Регистр ника не учитывается.
+ * Одна позиция топа на игрока в каждой категории экрана: повторные попытки
+ * схлопываются в лучший результат внутри пары «ник + категория». Требует
+ * строки, отсортированные по score по убыванию, — тогда первая встретившаяся
+ * строка ника и есть его рекорд в этой категории. Регистр ника не учитывается;
+ * в топе «Все» игрок занимает по одной позиции на каждую свою категорию.
  */
 export function dedupeTop(rows: GlobalScore[]): GlobalScore[] {
   const seen = new Set<string>()
   return rows.filter((r) => {
-    const key = r.nick.toLowerCase()
+    const key = `${r.nick.toLowerCase()}\u0000${r.screen_class ?? ""}`
     if (seen.has(key)) return false
     seen.add(key)
     return true
@@ -104,7 +121,7 @@ export async function fetchTop(
     if (screen) params.set("screen", screen)
     const from = periodFromIso(period)
     if (from) params.set("from", from)
-    const res = await fetch(`${API_URL}?${params}`, { headers: apiHeaders() })
+    const res = await request(`${API_URL}?${params}`, { headers: apiHeaders() }, FETCH_TIMEOUT_MS)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = (await res.json()) as { rows?: GlobalScore[] }
     return dedupeTop(data.rows ?? []).slice(0, limit)
@@ -129,16 +146,23 @@ export async function submitScore(
 ): Promise<string | null> {
   try {
     if (!LEADERBOARD_ENABLED) return "Таблица рекордов не подключена"
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: apiHeaders(),
-      body: JSON.stringify({ nick, score, mode, wave, screen_class: screen }),
-    })
+    const res = await request(
+      API_URL,
+      {
+        method: "POST",
+        headers: apiHeaders(),
+        body: JSON.stringify({ nick, score, mode, wave, screen_class: screen }),
+      },
+      SUBMIT_TIMEOUT_MS
+    )
     const data = (await res.json().catch(() => null)) as { error?: string } | null
     if (!res.ok) return data?.error || `Ошибка отправки (${res.status})`
     return null
   } catch (e) {
     console.error("[ШАРОБОЙ] не удалось отправить очки:", e)
+    if (e instanceof Error && e.name === "AbortError") {
+      return "Превышено время ожидания — проверьте связь и попробуйте ещё раз"
+    }
     return e instanceof Error ? e.message : String(e)
   }
 }

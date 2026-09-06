@@ -54,6 +54,26 @@ SQL-миграции выполнены в Supabase. Для истории — �
 
 Сервис-воркер регистрируется только в продакшен-сборке, в dev-режиме он отключён.
 
+## Масштабирование под экран
+
+Логика движка считает координаты в «мировых единицах», привязанных к эталонному
+окну 1920×1080 (`src/game/viewport.ts`). При изменении размера окна считается
+один коэффициент `scale = diag(окна) / diag(эталона)` (ограничен 0.4..3), мир
+получает размеры `cssW/scale × cssH/scale`, и канвас рисует всё одним трансформом
+`setTransform(dpr * scale, …)`. Следствия:
+
+- размеры и скорости всех сущностей одни и те же на телефоне, FHD и 4K —
+  на экране отличается только физический размер объектов;
+- отдельные множители скорости для «маленьких» и «4K» экранов не нужны (удалены);
+- плотность расстановки блоков (`densityFactor` в levelBuilder.ts) зависит
+  только от пропорций мирового поля (0.65..1.35), блоки не пересекаются;
+- зона блоков стартует ниже HUD-плашек: их высота (`HUD_TOP_CSS`, CSS px)
+  переводится в мировые единицы делением на `scale` (`Game.blockTop()`);
+- отступ ракетки от нижнего края в тач-режиме задан в CSS-пикселях и переводится
+  в мир делением на `scale` — палец не закрывает ракетку на любом масштабе;
+- категории мирового топа (📱/🖥/4K) остались: они делят таблицу рекордов по
+  физическому размеру экрана, к балансу игры больше не привязаны.
+
 ## Мировая таблица рекордов (Supabase)
 
 Клиент не обращается к базе напрямую: запись и чтение идут через Edge Function
@@ -67,74 +87,82 @@ SQL-миграции выполнены в Supabase. Для истории — �
 - **GET /functions/v1/scores?mode=&screen=&from=&limit=** — топ: функция
   отбрасывает записи с неверной подписью (принимаются и старые — без категории
   экрана) и возвращает строки без подписи. Периоды (день / месяц / всё время)
-  клиент задаёт параметром `from`, схлопывание повторов одного игрока —
-  `dedupeTop` на клиенте.
+  клиент задаёт параметром `from`, схлопывание повторов одного игрока
+  (внутри его категории экрана) — `dedupeTop` на клиенте.
+
+### ⚠️ Важно: синхронизация SCORE_SECRET
+
+`SCORE_SECRET` в секретах Edge Function должен совпадать с прежним
+`VITE_SCORE_SECRET` из `.env`. Если секрет когда-либо будет перегенерирован —
+подписи старых записей «не сойдутся» и весь исторический топ станет невидимым.
+Храните текущее значение в надёжном месте (менеджер паролей / vault).
 
 ### Деплой Edge Function
 
-Выполняется один раз, до пуша этого кода на сайт:
+Выполняется один раз, до пуша этого кода на сайт. Конфиг Supabase CLI
+уже содержит `project_ref` (`supabase/config.toml`), поэтому `--project-ref`
+не нужен:
 
     supabase login
-    supabase link --project-ref <PROJECT_REF>   # Supabase → Project Settings → General
     supabase secrets set SCORE_SECRET=<тот же секрет, что был в .env>
     supabase functions deploy scores
 
 Без CLI — то же в Dashboard: Supabase → _Edge Functions_ → Create function →
 вставить код `supabase/functions/scores/index.ts` и `sig.ts`; затем в
-_Edge Functions → Secrets_ добавить `SCORE_SECRET`. Значение должно совпадать
-с прежним `VITE_SCORE_SECRET` из `.env`, иначе подписи старых записей
-«не сойдутся» и они скроются из топа.
+_Edge Functions → Secrets_ добавить `SCORE_SECRET`.
 
-Миграция, закрывающая таблицу от прямых записей (Supabase → SQL Editor):
+### CI-автоматизация (deploy.yml)
 
-```sql
--- писать может только Edge Function (service role); anon/authenticated — только чтение
-revoke insert, update, delete on table public.sharoboy_scores from anon;
-revoke insert, update, delete on table public.sharoboy_scores from authenticated;
+Пуш в `beta`/`main` пересобирает и публикует сайт. Дополнительно:
 
--- записи до эпохи подписей (client_sig = '') всегда скрывались клиентским
--- фильтром; теперь проверка на сервере — удаляем их
-delete from public.sharoboy_scores where client_sig = '';
-```
+- job `deploy-function` — деплой Edge Function «scores» при изменениях в
+  `supabase/functions/**` (секрет `SUPABASE_ACCESS_TOKEN`; ручной запуск
+  workflow деплоит функцию всегда);
+- job `apply-migrations` — применение SQL-миграций при изменениях в
+  `supabase/migrations/**` (секрет `SUPABASE_DB_PASSWORD`).
+
+Оба секрета добавляются в _Settings → Secrets and variables → Actions_; без
+них соответствующий job завершается предупреждением, не ломая деплой сайта.
+
+### Миграции базы данных
+
+SQL-миграции версионируются в `supabase/migrations/` и применяются порядково:
+
+| Файл                                        | Что делает                                                              |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| `20250101000001_create_sharoboy_scores.sql` | Создание таблицы с базовыми колонками и индексом                        |
+| `20250101000002_add_client_sig.sql`         | Добавление `client_sig` + CHECK-ограничение (длина 0 или 8)             |
+| `20250101000003_add_screen_class.sql`       | Добавление `screen_class` (mobile/fhd/4k)                               |
+| `20250101000004_rls_and_cleanup.sql`        | RLS: только чтение для anon/authenticated; удаление записей без подписи |
+| `20250101000005_best_only_trigger.sql`      | Триггер: одна запись на игрока в каждом режиме                          |
+| `20250101000006_best_only_by_screen.sql`    | Триггер: рекорды одного игрока независимо по категориям экрана          |
+
+Применение: CI делает это автоматически — job `apply-migrations` в deploy.yml
+срабатывает при изменениях в `supabase/migrations/**` (подключение через
+session-pooler, т.к. прямой хост БД — IPv6-only). Вручную — из корня проекта:
+
+    supabase db push
+
+(`supabase migration up` целится в локальную базу Docker, для боевой нужен
+`db push`; пароль базы запрашивается интерактивно)
 
 Подпись защищает от записей в обход функции (прямые вставки закрыты), но не от
 накрутки через саму функцию — против неё работают лимиты валидации в коде
 функции (границы очков и волн, длина ника).
-
-Если таблица уже создана, выполните в Supabase → SQL Editor миграцию:
-
-```sql
--- дата и время записи (используется для периодов «День»/«Месяц»)
-alter table public.sharoboy_scores
-  add column if not exists created_at timestamptz not null default now();
-
-alter table public.sharoboy_scores
-  add column if not exists client_sig text not null default '';
-
--- 0 = старые записи до миграции (будут скрыты из топа), 8 = валидная подпись
-alter table public.sharoboy_scores
-  add constraint sharoboy_scores_sig_len check (char_length(client_sig) in (0, 8));
-```
-
-Новые записи будут попадать в таблицу только с валидной подписью. Подписи
-не защищают от накрутки на 100% (секрет виден в клиентском коде) — это
-защита от случайных злоупотреблений через консоль.
 
 ### Рейтинг по типу экрана
 
 Мировой топ фильтруется по категории экрана: `mobile` (телефоны и планшеты),
 `fhd` (HD/FullHD/2K/ultrawide) и `4k` (4K и выше). Категория определяется
 автоматически по диагонали окна и пишется в колонку `screen_class`; очки
-сравнимы только внутри категории. Миграция:
-
-```sql
-alter table public.sharoboy_scores
-  add column if not exists screen_class text not null default '';
-```
+сравнимы только внутри категории.
 
 Подпись новых записей включает категорию экрана (формат
-`nick:score:mode:wave:screen_class:secret`); старые записи без категории
-продолжают проходить проверку со старой подписью и видны в топе «Все».
+`nick:score:mode:wave:screen_class:secret`). Топ «Все» показывает и новые, и
+старые записи: проверяется подпись с собственной `screen_class` строки (новые)
+или без неё (старые записи до миграции). При выборе конкретной категории
+(fhd/mobile/4k) проходят только записи с совпадающей категорией и валидной
+подписью.
 
 ### Одна запись на игрока
 
@@ -162,14 +190,18 @@ alter table public.sharoboy_scores
     src/config.ts             URL/ключ Supabase (рекордборд)
     src/game/audio.ts         синтезатор звуков (WebAudio)
     src/game/game.ts          движок: физика, уровни, босс, бонусы, прокачка
-    src/game/levelBuilder.ts  генерация уровней (плотность зависит от экрана)
+    src/game/levelBuilder.ts  генерация уровней (плотность зависит от пропорций поля)
+    src/game/viewport.ts      эталонное разрешение 1920×1080 и масштаб мира
     src/game/boss.ts          босс «Царь-шар» (фазы, негативные дропы)
     src/game/powers.ts        бонусы (позитивные и негативные дропы)
     src/game/achievements.ts  12 достижений (условия, localStorage)
     src/game/leaderboard.ts   клиент мирового топа (вызывает Edge Function)
-    src/game/profanity.ts     фильтр запрещённых ников
+    src/game/profanity.ts     ре-экспорт фильтра ников (общий с Edge Function)
     src/ui/screens.tsx        React-экраны (меню, топ, магазин, достижения)
     src/vite-env.d.ts         типы Vite (import.meta.env)
-    supabase/functions/scores Edge Function «scores»: запись и чтение топа
+    supabase/config.toml         конфиг Supabase CLI (project_ref, порты)
+    supabase/migrations/         SQL-миграции базы данных (версионированные)
+    supabase/functions/scores    Edge Function «scores»: запись и чтение топа
+                              (+ общий фильтр ников profanity.ts)
 
 См. также `docs/REFACTORING.md`.

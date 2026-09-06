@@ -126,6 +126,12 @@ describe("validateNick", () => {
     }
   })
 
+  it("отклоняет управляющие символы", () => {
+    for (const bad of ["ник\tимя", "ник\nимя", "ник\x00имя", ""]) {
+      expect(validateNick(bad).ok, `пропустили: ${JSON.stringify(bad)}`).toBe(false)
+    }
+  })
+
   it("отклоняет мат", () => {
     expect(validateNick("xyй").ok).toBe(false)
     expect(validateNick("fuck").ok).toBe(false)

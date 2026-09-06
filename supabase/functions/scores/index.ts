@@ -18,15 +18,26 @@
  * публичный anon-ключ в заголовках apikey/Authorization.
  */
 
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined
+  }
+  serve(handler: (req: Request) => Promise<Response> | Response): void
+}
+
+import { validateNick } from "./profanity.ts"
 import { sigFor, sigMatches, type ScoreMode, type SigRow, type SigScreen } from "./sig.ts"
 
 const MODES: ScoreMode[] = ["campaign", "endless"]
 const SCREENS: SigScreen[] = ["mobile", "fhd", "4k"]
 
+/** Таймаут на исходящие запросы к PostgREST — чтобы функция не висла дольше
+ *  платформенного лимита, если PostgREST завис или недоступен. */
+const REST_TIMEOUT_MS = 5000
+
 /** Грубая отсечка заведомо накрученных значений. */
 const MAX_SCORE = 10_000_000
 const MAX_WAVE = 100_000
-const MAX_NICK = 24
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -71,7 +82,13 @@ async function submitScore(req: Request): Promise<Response> {
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null
   if (!body) return json({ error: "Ожидается JSON-тело" }, 400)
 
-  const nick = typeof body.nick === "string" ? body.nick.trim() : ""
+  /* Фикс 1: серверная валидация ника — та же, что и на клиенте (profanity.ts):
+     длина 2..16, только буквы/цифры/_-./пробел, без мата. Обходы (leet, латинские
+     двойники, разделители) отсекаются на сервере, а не только в UI. */
+  const nickname = validateNick(typeof body.nick === "string" ? body.nick : "")
+  if (!nickname.ok) return json({ error: nickname.error ?? "Некорректный ник" }, 400)
+  const nick = nickname.nick
+
   const score = asInt(body.score, 0, MAX_SCORE)
   const wave = asInt(body.wave, 0, MAX_WAVE)
   const mode = MODES.includes(body.mode as ScoreMode) ? (body.mode as ScoreMode) : null
@@ -79,12 +96,12 @@ async function submitScore(req: Request): Promise<Response> {
     ? (body.screen_class as SigScreen)
     : null
 
-  if (!nick || nick.length > MAX_NICK) return json({ error: "Некорректный ник" }, 400)
   if (score === null) return json({ error: "Некорректные очки" }, 400)
   if (wave === null) return json({ error: "Некорректная волна" }, 400)
   if (!mode) return json({ error: "Некорректный режим" }, 400)
   if (!screen) return json({ error: "Некорректная категория экрана" }, 400)
 
+  /* Фикс 2: таймаут на вставку — иначе зависший PostgREST держал бы функцию. */
   const res = await fetch(`${env.url}/rest/v1/sharoboy_scores`, {
     method: "POST",
     headers: {
@@ -101,6 +118,7 @@ async function submitScore(req: Request): Promise<Response> {
       screen_class: screen,
       client_sig: sigFor(nick, score, mode, wave, screen, env.secret),
     }),
+    signal: AbortSignal.timeout(REST_TIMEOUT_MS),
   })
   if (!res.ok) {
     console.error("[scores] insert failed:", res.status, (await res.text()).slice(0, 300))
@@ -143,6 +161,7 @@ async function fetchTop(req: Request): Promise<Response> {
 
   const res = await fetch(`${env.url}/rest/v1/sharoboy_scores?${rest}`, {
     headers: { apikey: env.key, Authorization: `Bearer ${env.key}` },
+    signal: AbortSignal.timeout(REST_TIMEOUT_MS),
   })
   if (!res.ok) {
     console.error("[scores] select failed:", res.status, (await res.text()).slice(0, 300))
@@ -161,7 +180,7 @@ async function fetchTop(req: Request): Promise<Response> {
   })
 }
 
-Deno.serve((req: Request): Promise<Response> => {
+Deno.serve((req: Request): Promise<Response> | Response => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS })
   if (req.method === "POST") return submitScore(req)
   if (req.method === "GET") return fetchTop(req)
