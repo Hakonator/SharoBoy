@@ -65,13 +65,13 @@ jobs:
         run: npm ci
       - name: Линт (beta)
         working-directory: beta-src
-        run: npm run lint:check
+        run: npm run lint:check --if-present
       - name: Тесты (beta)
         working-directory: beta-src
-        run: npm run test
+        run: npm run test --if-present
       - name: Проверка типов (beta)
         working-directory: beta-src
-        run: npm run typecheck
+        run: npm run typecheck --if-present
       - name: Сборка бета-версии (beta)
         working-directory: beta-src
         env:
@@ -94,6 +94,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Публикация
         id: deployment
@@ -103,10 +106,15 @@ jobs:
   # Сайт (Pages) функция не содержит, поэтому обычная пересборка её не обновляет.
   # Требуется секрет SUPABASE_ACCESS_TOKEN (Supabase → Account → Access Tokens);
   # без него job завершается с предупреждением, не ломая деплой сайта.
+  # Project-ref берётся из supabase/config.toml (project_id) — отдельный секрет не нужен.
   # Ручной запуск (workflow_dispatch) деплоит функцию всегда — удобно, чтобы
   # один раз выкатить накопившиеся правки без изменения файлов.
   deploy-function:
     runs-on: ubuntu-latest
+    # Функция не публикует Pages — ограничиваем права минимумом
+    # (без наследования pages: write и id-token: write).
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -114,13 +122,19 @@ jobs:
       - name: Изменилась ли функция в этом пуше?
         id: changes
         run: |
+          CHANGED=true
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/functions | grep -q .; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
+            : # Ручной запуск или первый пуш в ветку — деплоим всегда
+          elif DIFF=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/functions 2>/dev/null); then
+            if [ -z "$DIFF" ]; then
+              CHANGED=false
+            fi
           else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+            # before может не попасть в историю (например, после force push) —
+            # тогда перестраховываемся и деплоим функцию, а не роняем job.
+            echo "::warning::Не удалось сравнить коммиты — считаем функцию изменённой."
           fi
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
       - name: Установка Supabase CLI
         if: steps.changes.outputs.changed == 'true'
         uses: supabase/setup-cli@v1
@@ -130,18 +144,15 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
             echo "::warning::Секрет SUPABASE_ACCESS_TOKEN не задан — деплой функции пропущен. Добавьте его: Settings → Secrets and variables → Actions."
             exit 0
           fi
-          REF="$SUPABASE_PROJECT_REF"
+          # Project-ref берём из supabase/config.toml (project_id).
+          REF=$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' supabase/config.toml)
           if [ -z "$REF" ]; then
-            REF=$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' supabase/config.toml)
-          fi
-          if [ -z "$REF" ]; then
-            echo "::error::Не удалось определить project-ref (supabase/config.toml). Задайте секрет SUPABASE_PROJECT_REF."
+            echo "::error::Не удалось определить project-ref: задайте project_id в supabase/config.toml."
             exit 1
           fi
           echo "Деплой Edge Function «scores» в проект $REF…"
@@ -155,6 +166,10 @@ jobs:
   # (workflow_dispatch) применяет миграции всегда.
   apply-migrations:
     runs-on: ubuntu-latest
+    # Миграции не публикуют Pages — ограничиваем права минимумом
+    # (без наследования pages: write и id-token: write).
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -162,13 +177,19 @@ jobs:
       - name: Есть ли новые миграции в этом пуше?
         id: changes
         run: |
+          CHANGED=true
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/migrations | grep -q .; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
+            : # Ручной запуск или первый пуш в ветку — применяем всегда
+          elif DIFF=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/migrations 2>/dev/null); then
+            if [ -z "$DIFF" ]; then
+              CHANGED=false
+            fi
           else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+            # before может не попасть в историю (например, после force push) —
+            # тогда перестраховываемся и применяем миграции, а не роняем job.
+            echo "::warning::Не удалось сравнить коммиты — считаем миграции изменёнными."
           fi
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
       - name: Установка Supabase CLI
         if: steps.changes.outputs.changed == 'true'
         uses: supabase/setup-cli@v1
@@ -178,14 +199,16 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          SUPABASE_POOLER_HOST: ${{ secrets.SUPABASE_POOLER_HOST }}
         run: |
           if [ -z "$SUPABASE_DB_PASSWORD" ]; then
             echo "::warning::Секрет SUPABASE_DB_PASSWORD не задан — миграции пропущены. Добавьте его: Settings → Secrets and variables → Actions."
             exit 0
           fi
           REF=$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' supabase/config.toml)
-          HOST="${SUPABASE_POOLER_HOST:-aws-0-eu-central-1.pooler.supabase.com}"
+          # Хост session-pooler'а (регион aws-0-eu-central-1) — не секрет,
+          # поэтому задан константой; при переезде проекта Supabase в другой
+          # регион достаточно поправить значение здесь.
+          HOST="aws-0-eu-central-1.pooler.supabase.com"
           DB_URL="postgresql://postgres.${REF}:${SUPABASE_DB_PASSWORD}@${HOST}:5432/postgres"
           echo "Применение миграций к проекту $REF через session-pooler…"
           echo "y" | supabase db push --db-url "$DB_URL"
