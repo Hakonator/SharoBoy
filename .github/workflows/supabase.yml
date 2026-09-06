@@ -1,0 +1,129 @@
+# Деплой Supabase-ресурсов: Edge Function «scores» и SQL-миграции.
+# Вынесено из deploy.yml в отдельный workflow: очередь pages там работает с
+# cancel-in-progress (отменять пересборку сайта — нормально), а прерывать
+# выполняющийся supabase db push к боевой базе нельзя. Здесь обратная
+# политика: новый пуш просто ждёт своей очереди, повторные применения
+# идемпотентны (db push накатывает только неоткатанные миграции).
+name: Supabase (функции и миграции)
+
+on:
+  push:
+    branches: [beta, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase
+  cancel-in-progress: false
+
+jobs:
+  # --- Edge Function «scores»: деплой при изменениях в supabase/functions ---
+  # Сайт (Pages) функция не содержит, поэтому обычная пересборка её не обновляет.
+  # Требуется секрет SUPABASE_ACCESS_TOKEN (Supabase → Account → Access Tokens);
+  # без него job завершается с предупреждением, не ломая остальной CI.
+  # Project-ref берётся из supabase/config.toml (project_id) — отдельный секрет не нужен.
+  # Ручной запуск (workflow_dispatch) деплоит функцию всегда — удобно, чтобы
+  # один раз выкатить накопившиеся правки без изменения файлов.
+  deploy-function:
+    runs-on: ubuntu-latest
+    # Минимальные права: чтение кода — больше ничего не нужно.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Изменилась ли функция в этом пуше?
+        id: changes
+        run: |
+          CHANGED=true
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            : # Ручной запуск или первый пуш в ветку — деплоим всегда
+          elif DIFF=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/functions 2>/dev/null); then
+            if [ -z "$DIFF" ]; then
+              CHANGED=false
+            fi
+          else
+            # before может не попасть в историю (например, после force push) —
+            # тогда перестраховываемся и деплоим функцию, а не роняем job.
+            echo "::warning::Не удалось сравнить коммиты — считаем функцию изменённой."
+          fi
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+      - name: Установка Supabase CLI
+        if: steps.changes.outputs.changed == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Деплой Edge Function «scores»
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::warning::Секрет SUPABASE_ACCESS_TOKEN не задан — деплой функции пропущен. Добавьте его: Settings → Secrets and variables → Actions."
+            exit 0
+          fi
+          # Project-ref берём из supabase/config.toml (project_id).
+          REF=$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' supabase/config.toml)
+          if [ -z "$REF" ]; then
+            echo "::error::Не удалось определить project-ref: задайте project_id в supabase/config.toml."
+            exit 1
+          fi
+          echo "Деплой Edge Function «scores» в проект $REF…"
+          supabase functions deploy scores --project-ref "$REF"
+
+  # --- Миграции: применение к боевой базе при изменениях в supabase/migrations ---
+  # Прямой хост db.<ref>.supabase.co — IPv6-only, поэтому подключаемся через
+  # session-pooler (IPv4). Нужен секрет SUPABASE_DB_PASSWORD (Supabase →
+  # Project Settings → Database → Database password; спецсимволы — в
+  # URL-кодировке). Без секрета job завершается предупреждением. Ручной запуск
+  # (workflow_dispatch) применяет миграции всегда.
+  apply-migrations:
+    runs-on: ubuntu-latest
+    # Минимальные права: чтение кода — больше ничего не нужно.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Есть ли новые миграции в этом пуше?
+        id: changes
+        run: |
+          CHANGED=true
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            : # Ручной запуск или первый пуш в ветку — применяем всегда
+          elif DIFF=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/migrations 2>/dev/null); then
+            if [ -z "$DIFF" ]; then
+              CHANGED=false
+            fi
+          else
+            # before может не попасть в историю (например, после force push) —
+            # тогда перестраховываемся и применяем миграции, а не роняем job.
+            echo "::warning::Не удалось сравнить коммиты — считаем миграции изменёнными."
+          fi
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+      - name: Установка Supabase CLI
+        if: steps.changes.outputs.changed == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Применение миграций к боевой базе
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          if [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "::warning::Секрет SUPABASE_DB_PASSWORD не задан — миграции пропущены. Добавьте его: Settings → Secrets and variables → Actions."
+            exit 0
+          fi
+          REF=$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' supabase/config.toml)
+          # Хост session-pooler'а (регион aws-0-eu-central-1) — не секрет,
+          # поэтому задан константой; при переезде проекта Supabase в другой
+          # регион достаточно поправить значение здесь.
+          HOST="aws-0-eu-central-1.pooler.supabase.com"
+          DB_URL="postgresql://postgres.${REF}:${SUPABASE_DB_PASSWORD}@${HOST}:5432/postgres"
+          echo "Применение миграций к проекту $REF через session-pooler…"
+          echo "y" | supabase db push --db-url "$DB_URL"

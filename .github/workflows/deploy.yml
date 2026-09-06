@@ -5,20 +5,67 @@ on:
     branches: [beta, main]
   workflow_dispatch:
 
+# Минимальные права на уровне workflow; более широкие выдаются точечно
+# тем job'ам, которым они действительно нужны (publish, deploy).
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  # --- Какие версии пересобирать в этом прогоне ---
+  # Пуш в ветку пересобирает только её версию; вторая берётся из последней
+  # зелёной сборки (job publish). Ручной запуск, первый пуш в ветку или
+  # отсутствие нужного артефакта (бустрап) — строим обе версии.
+  changes:
     runs-on: ubuntu-latest
+    # Список артефактов прошлых прогонов читаем через gh api
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      stable: ${{ steps.decide.outputs.stable }}
+      beta: ${{ steps.decide.outputs.beta }}
     steps:
-      # --- Стабильная версия (main) → корень сайта ---
+      - name: Какие версии нужно пересобрать?
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          artifact_exists() {
+            local id
+            id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=$1&per_page=100" \
+              --jq '[.artifacts[] | select(.expired == false)][0].id' 2>/dev/null || true)
+            [ -n "$id" ] && [ "$id" != "null" ]
+          }
+
+          STABLE=true
+          BETA=true
+          ZERO=0000000000000000000000000000000000000000
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.before }}" = "$ZERO" ]; then
+            : # Ручной запуск или первый пуш в ветку — бустрап, строим обе версии
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            BETA=false
+            artifact_exists site-beta || BETA=true
+          elif [ "${{ github.ref_name }}" = "beta" ]; then
+            STABLE=false
+            artifact_exists site-stable || STABLE=true
+          else
+            echo "::warning::Неожиданная ветка «${{ github.ref_name }}» — для надёжности строим обе версии."
+          fi
+          echo "stable=$STABLE" >> "$GITHUB_OUTPUT"
+          echo "beta=$BETA" >> "$GITHUB_OUTPUT"
+
+  # --- Стабильная версия (main) → корень сайта ---
+  build-stable:
+    needs: changes
+    if: needs.changes.outputs.stable == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
       - uses: actions/checkout@v4
         with:
           ref: main
@@ -47,10 +94,20 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
-      - name: Перенос в корень сайта
-        run: mv main-src/dist site
+      - name: Загрузка артефакта стабильной версии
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-stable
+          path: main-src/dist
 
-      # --- Бета-версия (beta) → подкаталог /beta/ ---
+  # --- Бета-версия (beta) → подкаталог /beta/ ---
+  build-beta:
+    needs: changes
+    if: needs.changes.outputs.beta == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
       - uses: actions/checkout@v4
         with:
           ref: beta
@@ -79,21 +136,92 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
-      - name: Перенос в подкаталог /beta/
-        run: mv beta-src/dist site/beta
+      - name: Загрузка артефакта бета-версии
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-beta
+          path: beta-src/dist
 
+  # --- Склейка сайта и подготовка артефакта Pages ---
+  # Деплой Pages атомарен: артефакт заменяет сайт ЦЕЛИКОМ, поэтому в site/
+  # всегда кладутся ОБЕ версии. Свежие — из этого прогона; если сборка ветки
+  # пропущена (пуш в другую ветку) или упала — берём её последнюю рабочую
+  # сборку из прошлых прогонов. Так упавший main не блокирует бету (и
+  # наоборот), а корень и /beta/ никогда не публикуются пустыми или битыми.
+  publish:
+    needs: [build-stable, build-beta]
+    # Нужен хотя бы один успешно собранный артефакт этого прогона: остальную
+    # версию в site/ подтянут шаги-фолбэки ниже (независимо от того, упала
+    # вторая сборка или была пропущена).
+    if: >-
+      ${{
+        always() && !cancelled() &&
+        (needs.build-stable.result == 'success' || needs.build-beta.result == 'success')
+      }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Свежая сборка main → корень сайта
+        if: needs.build-stable.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: site-stable
+          path: site
+      - name: Фолбэк — последняя зелёная сборка main
+        if: needs.build-stable.result != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ART_ID=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=site-stable&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)][0].id' 2>/dev/null || true)
+          if [ -z "$ART_ID" ] || [ "$ART_ID" = "null" ]; then
+            echo "::error::Сборка main в этом прогоне не выполнялась, а прошлой зелёной сборки нет — корень сайта нечем заполнить."
+            exit 1
+          fi
+          echo "Используем артефакт #$ART_ID последней зелёной сборки main."
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip" > /tmp/site-stable.zip
+          mkdir -p site
+          unzip -q /tmp/site-stable.zip -d site
+      - name: Свежая сборка beta → /beta/
+        if: needs.build-beta.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: site-beta
+          path: site/beta
+      - name: Фолбэк — последняя зелёная сборка beta
+        if: needs.build-beta.result != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ART_ID=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=site-beta&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)][0].id' 2>/dev/null || true)
+          if [ -z "$ART_ID" ] || [ "$ART_ID" = "null" ]; then
+            echo "::error::Сборка beta в этом прогоне не выполнялась, а прошлой зелёной сборки нет — /beta/ нечем заполнить."
+            exit 1
+          fi
+          echo "Используем артефакт #$ART_ID последней зелёной сборки beta."
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip" > /tmp/site-beta.zip
+          mkdir -p site/beta
+          unzip -q /tmp/site-beta.zip -d site/beta
       - name: Настройка Pages
         uses: actions/configure-pages@v5
         with:
           enablement: true
-      - name: Загрузка артефакта
+      - name: Загрузка артефакта Pages
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
   deploy:
-    needs: build
+    needs: publish
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -101,114 +229,3 @@ jobs:
       - name: Публикация
         id: deployment
         uses: actions/deploy-pages@v4
-
-  # --- Edge Function «scores»: деплой при изменениях в supabase/functions ---
-  # Сайт (Pages) функция не содержит, поэтому обычная пересборка её не обновляет.
-  # Требуется секрет SUPABASE_ACCESS_TOKEN (Supabase → Account → Access Tokens);
-  # без него job завершается с предупреждением, не ломая деплой сайта.
-  # Project-ref берётся из supabase/config.toml (project_id) — отдельный секрет не нужен.
-  # Ручной запуск (workflow_dispatch) деплоит функцию всегда — удобно, чтобы
-  # один раз выкатить накопившиеся правки без изменения файлов.
-  deploy-function:
-    runs-on: ubuntu-latest
-    # Функция не публикует Pages — ограничиваем права минимумом
-    # (без наследования pages: write и id-token: write).
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Изменилась ли функция в этом пуше?
-        id: changes
-        run: |
-          CHANGED=true
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
-            : # Ручной запуск или первый пуш в ветку — деплоим всегда
-          elif DIFF=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/functions 2>/dev/null); then
-            if [ -z "$DIFF" ]; then
-              CHANGED=false
-            fi
-          else
-            # before может не попасть в историю (например, после force push) —
-            # тогда перестраховываемся и деплоим функцию, а не роняем job.
-            echo "::warning::Не удалось сравнить коммиты — считаем функцию изменённой."
-          fi
-          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
-      - name: Установка Supabase CLI
-        if: steps.changes.outputs.changed == 'true'
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-      - name: Деплой Edge Function «scores»
-        if: steps.changes.outputs.changed == 'true'
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
-            echo "::warning::Секрет SUPABASE_ACCESS_TOKEN не задан — деплой функции пропущен. Добавьте его: Settings → Secrets and variables → Actions."
-            exit 0
-          fi
-          # Project-ref берём из supabase/config.toml (project_id).
-          REF=$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' supabase/config.toml)
-          if [ -z "$REF" ]; then
-            echo "::error::Не удалось определить project-ref: задайте project_id в supabase/config.toml."
-            exit 1
-          fi
-          echo "Деплой Edge Function «scores» в проект $REF…"
-          supabase functions deploy scores --project-ref "$REF"
-
-  # --- Миграции: применение к боевой базе при изменениях в supabase/migrations ---
-  # Прямой хост db.<ref>.supabase.co — IPv6-only, поэтому подключаемся через
-  # session-pooler (IPv4). Нужен секрет SUPABASE_DB_PASSWORD (Supabase →
-  # Project Settings → Database → Database password; спецсимволы — в
-  # URL-кодировке). Без секрета job завершается предупреждением. Ручной запуск
-  # (workflow_dispatch) применяет миграции всегда.
-  apply-migrations:
-    runs-on: ubuntu-latest
-    # Миграции не публикуют Pages — ограничиваем права минимумом
-    # (без наследования pages: write и id-token: write).
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Есть ли новые миграции в этом пуше?
-        id: changes
-        run: |
-          CHANGED=true
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
-            : # Ручной запуск или первый пуш в ветку — применяем всегда
-          elif DIFF=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/migrations 2>/dev/null); then
-            if [ -z "$DIFF" ]; then
-              CHANGED=false
-            fi
-          else
-            # before может не попасть в историю (например, после force push) —
-            # тогда перестраховываемся и применяем миграции, а не роняем job.
-            echo "::warning::Не удалось сравнить коммиты — считаем миграции изменёнными."
-          fi
-          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
-      - name: Установка Supabase CLI
-        if: steps.changes.outputs.changed == 'true'
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-      - name: Применение миграций к боевой базе
-        if: steps.changes.outputs.changed == 'true'
-        env:
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: |
-          if [ -z "$SUPABASE_DB_PASSWORD" ]; then
-            echo "::warning::Секрет SUPABASE_DB_PASSWORD не задан — миграции пропущены. Добавьте его: Settings → Secrets and variables → Actions."
-            exit 0
-          fi
-          REF=$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' supabase/config.toml)
-          # Хост session-pooler'а (регион aws-0-eu-central-1) — не секрет,
-          # поэтому задан константой; при переезде проекта Supabase в другой
-          # регион достаточно поправить значение здесь.
-          HOST="aws-0-eu-central-1.pooler.supabase.com"
-          DB_URL="postgresql://postgres.${REF}:${SUPABASE_DB_PASSWORD}@${HOST}:5432/postgres"
-          echo "Применение миграций к проекту $REF через session-pooler…"
-          echo "y" | supabase db push --db-url "$DB_URL"

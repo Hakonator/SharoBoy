@@ -111,18 +111,26 @@ SQL-миграции выполнены в Supabase. Для истории — �
 вставить код `supabase/functions/scores/index.ts` и `sig.ts`; затем в
 _Edge Functions → Secrets_ добавить `SCORE_SECRET`.
 
-### CI-автоматизация (deploy.yml)
+### CI-автоматизация (deploy.yml и supabase.yml)
 
-Пуш в `beta`/`main` пересобирает и публикует сайт. Дополнительно:
+CI состоит из двух workflow, оба запускаются пушем в `beta`/`main` и вручную
+(workflow_dispatch):
 
-- job `deploy-function` — деплой Edge Function «scores» при изменениях в
-  `supabase/functions/**` (секрет `SUPABASE_ACCESS_TOKEN`; ручной запуск
-  workflow деплоит функцию всегда);
-- job `apply-migrations` — применение SQL-миграций при изменениях в
-  `supabase/migrations/**` (секрет `SUPABASE_DB_PASSWORD`).
+- `.github/workflows/deploy.yml` — сборка и публикация сайта (GitHub Pages):
+  `main` → корень, `beta` → `/beta/`. Пересобирается только версия той ветки,
+  которая была обновлена; вторая берётся из последней зелёной сборки, поэтому
+  упавшая сборка одной ветки не блокирует публикацию другой.
+- `.github/workflows/supabase.yml`:
+  - job `deploy-function` — деплой Edge Function «scores» при изменениях в
+    `supabase/functions/**` (секрет `SUPABASE_ACCESS_TOKEN`; ручной запуск
+    workflow деплоит функцию всегда);
+  - job `apply-migrations` — применение SQL-миграций при изменениях в
+    `supabase/migrations/**` (секрет `SUPABASE_DB_PASSWORD`).
 
 Оба секрета добавляются в _Settings → Secrets and variables → Actions_; без
-них соответствующий job завершается предупреждением, не ломая деплой сайта.
+них соответствующий job завершается предупреждением, не ломая остальной CI.
+Миграции и деплой функции идут в отдельной очереди и никогда не отменяются
+новым пушем (в отличие от пересборки сайта, где отмена — норм).
 
 ### Миграции базы данных
 
@@ -137,7 +145,7 @@ SQL-миграции версионируются в `supabase/migrations/` и �
 | `20250101000005_best_only_trigger.sql`      | Триггер: одна запись на игрока в каждом режиме                          |
 | `20250101000006_best_only_by_screen.sql`    | Триггер: рекорды одного игрока независимо по категориям экрана          |
 
-Применение: CI делает это автоматически — job `apply-migrations` в deploy.yml
+Применение: CI делает это автоматически — job `apply-migrations` в supabase.yml
 срабатывает при изменениях в `supabase/migrations/**` (подключение через
 session-pooler, т.к. прямой хост БД — IPv6-only). Вручную — из корня проекта:
 
