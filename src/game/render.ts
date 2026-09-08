@@ -300,11 +300,11 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
       byId.set(t.tentacleId, arr)
     }
     const segColor = (t: (typeof tentacles)[0]) => {
-      // Цвет сегмента по здоровью босса — темнее, когда босс ранен.
-      const frac = clamp(bo!.hp / bo!.maxHp, 0, 1)
-      if (frac > 0.55) return `rgba(93,255,176,${0.7 + t.tentacleSeg! * 0.05})`
-      if (frac > 0.25) return `rgba(255,201,77,${0.7 + t.tentacleSeg! * 0.05})`
-      return `rgba(255,83,71,${0.7 + t.tentacleSeg! * 0.05})`
+      // Цвет сегмента по его собственному здоровью — темнее, когда сегмент повреждён.
+      const frac = clamp((t.hp ?? 1) / (t.maxHp ?? 1), 0, 1)
+      if (frac > 0.6) return `rgba(93,255,176,${0.85})`
+      if (frac > 0.3) return `rgba(255,201,77,${0.8})`
+      return `rgba(255,70,70,${0.75})`
     }
     for (const segs of byId.values()) {
       // Рисуем связи между сегментами (линии).

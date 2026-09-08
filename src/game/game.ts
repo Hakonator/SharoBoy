@@ -697,7 +697,7 @@ export class Game {
       x: this.w / 2,
       y: this.h * 0.28,
       baseY: this.h * 0.28,
-      r: 40,
+      r: 52,
       hp: octoHp,
       maxHp: octoHp,
       t: 0,

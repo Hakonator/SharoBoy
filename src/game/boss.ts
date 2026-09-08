@@ -64,11 +64,11 @@ export class BossSystem {
     // Щупальца осьминога: сегменты начинаются от кольца здоровья босса и
     // извиваются по длине, как змея. Каждый сегмент запаздывает по фазе,
     // создавая волновое движение от базы к кончику.
-    const SEG_SPACING = 24
+    const SEG_SPACING = 28
     const SEG_COUNT = 4
-    const HEALTH_RING_R = 14 // радиус кольца здоровья (r+14 от центра босса)
+    const HEALTH_RING_R = 18 // радиус кольца здоровья (r+18 от центра босса)
     const TENTACLE_LENGTH = SEG_COUNT * SEG_SPACING
-    const WAVE_AMP = 18 // амплитуда изгиба (растёт к кончику)
+    const WAVE_AMP = 16 // амплитуда изгиба (растёт к кончику)
     const WAVE_SPEED = 1.3 // скорость распространения волны
     for (const b of this.g.blocks) {
       const orb = b.tentacleOrbit
@@ -82,7 +82,7 @@ export class BossSystem {
       const phase = orb.seg * 0.9 // фазовый сдвиг по сегментам
       const wave = Math.sin(bo.t * WAVE_SPEED + phase) * WAVE_AMP * segT
       const dirX = Math.cos(orb.ang)
-      const dirY = Math.sin(orb.ang) * 0.5
+      const dirY = Math.sin(orb.ang)
       // Базовая точка — на кольце здоровья босса (внешняя окружность)
       const baseR = bo.r + HEALTH_RING_R
       const baseX = bo.x + dirX * baseR
