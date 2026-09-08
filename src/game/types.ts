@@ -68,6 +68,12 @@ export interface Block {
   minionOrbit?: { ang: number; rad: number; dir: number; speed: number }
   /** Щупальце босса-осьминога: нужно уничтожить прежде чем наносить урон телу. */
   isTentacle?: boolean
+  /** Идентификатор щупальца (0..tentacleCount-1), чтобы группировать сегменты. */
+  tentacleId?: number
+  /** Номер сегмента вдоль щупальца (0 = база, N = кончик). undefined = не сегмент. */
+  tentacleSeg?: number
+  /** Параметры орбиты щупальца (вращение вокруг босса). */
+  tentacleOrbit?: { ang: number; rad: number; dir: number; speed: number; seg: number }
   /** Скорость бомбы по X (для бомб осьминога). */
   bombVx?: number
   /** Скорость бомбы по Y (для бомб осьминога). */

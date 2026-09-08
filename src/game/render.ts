@@ -198,7 +198,7 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
   }
 }
 
-export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[]) {
+export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks: Block[]) {
   const bo = boss
   if (!bo) return
   const angry = bo.hp < bo.maxHp * 0.4
@@ -286,6 +286,72 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[]) {
   }
   ctx.stroke()
   ctx.restore()
+
+  // Щупальца осьминога — сегменты-шарики вдоль луча от центра.
+  if (bo.isOctopus) {
+    const tentacles = blocks.filter((b) => b.isTentacle && !b.dead) as (Block & {
+      tentacleId: number
+      tentacleSeg: number
+    })[]
+    const byId = new Map<number, typeof tentacles>()
+    for (const t of tentacles) {
+      const arr = byId.get(t.tentacleId) ?? []
+      arr.push(t)
+      byId.set(t.tentacleId, arr)
+    }
+    const segColor = (t: (typeof tentacles)[0]) => {
+      // Цвет сегмента по здоровью босса — темнее, когда босс ранен.
+      const frac = clamp(bo!.hp / bo!.maxHp, 0, 1)
+      if (frac > 0.55) return `rgba(93,255,176,${0.7 + t.tentacleSeg! * 0.05})`
+      if (frac > 0.25) return `rgba(255,201,77,${0.7 + t.tentacleSeg! * 0.05})`
+      return `rgba(255,83,71,${0.7 + t.tentacleSeg! * 0.05})`
+    }
+    for (const segs of byId.values()) {
+      // Рисуем связи между сегментами (линии).
+      if (segs.length > 1) {
+        segs.sort((a, b) => a.tentacleSeg! - b.tentacleSeg!)
+        ctx.strokeStyle = "rgba(40,40,60,0.55)"
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.moveTo(segs[0].x, segs[0].y)
+        for (let k = 1; k < segs.length; k++) {
+          ctx.lineTo(segs[k].x, segs[k].y)
+        }
+        ctx.stroke()
+      }
+      // Рисуем сегменты-шарики.
+      for (const seg of segs) {
+        const r = seg.rx
+        ctx.save()
+        ctx.shadowColor = segColor(seg)
+        ctx.shadowBlur = 14
+        const g = ctx.createRadialGradient(
+          seg.x - r * 0.3,
+          seg.y - r * 0.3,
+          1,
+          seg.x,
+          seg.y,
+          r * 1.2
+        )
+        g.addColorStop(0, "#ffffff")
+        g.addColorStop(0.45, segColor(seg))
+        g.addColorStop(1, "rgba(30,20,40,0.55)")
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.arc(seg.x, seg.y, r, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.shadowBlur = 0
+        // У Yank-уцепление с колой — постепенно светится.
+        if (seg.hp < seg.maxHp) {
+          ctx.fillStyle = `rgba(255,255,255,${(1 - seg.hp / seg.maxHp) * 0.4})`
+          ctx.beginPath()
+          ctx.arc(seg.x, seg.y, r * 0.5, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        ctx.restore()
+      }
+    }
+  }
 }
 
 export function drawRings(ctx: Ctx, rings: Ring[]) {

@@ -622,41 +622,76 @@ export class Game {
   /** Босс-осьминог: тело + щупальца, которые нужно уничтожить первыми. */
   private buildOctopusBoss(): BossState {
     const octoHp = 50
-    // Создаём щупальца вокруг тела босса
+    // Создаём щупальца вокруг тела босса — каждый из нескольких сегментов-шариков,
+    // уменьшающихся к концу, как провода. Сегменты начинаются от кольца здоровья
+    // босса и извиваются по длине, как змея.
     const tentacleCount = 6
-    const orbitRadius = 90
+    const SEG_COUNT = 4
+    const SEG_RADII = [20, 15, 10, 5] // от базы к кончику
+    const SEG_SPACING = 24 // расстояние между центрами сегментов
+    const TENTACLE_LENGTH = SEG_COUNT * SEG_SPACING // ~96px
+    const HEALTH_RING_R = 14 // радиус кольца здоровья (r + 14)
+    const WAVE_AMP = 18
+    const WAVE_SPEED = 1.3
     for (let i = 0; i < tentacleCount; i++) {
+      // Направление от центра босса к точке прикрепления щупальца.
       const ang = (i / tentacleCount) * Math.PI * 2
-      const tx = this.w / 2 + Math.cos(ang) * orbitRadius
-      const ty = this.h * 0.28 + Math.sin(ang) * orbitRadius * 0.5
-      this.blocks.push({
-        x: tx,
-        y: ty,
-        rx: 24,
-        ry: 24,
-        rot: 0,
-        circle: true,
-        hp: 5,
-        maxHp: 5,
-        tier: 2,
-        flash: 0,
-        seed: Math.random() * 1000,
-        dead: false,
-        x0: tx,
-        swayAmp: 0,
-        swayFreq: 0,
-        swayPh: 0,
-        bomb: false,
-        splits: false,
-        minionOrbit: {
-          ang,
-          rad: orbitRadius,
-          dir: 1,
-          speed: 0.8,
-        },
-        // Помечаем как щупальце осьминога
-        isTentacle: true,
-      } as Block & { isTentacle: true })
+      // Точка на кольце здоровья босса (внешняя окружность r+14)
+      const bodyX = this.w / 2
+      const bodyY = this.h * 0.28
+      const dirX = Math.cos(ang)
+      const dirY = Math.sin(ang) * 0.5
+      const baseR = 40 + HEALTH_RING_R // r босса + радиус кольца здоровья
+      const baseX = bodyX + dirX * baseR
+      const baseY = bodyY + dirY * baseR
+      for (let seg = 0; seg < SEG_COUNT; seg++) {
+        // Прогресс по длине щупальца (0.25 = первый сегмент, 1 = кончик).
+        const segT = (seg + 1) / SEG_COUNT
+        const along = segT * TENTACLE_LENGTH
+        // Волновое отклонение при спавне (используем t=0 для начальной фазы).
+        const phase = seg * 0.9
+        const wave = Math.sin(0 * WAVE_SPEED + phase) * WAVE_AMP * segT
+        const perpX = -dirY
+        const perpY = dirX
+        const bx = baseX + dirX * along + perpX * wave
+        const by = baseY + dirY * along + perpY * wave
+        this.blocks.push({
+          x: bx,
+          y: by,
+          rx: SEG_RADII[seg],
+          ry: SEG_RADII[seg],
+          rot: 0,
+          circle: true,
+          hp: seg === SEG_COUNT - 1 ? 2 : 4,
+          maxHp: seg === SEG_COUNT - 1 ? 2 : 4,
+          tier: 2,
+          flash: 0,
+          seed: Math.random() * 1000 + seg * 100,
+          dead: false,
+          x0: bx,
+          swayAmp: 0,
+          swayFreq: 0,
+          swayPh: 0,
+          bomb: false,
+          splits: false,
+          minionOrbit: {
+            ang,
+            rad: 90,
+            dir: 1,
+            speed: 0.8,
+          },
+          isTentacle: true,
+          tentacleId: i,
+          tentacleSeg: seg,
+          tentacleOrbit: {
+            ang,
+            rad: 90,
+            dir: 1,
+            speed: 0.8,
+            seg: seg,
+          },
+        } as Block & { isTentacle: true; tentacleId: number; tentacleSeg: number })
+      }
     }
     return {
       x: this.w / 2,
@@ -1381,7 +1416,7 @@ export class Game {
     drawBackground(ctx, w, h, this.combo, this.bubbles)
     drawShieldLine(ctx, w, h, this.time, this.shield, this.phase === "menu")
     drawBlocks(ctx, this.blocks, this.time)
-    drawBoss(ctx, this.bossSys.boss, this.balls)
+    drawBoss(ctx, this.bossSys.boss, this.balls, this.blocks)
     drawRings(ctx, this.fx.rings)
     drawPowers(ctx, this.powers)
     drawLaserBeams(ctx, {

@@ -61,6 +61,39 @@ export class BossSystem {
       b.x = clamp(bo.x + Math.cos(m.ang) * m.rad, b.rx + 4, this.g.w - b.rx - 4)
       b.y = clamp(bo.y + Math.sin(m.ang) * m.rad * 0.55, b.ry + 4, this.g.h * 0.8)
     }
+    // Щупальца осьминога: сегменты начинаются от кольца здоровья босса и
+    // извиваются по длине, как змея. Каждый сегмент запаздывает по фазе,
+    // создавая волновое движение от базы к кончику.
+    const SEG_SPACING = 24
+    const SEG_COUNT = 4
+    const HEALTH_RING_R = 14 // радиус кольца здоровья (r+14 от центра босса)
+    const TENTACLE_LENGTH = SEG_COUNT * SEG_SPACING
+    const WAVE_AMP = 18 // амплитуда изгиба (растёт к кончику)
+    const WAVE_SPEED = 1.3 // скорость распространения волны
+    for (const b of this.g.blocks) {
+      const orb = b.tentacleOrbit
+      if (!orb) continue
+      orb.ang += orb.dir * orb.speed * dt * (angry ? 1.6 : 1)
+      const segT = (orb.seg + 1) / SEG_COUNT // прогресс от 0.25 до 1
+      const along = segT * TENTACLE_LENGTH
+      // Волновое отклонение: каждый сегмент сдвинут по фазе, создавая эффект
+      // «волны», идущей от базы к кончику. Чем дальше сегмент, тем сильнее
+      // отклонение (извилистый хвост).
+      const phase = orb.seg * 0.9 // фазовый сдвиг по сегментам
+      const wave = Math.sin(bo.t * WAVE_SPEED + phase) * WAVE_AMP * segT
+      const dirX = Math.cos(orb.ang)
+      const dirY = Math.sin(orb.ang) * 0.5
+      // Базовая точка — на кольце здоровья босса (внешняя окружность)
+      const baseR = bo.r + HEALTH_RING_R
+      const baseX = bo.x + dirX * baseR
+      const baseY = bo.y + dirY * baseR
+      // Положение сегмента: вдоль луча от базы + волновое отклонение
+      // (перпендикулярное направлению луча)
+      const perpX = -dirY
+      const perpY = dirX
+      b.x = clamp(baseX + dirX * along + perpX * wave, b.rx + 4, this.g.w - b.rx - 4)
+      b.y = clamp(baseY + dirY * along + perpY * wave, b.ry + 4, this.g.h * 0.8)
+    }
     bo.dropTimer -= dt
     if (bo.dropTimer <= 0) {
       bo.dropTimer = angry ? 3.6 : 5
@@ -119,11 +152,18 @@ export class BossSystem {
     if (fromWeapon && this.g.time < this.weaponHitCd) return
     this.weaponHitCd = this.g.time + 0.08
 
-    // Босс-осьминог: тело неуязвимо, пока живы щупальца
+    // Босс-осьминог: тело неуязвимо, пока живы хотя бы некоторые щупальца
+    // (в каждом щупальце несколько сегментов; если все сегменты щупальца
+    // уничтожены — щупальце считается мёртвым).
     if (bo.isOctopus) {
-      const tentacles = this.g.blocks.filter((b) => b.isTentacle)
-      if (tentacles.length > 0) {
-        // Урон по телу заблокирован — есть живые щупальца
+      const tentacles = this.g.blocks.filter((b) => b.isTentacle && !b.dead) as (Block & {
+        tentacleId: number
+      })[]
+      // Считаем, сколько щупалец ещё имеют живые сегменты.
+      const aliveIds = new Set<number>()
+      for (const t of tentacles) aliveIds.add(t.tentacleId)
+      if (aliveIds.size > 0) {
+        // Есть живые щупальца — урон по телу заблокирован.
         this.g.sfx.brick(1)
         this.g.fx.burst(bo.x, bo.y, "#ff5ca8", 4, 100)
         return
