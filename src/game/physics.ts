@@ -331,15 +331,16 @@ export class Physics {
       return
     }
     b.dead = true
-    // Если это сегмент щупальца, ближайший к туловищу (tentacleSeg === 0),
-    // то также уничтожаем все остальные сегменты этого же щупальца.
+    // Если уничтожен сегмент щупальца, то уничтожаем все сегменты,
+    // которые дальше от туловища (с большим номером tentacleSeg).
     if (b.isTentacle) {
       const tentacleId = (b as any).tentacleId
+      const seg = (b as any).tentacleSeg!
       for (const other of g.blocks) {
         if (
           other.isTentacle &&
           (other as any).tentacleId === tentacleId &&
-          (other as any).tentacleSeg !== (b as any).tentacleSeg
+          (other as any).tentacleSeg! > seg
         ) {
           other.dead = true
         }

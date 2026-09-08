@@ -627,7 +627,7 @@ export class Game {
     // босса и извиваются по длине, как змея.
     const tentacleCount = 6
     const SEG_COUNT = 4
-    const SEG_RADII = [20, 15, 10, 5] // от базы к кончику
+    const SEG_RADII = [25, 20, 15, 10] // от базы к кончику (+5px)
     const SEG_SPACING = 24 // расстояние между центрами сегментов
     const TENTACLE_LENGTH = SEG_COUNT * SEG_SPACING // ~96px
     const HEALTH_RING_R = 14 // радиус кольца здоровья (r + 14)
