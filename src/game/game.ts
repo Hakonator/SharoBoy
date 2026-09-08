@@ -22,7 +22,16 @@ import {
   drawRings,
   drawShieldLine,
 } from "./render"
-import type { Ball, Block, Bubble, PaddleState, Phase, PowerUp, Projectile } from "./types"
+import type {
+  Ball,
+  Block,
+  BossState,
+  Bubble,
+  PaddleState,
+  Phase,
+  PowerUp,
+  Projectile,
+} from "./types"
 import type { HudData, ScoreEntry } from "./types"
 import { clamp, daySeed, lsGet, lsSet, mulberry32, rand } from "./utils"
 import { HUD_TOP_CSS, computeScale } from "./viewport"
@@ -66,6 +75,11 @@ export class Game {
   private mode: "campaign" | "endless" = "campaign"
   private wave = 0
   private waveSpec: { name: string; speed: number } | null = null
+
+  /** Режим отладки: позволяет тестировать новые механики и контент. */
+  debug = false
+  /** Принудительный тип босса для отладки (null = стандартное поведение). */
+  debugBossType: "octopus" | null = null
 
   private paddle: PaddleState = { x: 480, y: 600, w: 150, baseW: 150, h: 18, vx: 0, squash: 0 }
   /** Режим тача: ракетка поднята выше, чтобы управляющий палец её не закрывал. */
@@ -210,6 +224,7 @@ export class Game {
       get boomQueue() {
         return g.boomQueue
       },
+      paddle: g.paddle,
       fx: g.fx,
       sfx: g.sfx,
       addRawScore: (n) => g.addRawScore(n),
@@ -415,6 +430,12 @@ export class Game {
       set hitStop(v) {
         g.hitStop = v
       },
+      get flash() {
+        return g.flash
+      },
+      set flash(v) {
+        g.flash = v
+      },
       fx: g.fx,
       sfx: g.sfx,
       fireActive: () => g.time < g.fireUntil,
@@ -426,6 +447,7 @@ export class Game {
       addScore: (n, x, y, color, size) => g.addScore(n, x, y, color, size),
       dropPower: (x, y) => g.powersSys.dropPower(x, y),
       damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
+      onBombHitPaddle: () => g.onBombHitPaddle(),
       pushHud: () => g.pushHud(),
     }
   }
@@ -552,6 +574,102 @@ export class Game {
     const paddleLvl = this.upgrades.paddle ?? 0
     this.paddleWidthMult = 1 + 0.12 * paddleLvl
     this.paddle.baseW = clamp(this.w * 0.18, 110, 200) * this.paddleWidthMult
+  }
+
+  /* ---------- отладка ---------- */
+
+  /** Переключение режима отладки. */
+  toggleDebug() {
+    this.debug = !this.debug
+    this.pushHud()
+  }
+
+  /** Принудительно спавнит босса-осьминога для тестирования. */
+  spawnOctopusBoss() {
+    this.debugBossType = "octopus"
+    this.blocks = []
+    this.balls = []
+    this.powers = []
+    this.projectiles = []
+    this.bossSys.clear()
+    const boss = this.buildBoss("octopus")
+    this.bossSys.spawn(boss)
+    if (this.phase === "menu") {
+      this.phase = "playing"
+      this.serveBall()
+    }
+    this.pushHud()
+  }
+
+  /** Создаёт состояние босса по типу. */
+  private buildBoss(type: "default" | "octopus"): BossState {
+    if (type === "octopus") {
+      return this.buildOctopusBoss()
+    }
+    return {
+      x: this.w / 2,
+      y: this.h * 0.28,
+      baseY: this.h * 0.28,
+      r: 46,
+      hp: 30,
+      maxHp: 30,
+      t: 0,
+      flash: 0,
+      dropTimer: 3,
+    }
+  }
+
+  /** Босс-осьминог: тело + щупальца, которые нужно уничтожить первыми. */
+  private buildOctopusBoss(): BossState {
+    const octoHp = 50
+    // Создаём щупальца вокруг тела босса
+    const tentacleCount = 6
+    const orbitRadius = 90
+    for (let i = 0; i < tentacleCount; i++) {
+      const ang = (i / tentacleCount) * Math.PI * 2
+      const tx = this.w / 2 + Math.cos(ang) * orbitRadius
+      const ty = this.h * 0.28 + Math.sin(ang) * orbitRadius * 0.5
+      this.blocks.push({
+        x: tx,
+        y: ty,
+        rx: 24,
+        ry: 24,
+        rot: 0,
+        circle: true,
+        hp: 5,
+        maxHp: 5,
+        tier: 2,
+        flash: 0,
+        seed: Math.random() * 1000,
+        dead: false,
+        x0: tx,
+        swayAmp: 0,
+        swayFreq: 0,
+        swayPh: 0,
+        bomb: false,
+        splits: false,
+        minionOrbit: {
+          ang,
+          rad: orbitRadius,
+          dir: 1,
+          speed: 0.8,
+        },
+        // Помечаем как щупальце осьминога
+        isTentacle: true,
+      } as Block & { isTentacle: true })
+    }
+    return {
+      x: this.w / 2,
+      y: this.h * 0.28,
+      baseY: this.h * 0.28,
+      r: 40,
+      hp: octoHp,
+      maxHp: octoHp,
+      t: 0,
+      flash: 0,
+      dropTimer: 4,
+      isOctopus: true,
+    } as BossState & { isOctopus: true }
   }
 
   /* ---------- жизненный цикл ---------- */
@@ -1000,6 +1118,7 @@ export class Game {
       this.weaponsSys.tryFire(dt, fire)
       this.weaponsSys.updateProjectiles(dt)
       for (const ball of this.balls) this.physics.updateBall(ball, dt)
+      this.physics.updateBombs(dt)
       this.balls = this.balls.filter((b) => !b.lost)
       if (this.balls.length === 0) this.loseLife()
     }
@@ -1122,9 +1241,14 @@ export class Game {
     this.pushHud()
   }
 
+  /** Попадание бомбы осьминога по ракетке — отнимает жизнь. */
+  onBombHitPaddle() {
+    if (this.phase !== "playing") return
+    this.loseLife()
+  }
+
   /** Полный сброс временных эффектов между уровнями/волнами. */
   private clearAllEffects() {
-    this.wideUntil = 0
     this.slowUntil = 0
     this.fastUntil = 0
     this.shrinkUntil = 0

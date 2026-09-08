@@ -5,7 +5,7 @@
  */
 import type { Effects } from "./effects"
 import type { SFX } from "./audio"
-import type { Block, BossState, PowerType, PowerUp } from "./types"
+import type { Block, BossState, PaddleState, PowerType, PowerUp } from "./types"
 import { clamp, rand } from "./utils"
 
 /** Хост-интерфейс: то, что системе босса нужно от движка. */
@@ -19,6 +19,7 @@ export interface BossHost {
   blocks: Block[]
   readonly powers: PowerUp[]
   readonly boomQueue: { x: number; y: number; at: number }[]
+  readonly paddle: PaddleState
   fx: Effects
   sfx: SFX
   /** Начисление очков без попапа и проверки рекорда (как в damageBoss/killBoss). */
@@ -72,6 +73,43 @@ export class BossSystem {
         t: 0,
       })
     }
+
+    // Босс-осьминог: периодически бросает бомбы в ракетку
+    if (bo.isOctopus) {
+      bo.bombTimer = (bo.bombTimer ?? 4) - dt
+      if (bo.bombTimer <= 0) {
+        bo.bombTimer = angry ? 3 : 4.5
+        // Создаём бомбу, летящую в направлении ракетки
+        const paddle = this.g.paddle
+        const dx = paddle.x - bo.x
+        const dy = paddle.y - bo.y
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1
+        const speed = 200
+        this.g.blocks.push({
+          x: bo.x,
+          y: bo.y + bo.r + 5,
+          rx: 18,
+          ry: 18,
+          rot: 0,
+          circle: true,
+          hp: 1,
+          maxHp: 1,
+          tier: 1,
+          flash: 0,
+          seed: Math.random() * 1000,
+          dead: false,
+          x0: bo.x,
+          swayAmp: 0,
+          swayFreq: 0,
+          swayPh: 0,
+          bomb: true,
+          splits: false,
+          bombVx: (dx / dist) * speed,
+          bombVy: (dy / dist) * speed,
+          hitsPaddle: true,
+        } as Block & { bombVx: number; bombVy: number; hitsPaddle: true })
+      }
+    }
   }
 
   /** Урон боссу; fromWeapon — от лазера/ракет (с кулдауном), иначе от шара. */
@@ -80,6 +118,18 @@ export class BossSystem {
     if (!bo) return
     if (fromWeapon && this.g.time < this.weaponHitCd) return
     this.weaponHitCd = this.g.time + 0.08
+
+    // Босс-осьминог: тело неуязвимо, пока живы щупальца
+    if (bo.isOctopus) {
+      const tentacles = this.g.blocks.filter((b) => b.isTentacle)
+      if (tentacles.length > 0) {
+        // Урон по телу заблокирован — есть живые щупальца
+        this.g.sfx.brick(1)
+        this.g.fx.burst(bo.x, bo.y, "#ff5ca8", 4, 100)
+        return
+      }
+    }
+
     bo.hp -= dmg
     bo.flash = 1
     this.g.sfx.brick(3)

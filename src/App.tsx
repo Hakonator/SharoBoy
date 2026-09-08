@@ -66,6 +66,7 @@ export default function App() {
   const gameRef = useRef<Game | null>(null)
   const [hud, setHud] = useState<HudData>(INITIAL_HUD)
   const [bootError, setBootError] = useState<string | null>(null)
+  const [debug, setDebug] = useState<boolean>(false)
 
   const [globalTop, setGlobalTop] = useState<GlobalScore[]>([])
   const [globalTopEndless, setGlobalTopEndless] = useState<GlobalScore[]>([])
@@ -104,6 +105,18 @@ export default function App() {
   )
 
   const onHud = useCallback((h: HudData) => setHud(h), [])
+
+  const handleToggleDebug = useCallback(() => {
+    setDebug((prev) => {
+      const next = !prev
+      gameRef.current?.toggleDebug()
+      return next
+    })
+  }, [])
+
+  const handleSpawnOctopus = useCallback(() => {
+    gameRef.current?.spawnOctopusBoss()
+  }, [])
 
   /* Ник редактируется в меню и в форме топа: сразу пишем в localStorage,
      движок синхронизируется эффектом по [nick] ниже (game.setNick). */
@@ -352,6 +365,9 @@ export default function App() {
           onCampaign={() => g()?.startGame()}
           onEndless={() => g()?.startEndless()}
           onBuyUpgrade={(id) => g()?.buyUpgrade(id)}
+          debug={debug}
+          onToggleDebug={handleToggleDebug}
+          onSpawnOctopus={handleSpawnOctopus}
         />
       )}
 

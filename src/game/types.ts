@@ -66,6 +66,14 @@ export interface Block {
   boomQueued?: boolean
   splits: boolean
   minionOrbit?: { ang: number; rad: number; dir: number; speed: number }
+  /** Щупальце босса-осьминога: нужно уничтожить прежде чем наносить урон телу. */
+  isTentacle?: boolean
+  /** Скорость бомбы по X (для бомб осьминога). */
+  bombVx?: number
+  /** Скорость бомбы по Y (для бомб осьминога). */
+  bombVy?: number
+  /** Бомба бьёт по ракетке (а не по блокам). */
+  hitsPaddle?: boolean
 }
 
 export interface BossState {
@@ -78,6 +86,10 @@ export interface BossState {
   t: number
   flash: number
   dropTimer: number
+  /** Босс-осьминог: тело неуязвимо, пока живы щупальца. */
+  isOctopus?: boolean
+  /** Таймер бросания бомб для осьминога. */
+  bombTimer?: number
 }
 
 export interface Ball {

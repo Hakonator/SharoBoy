@@ -33,6 +33,7 @@ export interface PhysicsWorld {
   combo: number
   shake: number
   hitStop: number
+  flash: number
   fx: Effects
   sfx: SFX
   fireActive(): boolean
@@ -44,6 +45,8 @@ export interface PhysicsWorld {
   addScore(n: number, x: number, y: number, color: string, size: number): void
   dropPower(x: number, y: number): void
   damageBoss(dmg: number, fromWeapon: boolean): void
+  /** Попадание бомбы осьминога по ракетке. */
+  onBombHitPaddle(): void
   pushHud(): void
 }
 
@@ -417,5 +420,49 @@ export class Physics {
     g.fx.popups.push({ x: b.x, y: b.y, text: "РАССЫПЬ!", color: "#5dffb0", t: 0, size: 16 })
     g.fx.rings.push({ x: b.x, y: b.y, r: 8, maxR: 90, color: "rgba(93,255,176,0.7)", t: 0 })
     g.fx.burst(b.x, b.y, "#5dffb0", 10, 200)
+  }
+
+  /** Обновление бомб осьминога: движение и столкновение с ракеткой. */
+  updateBombs(dt: number) {
+    const g = this.g
+    const p = g.paddle
+    for (const b of g.blocks) {
+      if (!b.bomb || b.hitsPaddle === undefined) continue
+      // Движение бомбы
+      b.x += (b.bombVx ?? 0) * dt
+      b.y += (b.bombVy ?? 0) * dt
+      // Отскок от боковых стен
+      if (b.x - b.rx < 0) {
+        b.x = b.rx
+        b.bombVx = Math.abs(b.bombVx ?? 0)
+      }
+      if (b.x + b.rx > g.w) {
+        b.x = g.w - b.rx
+        b.bombVx = -Math.abs(b.bombVx ?? 0)
+      }
+      // Потеря за нижней границей
+      if (b.y > g.h + b.ry * 2) {
+        b.dead = true
+        continue
+      }
+      // Столкновение с ракеткой
+      const top = p.y - p.h / 2
+      if (
+        b.y + b.ry >= top &&
+        b.y - b.ry <= p.y + p.h / 2 &&
+        b.x >= p.x - p.w / 2 - b.rx &&
+        b.x <= p.x + p.w / 2 + b.rx
+      ) {
+        b.dead = true
+        // Бомба отнимает жизнь
+        g.onBombHitPaddle()
+        g.shake = Math.min(g.shake + 8, 14)
+        g.flash = 0.6
+        g.sfx.explosion()
+        g.fx.burst(b.x, b.y, "#ff6a5c", 20, 300)
+        g.fx.burst(b.x, b.y, "#ffc94d", 12, 200)
+      }
+    }
+    g.blocks = g.blocks.filter((x) => !x.dead)
   }
 }

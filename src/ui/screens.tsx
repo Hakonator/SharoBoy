@@ -392,6 +392,9 @@ export function MenuScreen({
   onCampaign,
   onEndless,
   onBuyUpgrade,
+  debug,
+  onToggleDebug,
+  onSpawnOctopus,
 }: {
   hud: HudData
   stats: PlayerStats
@@ -408,6 +411,12 @@ export function MenuScreen({
   onCampaign: () => void
   onEndless: () => void
   onBuyUpgrade: (id: string) => void
+  /** Режим отладки включён. */
+  debug: boolean
+  /** Переключатель режима отладки. */
+  onToggleDebug: () => void
+  /** Спавн босса-осьминога для тестирования. */
+  onSpawnOctopus: () => void
 }) {
   /** Есть улучшение, которое игрок уже может купить, — индикатор на секции. */
   const canBuyAny = UPGRADE_DEFS.some((u) => {
@@ -615,6 +624,31 @@ export function MenuScreen({
                 </div>
               </MenuSection>
             )}
+            {/* Секция отладки — для тестирования новых механик */}
+            <MenuSection title="🐛 Отладка" dot={debug}>
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 text-sm text-foam">
+                  <input
+                    type="checkbox"
+                    checked={debug}
+                    onChange={onToggleDebug}
+                    className="h-4 w-4 accent-cyan-400"
+                  />
+                  Режим отладки
+                </label>
+                {debug && (
+                  <button className="btn-ghost px-4 py-2 text-sm" onClick={onSpawnOctopus}>
+                    🐙 Спавн осьминога
+                  </button>
+                )}
+                {debug && (
+                  <p className="text-[11px] leading-tight text-dim">
+                    Босс-осьминог: тело неуязвимо, пока живы щупальца. Уничтожьте все щупальца,
+                    затем наносите урон телу. Осьминог бросает бомбы в ракетку.
+                  </p>
+                )}
+              </div>
+            </MenuSection>
             <MenuSection
               title="🏅 Достижения"
               badge={`${Object.keys(unlocked).length}/${ACHIEVEMENTS.length}`}
