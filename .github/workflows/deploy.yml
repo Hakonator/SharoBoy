@@ -163,7 +163,7 @@ jobs:
     permissions:
       contents: write
       actions: read
-      steps:
+    steps:
       - name: Свежая сборка main → корень сайта
         if: needs.build-stable.result == 'success'
         uses: actions/download-artifact@v4
