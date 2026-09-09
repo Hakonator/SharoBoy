@@ -222,6 +222,23 @@ jobs:
         run: |
           set -euo pipefail
           cd site
+
+          # Ветка gh-pages уже существует? Если нет — публикуем в первый раз.
+          if git ls-remote --exit-code "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages >/dev/null 2>&1; then
+            # Ветка есть. Скачиваем её в отдельную папку для сравнения.
+            git clone -q --depth 1 --branch gh-pages "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ../current-gh-pages
+            # Сравниваем содержимое: если в gh-pages уже опубликован ровно этот
+            # сайт (тот же коммит ветки beta), ничего пересобирать не нужно —
+            # не создаём «мусорный» коммит и не триггерим лишний деплой.
+            if diff -r --exclude=.git . ../current-gh-pages >/dev/null 2>&1; then
+              echo "Сайт не изменился — пропускаем публикацию."
+              exit 0
+            fi
+            echo "Сайт изменился — публикуем обновление."
+          else
+            echo "Ветки gh-pages ещё нет — публикуем в первый раз."
+          fi
+
           git init -q
           git add -A
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
