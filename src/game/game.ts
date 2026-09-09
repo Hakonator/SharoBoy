@@ -631,7 +631,7 @@ export class Game {
     const SEG_SPACING = 24 // расстояние между центрами сегментов
     const TENTACLE_LENGTH = SEG_COUNT * SEG_SPACING // ~96px
     const HEALTH_RING_R = 14 // радиус кольца здоровья (r + 14)
-    const WAVE_AMP = 18
+    const WAVE_AMP = 22 // синхронизировано с boss.ts (анимация волн)
     const WAVE_SPEED = 1.3
     for (let i = 0; i < tentacleCount; i++) {
       // Направление от центра босса к точке прикрепления щупальца.

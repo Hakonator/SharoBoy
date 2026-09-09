@@ -68,7 +68,7 @@ export class BossSystem {
     const SEG_COUNT = 4
     const HEALTH_RING_R = 18 // радиус кольца здоровья (r+18 от центра босса)
     const TENTACLE_LENGTH = SEG_COUNT * SEG_SPACING
-    const WAVE_AMP = 16 // амплитуда изгиба (растёт к кончику)
+    const WAVE_AMP = 22 // амплитуда изгиба (растёт к кончику)
     const WAVE_SPEED = 1.3 // скорость распространения волны
     for (const b of this.g.blocks) {
       const orb = b.tentacleOrbit
