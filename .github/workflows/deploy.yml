@@ -161,11 +161,9 @@ jobs:
       }}
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       actions: read
-      pages: write
-      id-token: write
-    steps:
+      steps:
       - name: Свежая сборка main → корень сайта
         if: needs.build-stable.result == 'success'
         uses: actions/download-artifact@v4
@@ -213,24 +211,11 @@ jobs:
         with:
           name: github-pages
           path: site
-
-  # --- Публикация в ветку gh-pages ---
-  # GitHub Pages настроен на источник «Deploy from a branch: gh-pages / root».
-  # Такой вариант не зависит от environment «github-pages» и его protection
-  # rules (которые разрешают деплой только из ветки main и блокируют beta):
-  # ветку gh-pages GitHub разворачивает автоматически при каждом пуше.
-  deploy:
-    needs: publish
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: read
-    steps:
-      - name: Скачивание собранного сайта
-        uses: actions/download-artifact@v4
-        with:
-          name: github-pages
-          path: site
+      # Публикация в ветку gh-pages выполняется прямо здесь, внутри job publish.
+      # Отдельный job «deploy» GitHub автоматически трактует как Pages-деплой и
+      # блокирует его для ветки beta (environment github-pages разрешает деплой
+      # только из main; см. protection rules). Ветку gh-pages GitHub Pages
+      # разворачивает автоматически при каждом пуше — без environment вовсе.
       - name: Публикация в ветку gh-pages
         env:
           GH_TOKEN: ${{ github.token }}
