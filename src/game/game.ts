@@ -167,6 +167,13 @@ export class Game {
       onBlur: () => {
         if (this.phase === "playing") this.togglePause()
       },
+      // Первый Esc при pointer lock браузер перехватывает (keydown не
+      // доставляется) — потеря захвата без нашего запроса = нажатие Esc.
+      // onBlur уже мог поставить паузу (alt-tab): фаз-гард не даёт
+      // случайно «снять» её повторным вызовом.
+      onLockLostUnexpectedly: () => {
+        if (this.phase === "playing") this.togglePause()
+      },
     })
     this.bossSys = new BossSystem(this.makeBossHost())
     this.powersSys = new PowersSystem(this.makePowersHost())

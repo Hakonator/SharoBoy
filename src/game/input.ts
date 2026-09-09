@@ -30,6 +30,10 @@ export interface InputHost {
   onTouchInput(): void
   /** Пауза/снятие паузы (клавиши P/Esc). */
   togglePause(): void
+  /** Захват мыши потерян без запроса хоста (первый Esc при pointer lock
+   *  браузер перехватывает и keydown не доставляет). Хост решает сам:
+   *  обычно ставит паузу, как будто пользователь нажал паузу. */
+  onLockLostUnexpectedly(): void
   /** Переключение звука (клавиша M). */
   toggleMute(): void
   /** Окно потеряло фокус — хост ставит паузу, если партия шла. */
@@ -46,6 +50,13 @@ export class InputController {
 
   private virtualX: number | null = null
   private tapFire = false
+  /** true — снятие захвата инициировано самим контроллером (releaseLock),
+   *  а не пользователем: не трактуем как нажатие Esc. */
+  private expectedUnlock = false
+  /** До этого момента (performance.now) подавляем mousemove без захвата —
+   *  браузер после снятия pointer lock отдаёт «хвостовой» mousemove с
+   *  реальной позицией курсора, и ракетка прыгала к нему. */
+  private suppressMouseUntil = 0
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -90,10 +101,15 @@ export class InputController {
     this.canvas.removeEventListener("pointercancel", this.handlePointerUp)
   }
 
-  /** Отпустить захват мыши (пауза, конец партии). */
+  /** Отпустить захват мыши (пауза, конец партии). Помечаем снятие как
+   *  «запрошенное самим контроллером», чтобы pointerlockchange от этого
+   *  выхода не трактовался как пользовательское нажатие Esc. */
   releaseLock() {
     try {
-      if (document.pointerLockElement) document.exitPointerLock?.()
+      if (document.pointerLockElement) {
+        this.expectedUnlock = true
+        document.exitPointerLock?.()
+      }
     } catch {
       /* ignore */
     }
@@ -163,6 +179,9 @@ export class InputController {
       this.pointerX = this.virtualX
       return
     }
+    // Сразу после снятия захвата браузер шлёт mousemove с реальной позицией
+    // курсора — игнорируем короткое окно, чтобы ракетка не прыгала.
+    if (performance.now() < this.suppressMouseUntil) return
     this.pointerX = this.clientToGameX(e.clientX)
   }
 
@@ -195,8 +214,16 @@ export class InputController {
     this.locked = document.pointerLockElement === this.canvas
     if (this.locked) {
       this.virtualX = this.pointerX ?? this.host.paddleX()
-    } else if (this.virtualX !== null) {
-      this.pointerX = this.virtualX
+      this.expectedUnlock = false
+      this.suppressMouseUntil = 0
+      return
     }
+    this.expectedUnlock = false
+    // Браузер снимает захват по первому Esc и НЕ доставляет keydown странице
+    // (Pointer Lock API). Внезапная потеря захвата без нашего запроса =
+    // пользователь нажал Esc — сообщаем хосту, он ставит паузу.
+    this.suppressMouseUntil = performance.now() + 150
+    if (this.virtualX !== null) this.pointerX = this.virtualX
+    this.host.onLockLostUnexpectedly()
   }
 }
