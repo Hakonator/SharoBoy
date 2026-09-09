@@ -234,4 +234,5 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
       - name: Ссылка на опубликованный сайт
-        run: echo "Сайт: ${{ steps.deployment.outputs.page_url }}"
+        run: |
+          echo "Сайт: ${{ steps.deployment.outputs.page_url }}"
