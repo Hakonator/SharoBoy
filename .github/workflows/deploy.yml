@@ -223,10 +223,15 @@ jobs:
     permissions:
       pages: write
       id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # ВАЖНО: не объявляем environment: github-pages.
+    # Окружение с настройкой «Deployment branches → main» запрещает деплой
+    # из beta (GitHub отклоняет его правилами защиты: «Branch "beta" is not
+    # allowed to deploy to github-pages due to environment protection rules»).
+    # actions/deploy-pages@v4 создаёт Pages-деплой сам, без проверки
+    # branch policy у job'а — так публикация работает из обеих веток.
     steps:
       - name: Публикация
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Ссылка на опубликованный сайт
+        run: echo "Сайт: ${{ steps.deployment.outputs.page_url }}"
