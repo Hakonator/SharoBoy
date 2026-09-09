@@ -208,31 +208,38 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip" > /tmp/site-beta.zip
           mkdir -p site/beta
           unzip -q /tmp/site-beta.zip -d site/beta
-      - name: Настройка Pages
-        uses: actions/configure-pages@v5
+      - name: Загрузка собранного сайта как артефакта
+        uses: actions/upload-artifact@v4
         with:
-          enablement: true
-      - name: Загрузка артефакта Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
+          name: github-pages
           path: site
 
+  # --- Публикация в ветку gh-pages ---
+  # GitHub Pages настроен на источник «Deploy from a branch: gh-pages / root».
+  # Такой вариант не зависит от environment «github-pages» и его protection
+  # rules (которые разрешают деплой только из ветки main и блокируют beta):
+  # ветку gh-pages GitHub разворачивает автоматически при каждом пуше.
   deploy:
     needs: publish
     runs-on: ubuntu-latest
     permissions:
-      pages: write
-      id-token: write
-    # ВАЖНО: не объявляем environment: github-pages.
-    # Окружение с настройкой «Deployment branches → main» запрещает деплой
-    # из beta (GitHub отклоняет его правилами защиты: «Branch "beta" is not
-    # allowed to deploy to github-pages due to environment protection rules»).
-    # actions/deploy-pages@v4 создаёт Pages-деплой сам, без проверки
-    # branch policy у job'а — так публикация работает из обеих веток.
+      contents: write
+      actions: read
     steps:
-      - name: Публикация
-        id: deployment
-        uses: actions/deploy-pages@v4
-      - name: Ссылка на опубликованный сайт
+      - name: Скачивание собранного сайта
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: site
+      - name: Публикация в ветку gh-pages
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Сайт: ${{ steps.deployment.outputs.page_url }}"
+          set -euo pipefail
+          cd site
+          git init -q
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -qm "deploy: ${{ github.ref_name }} @ ${GITHUB_SHA:0:7}"
+          git branch -M gh-pages
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
