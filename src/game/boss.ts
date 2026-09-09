@@ -50,9 +50,11 @@ export class BossSystem {
     if (!bo) return
     bo.t += dt
     bo.flash = Math.max(0, bo.flash - dt * 4)
-    const angry = bo.hp < bo.maxHp * 0.4
+    // Порог агрессии: осьминог «злится» при жизни менее половины,
+    // остальные боссы — при 40%.
+    const angry = bo.hp < bo.maxHp * (bo.isOctopus ? 0.5 : 0.4)
     const amp = clamp(this.g.w * 0.26, 120, 420)
-    bo.x = this.g.w / 2 + Math.sin(bo.t * (angry ? 1.1 : 0.6)) * amp
+    bo.x = this.g.w / 2 + Math.sin(bo.t * (angry ? (bo.isOctopus ? 1.5 : 1.1) : 0.6)) * amp
     bo.y = bo.baseY + Math.sin(bo.t * 1.7) * 22
     for (const b of this.g.blocks) {
       const m = b.minionOrbit
@@ -111,7 +113,8 @@ export class BossSystem {
     if (bo.isOctopus) {
       bo.bombTimer = (bo.bombTimer ?? 4) - dt
       if (bo.bombTimer <= 0) {
-        bo.bombTimer = angry ? 3 : 4.5
+        // Базовый интервал чуть увеличен (5.2с), в агрессии бомбы летят чаще (2.6с).
+        bo.bombTimer = angry ? 2.6 : 5.2
         // Создаём бомбу, летящую в направлении ракетки
         const paddle = this.g.paddle
         const dx = paddle.x - bo.x

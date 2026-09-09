@@ -276,7 +276,27 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
   ctx.lineWidth = bo.r * 0.07
   ctx.lineCap = "round"
   ctx.beginPath()
-  if (angry) {
+  if (bo.isOctopus) {
+    // Выражение лица осьминога зависит от числа живых щупалец:
+    // больше половины — улыбка, половина и меньше — прямая линия,
+    // ни одного — грустная дуга (перевёрнутая улыбка).
+    const all = new Set<number>()
+    const alive = new Set<number>()
+    for (const b of blocks) {
+      if (!b.isTentacle) continue
+      const id = (b as Block & { tentacleId: number }).tentacleId
+      all.add(id)
+      if (!b.dead) alive.add(id)
+    }
+    if (alive.size === 0) {
+      ctx.arc(0, bo.r * 0.48, bo.r * 0.3, Math.PI + 0.15, Math.PI * 2 - 0.15)
+    } else if (alive.size <= all.size / 2) {
+      ctx.moveTo(-bo.r * 0.3, bo.r * 0.42)
+      ctx.lineTo(bo.r * 0.3, bo.r * 0.42)
+    } else {
+      ctx.arc(0, bo.r * 0.28, bo.r * 0.3, 0.15, Math.PI - 0.15)
+    }
+  } else if (angry) {
     ctx.moveTo(-bo.r * 0.3, bo.r * 0.42)
     for (let i = 0; i <= 6; i++) {
       ctx.lineTo(-bo.r * 0.3 + (i * bo.r * 0.6) / 6, bo.r * 0.42 + (i % 2 ? bo.r * 0.09 : 0))
