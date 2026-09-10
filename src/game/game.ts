@@ -622,8 +622,8 @@ export class Game {
       return
     }
     let target = 0
-    if (inp.leftButton && !inp.rightButton) target = -ROT_MAX
-    else if (inp.rightButton && !inp.leftButton) target = ROT_MAX
+    if (inp.leftButton && !inp.rightButton) target = ROT_MAX
+    else if (inp.rightButton && !inp.leftButton) target = -ROT_MAX
     // Плавно подходим к целевому углу
     p.rot = (p.rot ?? 0) + (target - (p.rot ?? 0)) * Math.min(1, dt * ROT_SPEED)
   }

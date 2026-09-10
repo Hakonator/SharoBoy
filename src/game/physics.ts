@@ -212,44 +212,51 @@ export class Physics {
   private collidePaddle(ball: Ball) {
     const g = this.g
     const p = g.paddle
-    const top = p.y - p.h / 2
-    if (ball.vy <= 0) return
-    if (
-      ball.y + ball.r >= top &&
-      ball.y - ball.r <= p.y + p.h / 2 &&
-      ball.x >= p.x - p.w / 2 - ball.r &&
-      ball.x <= p.x + p.w / 2 + ball.r
-    ) {
-      const rel = clamp((ball.x - p.x) / (p.w / 2), -1, 1)
-      // магнит: шар прилипает вместо отскока
-      if (g.magnetActive() && !ball.stuck) {
-        ball.stuck = true
-        ball.stuckOffset = clamp(ball.x - p.x, -p.w / 2 + ball.r, p.w / 2 - ball.r)
-        ball.vx = 0
-        ball.vy = 0
-        ball.squash = 1
-        ball.sinceHit = 0
-        g.sfx.paddle(Math.abs(rel))
-        g.fx.burst(ball.x, top, "#4dff9e", 8, 140)
-        return
-      }
-      const ang = -Math.PI / 2 + rel * 1.05 + clamp(p.vx * 0.0004, -0.3, 0.3)
-      let sp = Math.hypot(ball.vx, ball.vy) || ball.speed
-      // Режим отладки: удар повёрнутой ракеткой придаёт мячу временное ускорение
-      if (p.rot && Math.abs(p.rot) > 0.05) {
-        sp *= 1.5 // +50% скорости при ударе под углом
-      }
-      ball.vx = Math.cos(ang) * sp
-      ball.vy = Math.sin(ang) * sp
-      ball.y = top - ball.r - 0.5
+    const rot = p.rot ?? 0
+    // Трансформируем координаты шара в локальную систему ракетки (с учётом поворота)
+    const dx = ball.x - p.x
+    const dy = ball.y - p.y
+    const cs = Math.cos(-rot)
+    const sn = Math.sin(-rot)
+    const lx = dx * cs - dy * sn
+    const ly = dx * sn + dy * cs
+    const halfW = p.w / 2 + ball.r
+    const halfH = p.h / 2 + ball.r
+    // Проверяем коллизию в локальных координатах
+    if (Math.abs(lx) > halfW || Math.abs(ly) > halfH) return
+    // Шар должен двигаться вниз (в локальных координатах)
+    const lvy = ball.vx * sn + ball.vy * cs
+    if (lvy <= 0) return
+    const rel = clamp(lx / (p.w / 2), -1, 1)
+    // магнит: шар прилипает вместо отскока
+    if (g.magnetActive() && !ball.stuck) {
+      ball.stuck = true
+      ball.stuckOffset = clamp(lx, -p.w / 2 + ball.r, p.w / 2 - ball.r)
+      ball.vx = 0
+      ball.vy = 0
       ball.squash = 1
       ball.sinceHit = 0
-      p.squash = 1
-      g.combo = 0
       g.sfx.paddle(Math.abs(rel))
-      g.fx.burst(ball.x, top, "#7cf5ff", 6, 130)
-      g.pushHud()
+      g.fx.burst(ball.x, p.y + ly - ball.r, "#4dff9e", 8, 140)
+      return
     }
+    const ang = -Math.PI / 2 + rel * 1.05 + clamp(p.vx * 0.0004, -0.3, 0.3)
+    let sp = Math.hypot(ball.vx, ball.vy) || ball.speed
+    // Режим отладки: удар повёрнутой ракеткой придаёт мячу временное ускорение
+    if (Math.abs(rot) > 0.05) {
+      sp *= 1.5 // +50% скорости при ударе под углом
+    }
+    ball.vx = Math.cos(ang) * sp
+    ball.vy = Math.sin(ang) * sp
+    // Корректируем позицию шара, чтобы не застревал в ракетке
+    ball.y = p.y + (halfH - ball.r) * Math.sign(ly || 1)
+    ball.squash = 1
+    ball.sinceHit = 0
+    p.squash = 1
+    g.combo = 0
+    g.sfx.paddle(Math.abs(rel))
+    g.fx.burst(ball.x, ball.y - ball.r, "#7cf5ff", 6, 130)
+    g.pushHud()
   }
 
   /** Столкновения с блоками: локальные координаты повёрнутого эллипса, отражение по нормали. */
