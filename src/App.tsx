@@ -118,6 +118,25 @@ export default function App() {
     gameRef.current?.spawnOctopusBoss()
   }, [])
 
+  const [debugBoss, setDebugBoss] = useState<string>("default")
+  const handleSelectDebugBoss = useCallback((boss: string) => {
+    setDebugBoss(boss)
+    const game = gameRef.current
+    if (game) {
+      game.debugBossType = boss === "octopus" ? "octopus" : null
+      if (boss === "octopus") game.spawnOctopusBoss()
+    }
+  }, [])
+
+  const handleToggleDebugEffect = useCallback((id: string) => {
+    gameRef.current?.toggleDebugEffect(id)
+  }, [])
+
+  const handleIsDebugEffectActive = useCallback(
+    (id: string) => gameRef.current?.isDebugEffectActive(id) ?? false,
+    []
+  )
+
   /* Ник редактируется в меню и в форме топа: сразу пишем в localStorage,
      движок синхронизируется эффектом по [nick] ниже (game.setNick). */
   const handleNickChange = useCallback((v: string) => {
@@ -367,7 +386,10 @@ export default function App() {
           onBuyUpgrade={(id) => g()?.buyUpgrade(id)}
           debug={debug}
           onToggleDebug={handleToggleDebug}
-          onSpawnOctopus={handleSpawnOctopus}
+          debugBoss={debugBoss}
+          onSelectDebugBoss={handleSelectDebugBoss}
+          isDebugEffectActive={handleIsDebugEffectActive}
+          onToggleDebugEffect={handleToggleDebugEffect}
         />
       )}
 

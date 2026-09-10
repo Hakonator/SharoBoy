@@ -394,7 +394,10 @@ export function MenuScreen({
   onBuyUpgrade,
   debug,
   onToggleDebug,
-  onSpawnOctopus,
+  debugBoss,
+  onSelectDebugBoss,
+  isDebugEffectActive,
+  onToggleDebugEffect,
 }: {
   hud: HudData
   stats: PlayerStats
@@ -415,8 +418,14 @@ export function MenuScreen({
   debug: boolean
   /** Переключатель режима отладки. */
   onToggleDebug: () => void
-  /** Спавн босса-осьминога для тестирования. */
-  onSpawnOctopus: () => void
+  /** Выбранный босс для тестирования (одиночный выбор). */
+  debugBoss: string
+  /** Выбрать босса для тестирования. */
+  onSelectDebugBoss: (boss: string) => void
+  /** Активен ли эффект отладки. */
+  isDebugEffectActive: (id: string) => boolean
+  /** Переключить эффект отладки. */
+  onToggleDebugEffect: (id: string) => void
 }) {
   /** Есть улучшение, которое игрок уже может купить, — индикатор на секции. */
   const canBuyAny = UPGRADE_DEFS.some((u) => {
@@ -637,15 +646,72 @@ export function MenuScreen({
                   Режим отладки
                 </label>
                 {debug && (
-                  <button className="btn-ghost px-4 py-2 text-sm" onClick={onSpawnOctopus}>
-                    🐙 Спавн осьминога
-                  </button>
-                )}
-                {debug && (
-                  <p className="text-[11px] leading-tight text-dim">
-                    Босс-осьминог: тело неуязвимо, пока живы щупальца. Уничтожьте все щупальца,
-                    затем наносите урон телу. Осьминог бросает бомбы в ракетку.
-                  </p>
+                  <>
+                    {/* Блок 1: выбор босса для тестирования */}
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-dim">Босс</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: "default", label: "Обычный" },
+                          { id: "octopus", label: "🐙 Осьминог" },
+                        ].map((b) => (
+                          <label
+                            key={b.id}
+                            className={`flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-xs transition ${
+                              debugBoss === b.id
+                                ? "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-400/50"
+                                : "bg-white/5 text-foam hover:bg-white/10"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="debugBoss"
+                              value={b.id}
+                              checked={debugBoss === b.id}
+                              onChange={() => onSelectDebugBoss(b.id)}
+                              className="sr-only"
+                            />
+                            {b.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Блок 2: активируемые эффекты */}
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-dim">Эффекты</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          {
+                            id: "paddleRotation",
+                            label: "↻ Поворот ракетки",
+                            hint: "ЛКМ = -30°, ПКМ = +30°",
+                          },
+                        ].map((e) => (
+                          <label
+                            key={e.id}
+                            className={`flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-xs transition ${
+                              isDebugEffectActive(e.id)
+                                ? "bg-amber-500/20 text-amber-200 ring-1 ring-amber-400/50"
+                                : "bg-white/5 text-foam hover:bg-white/10"
+                            }`}
+                            title={e.hint}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isDebugEffectActive(e.id)}
+                              onChange={() => onToggleDebugEffect(e.id)}
+                              className="sr-only"
+                            />
+                            {e.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-[11px] leading-tight text-dim">
+                      Выберите босса и активируйте нужные эффекты, затем запустите кампанию или
+                      бесконечный режим для тестирования.
+                    </p>
+                  </>
                 )}
               </div>
             </MenuSection>

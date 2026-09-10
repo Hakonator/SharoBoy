@@ -632,7 +632,8 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   const hh = p.h * (1 - p.squash * 0.3)
   ctx.save()
   ctx.translate(p.x, p.y)
-  ctx.rotate(clamp(p.vx * 0.00011, -0.1, 0.1))
+  // В режиме отладки ракетка поворачивается по ЛКМ/ПКМ, иначе — лёгкий наклон от скорости
+  ctx.rotate(p.rot ?? clamp(p.vx * 0.00011, -0.1, 0.1))
   const wide = time < v.wideUntil
   const shrink = !wide && time < v.shrinkUntil
   ctx.shadowColor = wide ? "#ffc94d" : shrink ? "#ff5347" : "#35e0ff"

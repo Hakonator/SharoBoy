@@ -234,7 +234,11 @@ export class Physics {
         return
       }
       const ang = -Math.PI / 2 + rel * 1.05 + clamp(p.vx * 0.0004, -0.3, 0.3)
-      const sp = Math.hypot(ball.vx, ball.vy) || ball.speed
+      let sp = Math.hypot(ball.vx, ball.vy) || ball.speed
+      // Режим отладки: удар повёрнутой ракеткой придаёт мячу временное ускорение
+      if (p.rot && Math.abs(p.rot) > 0.05) {
+        sp *= 1.5 // +50% скорости при ударе под углом
+      }
       ball.vx = Math.cos(ang) * sp
       ball.vy = Math.sin(ang) * sp
       ball.y = top - ball.r - 0.5

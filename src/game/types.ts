@@ -148,6 +148,8 @@ export interface PaddleState {
   h: number
   vx: number
   squash: number
+  /** Поворот в радианах (режим отладки: ЛКМ/ПКМ для удара с ускорением). */
+  rot?: number
 }
 
 export interface Projectile {

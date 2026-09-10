@@ -80,6 +80,8 @@ export class Game {
   debug = false
   /** Принудительный тип босса для отладки (null = стандартное поведение). */
   debugBossType: "octopus" | null = null
+  /** Активные эффекты отладки (для тестирования механик). */
+  debugEffects = new Set<string>()
 
   private paddle: PaddleState = { x: 480, y: 600, w: 150, baseW: 150, h: 18, vx: 0, squash: 0 }
   /** Режим тача: ракетка поднята выше, чтобы управляющий палец её не закрывал. */
@@ -588,7 +590,42 @@ export class Game {
   /** Переключение режима отладки. */
   toggleDebug() {
     this.debug = !this.debug
+    if (!this.debug) this.debugEffects.clear()
     this.pushHud()
+  }
+
+  /** Переключение эффекта отладки (вкл/выкл). */
+  toggleDebugEffect(id: string) {
+    if (this.debugEffects.has(id)) this.debugEffects.delete(id)
+    else this.debugEffects.add(id)
+    this.pushHud()
+  }
+
+  /** Активен ли эффект отладки. */
+  isDebugEffectActive(id: string) {
+    return this.debugEffects.has(id)
+  }
+
+  /** Обновление поворота ракетки (режим отладки: ЛКМ/ПКМ = ±30°). */
+  private updatePaddleRotation(dt: number) {
+    const p = this.paddle
+    const ROT_MAX = (30 * Math.PI) / 180 // 30 градусов
+    const ROT_SPEED = 8 // скорость поворота
+    const inp = this.input
+    const active = this.isDebugEffectActive("paddleRotation")
+    if (!active) {
+      // Эффект выключен — плавно возвращаем в 0
+      if (p.rot) {
+        p.rot *= Math.exp(-dt * 6)
+        if (Math.abs(p.rot) < 0.01) p.rot = 0
+      }
+      return
+    }
+    let target = 0
+    if (inp.leftButton && !inp.rightButton) target = -ROT_MAX
+    else if (inp.rightButton && !inp.leftButton) target = ROT_MAX
+    // Плавно подходим к целевому углу
+    p.rot = (p.rot ?? 0) + (target - (p.rot ?? 0)) * Math.min(1, dt * ROT_SPEED)
   }
 
   /** Принудительно спавнит босса-осьминога для тестирования. */
@@ -1138,6 +1175,7 @@ export class Game {
 
     this.syncEffectsHud()
     this.physics.updatePaddle(dt)
+    this.updatePaddleRotation(dt)
     /* Прилипший шар следует за ракеткой даже пока мир заморожен баннером/отсчётом:
        иначе на старте партии шар оставался на точке спавна, а ракетка уезжала к курсору. */
     for (const ball of this.balls) this.physics.stickToPaddle(ball)

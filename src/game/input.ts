@@ -47,6 +47,10 @@ export class InputController {
   pointerX: number | null = null
   /** Захвачена ли мышь (pointer lock) — влияет на чувствительность ракетки. */
   locked = false
+  /** Нажата ли левая кнопка мыши (для поворота ракетки в режиме отладки). */
+  leftButton = false
+  /** Нажата ли правая кнопка мыши (для поворота ракетки в режиме отладки). */
+  rightButton = false
 
   private virtualX: number | null = null
   private tapFire = false
@@ -75,6 +79,22 @@ export class InputController {
     this.keys.left = false
     this.keys.right = false
     this.keys.space = false
+    this.leftButton = false
+    this.rightButton = false
+  }
+
+  private handleMouseDown = (e: MouseEvent) => {
+    if (e.button === 0) this.leftButton = true
+    if (e.button === 2) this.rightButton = true
+  }
+
+  private handleMouseUp = (e: MouseEvent) => {
+    if (e.button === 0) this.leftButton = false
+    if (e.button === 2) this.rightButton = false
+  }
+
+  private handleContextMenu = (e: Event) => {
+    e.preventDefault()
   }
 
   attach() {
@@ -87,6 +107,9 @@ export class InputController {
     this.canvas.addEventListener("pointerdown", this.handlePointerDown)
     this.canvas.addEventListener("pointerup", this.handlePointerUp)
     this.canvas.addEventListener("pointercancel", this.handlePointerUp)
+    this.canvas.addEventListener("mousedown", this.handleMouseDown)
+    window.addEventListener("mouseup", this.handleMouseUp)
+    this.canvas.addEventListener("contextmenu", this.handleContextMenu)
   }
 
   destroy() {
@@ -99,6 +122,9 @@ export class InputController {
     this.canvas.removeEventListener("pointerdown", this.handlePointerDown)
     this.canvas.removeEventListener("pointerup", this.handlePointerUp)
     this.canvas.removeEventListener("pointercancel", this.handlePointerUp)
+    this.canvas.removeEventListener("mousedown", this.handleMouseDown)
+    window.removeEventListener("mouseup", this.handleMouseUp)
+    this.canvas.removeEventListener("contextmenu", this.handleContextMenu)
   }
 
   /** Отпустить захват мыши (пауза, конец партии). Помечаем снятие как
