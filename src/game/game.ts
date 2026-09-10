@@ -610,7 +610,7 @@ export class Game {
   private updatePaddleRotation(dt: number) {
     const p = this.paddle
     const ROT_MAX = (30 * Math.PI) / 180 // 30 градусов
-    const ROT_SPEED = 8 // скорость поворота
+    const ROT_SPEED = 12 // скорость поворота
     const inp = this.input
     const active = this.isDebugEffectActive("paddleRotation")
     if (!active) {
@@ -621,6 +621,9 @@ export class Game {
       }
       return
     }
+    // Блокируем поворот при старте мяча (мяч прилип к ракетке)
+    const ballStuck = this.balls.some((b) => b.stuck)
+    if (ballStuck) return
     let target = 0
     if (inp.leftButton && !inp.rightButton) target = ROT_MAX
     else if (inp.rightButton && !inp.leftButton) target = -ROT_MAX
