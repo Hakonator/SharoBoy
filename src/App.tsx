@@ -114,10 +114,6 @@ export default function App() {
     })
   }, [])
 
-  const handleSpawnOctopus = useCallback(() => {
-    gameRef.current?.spawnOctopusBoss()
-  }, [])
-
   const [debugBoss, setDebugBoss] = useState<string>("default")
   const handleSelectDebugBoss = useCallback((boss: string) => {
     setDebugBoss(boss)
