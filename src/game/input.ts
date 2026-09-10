@@ -16,6 +16,10 @@ export interface InputKeys {
 export interface InputHost {
   /** X ракетки — начальная точка виртуальной координаты при pointer lock. */
   paddleX(): number
+  /** Y ракетки — для определения зоны тач-поворота. */
+  paddleY(): number
+  /** Текущая ширина ракетки — для зоны тач-поворота. */
+  paddleWidth(): number
   /** Ширина игрового мира — для ограничения координат указателя. */
   worldWidth(): number
   /** Разблокировка звука по первому пользовательскому вводу. */
@@ -51,6 +55,8 @@ export class InputController {
   leftButton = false
   /** Нажата ли правая кнопка мыши (для поворота ракетки в режиме отладки). */
   rightButton = false
+  /** PointerId пальца, который вращает ракетку (тач); -1 — нет такого пальца. */
+  private touchRotateId = -1
 
   private virtualX: number | null = null
   private tapFire = false
@@ -81,6 +87,7 @@ export class InputController {
     this.keys.space = false
     this.leftButton = false
     this.rightButton = false
+    this.touchRotateId = -1
   }
 
   private handleMouseDown = (e: MouseEvent) => {
@@ -191,6 +198,13 @@ export class InputController {
     return clientX - rect.left
   }
 
+  /* Координата указателя (clientY) → игровая координата Y. */
+  private clientToGameY(clientY: number): number {
+    const rect = this.canvas.getBoundingClientRect()
+    if (rect.height > 0) return ((clientY - rect.top) / rect.height) * this.canvas.height
+    return clientY - rect.top
+  }
+
   /* Сколько игровых пикселей приходится на один CSS-пиксель канваса
      (для дельты movementX в режиме pointer lock). */
   private worldPerCssPx(): number {
@@ -219,9 +233,25 @@ export class InputController {
     // от ракетки, и ракетка «уезжала» к месту тапа.
     if (this.host.isPlaying()) {
       if (e.pointerType === "touch") {
-        // Тач: сначала ведём ракетку пальцем в нужное место, шар запускается
-        // при отпускании (handlePointerUp).
-        return
+        // Тач: если палец попал в зону ракетки (сама ракетка + область чуть
+        // ниже неё), вращаем ракетку: левая половина — поворот левой стороны
+        // по часовой (leftButton), правая — наоборот (rightButton).
+        const gx = this.clientToGameX(e.clientX)
+        const gy = this.clientToGameY(e.clientY)
+        const px = this.host.paddleX()
+        const py = this.host.paddleY()
+        const pw = this.host.paddleWidth()
+        const inX = Math.abs(gx - px) <= pw / 2 + 14
+        const inY = gy >= py - 44 && gy <= py + 90
+        if (inX && inY) {
+          this.touchRotateId = e.pointerId
+          this.leftButton = false
+          this.rightButton = false
+          if (gx < px) this.leftButton = true
+          else this.rightButton = true
+          return // палец занят поворотом — шар при отпускании не запускаем
+        }
+        return // обычный тач: шар запускается при отпускании (handlePointerUp)
       }
       // Мышь/стилус: запуск сразу + pointer lock, как раньше.
       this.host.launchIfPlaying()
@@ -229,8 +259,15 @@ export class InputController {
     }
   }
 
-  /* Отпускание пальца на таче = запуск шара (если он на ракетке). */
+  /* Отпускание пальца на таче = запуск шара (если он на ракетке),
+     кроме пальца, который вращал ракетку. */
   private handlePointerUp = (e: PointerEvent) => {
+    if (this.touchRotateId === e.pointerId) {
+      this.touchRotateId = -1
+      this.leftButton = false
+      this.rightButton = false
+      return
+    }
     if (this.host.isPlaying() && (e.pointerType === "touch" || e.pointerType === "pen")) {
       this.host.launchIfPlaying()
     }

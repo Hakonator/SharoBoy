@@ -158,6 +158,8 @@ export class Game {
     if (nick) this.nick = nick
     this.input = new InputController(canvas, {
       paddleX: () => this.paddle.x,
+      paddleY: () => this.paddle.y,
+      paddleWidth: () => this.paddle.w,
       worldWidth: () => this.w,
       sfxEnsure: () => this.sfx.ensure(),
       isPlaying: () => this.phase === "playing",
