@@ -687,7 +687,12 @@ export function MenuScreen({
                           {
                             id: "paddleRotation",
                             label: "↻ Поворот ракетки",
-                            hint: "ЛКМ = -30°, ПКМ = +30°",
+                            hint: "ЛКМ/ПКМ удержание = ±30°, ускорение мяча",
+                          },
+                          {
+                            id: "paddleImpulse",
+                            label: "⚡ Импульсный удар",
+                            hint: "ЛКМ/ПКМ клик = резкий доворот и возврат, ускорение мяча",
                           },
                         ].map((e) => (
                           <label

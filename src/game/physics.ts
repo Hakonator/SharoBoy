@@ -224,6 +224,9 @@ export class Physics {
     const halfH = p.h / 2 + ball.r
     // Проверяем коллизию в локальных координатах
     if (Math.abs(lx) > halfW || Math.abs(ly) > halfH) return
+    // Cooldown после предыдущего отскока: шар не должен повторно задевать
+    // ракетку на следующих субшагах (особенно при её вращении по удержанию).
+    if (ball.sinceHit < 0.05) return
     // Шар должен двигаться вниз (в локальных координатах)
     const lvy = ball.vx * sn + ball.vy * cs
     if (lvy <= 0) return

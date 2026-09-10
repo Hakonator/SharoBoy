@@ -84,6 +84,11 @@ export class Game {
   debugEffects = new Set<string>()
 
   private paddle: PaddleState = { x: 480, y: 600, w: 150, baseW: 150, h: 18, vx: 0, squash: 0 }
+  /** Импульсный поворот ракетки (однократный резкий доворот + возврат). */
+  private paddleImpulse: { dir: number; t: number } | null = null
+  /** Предыдущее состояние кнопок мыши для детекта краёв нажатия. */
+  private prevLeftDown = false
+  private prevRightDown = false
   /** Режим тача: ракетка поднята выше, чтобы управляющий палец её не закрывал. */
   private touchMode =
     typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches
@@ -598,6 +603,13 @@ export class Game {
   toggleDebugEffect(id: string) {
     if (this.debugEffects.has(id)) this.debugEffects.delete(id)
     else this.debugEffects.add(id)
+    // Сброс поворота при смене режима, чтобы не оставался наклон
+    if (id === "paddleRotation" || id === "paddleImpulse") {
+      this.paddle.rot = 0
+      this.paddleImpulse = null
+      this.prevLeftDown = false
+      this.prevRightDown = false
+    }
     this.pushHud()
   }
 
@@ -613,6 +625,47 @@ export class Game {
     const ROT_SPEED = 12 // скорость поворота
     const inp = this.input
     const active = this.isDebugEffectActive("paddleRotation")
+    const impulseActive = this.isDebugEffectActive("paddleImpulse")
+    // Блокируем поворот при старте мяча (мяч прилип к ракетке)
+    const ballStuck = this.balls.some((b) => b.stuck)
+
+    if (impulseActive) {
+      // --- Импульсный режим: однократный резкий доворот и автоматический возврат ---
+      const edgeLeft = inp.leftButton && !this.prevLeftDown
+      const edgeRight = inp.rightButton && !this.prevRightDown
+      this.prevLeftDown = inp.leftButton
+      this.prevRightDown = inp.rightButton
+      if (!ballStuck && this.paddleImpulse === null) {
+        if (edgeLeft && !edgeRight) {
+          this.paddleImpulse = { dir: 1, t: 0 }
+        } else if (edgeRight && !edgeLeft) {
+          this.paddleImpulse = { dir: -1, t: 0 }
+        }
+      }
+      if (this.paddleImpulse) {
+        this.paddleImpulse.t += dt
+        const t = this.paddleImpulse.t
+        const total = 0.35 // полный цикл: доворот + удержание + возврат
+        const rise = 0.08 // резкий доворот
+        const hold = 0.14 // удержание угла
+        let k: number
+        if (t < rise) {
+          k = t / rise // 0 → 1
+        } else if (t < rise + hold) {
+          k = 1 // держим максимум
+        } else {
+          const f = (t - rise - hold) / (total - rise - hold) // 0 → 1
+          k = 1 - f * f * (3 - 2 * f) // smoothstep-возврат
+        }
+        p.rot = this.paddleImpulse.dir * ROT_MAX * k
+        if (t >= total) {
+          p.rot = 0
+          this.paddleImpulse = null
+        }
+      }
+      return
+    }
+
     if (!active) {
       // Эффект выключен — плавно возвращаем в 0
       if (p.rot) {
@@ -621,8 +674,6 @@ export class Game {
       }
       return
     }
-    // Блокируем поворот при старте мяча (мяч прилип к ракетке)
-    const ballStuck = this.balls.some((b) => b.stuck)
     if (ballStuck) return
     let target = 0
     if (inp.leftButton && !inp.rightButton) target = ROT_MAX
@@ -976,6 +1027,10 @@ export class Game {
        и они появляются вместе, а не в разных концах поля. */
     this.paddle.x = this.w / 2
     this.paddle.vx = 0
+    this.paddle.rot = 0
+    this.paddleImpulse = null
+    this.prevLeftDown = false
+    this.prevRightDown = false
     this.wideUntil = 0
     this.slowUntil = 0
     this.fastUntil = 0
@@ -1314,6 +1369,9 @@ export class Game {
     this.powers = []
     this.projectiles = []
     this.paddle.rot = 0 // Сброс поворота при потере мяча
+    this.paddleImpulse = null
+    this.prevLeftDown = false
+    this.prevRightDown = false
     if (this.lives <= 0) {
       this.phase = "over"
       this.input.releaseLock()
@@ -1348,6 +1406,10 @@ export class Game {
     this.powers = []
     this.projectiles = []
     this.combo = 0
+    this.paddle.rot = 0
+    this.paddleImpulse = null
+    this.prevLeftDown = false
+    this.prevRightDown = false
     this.effectsKey = ""
     this.pushHud()
   }
