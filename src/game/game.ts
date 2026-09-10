@@ -1313,6 +1313,7 @@ export class Game {
     this.weaponCd = 0
     this.powers = []
     this.projectiles = []
+    this.paddle.rot = 0 // Сброс поворота при потере мяча
     if (this.lives <= 0) {
       this.phase = "over"
       this.input.releaseLock()

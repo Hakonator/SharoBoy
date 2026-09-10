@@ -266,8 +266,12 @@ export class Physics {
       ball.vx *= scale
       ball.vy *= scale
     }
-    // Корректируем позицию шара, чтобы не застревал в ракетке
-    ball.y = p.y + (halfH - ball.r) * Math.sign(ly || 1)
+    // Корректируем позицию шара: выталкиваем вдоль нормали ракетки
+    const pen = halfH + ball.r - Math.abs(ly) // глубина проникновения
+    if (pen > 0) {
+      ball.x = ball.x + nx * pen
+      ball.y = ball.y + ny * pen
+    }
     ball.squash = 1
     ball.sinceHit = 0
     p.squash = 1
