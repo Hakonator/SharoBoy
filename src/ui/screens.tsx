@@ -398,6 +398,7 @@ export function MenuScreen({
   onSelectDebugBoss,
   isDebugEffectActive,
   onToggleDebugEffect,
+  onDebugStartGame,
 }: {
   hud: HudData
   stats: PlayerStats
@@ -426,6 +427,8 @@ export function MenuScreen({
   isDebugEffectActive: (id: string) => boolean
   /** Переключить эффект отладки. */
   onToggleDebugEffect: (id: string) => void
+  /** Запустить уровень с выбранными настройками отладки. */
+  onDebugStartGame: () => void
 }) {
   /** Есть улучшение, которое игрок уже может купить, — индикатор на секции. */
   const canBuyAny = UPGRADE_DEFS.some((u) => {
@@ -652,7 +655,7 @@ export function MenuScreen({
                       <p className="text-xs font-medium text-dim">Босс</p>
                       <div className="flex flex-wrap gap-2">
                         {[
-                          { id: "default", label: "Обычный" },
+                          { id: "", label: "Нет" },
                           { id: "octopus", label: "🐙 Осьминог" },
                         ].map((b) => (
                           <label
@@ -676,7 +679,7 @@ export function MenuScreen({
                         ))}
                       </div>
                     </div>
-                    {/* Блок 2: активируемые эффекты */}
+                    {/* Блок 2: активируемые эффекты (галочки) */}
                     <div className="space-y-1.5">
                       <p className="text-xs font-medium text-dim">Эффекты</p>
                       <div className="flex flex-wrap gap-2">
@@ -707,10 +710,13 @@ export function MenuScreen({
                         ))}
                       </div>
                     </div>
-                    <p className="text-[11px] leading-tight text-dim">
-                      Выберите босса и активируйте нужные эффекты, затем запустите кампанию или
-                      бесконечный режим для тестирования.
-                    </p>
+                    {/* Кнопка запуска уровня */}
+                    <button
+                      className="btn-ghost w-full px-4 py-2 text-sm"
+                      onClick={onDebugStartGame}
+                    >
+                      ▶ Запустить уровень
+                    </button>
                   </>
                 )}
               </div>

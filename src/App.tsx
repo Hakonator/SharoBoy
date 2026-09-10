@@ -114,14 +114,9 @@ export default function App() {
     })
   }, [])
 
-  const [debugBoss, setDebugBoss] = useState<string>("default")
+  const [debugBoss, setDebugBoss] = useState<string>("")
   const handleSelectDebugBoss = useCallback((boss: string) => {
     setDebugBoss(boss)
-    const game = gameRef.current
-    if (game) {
-      game.debugBossType = boss === "octopus" ? "octopus" : null
-      if (boss === "octopus") game.spawnOctopusBoss()
-    }
   }, [])
 
   const handleToggleDebugEffect = useCallback((id: string) => {
@@ -132,6 +127,18 @@ export default function App() {
     (id: string) => gameRef.current?.isDebugEffectActive(id) ?? false,
     []
   )
+
+  const handleDebugStartGame = useCallback(() => {
+    const game = gameRef.current
+    if (!game) return
+    game.debugBossType = debugBoss === "octopus" ? "octopus" : null
+    if (debugBoss === "octopus") {
+      game.spawnOctopusBoss()
+    } else {
+      // Пустой уровень со случайными блоками (стандартный _wave_ 1)
+      game.startEndless()
+    }
+  }, [debugBoss])
 
   /* Ник редактируется в меню и в форме топа: сразу пишем в localStorage,
      движок синхронизируется эффектом по [nick] ниже (game.setNick). */
@@ -386,6 +393,7 @@ export default function App() {
           onSelectDebugBoss={handleSelectDebugBoss}
           isDebugEffectActive={handleIsDebugEffectActive}
           onToggleDebugEffect={handleToggleDebugEffect}
+          onDebugStartGame={handleDebugStartGame}
         />
       )}
 
