@@ -240,14 +240,32 @@ export class Physics {
       g.fx.burst(ball.x, p.y + ly - ball.r, "#4dff9e", 8, 140)
       return
     }
-    const ang = -Math.PI / 2 + rel * 1.05 + clamp(p.vx * 0.0004, -0.3, 0.3)
-    let sp = Math.hypot(ball.vx, ball.vy) || ball.speed
-    // Режим отладки: удар повёрнутой ракеткой придаёт мячу временное ускорение
-    if (Math.abs(rot) > 0.05) {
-      sp *= 1.5 // +50% скорости при ударе под углом
+    // Реальное физическое отражение от наклонной поверхности ракетки
+    // Наль к поверхности ракетки (с учётом поворота): (sin(rot), -cos(rot))
+    const nx = Math.sin(rot)
+    const ny = -Math.cos(rot)
+    // Скалярное произведение скорости и нормали
+    const dot = ball.vx * nx + ball.vy * ny
+    // Отражение: v' = v - 2(v·n)n
+    let rvx = ball.vx - 2 * dot * nx
+    let rvy = ball.vy - 2 * dot * ny
+    // Ускорение при ударе под углом
+    let sp = Math.hypot(rvx, rvy) * 1.5
+    // Если отражение направило мяч вниз (из-за сильного наклона), инвертируем
+    if (rvy > 0) {
+      rvy = -rvy
+      sp = Math.hypot(rvx, rvy)
     }
-    ball.vx = Math.cos(ang) * sp
-    ball.vy = Math.sin(ang) * sp
+    ball.vx = rvx
+    ball.vy = rvy
+    // Корректируем скорость, чтобы не была слишком маленькой
+    const minSpeed = ball.speed * 0.8
+    if (sp < minSpeed) {
+      sp = minSpeed
+      const scale = sp / Math.hypot(ball.vx, ball.vy)
+      ball.vx *= scale
+      ball.vy *= scale
+    }
     // Корректируем позицию шара, чтобы не застревал в ракетке
     ball.y = p.y + (halfH - ball.r) * Math.sign(ly || 1)
     ball.squash = 1
