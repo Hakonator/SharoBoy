@@ -601,6 +601,13 @@ export class Game {
 
   /** Переключение эффекта отладки (вкл/выкл). */
   toggleDebugEffect(id: string) {
+    const turnOn = !this.debugEffects.has(id)
+    if (turnOn) {
+      // Прямое правило: «Поворот ракетки» и «Импульсный удар» не могут
+      // быть активны одновременно (реализация одна и та же — p.rot).
+      if (id === "paddleRotation") this.debugEffects.delete("paddleImpulse")
+      if (id === "paddleImpulse") this.debugEffects.delete("paddleRotation")
+    }
     if (this.debugEffects.has(id)) this.debugEffects.delete(id)
     else this.debugEffects.add(id)
     // Сброс поворота при смене режима, чтобы не оставался наклон
