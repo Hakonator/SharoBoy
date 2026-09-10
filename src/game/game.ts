@@ -711,6 +711,7 @@ export class Game {
       flash: 0,
       dropTimer: 4,
       isOctopus: true,
+      totalTentacles: tentacleCount,
     } as BossState & { isOctopus: true }
   }
 

@@ -277,26 +277,26 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
   ctx.lineCap = "round"
   ctx.beginPath()
   if (bo.isOctopus) {
-    // Выражение лица осьминога зависит от числа живых щупалец:
-    // больше половины — улыбка (дуга вверх), меньше половины —
+    // Выражение лица осьминога зависит от числа живых щупалец.
+    // Мёртвые блоки удаляются из blocks, поэтому исходное количество
+    // щупалец хранится в bo.totalTentacles.
+    // больше половины — улыбка (дуга вверх), половина и меньше —
     // прямая горизонтальная линия, ни одного — грустная дуга (вниз).
-    const all = new Set<number>()
     const alive = new Set<number>()
     for (const b of blocks) {
-      if (!b.isTentacle) continue
-      const id = (b as Block & { tentacleId: number }).tentacleId
-      all.add(id)
-      if (!b.dead) alive.add(id)
+      if (!b.isTentacle || b.dead) continue
+      alive.add((b as Block & { tentacleId: number }).tentacleId)
     }
+    const total = bo.totalTentacles ?? 1
     if (alive.size === 0) {
       // грусть: дуга вниз
       ctx.arc(0, bo.r * 0.48, bo.r * 0.3, Math.PI + 0.15, Math.PI * 2 - 0.15)
-    } else if (alive.size * 2 < all.size) {
-      // меньше половины щупалец: прямая горизонтальная линия
+    } else if (alive.size * 2 <= total) {
+      // половина щупалец и меньше: прямая горизонтальная линия
       ctx.moveTo(-bo.r * 0.3, bo.r * 0.42)
       ctx.lineTo(bo.r * 0.3, bo.r * 0.42)
     } else {
-      // улыбка: дуга вверх
+      // больше половины: улыбка (дуга вверх)
       ctx.arc(0, bo.r * 0.28, bo.r * 0.3, 0.15, Math.PI - 0.15)
     }
   } else if (angry) {

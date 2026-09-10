@@ -96,6 +96,8 @@ export interface BossState {
   isOctopus?: boolean
   /** Таймер бросания бомб для осьминога. */
   bombTimer?: number
+  /** Исходное количество щупалец (для расчёта выражения рта). */
+  totalTentacles?: number
 }
 
 export interface Ball {
