@@ -247,7 +247,7 @@ export class Physics {
     // Скалярное произведение скорости и нормали
     const dot = ball.vx * nx + ball.vy * ny
     // Отражение: v' = v - 2(v·n)n
-    let rvx = ball.vx - 2 * dot * nx
+    const rvx = ball.vx - 2 * dot * nx
     let rvy = ball.vy - 2 * dot * ny
     // Ускорение при ударе под углом
     let sp = Math.hypot(rvx, rvy) * 1.5
