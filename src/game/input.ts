@@ -201,11 +201,11 @@ export class InputController {
   }
 
   /* Сторона тач-поворота: -1 — левая зона, +1 — правая, 0 — не в зоне.
-     Считаем в CSS-пикселях (физических), а не в мировых: мировые единицы
-     на телефоне равны доле от 1920-эталона и зона в десятках «мировых»
-     единиц превращается там в пару пикселей — меньше пальца.
-     Под центром ракетки мёртвая зона (±30% полуширины): обычное нажатие
-     под серединой ракетки её не вращает — только у краёв. */
+     Зоны лежат СНАРУЖИ краёв ракетки (не в её пределах): касание самой
+     ракетки или под ней остаётся обычным управлением движением. Считаем
+     в CSS-пикселях (физических), а не в мировых: мировые единицы на
+     телефоне равны доле от 1920-эталона и сотни «мировых» единиц
+     превращаются там в пару пикселей — меньше пальца. */
   private touchRotateSide(clientX: number, clientY: number): -1 | 0 | 1 {
     const rect = this.canvas.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return 0
@@ -214,12 +214,12 @@ export class InputController {
     const px = (this.host.paddleX() / this.host.worldWidth()) * rect.width
     const py = (this.host.paddleY() / this.host.worldHeight()) * rect.height
     const halfW = ((this.host.paddleWidth() / this.host.worldWidth()) * rect.width) / 2
-    const extend = Math.min(24, halfW * 0.5) // небольшой вынос за края
-    const dead = halfW * 0.3 // мёртвая зона под центром
     const inY = gy >= py - 32 && gy <= py + 90
     if (!inY) return 0
-    if (gx >= px - halfW - extend && gx <= px - dead) return -1
-    if (gx >= px + dead && gx <= px + halfW + extend) return 1
+    const gap = 8 // зазор от края ракетки
+    const zone = 70 // ширина зоны наружу от края
+    if (gx >= px - halfW - gap - zone && gx <= px - halfW - gap) return -1
+    if (gx >= px + halfW + gap && gx <= px + halfW + gap + zone) return 1
     return 0
   }
 
@@ -237,6 +237,11 @@ export class InputController {
       this.pointerX = this.virtualX
       return
     }
+    // Палец, вращающий ракетку, её не двигает — иначе ракетка «прыгала»
+    // к месту касания при попытке повернуть. Вращение и движение —
+    // независимые жесты (вращающий палец фиксируется в handlePointerDown).
+    const pid = (e as PointerEvent).pointerId
+    if (pid !== undefined && pid === this.touchRotateId) return
     // Сразу после снятия захвата браузер шлёт mousemove с реальной позицией
     // курсора — игнорируем короткое окно, чтобы ракетка не прыгала.
     if (performance.now() < this.suppressMouseUntil) return
