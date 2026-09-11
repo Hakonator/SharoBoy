@@ -161,6 +161,7 @@ export class Game {
       paddleY: () => this.paddle.y,
       paddleWidth: () => this.paddle.w,
       worldWidth: () => this.w,
+      worldHeight: () => this.h,
       sfxEnsure: () => this.sfx.ensure(),
       isPlaying: () => this.phase === "playing",
       primaryAction: () => {

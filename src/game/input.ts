@@ -22,6 +22,8 @@ export interface InputHost {
   paddleWidth(): number
   /** Ширина игрового мира — для ограничения координат указателя. */
   worldWidth(): number
+  /** Высота игрового мира — для перевода касаний в координаты ракетки. */
+  worldHeight(): number
   /** Разблокировка звука по первому пользовательскому вводу. */
   sfxEnsure(): void
   /** Идёт ли сейчас партия (запуск шара и захват мыши — только в игре). */
@@ -113,7 +115,7 @@ export class InputController {
     document.addEventListener("pointerlockchange", this.handleLockChange)
     this.canvas.addEventListener("pointerdown", this.handlePointerDown)
     this.canvas.addEventListener("pointerup", this.handlePointerUp)
-    this.canvas.addEventListener("pointercancel", this.handlePointerUp)
+    this.canvas.addEventListener("pointercancel", this.handlePointerCancel)
     this.canvas.addEventListener("mousedown", this.handleMouseDown)
     window.addEventListener("mouseup", this.handleMouseUp)
     this.canvas.addEventListener("contextmenu", this.handleContextMenu)
@@ -128,7 +130,7 @@ export class InputController {
     document.removeEventListener("pointerlockchange", this.handleLockChange)
     this.canvas.removeEventListener("pointerdown", this.handlePointerDown)
     this.canvas.removeEventListener("pointerup", this.handlePointerUp)
-    this.canvas.removeEventListener("pointercancel", this.handlePointerUp)
+    this.canvas.removeEventListener("pointercancel", this.handlePointerCancel)
     this.canvas.removeEventListener("mousedown", this.handleMouseDown)
     window.removeEventListener("mouseup", this.handleMouseUp)
     this.canvas.removeEventListener("contextmenu", this.handleContextMenu)
@@ -198,11 +200,20 @@ export class InputController {
     return clientX - rect.left
   }
 
-  /* Координата указателя (clientY) → игровая координата Y. */
-  private clientToGameY(clientY: number): number {
+  /* Зона тач-поворота. Считаем в CSS-пикселях (физических), а не в мировых:
+     мировые единицы на телефоне равны доле от 1920-эталона и зона в 90–120
+     «мировых» единиц превращается там в несколько пикселей — меньше пальца. */
+  private touchRotateZone(clientX: number, clientY: number): boolean {
     const rect = this.canvas.getBoundingClientRect()
-    if (rect.height > 0) return ((clientY - rect.top) / rect.height) * this.canvas.height
-    return clientY - rect.top
+    if (rect.width <= 0 || rect.height <= 0) return false
+    const gx = clientX - rect.left
+    const gy = clientY - rect.top
+    const px = (this.host.paddleX() / this.host.worldWidth()) * rect.width
+    const py = (this.host.paddleY() / this.host.worldHeight()) * rect.height
+    const pw = (this.host.paddleWidth() / this.host.worldWidth()) * rect.width
+    const inX = Math.abs(gx - px) <= pw / 2 + 20
+    const inY = gy >= py - 44 && gy <= py + 120
+    return inX && inY
   }
 
   /* Сколько игровых пикселей приходится на один CSS-пиксель канваса
@@ -237,13 +248,8 @@ export class InputController {
         // ниже неё), вращаем ракетку: левая половина — поворот левой стороны
         // по часовой (leftButton), правая — наоборот (rightButton).
         const gx = this.clientToGameX(e.clientX)
-        const gy = this.clientToGameY(e.clientY)
         const px = this.host.paddleX()
-        const py = this.host.paddleY()
-        const pw = this.host.paddleWidth()
-        const inX = Math.abs(gx - px) <= pw / 2 + 14
-        const inY = gy >= py - 44 && gy <= py + 90
-        if (inX && inY) {
+        if (this.touchRotateZone(e.clientX, e.clientY)) {
           this.touchRotateId = e.pointerId
           this.leftButton = false
           this.rightButton = false
@@ -270,6 +276,16 @@ export class InputController {
     }
     if (this.host.isPlaying() && (e.pointerType === "touch" || e.pointerType === "pen")) {
       this.host.launchIfPlaying()
+    }
+  }
+
+  /* Отмена касания браузером (системный жест, смена пальца) — указатель
+     теряется без pointerup. Сбрасываем кнопки поворота, шар не запускаем. */
+  private handlePointerCancel = (e: PointerEvent) => {
+    if (this.touchRotateId === e.pointerId) {
+      this.touchRotateId = -1
+      this.leftButton = false
+      this.rightButton = false
     }
   }
 
