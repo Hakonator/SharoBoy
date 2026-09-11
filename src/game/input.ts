@@ -245,9 +245,12 @@ export class InputController {
     // независимые жесты (вращающий палец фиксируется в handlePointerDown).
     const pid = (e as PointerEvent).pointerId
     if (pid !== undefined && pid === this.touchRotateId) return
+    // Подавляем только эмулированные мышиные события после тача (у MouseEvent
+    // нет pointerId). Настоящие pointer-события от пальца/стилуса работают
+    // сразу — иначе движение ракетки «замирало» на полсекунды после касания.
+    if (pid === undefined && performance.now() < this.suppressMouseUntil) return
     // Сразу после снятия захвата браузер шлёт mousemove с реальной позицией
     // курсора — игнорируем короткое окно, чтобы ракетка не прыгала.
-    if (performance.now() < this.suppressMouseUntil) return
     this.pointerX = this.clientToGameX(e.clientX)
   }
 
