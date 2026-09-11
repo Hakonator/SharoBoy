@@ -93,6 +93,9 @@ export class InputController {
   }
 
   private handleMouseDown = (e: MouseEvent) => {
+    // Эмулированные браузером mouse-события после тача игнорируем:
+    // иначе тап по зоне поворота давал ложный leftButton/rightButton.
+    if (performance.now() < this.suppressMouseUntil) return
     if (e.button === 0) this.leftButton = true
     if (e.button === 2) this.rightButton = true
   }
@@ -250,7 +253,13 @@ export class InputController {
 
   private handlePointerDown = (e: PointerEvent) => {
     this.host.sfxEnsure()
-    if (e.pointerType === "touch") this.host.onTouchInput()
+    if (e.pointerType === "touch") {
+      this.host.onTouchInput()
+      // Браузер после отпускания пальца эмулирует мышь (mousemove/mousedown)
+      // в точке касания: без подавления ракетка «прыгала» к пальцу после
+      // поворота, а эмулированный mousedown давал ложный импульс вращения.
+      this.suppressMouseUntil = performance.now() + 600
+    }
     this.tapFire = true
     // Ракетку в точку касания НЕ перекидываем — палец/мышь могут быть далеко
     // от ракетки, и ракетка «уезжала» к месту тапа.
@@ -280,10 +289,14 @@ export class InputController {
       this.touchRotateId = -1
       this.leftButton = false
       this.rightButton = false
+      // Долгий поворот: окно подавления от pointerdown могло истечь —
+      // продлеваем, чтобы эмулированный mousemove не дёрнул ракетку.
+      if (e.pointerType === "touch") this.suppressMouseUntil = performance.now() + 600
       return
     }
     if (this.host.isPlaying() && (e.pointerType === "touch" || e.pointerType === "pen")) {
       this.host.launchIfPlaying()
+      if (e.pointerType === "touch") this.suppressMouseUntil = performance.now() + 600
     }
   }
 
@@ -295,6 +308,7 @@ export class InputController {
       this.leftButton = false
       this.rightButton = false
     }
+    if (e.pointerType === "touch") this.suppressMouseUntil = performance.now() + 600
   }
 
   private handleLockChange = () => {
