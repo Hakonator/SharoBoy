@@ -200,20 +200,27 @@ export class InputController {
     return clientX - rect.left
   }
 
-  /* Зона тач-поворота. Считаем в CSS-пикселях (физических), а не в мировых:
-     мировые единицы на телефоне равны доле от 1920-эталона и зона в 90–120
-     «мировых» единиц превращается там в несколько пикселей — меньше пальца. */
-  private touchRotateZone(clientX: number, clientY: number): boolean {
+  /* Сторона тач-поворота: -1 — левая зона, +1 — правая, 0 — не в зоне.
+     Считаем в CSS-пикселях (физических), а не в мировых: мировые единицы
+     на телефоне равны доле от 1920-эталона и зона в десятках «мировых»
+     единиц превращается там в пару пикселей — меньше пальца.
+     Под центром ракетки мёртвая зона (±30% полуширины): обычное нажатие
+     под серединой ракетки её не вращает — только у краёв. */
+  private touchRotateSide(clientX: number, clientY: number): -1 | 0 | 1 {
     const rect = this.canvas.getBoundingClientRect()
-    if (rect.width <= 0 || rect.height <= 0) return false
+    if (rect.width <= 0 || rect.height <= 0) return 0
     const gx = clientX - rect.left
     const gy = clientY - rect.top
     const px = (this.host.paddleX() / this.host.worldWidth()) * rect.width
     const py = (this.host.paddleY() / this.host.worldHeight()) * rect.height
-    const pw = (this.host.paddleWidth() / this.host.worldWidth()) * rect.width
-    const inX = Math.abs(gx - px) <= pw / 2 + 20
-    const inY = gy >= py - 44 && gy <= py + 120
-    return inX && inY
+    const halfW = ((this.host.paddleWidth() / this.host.worldWidth()) * rect.width) / 2
+    const extend = Math.min(24, halfW * 0.5) // небольшой вынос за края
+    const dead = halfW * 0.3 // мёртвая зона под центром
+    const inY = gy >= py - 32 && gy <= py + 90
+    if (!inY) return 0
+    if (gx >= px - halfW - extend && gx <= px - dead) return -1
+    if (gx >= px + dead && gx <= px + halfW + extend) return 1
+    return 0
   }
 
   /* Сколько игровых пикселей приходится на один CSS-пиксель канваса
@@ -244,17 +251,13 @@ export class InputController {
     // от ракетки, и ракетка «уезжала» к месту тапа.
     if (this.host.isPlaying()) {
       if (e.pointerType === "touch") {
-        // Тач: если палец попал в зону ракетки (сама ракетка + область чуть
-        // ниже неё), вращаем ракетку: левая половина — поворот левой стороны
-        // по часовой (leftButton), правая — наоборот (rightButton).
-        const gx = this.clientToGameX(e.clientX)
-        const px = this.host.paddleX()
-        if (this.touchRotateZone(e.clientX, e.clientY)) {
+        // Тач: зоны поворота — левый/правый край ракетки (+чуть ниже).
+        // Центр — «мёртвая зона»: нажатие под серединой не вращает ракетку.
+        const side = this.touchRotateSide(e.clientX, e.clientY)
+        if (side !== 0) {
           this.touchRotateId = e.pointerId
-          this.leftButton = false
-          this.rightButton = false
-          if (gx < px) this.leftButton = true
-          else this.rightButton = true
+          this.leftButton = side < 0
+          this.rightButton = side > 0
           return // палец занят поворотом — шар при отпускании не запускаем
         }
         return // обычный тач: шар запускается при отпускании (handlePointerUp)
