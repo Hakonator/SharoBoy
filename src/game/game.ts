@@ -1159,9 +1159,14 @@ export class Game {
     /* Единый масштаб мира (viewport.ts): скорость одна на всех экранах —
        поле в мировых единицах имеет сопоставимые пропорции. */
     const speed = base
+    /* Старт: шар на поверхности ракетки. На выпуклой ракетке (купол) —
+       на вершине купола, а не внутри тела. */
+    const bump = this.isDebugEffectActive("paddleConvex")
+      ? Physics.convexBump(this.paddle.w / 2)
+      : 0
     const ball: Ball = {
       x: this.paddle.x,
-      y: this.paddle.y - this.paddle.h / 2 - 9 - 2,
+      y: this.paddle.y - this.paddle.h / 2 - bump - 9 - 2,
       vx: 0,
       vy: 0,
       r: 9,
