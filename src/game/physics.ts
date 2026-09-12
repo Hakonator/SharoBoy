@@ -222,8 +222,11 @@ export class Physics {
     const sn = Math.sin(-rot)
     const lx = dx * cs - dy * sn
     const ly = dx * sn + dy * cs
+    // Купол поднимается над плоской гранью — расширяем зону проверки по высоте
+    const convex = g.paddleConvexActive()
+    const bump = convex ? Physics.convexBump(p.w / 2) : 0
     const halfW = p.w / 2 + ball.r
-    const halfH = p.h / 2 + ball.r
+    const halfH = p.h / 2 + ball.r + bump
     // Проверяем коллизию в локальных координатах
     if (Math.abs(lx) > halfW || Math.abs(ly) > halfH) return
     // Cooldown после предыдущего отскока: шар не должен повторно задевать
@@ -247,8 +250,12 @@ export class Physics {
     }
     // Купол (эффект отладки «Выпуклая ракетка»): верх ракетки — дуга,
     // мяч отражается по нормали дуги в точке попадания → «веер» отскоков.
-    if (g.paddleConvexActive()) {
-      this.collidePaddleConvex(ball, rel)
+    if (convex) {
+      // Точная проверка дуги: если шар ещё над куполом в этой точке —
+      // контакта нет (грубая AABB-зона шире фактической поверхности).
+      const ySurf = p.y - p.h / 2 - bump * (1 - rel * rel)
+      if (ball.y + ball.r < ySurf) return
+      this.collidePaddleConvex(ball, rel, bump)
       return
     }
     // Реальное физическое отражение от наклонной поверхности ракетки
@@ -301,11 +308,10 @@ export class Physics {
    *  y(rel) = yTop - bump·(1-rel²), нормаль в точке попадания считается
    *  из её наклона: dy/dx = 2·bump·rel / halfW. Удар в центр шлёт мяч
    *  строго вверх, ближе к краю — всё сильнее в сторону края («веер»). */
-  private collidePaddleConvex(ball: Ball, rel: number) {
+  private collidePaddleConvex(ball: Ball, rel: number, bump: number) {
     const g = this.g
     const p = g.paddle
     const halfW = p.w / 2
-    const bump = Physics.convexBump(halfW)
     const slope = (2 * bump * rel) / halfW
     const len = Math.hypot(slope, 1)
     const nx = slope / len

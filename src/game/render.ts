@@ -656,15 +656,23 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   }
   ctx.fillStyle = g
   if (v.convex) {
-    // Купол: верх — параболическая дуга (вершина на высоте bump над серединой),
-    // стороны прямые, низ прямой. bump согласован с Physics.convexBump.
+    // Купол с плавно закруглёнными углами: нижние углы — скругления rr,
+    // стыки купола с боками — мягкие quadratic-переходы, вершина купола
+    // на высоте bump (согласована с Physics.convexBump).
     const bump = Math.min((ww / 2) * 0.4, 42)
+    const rr = Math.min(hh * 0.5, 9)
+    const cap = bump * 0.16 // подъём купола у самого края (мягкий стык)
     ctx.beginPath()
-    ctx.moveTo(-ww / 2, hh / 2)
-    ctx.lineTo(-ww / 2, -hh / 2)
-    // Контрольная точка на удвоенной высоте: вершина квадратичной кривой = bump.
-    ctx.quadraticCurveTo(0, -hh / 2 - bump * 2, ww / 2, -hh / 2)
-    ctx.lineTo(ww / 2, hh / 2)
+    ctx.moveTo(-ww / 2 + rr, hh / 2)
+    ctx.quadraticCurveTo(-ww / 2, hh / 2, -ww / 2, hh / 2 - rr)
+    ctx.lineTo(-ww / 2, -hh / 2 + rr)
+    ctx.quadraticCurveTo(-ww / 2, -hh / 2, -ww / 2 + rr * 1.4, -hh / 2 - cap)
+    // Левая половина купола: контроль на высоте вершины → гладкий стык в центре
+    ctx.quadraticCurveTo(-ww / 4, -hh / 2 - bump, 0, -hh / 2 - bump)
+    ctx.quadraticCurveTo(ww / 4, -hh / 2 - bump, ww / 2 - rr * 1.4, -hh / 2 - cap)
+    ctx.quadraticCurveTo(ww / 2, -hh / 2, ww / 2, -hh / 2 + rr)
+    ctx.lineTo(ww / 2, hh / 2 - rr)
+    ctx.quadraticCurveTo(ww / 2, hh / 2, ww / 2 - rr, hh / 2)
     ctx.closePath()
     ctx.fill()
   } else {
@@ -679,8 +687,9 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     ctx.strokeStyle = "rgba(255,255,255,0.45)"
     ctx.lineWidth = 2.5
     ctx.beginPath()
-    ctx.moveTo(-ww / 2 + 6, -hh / 2 + 1)
-    ctx.quadraticCurveTo(0, -hh / 2 - bump * 2 + 5, ww / 2 - 6, -hh / 2 + 1)
+    ctx.moveTo(-ww / 2 + 8, -hh / 2 + 2)
+    ctx.quadraticCurveTo(-ww / 4, -hh / 2 - bump + 5, 0, -hh / 2 - bump + 3)
+    ctx.quadraticCurveTo(ww / 4, -hh / 2 - bump + 5, ww / 2 - 8, -hh / 2 + 2)
     ctx.stroke()
   } else {
     roundRect(ctx, -ww / 2 + 6, -hh / 2 + 2.5, ww - 12, 4, 2)
