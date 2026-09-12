@@ -361,6 +361,7 @@ export class Game {
       set laserArmedUntil(v) {
         g.laserArmedUntil = v
       },
+      paddleConvexActive: () => g.isDebugEffectActive("paddleConvex"),
       get shield() {
         return g.shield
       },

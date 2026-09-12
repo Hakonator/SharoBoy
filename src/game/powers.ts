@@ -5,9 +5,10 @@
  */
 import type { Effects } from "./effects"
 import type { SFX } from "./audio"
+import { Physics } from "./physics"
 import { POWER_META } from "./palette"
 import type { Ball, Block, BossState, PaddleState, PowerType, PowerUp } from "./types"
-import { fitTilt, rand } from "./utils"
+import { clamp, fitTilt, rand } from "./utils"
 
 /** Хост-интерфейс: состояние движка, которым управляет система бонусов. */
 export interface PowersWorld {
@@ -33,6 +34,8 @@ export interface PowersWorld {
   magnetUntil: number
   laserArmed: boolean
   laserArmedUntil: number
+  /** Эффект отладки «Выпуклая ракетка»: зона ловли повторяет купол. */
+  paddleConvexActive(): boolean
   shield: number
   lives: number
   shake: number
@@ -205,6 +208,17 @@ export class PowersSystem {
     g.sfx.power()
   }
 
+  /** Зона ловли бонуса: поверхность ракетки в точке X бонуса ± допуск.
+   *  На выпуклой ракетке (купол) верхняя граница повторяет изгиб купола —
+   *  бонус ловится верхней поверхностью, а не внутри тела ракетки. */
+  private catchTopY(pw: PowerUp, p: PaddleState): number {
+    const top = p.y - p.h / 2
+    if (!this.g.paddleConvexActive()) return top
+    const rel = clamp((pw.x - p.x) / (p.w / 2), -1, 1)
+    const bump = Physics.convexBump(p.w / 2)
+    return top - bump * (1 - rel * rel)
+  }
+
   updatePowers(dt: number) {
     const g = this.g
     const p = g.paddle
@@ -212,8 +226,10 @@ export class PowersSystem {
       pw.t += dt
       pw.y += pw.vy * dt
       pw.x += Math.sin(pw.t * 4) * 14 * dt
+      // Ловля на верхней поверхности: купол поднимает зону над телом ракетки
+      const topY = this.catchTopY(pw, p)
       if (
-        pw.y > p.y - p.h / 2 - 12 &&
+        pw.y > topY - 12 &&
         pw.y < p.y + p.h / 2 + 12 &&
         pw.x > p.x - p.w / 2 - 14 &&
         pw.x < p.x + p.w / 2 + 14
