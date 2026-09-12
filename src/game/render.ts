@@ -623,6 +623,8 @@ export interface PaddleView extends RenderView {
   laserArmed: boolean
   rocketUntil: number
   magnetUntil: number
+  /** Эффект отладки «Выпуклая ракетка»: верх — купол. */
+  convex?: boolean
 }
 
 export function drawPaddle(ctx: Ctx, v: PaddleView) {
@@ -653,12 +655,37 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     g.addColorStop(1, "#0e86a3")
   }
   ctx.fillStyle = g
-  roundRect(ctx, -ww / 2, -hh / 2, ww, hh, hh / 2)
-  ctx.fill()
+  if (v.convex) {
+    // Купол: верх — параболическая дуга (вершина на высоте bump над серединой),
+    // стороны прямые, низ прямой. bump согласован с Physics.convexBump.
+    const bump = Math.min((ww / 2) * 0.4, 42)
+    ctx.beginPath()
+    ctx.moveTo(-ww / 2, hh / 2)
+    ctx.lineTo(-ww / 2, -hh / 2)
+    // Контрольная точка на удвоенной высоте: вершина квадратичной кривой = bump.
+    ctx.quadraticCurveTo(0, -hh / 2 - bump * 2, ww / 2, -hh / 2)
+    ctx.lineTo(ww / 2, hh / 2)
+    ctx.closePath()
+    ctx.fill()
+  } else {
+    roundRect(ctx, -ww / 2, -hh / 2, ww, hh, hh / 2)
+    ctx.fill()
+  }
   ctx.shadowBlur = 0
   ctx.fillStyle = "rgba(255,255,255,0.5)"
-  roundRect(ctx, -ww / 2 + 6, -hh / 2 + 2.5, ww - 12, 4, 2)
-  ctx.fill()
+  if (v.convex) {
+    // Блик повторяет изгиб купола
+    const bump = Math.min((ww / 2) * 0.4, 42)
+    ctx.strokeStyle = "rgba(255,255,255,0.45)"
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    ctx.moveTo(-ww / 2 + 6, -hh / 2 + 1)
+    ctx.quadraticCurveTo(0, -hh / 2 - bump * 2 + 5, ww / 2 - 6, -hh / 2 + 1)
+    ctx.stroke()
+  } else {
+    roundRect(ctx, -ww / 2 + 6, -hh / 2 + 2.5, ww - 12, 4, 2)
+    ctx.fill()
+  }
   ctx.fillStyle = "rgba(4,18,26,0.35)"
   ctx.beginPath()
   ctx.arc(-ww / 2 + hh / 2, 0, hh * 0.22, 0, Math.PI * 2)

@@ -42,6 +42,8 @@ export interface PhysicsWorld {
   magnetActive(): boolean
   wideActive(): boolean
   shrinkActive(): boolean
+  /** Эффект отладки «Выпуклая ракетка»: верх — купол, отскок по нормали дуги. */
+  paddleConvexActive(): boolean
   addScore(n: number, x: number, y: number, color: string, size: number): void
   dropPower(x: number, y: number): void
   damageBoss(dmg: number, fromWeapon: boolean): void
@@ -243,6 +245,12 @@ export class Physics {
       g.fx.burst(ball.x, p.y + ly - ball.r, "#4dff9e", 8, 140)
       return
     }
+    // Купол (эффект отладки «Выпуклая ракетка»): верх ракетки — дуга,
+    // мяч отражается по нормали дуги в точке попадания → «веер» отскоков.
+    if (g.paddleConvexActive()) {
+      this.collidePaddleConvex(ball, rel)
+      return
+    }
     // Реальное физическое отражение от наклонной поверхности ракетки
     // Наль к поверхности ракетки (с учётом поворота): (sin(rot), -cos(rot))
     const nx = Math.sin(rot)
@@ -275,6 +283,53 @@ export class Physics {
       ball.x = ball.x + nx * pen
       ball.y = ball.y + ny * pen
     }
+    ball.squash = 1
+    ball.sinceHit = 0
+    p.squash = 1
+    g.combo = 0
+    g.sfx.paddle(Math.abs(rel))
+    g.fx.burst(ball.x, ball.y - ball.r, "#7cf5ff", 6, 130)
+    g.pushHud()
+  }
+
+  /** Высота купола выпуклой ракетки — единая для физики и рендера. */
+  static convexBump(halfW: number): number {
+    return Math.min(halfW * 0.4, 42)
+  }
+
+  /** Отскок от выпуклого купола ракетки. Верх — парабола
+   *  y(rel) = yTop - bump·(1-rel²), нормаль в точке попадания считается
+   *  из её наклона: dy/dx = 2·bump·rel / halfW. Удар в центр шлёт мяч
+   *  строго вверх, ближе к краю — всё сильнее в сторону края («веер»). */
+  private collidePaddleConvex(ball: Ball, rel: number) {
+    const g = this.g
+    const p = g.paddle
+    const halfW = p.w / 2
+    const bump = Physics.convexBump(halfW)
+    const slope = (2 * bump * rel) / halfW
+    const len = Math.hypot(slope, 1)
+    const nx = slope / len
+    const ny = -1 / len
+    // Отражение: v' = v - 2(v·n)n
+    const dot = ball.vx * nx + ball.vy * ny
+    const rvx = ball.vx - 2 * dot * nx
+    let rvy = ball.vy - 2 * dot * ny
+    // Страховка: купол всегда отбрасывает мяч вверх
+    if (rvy > 0) rvy = -rvy
+    ball.vx = rvx
+    ball.vy = rvy
+    // Скорость не должна упасть ниже нормы (плоский удар в вершину купола)
+    const sp = Math.hypot(ball.vx, ball.vy)
+    const minSpeed = ball.speed * 0.8
+    if (sp < minSpeed) {
+      const scale = minSpeed / (sp || 1)
+      ball.vx *= scale
+      ball.vy *= scale
+    }
+    // Выталкивание над куполом в точке попадания
+    const yTop = p.y - p.h / 2
+    const ySurf = yTop - bump * (1 - rel * rel)
+    if (ball.y > ySurf - ball.r) ball.y = ySurf - ball.r
     ball.squash = 1
     ball.sinceHit = 0
     p.squash = 1

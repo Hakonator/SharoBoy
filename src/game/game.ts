@@ -461,6 +461,7 @@ export class Game {
       magnetActive: () => g.time < g.magnetUntil,
       wideActive: () => g.time < g.wideUntil,
       shrinkActive: () => g.time < g.shrinkUntil,
+      paddleConvexActive: () => g.isDebugEffectActive("paddleConvex"),
       addScore: (n, x, y, color, size) => g.addScore(n, x, y, color, size),
       dropPower: (x, y) => g.powersSys.dropPower(x, y),
       damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
@@ -605,16 +606,16 @@ export class Game {
   /** Переключение эффекта отладки (вкл/выкл). */
   toggleDebugEffect(id: string) {
     const turnOn = !this.debugEffects.has(id)
+    // Режимы формы/поворота ракетки взаимоисключающие: физика отскока и
+    // управление реализуют один и тот же ресурс (форма/угол ракетки).
+    const paddleModes = ["paddleRotation", "paddleImpulse", "paddleConvex"]
     if (turnOn) {
-      // Прямое правило: «Поворот ракетки» и «Импульсный удар» не могут
-      // быть активны одновременно (реализация одна и та же — p.rot).
-      if (id === "paddleRotation") this.debugEffects.delete("paddleImpulse")
-      if (id === "paddleImpulse") this.debugEffects.delete("paddleRotation")
+      for (const m of paddleModes) if (m !== id) this.debugEffects.delete(m)
     }
     if (this.debugEffects.has(id)) this.debugEffects.delete(id)
     else this.debugEffects.add(id)
     // Сброс поворота при смене режима, чтобы не оставался наклон
-    if (id === "paddleRotation" || id === "paddleImpulse") {
+    if (paddleModes.includes(id)) {
       this.paddle.rot = 0
       this.paddleImpulse = null
       this.prevLeftDown = false
@@ -1567,6 +1568,7 @@ export class Game {
         laserArmed: this.laserArmed,
         rocketUntil: this.rocketUntil,
         magnetUntil: this.magnetUntil,
+        convex: this.isDebugEffectActive("paddleConvex"),
       })
     }
     drawParticles(ctx, this.fx.particles)
