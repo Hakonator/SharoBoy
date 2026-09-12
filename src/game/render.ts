@@ -16,6 +16,7 @@ import type {
   RenderView,
   Ring,
 } from "./types"
+import { Physics } from "./physics"
 import { clamp, rotatedExtents } from "./utils"
 
 type Ctx = CanvasRenderingContext2D
@@ -474,6 +475,8 @@ export interface LaserBeamView extends RenderView {
   paddle: PaddleState
   blocks: Block[]
   boss: BossState | null
+  /** Эффект отладки «Выпуклая ракетка»: пилоны поднимаются над куполом. */
+  convex?: boolean
 }
 
 export function drawLaserBeams(ctx: Ctx, v: LaserBeamView) {
@@ -482,9 +485,12 @@ export function drawLaserBeams(ctx: Ctx, v: LaserBeamView) {
   if (cyc >= 0.17) return
   const onAmt = 1 - cyc / 0.17
   const p = v.paddle
-  const pylonY = p.y - p.h / 2 - 8
+  // На выпуклой ракетке пилоны лазера стоят на поверхности купола под точкой
+  // (bump·(1 - rel²), rel = |s|), иначе — на плоской грани (8px над ней).
   for (const s of [-0.36, 0.36]) {
     const px = p.x + p.w * s
+    const dome = v.convex ? Physics.convexBump(p.w / 2) * (1 - s * s) : 0
+    const pylonY = p.y - p.h / 2 - (dome > 0 ? dome + 8 : 8)
     let hitY = -30
     let best: Block | null = null
     for (const b of v.blocks) {
@@ -702,27 +708,32 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   ctx.fill()
   const laserOn = time < v.laserUntil
   const rocketOn = time < v.rocketUntil
+  // На выпуклой ракетке пилоны оружия (лазер, ракета) стоят на поверхности
+  // купола под своей точкой: bump·(1 - rel²), rel = |s| (согласовано с weapons).
+  const domeBump = (s: number) => (v.convex ? Physics.convexBump(ww / 2) * (1 - s * s) : 0)
+  const topAt = (s: number) => -hh / 2 - domeBump(s)
   if (laserOn || v.laserArmed) {
     const charge = !laserOn && v.laserArmed ? 8 + Math.sin(time * 16) * 6 : 10
     ctx.shadowColor = "#7cf5ff"
     ctx.shadowBlur = charge
     ctx.fillStyle = !laserOn && v.laserArmed ? "#5fd8ef" : "#9df2ff"
     for (const s of [-0.36, 0.36]) {
-      roundRect(ctx, ww * s - 3, -hh / 2 - 9, 6, 10, 2)
+      roundRect(ctx, ww * s - 3, topAt(s) - 9, 6, 10, 2)
       ctx.fill()
     }
     ctx.shadowBlur = 0
   }
   if (rocketOn) {
+    const top0 = topAt(0)
     ctx.shadowColor = "#ffc94d"
     ctx.shadowBlur = 10
     ctx.fillStyle = "#ffe9a8"
-    roundRect(ctx, -4.5, -hh / 2 - 13, 9, 14, 3)
+    roundRect(ctx, -4.5, top0 - 13, 9, 14, 3)
     ctx.fill()
     ctx.shadowBlur = 0
     ctx.fillStyle = "#ff6a5c"
     ctx.beginPath()
-    ctx.arc(0, -hh / 2 - 13, 3, Math.PI, 0)
+    ctx.arc(0, top0 - 13, 3, Math.PI, 0)
     ctx.fill()
   }
   if (time < v.magnetUntil) {

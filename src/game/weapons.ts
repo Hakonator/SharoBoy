@@ -5,7 +5,8 @@
 import type { Effects } from "./effects"
 import type { SFX } from "./audio"
 import type { Block, BossState, PaddleState, Projectile } from "./types"
-import { rand, rotatedExtents } from "./utils"
+import { Physics } from "./physics"
+import { clamp, rand, rotatedExtents } from "./utils"
 
 /** Хост-интерфейс: состояние движка, которым управляет система оружия. */
 export interface WeaponsWorld {
@@ -20,6 +21,8 @@ export interface WeaponsWorld {
   laserArmedUntil: number
   laserUntil: number
   laserWasOn: boolean
+  /** Эффект отладки «Выпуклая ракетка»: пилоны оружия стоят над куполом. */
+  paddleConvexActive(): boolean
   shake: number
   flash: number
   fx: Effects
@@ -45,12 +48,29 @@ export class WeaponsSystem {
     g.weaponCd -= dt
     if (g.weaponCd > 0) return
     const p = g.paddle
-    g.projectiles.push({ x: p.x, y: p.y - p.h - 6, vy: -560, kind: "rocket", r: 7, dead: false })
+    // Ракета стартует с пилона оружия: на выпуклой ракетке пилон стоит
+    // на поверхности купола под точкой старта, иначе — над плоской гранью.
+    g.projectiles.push({
+      x: p.x,
+      y: p.y - this.pylonHeight(0) - 6,
+      vy: -560,
+      kind: "rocket",
+      r: 7,
+      dead: false,
+    })
     g.sfx.rocket()
     g.weaponCd = 0.32
-    g.fx.burst(p.x, p.y - p.h, "#ffc94d", 5, 120)
+    g.fx.burst(p.x, p.y - this.pylonHeight(0), "#ffc94d", 5, 120)
     if (g.projectiles.length > 48) g.projectiles.splice(0, g.projectiles.length - 48)
     p.squash = Math.max(p.squash, 0.35)
+  }
+
+  /** Высота пилона оружия над центром ракетки (поверхность под точкой px). */
+  private pylonHeight(px: number): number {
+    const p = this.g.paddle
+    const rel = clamp(px / (p.w / 2), -1, 1)
+    const dome = this.g.paddleConvexActive() ? Physics.convexBump(p.w / 2) * (1 - rel * rel) : 0
+    return p.h / 2 + (dome > 0 ? dome + 8 : 8)
   }
 
   /** Лазер-луч: взводится бонусом, залп по пробелу/клику, импульсы ~2 с. */
@@ -73,6 +93,8 @@ export class WeaponsSystem {
     if (on && !g.laserWasOn) {
       g.sfx.laser()
       const p = g.paddle
+      // Лазерные пилоны стоят на поверхности купола (bump под точкой),
+      // иначе — на плоской грани (8px над ней). Высота согласована с рендером.
       this.beamHit(p.x - p.w * 0.36)
       this.beamHit(p.x + p.w * 0.36)
       p.squash = Math.max(p.squash, 0.25)
@@ -82,7 +104,7 @@ export class WeaponsSystem {
 
   private beamHit(px: number) {
     const g = this.g
-    const pylonY = g.paddle.y - g.paddle.h / 2 - 8
+    const pylonY = g.paddle.y - this.pylonHeight(px)
     let best: Block | null = null
     let bestHH = 0
     for (const b of g.blocks) {

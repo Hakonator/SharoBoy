@@ -528,6 +528,8 @@ export class Game {
       set laserWasOn(v) {
         g.laserWasOn = v
       },
+      // Пилоны оружия (лазер, ракеты) на выпуклой ракетке стоят над куполом
+      paddleConvexActive: () => g.isDebugEffectActive("paddleConvex"),
       get shake() {
         return g.shake
       },
@@ -1555,6 +1557,8 @@ export class Game {
       paddle: this.paddle,
       blocks: this.blocks,
       boss: this.bossSys.boss,
+      // Пилоны лазера на выпуклой ракетке стоят над куполом (согласовано с weapons)
+      convex: this.isDebugEffectActive("paddleConvex"),
     })
     drawProjectiles(ctx, this.projectiles, this.time)
     drawBalls(ctx, this.balls, {
