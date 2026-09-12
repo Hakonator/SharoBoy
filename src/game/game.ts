@@ -1164,9 +1164,7 @@ export class Game {
     const speed = base
     /* Старт: шар на поверхности ракетки. На выпуклой ракетке (купол) —
        на вершине купола, а не внутри тела. */
-    const bump = this.isDebugEffectActive("paddleConvex")
-      ? Physics.convexBump(this.paddle.w / 2)
-      : 0
+    const bump = Physics.surfaceAt(this.paddle.w / 2, 0, this.isDebugEffectActive("paddleConvex"))
     const ball: Ball = {
       x: this.paddle.x,
       y: this.paddle.y - this.paddle.h / 2 - bump - 9 - 2,

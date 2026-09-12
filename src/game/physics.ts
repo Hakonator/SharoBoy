@@ -95,8 +95,7 @@ export class Physics {
     ball.x = p.x + ball.stuckOffset
     if (g.paddleConvexActive()) {
       const rel = clamp(ball.stuckOffset / (p.w / 2), -1, 1)
-      const bump = Physics.convexBump(p.w / 2)
-      ball.y = p.y - p.h / 2 - bump * (1 - rel * rel) - ball.r - 2
+      ball.y = p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, true) - ball.r - 2
     } else {
       ball.y = p.y - p.h / 2 - ball.r - 2
     }
@@ -261,7 +260,7 @@ export class Physics {
     if (convex) {
       // Точная проверка дуги: если шар ещё над куполом в этой точке —
       // контакта нет (грубая AABB-зона шире фактической поверхности).
-      const ySurf = p.y - p.h / 2 - bump * (1 - rel * rel)
+      const ySurf = p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, true)
       if (ball.y + ball.r < ySurf) return
       this.collidePaddleConvex(ball, rel, bump)
       return
@@ -310,6 +309,14 @@ export class Physics {
   /** Высота купола выпуклой ракетки — единая для физики и рендера. */
   static convexBump(halfW: number): number {
     return Math.min(halfW * 0.4, 42)
+  }
+
+  /** Поверхность ракетки в точке relX ∈ [-1,1] над плоской гранью (у плоской
+   *  формы всегда 0). ЕДИНАЯ формула для физики, ловли бонусов, оружия и
+   *  рендера — форма и коллизии не могут разойтись. Новые формы (скины)
+   *  добавляются здесь, потребители подхватывают их автоматически. */
+  static surfaceAt(halfW: number, relX: number, convex: boolean): number {
+    return convex ? Physics.convexBump(halfW) * (1 - relX * relX) : 0
   }
 
   /** Отскок от выпуклого купола ракетки. Верх — парабола

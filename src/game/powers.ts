@@ -212,11 +212,8 @@ export class PowersSystem {
    *  На выпуклой ракетке (купол) верхняя граница повторяет изгиб купола —
    *  бонус ловится верхней поверхностью, а не внутри тела ракетки. */
   private catchTopY(pw: PowerUp, p: PaddleState): number {
-    const top = p.y - p.h / 2
-    if (!this.g.paddleConvexActive()) return top
     const rel = clamp((pw.x - p.x) / (p.w / 2), -1, 1)
-    const bump = Physics.convexBump(p.w / 2)
-    return top - bump * (1 - rel * rel)
+    return p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, this.g.paddleConvexActive())
   }
 
   updatePowers(dt: number) {

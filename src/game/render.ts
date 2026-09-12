@@ -486,10 +486,10 @@ export function drawLaserBeams(ctx: Ctx, v: LaserBeamView) {
   const onAmt = 1 - cyc / 0.17
   const p = v.paddle
   // На выпуклой ракетке пилоны лазера стоят на поверхности купола под точкой
-  // (bump·(1 - rel²), rel = |s|), иначе — на плоской грани (8px над ней).
+  // (Physics.surfaceAt), иначе — на плоской грани (8px над ней).
   for (const s of [-0.36, 0.36]) {
     const px = p.x + p.w * s
-    const dome = v.convex ? Physics.convexBump(p.w / 2) * (1 - s * s) : 0
+    const dome = Physics.surfaceAt(p.w / 2, s, v.convex === true)
     const pylonY = p.y - p.h / 2 - (dome > 0 ? dome + 8 : 8)
     let hitY = -30
     let best: Block | null = null
@@ -664,8 +664,8 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   if (v.convex) {
     // Купол с плавно закруглёнными углами: нижние углы — скругления rr,
     // стыки купола с боками — мягкие quadratic-переходы, вершина купола
-    // на высоте bump (согласована с Physics.convexBump).
-    const bump = Math.min((ww / 2) * 0.4, 42)
+    // на высоте bump (Physics.convexBump — единая с физикой).
+    const bump = Physics.convexBump(ww / 2)
     const rr = Math.min(hh * 0.5, 9)
     const cap = bump * 0.16 // подъём купола у самого края (мягкий стык)
     ctx.beginPath()
@@ -689,7 +689,7 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   ctx.fillStyle = "rgba(255,255,255,0.5)"
   if (v.convex) {
     // Блик повторяет изгиб купола
-    const bump = Math.min((ww / 2) * 0.4, 42)
+    const bump = Physics.convexBump(ww / 2)
     ctx.strokeStyle = "rgba(255,255,255,0.45)"
     ctx.lineWidth = 2.5
     ctx.beginPath()
@@ -709,8 +709,8 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   const laserOn = time < v.laserUntil
   const rocketOn = time < v.rocketUntil
   // На выпуклой ракетке пилоны оружия (лазер, ракета) стоят на поверхности
-  // купола под своей точкой: bump·(1 - rel²), rel = |s| (согласовано с weapons).
-  const domeBump = (s: number) => (v.convex ? Physics.convexBump(ww / 2) * (1 - s * s) : 0)
+  // купола под своей точкой: Physics.surfaceAt (согласовано с weapons).
+  const domeBump = (s: number) => Physics.surfaceAt(ww / 2, s, v.convex === true)
   const topAt = (s: number) => -hh / 2 - domeBump(s)
   if (laserOn || v.laserArmed) {
     const charge = !laserOn && v.laserArmed ? 8 + Math.sin(time * 16) * 6 : 10

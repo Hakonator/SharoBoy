@@ -65,11 +65,12 @@ export class WeaponsSystem {
     p.squash = Math.max(p.squash, 0.35)
   }
 
-  /** Высота пилона оружия над центром ракетки (поверхность под точкой px). */
+  /** Высота пилона оружия над центром ракетки (поверхность под точкой px).
+   *  Единая формула поверхности через Physics.surfaceAt — согласована с рендером. */
   private pylonHeight(px: number): number {
     const p = this.g.paddle
     const rel = clamp(px / (p.w / 2), -1, 1)
-    const dome = this.g.paddleConvexActive() ? Physics.convexBump(p.w / 2) * (1 - rel * rel) : 0
+    const dome = Physics.surfaceAt(p.w / 2, rel, this.g.paddleConvexActive())
     return p.h / 2 + (dome > 0 ? dome + 8 : 8)
   }
 
