@@ -698,9 +698,9 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     ctx.quadraticCurveTo(-ww / 2, hh / 2, -ww / 2, hh / 2 - rr)
     ctx.lineTo(-ww / 2, -hh / 2 + rr)
     ctx.quadraticCurveTo(-ww / 2, -hh / 2, -ww / 2 + rr * 1.4, topE)
-    // Вогнутая дуга ∪: контроль на уровне краёв → гребень провисает к центру
-    ctx.quadraticCurveTo(-ww / 4, topE, 0, topC)
-    ctx.quadraticCurveTo(ww / 4, topE, ww / 2 - rr * 1.4, topE)
+    // Гладкая ∪-дуга: контроль на уровне центра → гребень без угла
+    ctx.quadraticCurveTo(-ww / 4, topC, 0, topC)
+    ctx.quadraticCurveTo(ww / 4, topC, ww / 2 - rr * 1.4, topE)
     ctx.quadraticCurveTo(ww / 2, -hh / 2, ww / 2, -hh / 2 + rr)
     ctx.lineTo(ww / 2, hh / 2 - rr)
     ctx.quadraticCurveTo(ww / 2, hh / 2, ww / 2 - rr, hh / 2)
