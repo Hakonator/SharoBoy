@@ -687,21 +687,20 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     ctx.closePath()
     ctx.fill()
   } else if (shape === "concave") {
-    // Чаша — обычное тело (низ фиксирован на +hh/2, не вылезает за щит),
-    // сверху вогнутый вырез. Глубина ≤ hh/2 (concaveDepth), чтобы шар не
-    // проваливался сквозь тело. Торцы скруглены, верхние углы — скругление
-    // к началу вогнутой дуги.
-    const bump = Physics.concaveDepth(ww / 2, hh)
+    // Чаша: центр на грани, края приподняты на concaveDepth. Низ фиксирован
+    // на +hh/2 (не вылезает за щит). Зеркально куполу относительно грани.
+    const depth = Physics.concaveDepth(ww / 2, hh)
     const rr = Math.min(hh * 0.45, 8)
-    const cap = bump * 0.12
-    const topC = -hh / 2 + bump
+    const topE = -hh / 2 - depth // поднятые края
+    const topC = -hh / 2 // центр на грани
     ctx.beginPath()
     ctx.moveTo(-ww / 2 + rr, hh / 2)
     ctx.quadraticCurveTo(-ww / 2, hh / 2, -ww / 2, hh / 2 - rr)
     ctx.lineTo(-ww / 2, -hh / 2 + rr)
-    ctx.quadraticCurveTo(-ww / 2, -hh / 2, -ww / 2 + rr * 1.6, -hh / 2 + cap)
-    ctx.quadraticCurveTo(-ww / 4, topC, 0, topC)
-    ctx.quadraticCurveTo(ww / 4, topC, ww / 2 - rr * 1.6, -hh / 2 + cap)
+    ctx.quadraticCurveTo(-ww / 2, -hh / 2, -ww / 2 + rr * 1.4, topE)
+    // Вогнутая дуга ∪: контроль на уровне краёв → гребень провисает к центру
+    ctx.quadraticCurveTo(-ww / 4, topE, 0, topC)
+    ctx.quadraticCurveTo(ww / 4, topE, ww / 2 - rr * 1.4, topE)
     ctx.quadraticCurveTo(ww / 2, -hh / 2, ww / 2, -hh / 2 + rr)
     ctx.lineTo(ww / 2, hh / 2 - rr)
     ctx.quadraticCurveTo(ww / 2, hh / 2, ww / 2 - rr, hh / 2)
@@ -724,14 +723,14 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     ctx.quadraticCurveTo(ww / 4, topC + 5, ww / 2 - 8, -hh / 2 + 2)
     ctx.stroke()
   } else if (shape === "concave") {
-    const bump = Physics.concaveDepth(ww / 2, hh)
-    const topC = -hh / 2 + bump
+    const depth = Physics.concaveDepth(ww / 2, hh)
+    const topC = -hh / 2 + depth // края выше — блик вогнут к центру
     ctx.strokeStyle = "rgba(255,255,255,0.4)"
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.moveTo(-ww / 2 + 12, -hh / 2 + 3)
-    ctx.quadraticCurveTo(-ww / 4, topC + 4, 0, topC + 2)
-    ctx.quadraticCurveTo(ww / 4, topC + 4, ww / 2 - 12, -hh / 2 + 3)
+    ctx.moveTo(-ww / 2 + 12, -hh / 2 - depth + 3)
+    ctx.quadraticCurveTo(-ww / 4, topC + 3, 0, -hh / 2 + 2)
+    ctx.quadraticCurveTo(ww / 4, topC + 3, ww / 2 - 12, -hh / 2 - depth + 3)
     ctx.stroke()
   } else {
     roundRect(ctx, -ww / 2 + 6, -hh / 2 + 2.5, ww - 12, 4, 2)

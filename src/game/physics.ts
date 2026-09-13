@@ -94,8 +94,7 @@ export class Physics {
     const p = g.paddle
     ball.x = p.x + ball.stuckOffset
     const rel = clamp(ball.stuckOffset / (p.w / 2), -1, 1)
-    ball.y =
-      p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, g.paddleShape(), p.h) - ball.r - 2
+    ball.y = p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, g.paddleShape(), p.h) - ball.r - 2
   }
 
   /** Интеграция движения шара с подшагами: стены, щит, потери, столкновения. */
@@ -309,23 +308,23 @@ export class Physics {
     return Math.min(halfW * 0.4, 42)
   }
 
-  /** Глубина чаши (вогнутой формы): впадина не может быть глубже тела,
-   *  иначе шар/бонус проваливаются «сквозь» ракетку. */
+  /** Высота приподнятых краёв вогнутой ракетки (чаши) — не выше тела,
+   *  чтобы шар не проваливался сквозь края. */
   static concaveDepth(halfW: number, hh: number): number {
     return Math.min(Physics.convexBump(halfW), hh * 0.5)
   }
 
   /** Поверхность ракетки в точке relX ∈ [-1,1] относительно плоской грани:
-   *  «convex» — купол (плюс, выше грани), «concave» — чаша (минус, ниже
-   *  грани, но не глубже тела hh), «flat» — 0. ЕДИНАЯ формула для физики,
-   *  ловли бонусов, оружия и рендера — форма и коллизии не могут разойтись.
-   *  Новые формы (скины) добавляются здесь, потребители подхватывают их
-   *  автоматически. */
+   *  «convex» — купол (центр выше краёв: −bump·(1−rel²)), «concave» — чаша
+   *  (края подняты, центр на грани: +depth·rel²), «flat» — 0. ЕДИНАЯ формула
+   *  для физики, ловли бонусов, оружия и рендера — форма и коллизии не могут
+   *  разойтись. Новые формы (скины) добавляются здесь, потребители
+   *  подхватывают их автоматически. */
   static surfaceAt(halfW: number, relX: number, kind: PaddleShapeKind, hh = 0): number {
     if (kind === "flat") return 0
-    const bump = kind === "concave" ? Physics.concaveDepth(halfW, hh) : Physics.convexBump(halfW)
-    const sign = kind === "convex" ? 1 : -1
-    return bump * (1 - relX * relX) * sign
+    if (kind === "concave") return Physics.concaveDepth(halfW, hh) * relX * relX
+    // convex: центр выше краёв на bump, края на грани.
+    return -Physics.convexBump(halfW) * (1 - relX * relX)
   }
 
   /** Отскок от изогнутой поверхности ракетки (купол или чаша). Поверхность —
