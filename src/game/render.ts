@@ -704,6 +704,8 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     ctx.quadraticCurveTo(ww / 2, -hh / 2, ww / 2, -hh / 2 + rr)
     ctx.lineTo(ww / 2, hh / 2 - rr)
     ctx.quadraticCurveTo(ww / 2, hh / 2, ww / 2 - rr, hh / 2)
+    // Низ выпуклый вниз ∪: контроль ниже краёв на concaveDepth
+    ctx.quadraticCurveTo(0, hh / 2 + depth, -ww / 2 + rr, hh / 2)
     ctx.closePath()
     ctx.fill()
   } else {
