@@ -94,7 +94,8 @@ export class Physics {
     const p = g.paddle
     ball.x = p.x + ball.stuckOffset
     const rel = clamp(ball.stuckOffset / (p.w / 2), -1, 1)
-    ball.y = p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, g.paddleShape()) - ball.r - 2
+    ball.y =
+      p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, g.paddleShape(), p.h) - ball.r - 2
   }
 
   /** Интеграция движения шара с подшагами: стены, щит, потери, столкновения. */
@@ -257,7 +258,7 @@ export class Physics {
     if (shape !== "flat") {
       // Точная проверка: если шар ещё над поверхностью в этой точке —
       // контакта нет (грубая AABB-зона шире фактической поверхности).
-      const ySurf = p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, shape)
+      const ySurf = p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, shape, p.h)
       if (ball.y + ball.r < ySurf) return
       this.collidePaddleShape(ball, rel, shape)
       return
@@ -308,14 +309,21 @@ export class Physics {
     return Math.min(halfW * 0.4, 42)
   }
 
+  /** Глубина чаши (вогнутой формы): впадина не может быть глубже тела,
+   *  иначе шар/бонус проваливаются «сквозь» ракетку. */
+  static concaveDepth(halfW: number, hh: number): number {
+    return Math.min(Physics.convexBump(halfW), hh * 0.5)
+  }
+
   /** Поверхность ракетки в точке relX ∈ [-1,1] относительно плоской грани:
-   *  «convex» — купол (плюс, выше грани), «concave» — чаша (минус, ниже),
-   *  «flat» — 0. ЕДИНАЯ формула для физики, ловли бонусов, оружия и рендера
-   *  — форма и коллизии не могут разойтись. Новые формы (скины) добавляются
-   *  здесь, потребители подхватывают их автоматически. */
-  static surfaceAt(halfW: number, relX: number, kind: PaddleShapeKind): number {
+   *  «convex» — купол (плюс, выше грани), «concave» — чаша (минус, ниже
+   *  грани, но не глубже тела hh), «flat» — 0. ЕДИНАЯ формула для физики,
+   *  ловли бонусов, оружия и рендера — форма и коллизии не могут разойтись.
+   *  Новые формы (скины) добавляются здесь, потребители подхватывают их
+   *  автоматически. */
+  static surfaceAt(halfW: number, relX: number, kind: PaddleShapeKind, hh = 0): number {
     if (kind === "flat") return 0
-    const bump = Physics.convexBump(halfW)
+    const bump = kind === "concave" ? Physics.concaveDepth(halfW, hh) : Physics.convexBump(halfW)
     const sign = kind === "convex" ? 1 : -1
     return bump * (1 - relX * relX) * sign
   }
@@ -328,11 +336,13 @@ export class Physics {
     const g = this.g
     const p = g.paddle
     const halfW = p.w / 2
+    // Глубина чаши глубже не входит в тело (concaveDepth), купол — convexBump.
+    const bump = kind === "concave" ? Physics.concaveDepth(halfW, p.h) : Physics.convexBump(halfW)
     const sign = kind === "concave" ? -1 : 1
     // Наклон поверхности: f'(x) = -sign·2·bump·rel / halfW (нормаль вверх).
     // Для convex (sign=+1) rel>0 → наклон вниз к краю, нормаль наружу вправо-
     // вверх; для concave — зеркально (к центру).
-    const slope = (sign * 2 * Physics.convexBump(halfW) * rel) / halfW
+    const slope = (sign * 2 * bump * rel) / halfW
     const len = Math.hypot(slope, 1)
     const nx = slope / len
     const ny = -1 / len
@@ -353,7 +363,7 @@ export class Physics {
       ball.vy *= scale
     }
     // Выталкивание на поверхность формы в точке попадания
-    const ySurf = p.y - p.h / 2 - Physics.surfaceAt(halfW, rel, kind)
+    const ySurf = p.y - p.h / 2 - Physics.surfaceAt(halfW, rel, kind, p.h)
     if (ball.y > ySurf - ball.r) ball.y = ySurf - ball.r
     ball.squash = 1
     ball.sinceHit = 0

@@ -220,7 +220,7 @@ export class PowersSystem {
    *  Купол выше грани, чаша — ниже (вогнутая ловит бонус внутри себя). */
   private catchTopY(pw: PowerUp, p: PaddleState): number {
     const rel = clamp((pw.x - p.x) / (p.w / 2), -1, 1)
-    return p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, this.g.paddleShape())
+    return p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, this.g.paddleShape(), p.h)
   }
 
   updatePowers(dt: number) {

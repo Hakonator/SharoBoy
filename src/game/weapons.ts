@@ -70,7 +70,7 @@ export class WeaponsSystem {
   private pylonHeight(px: number): number {
     const p = this.g.paddle
     const rel = clamp(px / (p.w / 2), -1, 1)
-    return p.h / 2 + Physics.surfaceAt(p.w / 2, rel, this.g.paddleShape()) + 8
+    return p.h / 2 + Physics.surfaceAt(p.w / 2, rel, this.g.paddleShape(), p.h) + 8
   }
 
   /** Лазер-луч: взводится бонусом, залп по пробелу/клику, импульсы ~2 с. */

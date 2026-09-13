@@ -1172,7 +1172,7 @@ export class Game {
        поле в мировых единицах имеет сопоставимые пропорции. */
     const speed = base
     /* Старт: шар на поверхности ракетки (купол выше грани, чаша — ниже). */
-    const bump = Physics.surfaceAt(this.paddle.w / 2, 0, this.paddleShapeKind())
+    const bump = Physics.surfaceAt(this.paddle.w / 2, 0, this.paddleShapeKind(), this.paddle.h)
     const ball: Ball = {
       x: this.paddle.x,
       y: this.paddle.y - this.paddle.h / 2 - bump - 9 - 2,
