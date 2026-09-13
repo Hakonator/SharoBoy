@@ -5,6 +5,11 @@
 
 export type Phase = "menu" | "playing" | "paused" | "over" | "won"
 
+/** Форма верхней поверхности ракетки. Единая формула поверхности —
+ *  Physics.surfaceAt; отскоки, ловля бонусов и пилоны оружия
+ *  подхватывают форму автоматически. */
+export type PaddleShapeKind = "flat" | "convex" | "concave"
+
 export interface HudData {
   phase: Phase
   score: number

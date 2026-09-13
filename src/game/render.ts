@@ -8,6 +8,7 @@ import type {
   Block,
   BossState,
   Bubble,
+  PaddleShapeKind,
   PaddleState,
   Particle,
   Popup,
@@ -475,8 +476,8 @@ export interface LaserBeamView extends RenderView {
   paddle: PaddleState
   blocks: Block[]
   boss: BossState | null
-  /** Эффект отладки «Выпуклая ракетка»: пилоны поднимаются над куполом. */
-  convex?: boolean
+  /** Форма верхней поверхности ракетки: пилоны стоят на ней. */
+  shape?: PaddleShapeKind
 }
 
 export function drawLaserBeams(ctx: Ctx, v: LaserBeamView) {
@@ -485,12 +486,12 @@ export function drawLaserBeams(ctx: Ctx, v: LaserBeamView) {
   if (cyc >= 0.17) return
   const onAmt = 1 - cyc / 0.17
   const p = v.paddle
-  // На выпуклой ракетке пилоны лазера стоят на поверхности купола под точкой
-  // (Physics.surfaceAt), иначе — на плоской грани (8px над ней).
+  // Пилоны лазера стоят на поверхности формы ракетки (Physics.surfaceAt):
+  // купол выше грани, чаша — ниже; над поверхностью пилон торчит на 8px.
   for (const s of [-0.36, 0.36]) {
     const px = p.x + p.w * s
-    const dome = Physics.surfaceAt(p.w / 2, s, v.convex === true)
-    const pylonY = p.y - p.h / 2 - (dome > 0 ? dome + 8 : 8)
+    const dome = Physics.surfaceAt(p.w / 2, s, v.shape ?? "flat")
+    const pylonY = p.y - p.h / 2 - dome - 8
     let hitY = -30
     let best: Block | null = null
     for (const b of v.blocks) {
@@ -629,8 +630,8 @@ export interface PaddleView extends RenderView {
   laserArmed: boolean
   rocketUntil: number
   magnetUntil: number
-  /** Эффект отладки «Выпуклая ракетка»: верх — купол. */
-  convex?: boolean
+  /** Форма верхней поверхности: «convex» — купол, «concave» — чаша. */
+  shape?: PaddleShapeKind
 }
 
 export function drawPaddle(ctx: Ctx, v: PaddleView) {
@@ -661,24 +662,31 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     g.addColorStop(1, "#0e86a3")
   }
   ctx.fillStyle = g
-  if (v.convex) {
-    // Купол с плавно закруглёнными углами: нижние углы — скругления rr,
-    // стыки купола с боками — мягкие quadratic-переходы, вершина купола
-    // на высоте bump (Physics.convexBump — единая с физикой).
+  const shape = v.shape ?? "flat"
+  if (shape !== "flat") {
+    // Лента постоянной толщины hh: верхняя и нижняя поверхности — одинаковые
+    // параболы, нижняя сдвинута на hh вниз; торцы по краям скруглены.
     const bump = Physics.convexBump(ww / 2)
+    const sign = shape === "convex" ? 1 : -1 // купол ∩ / чаша ∪
     const rr = Math.min(hh * 0.5, 9)
-    const cap = bump * 0.16 // подъём купола у самого края (мягкий стык)
+    const cap = bump * 0.16 // мягкий стык у краёв (подъём выше/ниже грани)
+    const topE = -hh / 2 - sign * cap // край верхней поверхности
+    const topC = -hh / 2 - sign * bump // центр верхней поверхности
+    const botC = topC + hh // центр нижней поверхности (= hh/2 - sign·bump)
     ctx.beginPath()
     ctx.moveTo(-ww / 2 + rr, hh / 2)
     ctx.quadraticCurveTo(-ww / 2, hh / 2, -ww / 2, hh / 2 - rr)
     ctx.lineTo(-ww / 2, -hh / 2 + rr)
-    ctx.quadraticCurveTo(-ww / 2, -hh / 2, -ww / 2 + rr * 1.4, -hh / 2 - cap)
-    // Левая половина купола: контроль на высоте вершины → гладкий стык в центре
-    ctx.quadraticCurveTo(-ww / 4, -hh / 2 - bump, 0, -hh / 2 - bump)
-    ctx.quadraticCurveTo(ww / 4, -hh / 2 - bump, ww / 2 - rr * 1.4, -hh / 2 - cap)
+    ctx.quadraticCurveTo(-ww / 2, -hh / 2, -ww / 2 + rr * 1.4, topE)
+    // Верхняя дуга: контроль на высоте центра → гладкий гребень/впадина
+    ctx.quadraticCurveTo(-ww / 4, topC, 0, topC)
+    ctx.quadraticCurveTo(ww / 4, topC, ww / 2 - rr * 1.4, topE)
     ctx.quadraticCurveTo(ww / 2, -hh / 2, ww / 2, -hh / 2 + rr)
     ctx.lineTo(ww / 2, hh / 2 - rr)
     ctx.quadraticCurveTo(ww / 2, hh / 2, ww / 2 - rr, hh / 2)
+    // Нижняя дуга (сдвиг на hh) обратно к левому краю
+    ctx.quadraticCurveTo(ww / 4, botC, 0, botC)
+    ctx.quadraticCurveTo(-ww / 4, botC, -ww / 2 + rr, hh / 2)
     ctx.closePath()
     ctx.fill()
   } else {
@@ -687,15 +695,17 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   }
   ctx.shadowBlur = 0
   ctx.fillStyle = "rgba(255,255,255,0.5)"
-  if (v.convex) {
-    // Блик повторяет изгиб купола
+  if (shape !== "flat") {
+    // Блик повторяет изгиб верхней поверхности
     const bump = Physics.convexBump(ww / 2)
+    const sign = shape === "convex" ? 1 : -1
+    const topC = -hh / 2 - sign * bump
     ctx.strokeStyle = "rgba(255,255,255,0.45)"
     ctx.lineWidth = 2.5
     ctx.beginPath()
     ctx.moveTo(-ww / 2 + 8, -hh / 2 + 2)
-    ctx.quadraticCurveTo(-ww / 4, -hh / 2 - bump + 5, 0, -hh / 2 - bump + 3)
-    ctx.quadraticCurveTo(ww / 4, -hh / 2 - bump + 5, ww / 2 - 8, -hh / 2 + 2)
+    ctx.quadraticCurveTo(-ww / 4, topC + (sign > 0 ? 5 : -5), 0, topC + (sign > 0 ? 3 : -3))
+    ctx.quadraticCurveTo(ww / 4, topC + (sign > 0 ? 5 : -5), ww / 2 - 8, -hh / 2 + 2)
     ctx.stroke()
   } else {
     roundRect(ctx, -ww / 2 + 6, -hh / 2 + 2.5, ww - 12, 4, 2)
@@ -708,9 +718,9 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   ctx.fill()
   const laserOn = time < v.laserUntil
   const rocketOn = time < v.rocketUntil
-  // На выпуклой ракетке пилоны оружия (лазер, ракета) стоят на поверхности
-  // купола под своей точкой: Physics.surfaceAt (согласовано с weapons).
-  const domeBump = (s: number) => Physics.surfaceAt(ww / 2, s, v.convex === true)
+  // Пилоны оружия (лазер, ракета) стоят на поверхности формы ракетки под
+  // своей точкой: Physics.surfaceAt (купол выше грани, чаша — ниже).
+  const domeBump = (s: number) => Physics.surfaceAt(ww / 2, s, shape)
   const topAt = (s: number) => -hh / 2 - domeBump(s)
   if (laserOn || v.laserArmed) {
     const charge = !laserOn && v.laserArmed ? 8 + Math.sin(time * 16) * 6 : 10

@@ -27,6 +27,7 @@ import type {
   Block,
   BossState,
   Bubble,
+  PaddleShapeKind,
   PaddleState,
   Phase,
   PowerUp,
@@ -361,7 +362,7 @@ export class Game {
       set laserArmedUntil(v) {
         g.laserArmedUntil = v
       },
-      paddleConvexActive: () => g.isDebugEffectActive("paddleConvex"),
+      paddleShape: () => g.paddleShapeKind(),
       get shield() {
         return g.shield
       },
@@ -462,7 +463,7 @@ export class Game {
       magnetActive: () => g.time < g.magnetUntil,
       wideActive: () => g.time < g.wideUntil,
       shrinkActive: () => g.time < g.shrinkUntil,
-      paddleConvexActive: () => g.isDebugEffectActive("paddleConvex"),
+      paddleShape: () => g.paddleShapeKind(),
       addScore: (n, x, y, color, size) => g.addScore(n, x, y, color, size),
       dropPower: (x, y) => g.powersSys.dropPower(x, y),
       damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
@@ -528,8 +529,8 @@ export class Game {
       set laserWasOn(v) {
         g.laserWasOn = v
       },
-      // Пилоны оружия (лазер, ракеты) на выпуклой ракетке стоят над куполом
-      paddleConvexActive: () => g.isDebugEffectActive("paddleConvex"),
+      // Пилоны оружия (лазер, ракеты) стоят на поверхности формы ракетки
+      paddleShape: () => g.paddleShapeKind(),
       get shake() {
         return g.shake
       },
@@ -611,7 +612,7 @@ export class Game {
     const turnOn = !this.debugEffects.has(id)
     // Режимы формы/поворота ракетки взаимоисключающие: физика отскока и
     // управление реализуют один и тот же ресурс (форма/угол ракетки).
-    const paddleModes = ["paddleRotation", "paddleImpulse", "paddleConvex"]
+    const paddleModes = ["paddleRotation", "paddleImpulse", "paddleConvex", "paddleConcave"]
     if (turnOn) {
       for (const m of paddleModes) if (m !== id) this.debugEffects.delete(m)
     }
@@ -630,6 +631,14 @@ export class Game {
   /** Активен ли эффект отладки. */
   isDebugEffectActive(id: string) {
     return this.debugEffects.has(id)
+  }
+
+  /** Текущая форма верхней поверхности ракетки (из эффектов отладки).
+   *  Единый источник для физики, ловли бонусов, оружия и рендера. */
+  paddleShapeKind(): PaddleShapeKind {
+    if (this.isDebugEffectActive("paddleConvex")) return "convex"
+    if (this.isDebugEffectActive("paddleConcave")) return "concave"
+    return "flat"
   }
 
   /** Обновление поворота ракетки (режим отладки: ЛКМ/ПКМ = ±30°). */
@@ -1162,9 +1171,8 @@ export class Game {
     /* Единый масштаб мира (viewport.ts): скорость одна на всех экранах —
        поле в мировых единицах имеет сопоставимые пропорции. */
     const speed = base
-    /* Старт: шар на поверхности ракетки. На выпуклой ракетке (купол) —
-       на вершине купола, а не внутри тела. */
-    const bump = Physics.surfaceAt(this.paddle.w / 2, 0, this.isDebugEffectActive("paddleConvex"))
+    /* Старт: шар на поверхности ракетки (купол выше грани, чаша — ниже). */
+    const bump = Physics.surfaceAt(this.paddle.w / 2, 0, this.paddleShapeKind())
     const ball: Ball = {
       x: this.paddle.x,
       y: this.paddle.y - this.paddle.h / 2 - bump - 9 - 2,
@@ -1555,8 +1563,8 @@ export class Game {
       paddle: this.paddle,
       blocks: this.blocks,
       boss: this.bossSys.boss,
-      // Пилоны лазера на выпуклой ракетке стоят над куполом (согласовано с weapons)
-      convex: this.isDebugEffectActive("paddleConvex"),
+      // Пилоны лазера стоят на поверхности формы ракетки (согласовано с weapons)
+      shape: this.paddleShapeKind(),
     })
     drawProjectiles(ctx, this.projectiles, this.time)
     drawBalls(ctx, this.balls, {
@@ -1576,7 +1584,7 @@ export class Game {
         laserArmed: this.laserArmed,
         rocketUntil: this.rocketUntil,
         magnetUntil: this.magnetUntil,
-        convex: this.isDebugEffectActive("paddleConvex"),
+        shape: this.paddleShapeKind(),
       })
     }
     drawParticles(ctx, this.fx.particles)

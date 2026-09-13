@@ -4,7 +4,7 @@
  */
 import type { Effects } from "./effects"
 import type { SFX } from "./audio"
-import type { Block, BossState, PaddleState, Projectile } from "./types"
+import type { Block, BossState, PaddleState, PaddleShapeKind, Projectile } from "./types"
 import { Physics } from "./physics"
 import { clamp, rand, rotatedExtents } from "./utils"
 
@@ -21,8 +21,8 @@ export interface WeaponsWorld {
   laserArmedUntil: number
   laserUntil: number
   laserWasOn: boolean
-  /** Эффект отладки «Выпуклая ракетка»: пилоны оружия стоят над куполом. */
-  paddleConvexActive(): boolean
+  /** Форма верхней поверхности ракетки: пилоны оружия стоят на ней. */
+  paddleShape(): PaddleShapeKind
   shake: number
   flash: number
   fx: Effects
@@ -65,13 +65,12 @@ export class WeaponsSystem {
     p.squash = Math.max(p.squash, 0.35)
   }
 
-  /** Высота пилона оружия над центром ракетки (поверхность под точкой px).
-   *  Единая формула поверхности через Physics.surfaceAt — согласована с рендером. */
+  /** Высота пилона оружия над центром ракетки (поверхность формы под точкой px).
+   *  Купол — выше грани, чаша — ниже; единая формула Physics.surfaceAt. */
   private pylonHeight(px: number): number {
     const p = this.g.paddle
     const rel = clamp(px / (p.w / 2), -1, 1)
-    const dome = Physics.surfaceAt(p.w / 2, rel, this.g.paddleConvexActive())
-    return p.h / 2 + (dome > 0 ? dome + 8 : 8)
+    return p.h / 2 + Physics.surfaceAt(p.w / 2, rel, this.g.paddleShape()) + 8
   }
 
   /** Лазер-луч: взводится бонусом, залп по пробелу/клику, импульсы ~2 с. */

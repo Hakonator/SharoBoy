@@ -6,7 +6,7 @@
 import type { Effects } from "./effects"
 import type { SFX } from "./audio"
 import { TIER } from "./palette"
-import type { Ball, Block, BossState, PaddleState, PowerUp } from "./types"
+import type { Ball, Block, BossState, PaddleState, PaddleShapeKind, PowerUp } from "./types"
 import { clamp, rand } from "./utils"
 
 /** Узкий срез ввода, нужный ракетке (структурно совместим с InputController). */
@@ -42,8 +42,8 @@ export interface PhysicsWorld {
   magnetActive(): boolean
   wideActive(): boolean
   shrinkActive(): boolean
-  /** Эффект отладки «Выпуклая ракетка»: верх — купол, отскок по нормали дуги. */
-  paddleConvexActive(): boolean
+  /** Форма верхней поверхности ракетки (эффекты отладки). */
+  paddleShape(): PaddleShapeKind
   addScore(n: number, x: number, y: number, color: string, size: number): void
   dropPower(x: number, y: number): void
   damageBoss(dmg: number, fromWeapon: boolean): void
@@ -87,18 +87,14 @@ export class Physics {
   }
 
   /** Прилипший шар держится на ракетке — даже пока мир «заморожен» баннером/отсчётом.
-   *  На выпуклой ракетке шар сидит на поверхности купола в точке смещения. */
+   *  Шар сидит на поверхности формы в точке смещения (купол/чаша/грань). */
   stickToPaddle(ball: Ball) {
     if (!ball.stuck) return
     const g = this.g
     const p = g.paddle
     ball.x = p.x + ball.stuckOffset
-    if (g.paddleConvexActive()) {
-      const rel = clamp(ball.stuckOffset / (p.w / 2), -1, 1)
-      ball.y = p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, true) - ball.r - 2
-    } else {
-      ball.y = p.y - p.h / 2 - ball.r - 2
-    }
+    const rel = clamp(ball.stuckOffset / (p.w / 2), -1, 1)
+    ball.y = p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, g.paddleShape()) - ball.r - 2
   }
 
   /** Интеграция движения шара с подшагами: стены, щит, потери, столкновения. */
@@ -229,9 +225,9 @@ export class Physics {
     const sn = Math.sin(-rot)
     const lx = dx * cs - dy * sn
     const ly = dx * sn + dy * cs
-    // Купол поднимается над плоской гранью — расширяем зону проверки по высоте
-    const convex = g.paddleConvexActive()
-    const bump = convex ? Physics.convexBump(p.w / 2) : 0
+    // Форма (купол/чаша) выходит за плоскую грань — расширяем зону проверки
+    const shape = g.paddleShape()
+    const bump = shape === "flat" ? 0 : Physics.convexBump(p.w / 2)
     const halfW = p.w / 2 + ball.r
     const halfH = p.h / 2 + ball.r + bump
     // Проверяем коллизию в локальных координатах
@@ -255,14 +251,15 @@ export class Physics {
       g.fx.burst(ball.x, p.y + ly - ball.r, "#4dff9e", 8, 140)
       return
     }
-    // Купол (эффект отладки «Выпуклая ракетка»): верх ракетки — дуга,
-    // мяч отражается по нормали дуги в точке попадания → «веер» отскоков.
-    if (convex) {
-      // Точная проверка дуги: если шар ещё над куполом в этой точке —
+    // Купол (∪/∩): мяч отражается по нормали поверхности формы в точке
+    // попадания. Купол «convex» разводит мяч к краям, чаша «concave»
+    // сводит к центру — всё через единую формулу Physics.surfaceAt.
+    if (shape !== "flat") {
+      // Точная проверка: если шар ещё над поверхностью в этой точке —
       // контакта нет (грубая AABB-зона шире фактической поверхности).
-      const ySurf = p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, true)
+      const ySurf = p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, shape)
       if (ball.y + ball.r < ySurf) return
-      this.collidePaddleConvex(ball, rel, bump)
+      this.collidePaddleShape(ball, rel, shape)
       return
     }
     // Реальное физическое отражение от наклонной поверхности ракетки
@@ -311,23 +308,31 @@ export class Physics {
     return Math.min(halfW * 0.4, 42)
   }
 
-  /** Поверхность ракетки в точке relX ∈ [-1,1] над плоской гранью (у плоской
-   *  формы всегда 0). ЕДИНАЯ формула для физики, ловли бонусов, оружия и
-   *  рендера — форма и коллизии не могут разойтись. Новые формы (скины)
-   *  добавляются здесь, потребители подхватывают их автоматически. */
-  static surfaceAt(halfW: number, relX: number, convex: boolean): number {
-    return convex ? Physics.convexBump(halfW) * (1 - relX * relX) : 0
+  /** Поверхность ракетки в точке relX ∈ [-1,1] относительно плоской грани:
+   *  «convex» — купол (плюс, выше грани), «concave» — чаша (минус, ниже),
+   *  «flat» — 0. ЕДИНАЯ формула для физики, ловли бонусов, оружия и рендера
+   *  — форма и коллизии не могут разойтись. Новые формы (скины) добавляются
+   *  здесь, потребители подхватывают их автоматически. */
+  static surfaceAt(halfW: number, relX: number, kind: PaddleShapeKind): number {
+    if (kind === "flat") return 0
+    const bump = Physics.convexBump(halfW)
+    const sign = kind === "convex" ? 1 : -1
+    return bump * (1 - relX * relX) * sign
   }
 
-  /** Отскок от выпуклого купола ракетки. Верх — парабола
-   *  y(rel) = yTop - bump·(1-rel²), нормаль в точке попадания считается
-   *  из её наклона: dy/dx = 2·bump·rel / halfW. Удар в центр шлёт мяч
-   *  строго вверх, ближе к краю — всё сильнее в сторону края («веер»). */
-  private collidePaddleConvex(ball: Ball, rel: number, bump: number) {
+  /** Отскок от изогнутой поверхности ракетки (купол или чаша). Поверхность —
+   *  парабола y(rel) = yTop - sign·bump·(1-rel²), sign = +1 купол / -1 чаша.
+   *  Нормаль из наклона: dy/dx = -sign·2·bump·rel / halfW. Купол разводит мяч
+   *  от центра к краям, чаша сводит к центру — единая формула surfaceAt. */
+  private collidePaddleShape(ball: Ball, rel: number, kind: PaddleShapeKind) {
     const g = this.g
     const p = g.paddle
     const halfW = p.w / 2
-    const slope = (2 * bump * rel) / halfW
+    const sign = kind === "concave" ? -1 : 1
+    // Наклон поверхности: f'(x) = -sign·2·bump·rel / halfW (нормаль вверх).
+    // Для convex (sign=+1) rel>0 → наклон вниз к краю, нормаль наружу вправо-
+    // вверх; для concave — зеркально (к центру).
+    const slope = (sign * 2 * Physics.convexBump(halfW) * rel) / halfW
     const len = Math.hypot(slope, 1)
     const nx = slope / len
     const ny = -1 / len
@@ -335,11 +340,11 @@ export class Physics {
     const dot = ball.vx * nx + ball.vy * ny
     const rvx = ball.vx - 2 * dot * nx
     let rvy = ball.vy - 2 * dot * ny
-    // Страховка: купол всегда отбрасывает мяч вверх
+    // Страховка: поверхность всегда отбрасывает мяч вверх
     if (rvy > 0) rvy = -rvy
     ball.vx = rvx
     ball.vy = rvy
-    // Скорость не должна упасть ниже нормы (плоский удар в вершину купола)
+    // Скорость не должна упасть ниже нормы (плоский удар в вершину формы)
     const sp = Math.hypot(ball.vx, ball.vy)
     const minSpeed = ball.speed * 0.8
     if (sp < minSpeed) {
@@ -347,9 +352,8 @@ export class Physics {
       ball.vx *= scale
       ball.vy *= scale
     }
-    // Выталкивание над куполом в точке попадания
-    const yTop = p.y - p.h / 2
-    const ySurf = yTop - bump * (1 - rel * rel)
+    // Выталкивание на поверхность формы в точке попадания
+    const ySurf = p.y - p.h / 2 - Physics.surfaceAt(halfW, rel, kind)
     if (ball.y > ySurf - ball.r) ball.y = ySurf - ball.r
     ball.squash = 1
     ball.sinceHit = 0
