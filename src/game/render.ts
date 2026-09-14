@@ -689,24 +689,32 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   } else if (shape === "concave") {
     // Чаша — лента постоянной толщины hh, инверсия купола по горизонтали:
     // верх — дуга ∪ (края подняты на bump, центр на грани), низ — та же
-    // дуга, сдвинутая на hh вниз. Торцы скруглены.
+    // дуга, сдвинутая на hh вниз. Торцы скруглены гладкими «каплями»:
+    // контроль скругления лежит на пересечении касательной дуги с вертикалью
+    // торца (как у купола), поэтому стык дуга↔торец без излома.
     const depth = Physics.convexBump(ww / 2)
     const rr = Math.min(hh * 0.5, 9)
     const topE = -hh / 2 - depth // края верха (подняты)
     const topC = -hh / 2 // центр верха на грани
     const botE = topE + hh // края низа — та же дуга ниже на hh
     const botC = topC + hh // центр низа
+    // Высота контроля верхнего торцового скругления над краем дуги: продление
+    // касательной дуги до вертикали торца (парабола depth·rel²); нижние углы —
+    // как у купола, обычное скругление через контроль в углу.
+    const capT = (depth * rr * 1.4) / (ww / 4 - rr * 1.4)
     ctx.beginPath()
-    ctx.moveTo(-ww / 2, topE + rr)
-    ctx.quadraticCurveTo(-ww / 2, topE, -ww / 2 + rr * 1.4, topE)
+    // левый торец: снизу вверх, скругления согласованы с дугами по касательной
+    ctx.moveTo(-ww / 2 + rr, botE)
+    ctx.quadraticCurveTo(-ww / 2, botE, -ww / 2, botE - rr)
+    ctx.lineTo(-ww / 2, topE + rr)
+    ctx.quadraticCurveTo(-ww / 2, topE - capT, -ww / 2 + rr * 1.4, topE)
     ctx.quadraticCurveTo(-ww / 4, topC, 0, topC)
     ctx.quadraticCurveTo(ww / 4, topC, ww / 2 - rr * 1.4, topE)
-    ctx.quadraticCurveTo(ww / 2, topE, ww / 2, topE + rr)
+    ctx.quadraticCurveTo(ww / 2, topE - capT, ww / 2, topE + rr)
     ctx.lineTo(ww / 2, botE - rr)
     ctx.quadraticCurveTo(ww / 2, botE, ww / 2 - rr, botE)
     ctx.quadraticCurveTo(ww / 4, botC, 0, botC)
     ctx.quadraticCurveTo(-ww / 4, botC, -ww / 2 + rr, botE)
-    ctx.quadraticCurveTo(-ww / 2, botE, -ww / 2, botE - rr)
     ctx.closePath()
     ctx.fill()
   } else {
