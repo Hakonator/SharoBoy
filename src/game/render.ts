@@ -687,34 +687,28 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     ctx.closePath()
     ctx.fill()
   } else if (shape === "concave") {
-    // Чаша — лента постоянной толщины hh, инверсия купола по горизонтали:
-    // верх — дуга ∪ (края подняты на bump, центр на грани), низ — та же
-    // дуга, сдвинутая на hh вниз. Торцы скруглены гладкими «каплями»:
-    // контроль скругления лежит на пересечении касательной дуги с вертикалью
-    // торца (как у купола), поэтому стык дуга↔торец без излома.
+    // Чаша — лента постоянной толщины hh, инверсия купола. Верх и низ — дуги ∪
+    // (края подняты на bump, центр на грани; низ — та же дуга ниже на hh),
+    // торцы — полукруги радиуса hh/2 (как у купола): гладкая капсула-конец.
     const depth = Physics.convexBump(ww / 2)
-    const rr = Math.min(hh * 0.5, 9)
-    const topE = -hh / 2 - depth // края верха (подняты)
+    const topE = -hh / 2 - depth // край верха (поднят)
     const topC = -hh / 2 // центр верха на грани
-    const botE = topE + hh // края низа — та же дуга ниже на hh
+    const botE = topE + hh // край низа
     const botC = topC + hh // центр низа
-    // Высота контроля верхнего торцового скругления над краем дуги: продление
-    // касательной дуги до вертикали торца (парабола depth·rel²); нижние углы —
-    // как у купола, обычное скругление через контроль в углу.
-    const capT = (depth * rr * 1.4) / (ww / 4 - rr * 1.4)
+    const hr = hh / 2 // радиус торцового полукруга
+    const cy = topE + hr // центр торцов (середина толщины)
+    const cxL = -ww / 2 + hr
+    const cxR = ww / 2 - hr
     ctx.beginPath()
-    // левый торец: снизу вверх, скругления согласованы с дугами по касательной
-    ctx.moveTo(-ww / 2 + rr, botE)
-    ctx.quadraticCurveTo(-ww / 2, botE, -ww / 2, botE - rr)
-    ctx.lineTo(-ww / 2, topE + rr)
-    ctx.quadraticCurveTo(-ww / 2, topE - capT, -ww / 2 + rr * 1.4, topE)
+    // левый торец → верхняя дуга → правый торец
+    ctx.moveTo(cxL, topE)
     ctx.quadraticCurveTo(-ww / 4, topC, 0, topC)
-    ctx.quadraticCurveTo(ww / 4, topC, ww / 2 - rr * 1.4, topE)
-    ctx.quadraticCurveTo(ww / 2, topE - capT, ww / 2, topE + rr)
-    ctx.lineTo(ww / 2, botE - rr)
-    ctx.quadraticCurveTo(ww / 2, botE, ww / 2 - rr, botE)
+    ctx.quadraticCurveTo(ww / 4, topC, cxR, topE)
+    ctx.arc(cxR, cy, hr, -Math.PI / 2, Math.PI / 2, false)
+    // нижняя дуга (та же ∪-дуга на hh ниже)
     ctx.quadraticCurveTo(ww / 4, botC, 0, botC)
-    ctx.quadraticCurveTo(-ww / 4, botC, -ww / 2 + rr, botE)
+    ctx.quadraticCurveTo(-ww / 4, botC, cxL, botE)
+    ctx.arc(cxL, cy, hr, -Math.PI / 2, Math.PI / 2, true)
     ctx.closePath()
     ctx.fill()
   } else {
@@ -749,10 +743,12 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     roundRect(ctx, -ww / 2 + 6, -hh / 2 + 2.5, ww - 12, 4, 2)
     ctx.fill()
   }
+  // Оси по бокам — у чаши они в центре торцового полукруга (подняты на depth)
+  const hubY = shape === "concave" ? -Physics.convexBump(ww / 2) : 0
   ctx.fillStyle = "rgba(4,18,26,0.35)"
   ctx.beginPath()
-  ctx.arc(-ww / 2 + hh / 2, 0, hh * 0.22, 0, Math.PI * 2)
-  ctx.arc(ww / 2 - hh / 2, 0, hh * 0.22, 0, Math.PI * 2)
+  ctx.arc(-ww / 2 + hh / 2, hubY, hh * 0.22, 0, Math.PI * 2)
+  ctx.arc(ww / 2 - hh / 2, hubY, hh * 0.22, 0, Math.PI * 2)
   ctx.fill()
   const laserOn = time < v.laserUntil
   const rocketOn = time < v.rocketUntil
