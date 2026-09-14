@@ -26,12 +26,11 @@ describe("Physics.surfaceAt — высота поверхности над гр�
     )
   })
 
-  it("concave: края выше центра — 0 в центре, depth на краях", () => {
+  it("concave: края выше центра — bump на краях, грань в центре", () => {
     const halfW = 60
-    const hh = 20
-    expect(Physics.surfaceAt(halfW, 0, "concave", hh)).toBe(0)
-    expect(Physics.surfaceAt(halfW, 1, "concave", hh)).toBeCloseTo(Physics.concaveDepth(halfW, hh))
-    expect(Physics.surfaceAt(halfW, -1, "concave", hh)).toBeCloseTo(Physics.concaveDepth(halfW, hh))
+    expect(Physics.surfaceAt(halfW, 0, "concave")).toBe(0)
+    expect(Physics.surfaceAt(halfW, 1, "concave")).toBeCloseTo(Physics.convexBump(halfW))
+    expect(Physics.surfaceAt(halfW, -1, "concave")).toBeCloseTo(Physics.convexBump(halfW))
   })
 
   it("контракт: результат неотрицателен для всех форм во всех точках", () => {

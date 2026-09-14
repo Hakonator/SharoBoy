@@ -303,27 +303,23 @@ export class Physics {
     g.pushHud()
   }
 
-  /** Высота купола выпуклой ракетки — единая для физики и рендера. */
+  /** Высота купола выпуклой ракетки — единая для физики и рендера.
+   *  Чаша использует ту же глубину (инверсия купола). */
   static convexBump(halfW: number): number {
     return Math.min(halfW * 0.4, 42)
   }
 
-  /** Высота приподнятых краёв вогнутой ракетки (чаши) — не выше тела,
-   *  чтобы шар не проваливался сквозь края. */
-  static concaveDepth(halfW: number, hh: number): number {
-    return Math.min(Physics.convexBump(halfW), hh * 0.5)
-  }
-
   /** Поверхность ракетки в точке relX ∈ [-1,1] относительно плоской грани.
    *  Результат — ВЫСОТА НАД ГРАНЬЮ (≥0): потребители делают y = yTop − surfaceAt.
-   *  «convex» — купол (центр выше краёв: +bump·(1−rel²)), «concave» — чаша
-   *  (края подняты, центр на грани: +depth·rel²), «flat» — 0. ЕДИНАЯ формула
+   *  Формы — инверсии друг друга, обе ленты постоянной толщины с общей глубиной
+   *  convexBump: «convex» — купол (+bump·(1−rel²), центр выше), «concave» — чаша
+   *  (+bump·rel², края выше, центр на грани), «flat» — 0. ЕДИНАЯ формула
    *  для физики, ловли бонусов, оружия и рендера — форма и коллизии не могут
    *  разойтись. Новые формы (скины) добавляются здесь, потребители
    *  подхватывают их автоматически. */
-  static surfaceAt(halfW: number, relX: number, kind: PaddleShapeKind, hh = 0): number {
+  static surfaceAt(halfW: number, relX: number, kind: PaddleShapeKind, _hh = 0): number {
     if (kind === "flat") return 0
-    if (kind === "concave") return Physics.concaveDepth(halfW, hh) * relX * relX
+    if (kind === "concave") return Physics.convexBump(halfW) * relX * relX
     // convex: центр выше краёв на bump, края на грани (высота над гранью ≥ 0).
     return Physics.convexBump(halfW) * (1 - relX * relX)
   }
@@ -336,8 +332,8 @@ export class Physics {
     const g = this.g
     const p = g.paddle
     const halfW = p.w / 2
-    // Глубина чаши глубже не входит в тело (concaveDepth), купол — convexBump.
-    const bump = kind === "concave" ? Physics.concaveDepth(halfW, p.h) : Physics.convexBump(halfW)
+    // Обе формы — ленты постоянной толщины с одинаковой глубиной (convexBump).
+    const bump = Physics.convexBump(halfW)
     const sign = kind === "concave" ? -1 : 1
     // Наклон поверхности: f'(x) = sign·2·bump·rel / halfW (нормаль вверх).
     // Для convex (sign=+1) rel>0 → наклон вниз к краю, нормаль наружу вправо-

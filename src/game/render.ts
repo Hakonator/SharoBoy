@@ -687,25 +687,26 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     ctx.closePath()
     ctx.fill()
   } else if (shape === "concave") {
-    // Чаша: центр на грани, края приподняты на concaveDepth. Низ фиксирован
-    // на +hh/2 (не вылезает за щит). Зеркально куполу относительно грани.
-    const depth = Physics.concaveDepth(ww / 2, hh)
-    const rr = Math.min(hh * 0.45, 8)
-    const topE = -hh / 2 - depth // поднятые края
-    const topC = -hh / 2 // центр на грани
+    // Чаша — лента постоянной толщины hh, инверсия купола по горизонтали:
+    // верх — дуга ∪ (края подняты на bump, центр на грани), низ — та же
+    // дуга, сдвинутая на hh вниз. Торцы скруглены.
+    const depth = Physics.convexBump(ww / 2)
+    const rr = Math.min(hh * 0.5, 9)
+    const topE = -hh / 2 - depth // края верха (подняты)
+    const topC = -hh / 2 // центр верха на грани
+    const botE = topE + hh // края низа — та же дуга ниже на hh
+    const botC = topC + hh // центр низа
     ctx.beginPath()
-    ctx.moveTo(-ww / 2 + rr, hh / 2)
-    ctx.quadraticCurveTo(-ww / 2, hh / 2, -ww / 2, hh / 2 - rr)
-    ctx.lineTo(-ww / 2, -hh / 2 + rr)
-    ctx.quadraticCurveTo(-ww / 2, -hh / 2, -ww / 2 + rr * 1.4, topE)
-    // Гладкая ∪-дуга: контроль на уровне центра → гребень без угла
+    ctx.moveTo(-ww / 2, topE + rr)
+    ctx.quadraticCurveTo(-ww / 2, topE, -ww / 2 + rr * 1.4, topE)
     ctx.quadraticCurveTo(-ww / 4, topC, 0, topC)
     ctx.quadraticCurveTo(ww / 4, topC, ww / 2 - rr * 1.4, topE)
-    ctx.quadraticCurveTo(ww / 2, -hh / 2, ww / 2, -hh / 2 + rr)
-    ctx.lineTo(ww / 2, hh / 2 - rr)
-    ctx.quadraticCurveTo(ww / 2, hh / 2, ww / 2 - rr, hh / 2)
-    // Низ выпуклый вниз ∪: контроль ниже краёв на concaveDepth
-    ctx.quadraticCurveTo(0, hh / 2 + depth, -ww / 2 + rr, hh / 2)
+    ctx.quadraticCurveTo(ww / 2, topE, ww / 2, topE + rr)
+    ctx.lineTo(ww / 2, botE - rr)
+    ctx.quadraticCurveTo(ww / 2, botE, ww / 2 - rr, botE)
+    ctx.quadraticCurveTo(ww / 4, botC, 0, botC)
+    ctx.quadraticCurveTo(-ww / 4, botC, -ww / 2 + rr, botE)
+    ctx.quadraticCurveTo(-ww / 2, botE, -ww / 2, botE - rr)
     ctx.closePath()
     ctx.fill()
   } else {
@@ -725,14 +726,16 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     ctx.quadraticCurveTo(ww / 4, topC + 5, ww / 2 - 8, -hh / 2 + 2)
     ctx.stroke()
   } else if (shape === "concave") {
-    const depth = Physics.concaveDepth(ww / 2, hh)
-    const topC = -hh / 2 + depth // края выше — блик вогнут к центру
+    // Блик вдоль верхней ∪-дуги чаши (зеркало купольного).
+    const depth = Physics.convexBump(ww / 2)
+    const topE = -hh / 2 - depth
+    const topC = -hh / 2
     ctx.strokeStyle = "rgba(255,255,255,0.4)"
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.moveTo(-ww / 2 + 12, -hh / 2 - depth + 3)
-    ctx.quadraticCurveTo(-ww / 4, topC + 3, 0, -hh / 2 + 2)
-    ctx.quadraticCurveTo(ww / 4, topC + 3, ww / 2 - 12, -hh / 2 - depth + 3)
+    ctx.moveTo(-ww / 2 + 8, topE + 3)
+    ctx.quadraticCurveTo(-ww / 4, topC + 5, 0, topC + 3)
+    ctx.quadraticCurveTo(ww / 4, topC + 5, ww / 2 - 8, topE + 3)
     ctx.stroke()
   } else {
     roundRect(ctx, -ww / 2 + 6, -hh / 2 + 2.5, ww - 12, 4, 2)
