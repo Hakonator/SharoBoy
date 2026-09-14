@@ -4,22 +4,563 @@ export class SFX {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
   private noiseBuf: AudioBuffer | null = null
+  /** Выключить звуковые эффекты (не влияет на музыку). */
   muted = false
-
-  /* -------- 8-битный трекер -------- */
+  /** Выключить фоновую музыку (не влияет на эффекты). */
+  musicMuted = false
   private musicOn = false
   private musicTimer: number | null = null
   private nextBeat = 0
   private musicStep = 0
-  /** Мелодия (square-канал) и бас (triangle-канал). MIDI-ноты; -1 = пауза.
-   *  Ля минор, 8 долей в такте, грустный ретро-мотив с «качающим» басом. */
-  private static MELODY = [69, 76, 81, 76, 72, 79, 84, 79, 69, 76, 81, 76, 74, 71, 79, 83]
-  private static BASS = [45, -1, 45, -1, 41, -1, 41, -1, 45, -1, 45, -1, 40, -1, 43, -1]
+  /** Активный трек. */
+  private track: "menu" | "game" = "menu"
 
-  /** MIDI-нота → частота Гц. */
+  /** MIDI-нота → частота Гц (С4 = 60). */
   private static midi(m: number): number {
     return 440 * Math.pow(2, (m - 69) / 12)
   }
+
+  /** Размер шага (восьмая нота) для трека. Меню — медленно и «душевно». */
+  private static stepFor(track: "menu" | "game"): number {
+    return track === "menu" ? 60 / 76 / 2 : 60 / 144 / 2
+  }
+
+  /** Переключение фоновой музыки: меняет трек, цикл начинается заново. */
+  setTrack(track: "menu" | "game") {
+    if (this.track === track) return
+    this.track = track
+    this.musicStep = 0
+    if (this.ctx) this.nextBeat = this.ctx.currentTime + 0.05
+  }
+
+  /** Медленный душевный трек меню: квадрат-мелодия + тихий треугольник-бас.
+   *  Ля минор, 64 восьмых (~25 c при 76 BPM). Задумчивое арпеджио. */
+  private static MENU_LEAD = [
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    60,
+    55,
+    59,
+    62,
+    59,
+    55,
+    59,
+    62,
+    59, //
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    60,
+    53,
+    57,
+    60,
+    57,
+    53,
+    57,
+    60,
+    57, //
+    55,
+    59,
+    62,
+    59,
+    55,
+    59,
+    62,
+    59,
+    52,
+    55,
+    59,
+    55,
+    52,
+    55,
+    59,
+    55, //
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    60,
+    55,
+    59,
+    62,
+    64,
+    62,
+    59,
+    55,
+    52, //
+  ]
+  private static MENU_BASS = [
+    45,
+    0,
+    45,
+    0,
+    45,
+    0,
+    45,
+    0,
+    43,
+    0,
+    43,
+    0,
+    43,
+    0,
+    43,
+    0, //
+    45,
+    0,
+    45,
+    0,
+    45,
+    0,
+    45,
+    0,
+    41,
+    0,
+    41,
+    0,
+    41,
+    0,
+    41,
+    0, //
+    43,
+    0,
+    43,
+    0,
+    43,
+    0,
+    43,
+    0,
+    40,
+    0,
+    40,
+    0,
+    40,
+    0,
+    40,
+    0, //
+    45,
+    0,
+    45,
+    0,
+    45,
+    0,
+    45,
+    0,
+    43,
+    0,
+    43,
+    0,
+    43,
+    0,
+    43,
+    0, //
+  ]
+
+  /** Игровой трек: 3 голоса, длинный цикл (96 восьмых × 4 = 384 → 3 раза по
+   *  32... вариант с развитием). Мелодия-квадрат с арпеджио и басом. */
+  private static GAME_LEAD = [
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    60, //
+    55,
+    59,
+    62,
+    59,
+    55,
+    59,
+    62,
+    59,
+    55,
+    59,
+    62,
+    59,
+    55,
+    59,
+    62,
+    59, //
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    60, //
+    53,
+    57,
+    60,
+    57,
+    53,
+    57,
+    60,
+    57,
+    53,
+    57,
+    60,
+    57,
+    53,
+    57,
+    60,
+    57, //
+    55,
+    59,
+    62,
+    59,
+    55,
+    59,
+    62,
+    59,
+    55,
+    59,
+    62,
+    59,
+    55,
+    59,
+    62,
+    59, //
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    60, //
+    55,
+    59,
+    62,
+    66,
+    64,
+    62,
+    59,
+    55,
+    57,
+    60,
+    64,
+    60,
+    57,
+    60,
+    64,
+    67, //
+    72,
+    76,
+    81,
+    76,
+    72,
+    76,
+    81,
+    76,
+    76,
+    81,
+    84,
+    88,
+    84,
+    81,
+    76,
+    72, //
+  ]
+  private static GAME_BASS = [
+    45,
+    0,
+    0,
+    0,
+    45,
+    0,
+    0,
+    0,
+    45,
+    0,
+    0,
+    0,
+    45,
+    0,
+    0,
+    0, //
+    43,
+    0,
+    0,
+    0,
+    43,
+    0,
+    0,
+    0,
+    43,
+    0,
+    0,
+    0,
+    43,
+    0,
+    0,
+    0, //
+    45,
+    0,
+    0,
+    0,
+    45,
+    0,
+    0,
+    0,
+    45,
+    0,
+    0,
+    0,
+    45,
+    0,
+    0,
+    0, //
+    41,
+    0,
+    0,
+    0,
+    41,
+    0,
+    0,
+    0,
+    41,
+    0,
+    0,
+    0,
+    41,
+    0,
+    0,
+    0, //
+    43,
+    0,
+    0,
+    0,
+    43,
+    0,
+    0,
+    0,
+    43,
+    0,
+    0,
+    0,
+    43,
+    0,
+    0,
+    0, //
+    45,
+    0,
+    0,
+    0,
+    45,
+    0,
+    0,
+    0,
+    45,
+    0,
+    0,
+    0,
+    45,
+    0,
+    0,
+    0, //
+    43,
+    0,
+    0,
+    0,
+    43,
+    0,
+    0,
+    0,
+    40,
+    0,
+    0,
+    0,
+    40,
+    0,
+    0,
+    0, //
+    45,
+    0,
+    0,
+    0,
+    45,
+    0,
+    0,
+    0,
+    52,
+    0,
+    0,
+    0,
+    52,
+    0,
+    52,
+    0, //
+  ]
+  /** Арпеджио-«главная тема»: третий голос, съёминает на октаву выше баса. */
+  private static GAME_THEME = [
+    72,
+    0,
+    76,
+    0,
+    72,
+    0,
+    76,
+    0,
+    72,
+    0,
+    76,
+    0,
+    72,
+    0,
+    76,
+    0, //
+    71,
+    0,
+    74,
+    0,
+    71,
+    0,
+    74,
+    0,
+    71,
+    0,
+    74,
+    0,
+    71,
+    0,
+    74,
+    0, //
+    72,
+    0,
+    76,
+    0,
+    72,
+    0,
+    76,
+    0,
+    72,
+    0,
+    76,
+    0,
+    72,
+    0,
+    76,
+    0, //
+    68,
+    0,
+    72,
+    0,
+    68,
+    0,
+    72,
+    0,
+    68,
+    0,
+    72,
+    0,
+    68,
+    0,
+    72,
+    0, //
+    71,
+    0,
+    74,
+    0,
+    71,
+    0,
+    74,
+    0,
+    71,
+    0,
+    74,
+    0,
+    71,
+    0,
+    74,
+    0, //
+    72,
+    0,
+    76,
+    0,
+    72,
+    0,
+    76,
+    0,
+    72,
+    0,
+    76,
+    0,
+    72,
+    0,
+    76,
+    0, //
+    71,
+    0,
+    74,
+    0,
+    79,
+    0,
+    83,
+    0,
+    69,
+    0,
+    72,
+    0,
+    76,
+    0,
+    72,
+    0, //
+    88,
+    0,
+    84,
+    0,
+    81,
+    0,
+    76,
+    0,
+    84,
+    0,
+    88,
+    0,
+    91,
+    0,
+    91,
+    0, //
+  ]
 
   /** Запускает зацикленную 8-битную тему (idempotent). */
   startMusic() {
@@ -40,17 +581,32 @@ export class SFX {
 
   /** Lookahead-секвенсор: планирует ноты заранее, чтобы луп не «спотыкался». */
   private scheduleMusic = () => {
-    if (!this.musicOn || !this.ctx) return
-    const step = 60 / 144 / 2 // восьмая нота при 144 BPM
+    if (!this.musicOn || !this.ctx || this.musicMuted) return
+    const step = SFX.stepFor(this.track)
+    const lead = this.track === "menu" ? SFX.MENU_LEAD : SFX.GAME_LEAD
+    const bass = this.track === "menu" ? SFX.MENU_BASS : SFX.GAME_BASS
+    const theme = this.track === "menu" ? null : SFX.GAME_THEME
+    const L = lead.length
     while (this.nextBeat < this.ctx.currentTime + 0.5) {
-      const i = this.musicStep % SFX.MELODY.length
-      const m = SFX.MELODY[i]
-      const b = SFX.BASS[i]
+      const i = this.musicStep % L
       const t0 = this.ctx.currentTime
-      if (m >= 0)
-        this.blip(SFX.midi(m), step * 0.85, "square", 0.045, undefined, this.nextBeat - t0)
-      if (b >= 0)
-        this.blip(SFX.midi(b), step * 0.95, "triangle", 0.085, undefined, this.nextBeat - t0)
+      const delay = this.nextBeat - t0
+      const m = lead[i]
+      const b = bass[i]
+      const th = theme?.[i]
+      const isMenu = this.track === "menu"
+      if (m > 0)
+        this.tone(
+          SFX.midi(m),
+          step * 0.8,
+          isMenu ? "triangle" : "square",
+          isMenu ? 0.05 : 0.06,
+          undefined,
+          delay
+        )
+      if (b > 0) this.tone(SFX.midi(b), step, "triangle", 0.07, undefined, delay)
+      if (th !== undefined && th > 0)
+        this.tone(SFX.midi(th), step * 0.7, "triangle", 0.045, undefined, delay)
       this.musicStep++
       this.nextBeat += step
     }
@@ -82,7 +638,7 @@ export class SFX {
     }
   }
 
-  private blip(
+  private tone(
     freq: number,
     dur: number,
     type: OscillatorType,
@@ -90,7 +646,7 @@ export class SFX {
     slideTo?: number,
     delay = 0
   ) {
-    if (!this.ctx || !this.master || this.muted) return
+    if (!this.ctx || !this.master) return
     const t = this.ctx.currentTime + delay
     const osc = this.ctx.createOscillator()
     const g = this.ctx.createGain()
@@ -106,6 +662,18 @@ export class SFX {
     g.connect(this.master)
     osc.start(t)
     osc.stop(t + dur + 0.02)
+  }
+
+  private blip(
+    freq: number,
+    dur: number,
+    type: OscillatorType,
+    vol: number,
+    slideTo?: number,
+    delay = 0
+  ) {
+    if (this.muted) return
+    this.tone(freq, dur, type, vol, slideTo, delay)
   }
 
   private noise(dur: number, vol: number, delay = 0) {

@@ -42,6 +42,8 @@ export interface InputHost {
   onLockLostUnexpectedly(): void
   /** Переключение звука (клавиша M). */
   toggleMute(): void
+  /** Переключение фоновой музыки (клавиша N). */
+  toggleMusic(): void
   /** Окно потеряло фокус — хост ставит паузу, если партия шла. */
   onBlur(): void
 }
@@ -180,6 +182,7 @@ export class InputController {
     if (c === "Space") this.keys.space = true
     if (c === "KeyP" || c === "Escape") this.host.togglePause()
     if (c === "KeyM") this.host.toggleMute()
+    if (c === "KeyN") this.host.toggleMusic()
   }
 
   private handleKeyUp = (e: KeyboardEvent) => {

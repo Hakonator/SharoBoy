@@ -23,6 +23,8 @@ export interface HudData {
   combo: number
   blocksLeft: number
   muted: boolean
+  /** Фоновая музыка выключена отдельно от эффектов. */
+  musicMuted: boolean
   /** id достижений, открытых с прошлой отправки HUD (очередь для тостов). */
   newAchievements: string[]
   banner: string | null

@@ -15,6 +15,7 @@ import type { HudData } from "../game/types"
 import {
   IconBall,
   IconChevron,
+  IconMusic,
   IconPlay,
   IconPause,
   IconSound,
@@ -153,11 +154,13 @@ export function HudOverlay({
   inGame,
   onPause,
   onMute,
+  onMusic,
 }: {
   hud: HudData
   inGame: boolean
   onPause: () => void
   onMute: () => void
+  onMusic: () => void
 }) {
   return (
     <>
@@ -256,6 +259,13 @@ export function HudOverlay({
               aria-label="Пауза"
             >
               {hud.phase === "paused" ? <IconPlay /> : <IconPause />}
+            </button>
+            <button
+              className="icon-btn pointer-events-auto flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
+              onClick={onMusic}
+              aria-label="Музыка"
+            >
+              <IconMusic off={hud.musicMuted} />
             </button>
             <button
               className="icon-btn pointer-events-auto flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
@@ -399,6 +409,8 @@ export function MenuScreen({
   isDebugEffectActive,
   onToggleDebugEffect,
   onDebugStartGame,
+  onMute,
+  onMusic,
 }: {
   hud: HudData
   stats: PlayerStats
@@ -429,6 +441,10 @@ export function MenuScreen({
   onToggleDebugEffect: (id: string) => void
   /** Запустить уровень с выбранными настройками отладки. */
   onDebugStartGame: () => void
+  /** Переключить звуковые эффекты (кнопка в углу меню). */
+  onMute: () => void
+  /** Переключить фоновую музыку (кнопка в углу меню). */
+  onMusic: () => void
 }) {
   /** Есть улучшение, которое игрок уже может купить, — индикатор на секции. */
   const canBuyAny = UPGRADE_DEFS.some((u) => {
@@ -439,6 +455,23 @@ export function MenuScreen({
   return (
     <div className="absolute inset-0 z-40 overflow-y-auto">
       <FloatingBalls />
+      {/* Кнопки музыки и звука — одинаковые, компактные, в углу меню */}
+      <div className="absolute right-3 top-3 z-10 flex gap-1.5 sm:right-5 sm:top-5">
+        <button
+          className="icon-btn pointer-events-auto flex h-10 w-10 items-center justify-center"
+          onClick={onMusic}
+          aria-label="Музыка"
+        >
+          <IconMusic off={hud.musicMuted} />
+        </button>
+        <button
+          className="icon-btn pointer-events-auto flex h-10 w-10 items-center justify-center"
+          onClick={onMute}
+          aria-label="Звук"
+        >
+          <IconSound off={hud.muted} />
+        </button>
+      </div>
       <div className="relative flex min-h-full flex-col items-start justify-center gap-8 p-6 md:flex-row md:items-center md:gap-16 md:p-16 lg:p-24">
         <div className="anim-rise max-w-xl">
           <h1 className="font-display leading-[0.95]">

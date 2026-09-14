@@ -37,6 +37,7 @@ const INITIAL_HUD: HudData = {
   combo: 0,
   blocksLeft: 0,
   muted: false,
+  musicMuted: false,
   newAchievements: [],
   banner: null,
   stuck: true,
@@ -368,6 +369,7 @@ export default function App() {
         inGame={inGame}
         onPause={() => g()?.togglePause()}
         onMute={() => g()?.toggleMute()}
+        onMusic={() => g()?.toggleMusic()}
       />
 
       {hud.phase === "menu" && (
@@ -394,6 +396,8 @@ export default function App() {
           isDebugEffectActive={handleIsDebugEffectActive}
           onToggleDebugEffect={handleToggleDebugEffect}
           onDebugStartGame={handleDebugStartGame}
+          onMute={() => g()?.toggleMute()}
+          onMusic={() => g()?.toggleMusic()}
         />
       )}
 

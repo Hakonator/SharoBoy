@@ -175,6 +175,7 @@ export class Game {
       onTouchInput: () => this.enableTouchMode(),
       togglePause: () => this.togglePause(),
       toggleMute: () => this.toggleMute(),
+      toggleMusic: () => this.toggleMusic(),
       onBlur: () => {
         if (this.phase === "playing") this.togglePause()
       },
@@ -973,6 +974,7 @@ export class Game {
     this.laserArmed = (this.upgrades.laser ?? 0) > 0
     this.serveBall()
     this.phase = "playing"
+    this.applyTrack()
     this.setBanner(`УРОВЕНЬ 1 — ${LEVELS[0].name}`)
     this.pushHud()
   }
@@ -990,6 +992,7 @@ export class Game {
     this.laserArmed = (this.upgrades.laser ?? 0) > 0
     this.serveBall()
     this.phase = "playing"
+    this.applyTrack()
     this.setBanner("БЕСКОНЕЧНЫЙ РЕЖИМ — ВОЛНА 1")
     this.pushHud()
   }
@@ -999,6 +1002,7 @@ export class Game {
     this.input.releaseLock()
     this.saveTop()
     this.phase = "menu"
+    this.applyTrack()
     this.balls = []
     this.blocks = []
     this.powers = []
@@ -1031,6 +1035,17 @@ export class Game {
     this.sfx.muted = !this.sfx.muted
     if (!this.sfx.muted) this.sfx.ui()
     this.pushHud()
+  }
+
+  /** Переключить фоновую музыку (отдельно от эффектов). */
+  toggleMusic() {
+    this.sfx.musicMuted = !this.sfx.musicMuted
+    this.pushHud()
+  }
+
+  /** Трек по фазе: в меню/финале — душевный медленный, в партии — боевой. */
+  private applyTrack() {
+    this.sfx.setTrack(this.phase === "playing" || this.phase === "paused" ? "game" : "menu")
   }
 
   /** Полный сброс состояния партии перед стартом кампании/бесконечного режима. */
@@ -1360,6 +1375,7 @@ export class Game {
     if (this.level >= LEVELS.length) {
       this.phase = "won"
       this.input.releaseLock()
+      this.applyTrack()
       this.sfx.win()
       this.saveTop()
       this.pushHud()
@@ -1401,6 +1417,7 @@ export class Game {
     if (this.lives <= 0) {
       this.phase = "over"
       this.input.releaseLock()
+      this.applyTrack()
       this.sfx.gameOver()
       this.saveTop()
       this.pushHud()
@@ -1507,6 +1524,7 @@ export class Game {
       combo: this.combo,
       blocksLeft: this.blocks.length,
       muted: this.sfx.muted,
+      musicMuted: this.sfx.musicMuted,
       banner: this.banner,
       stuck: this.balls.some((b) => b.stuck),
       newRecord: this.newRecord,

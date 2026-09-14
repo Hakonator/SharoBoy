@@ -45,6 +45,16 @@ export function IconSound({ off }: { off: boolean }) {
   )
 }
 
+/** Нота — кнопка фоновой музыки; перечёркнута, когда музыка выключена. */
+export function IconMusic({ off }: { off: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+      <path d="M9 19a3 3 0 1 1-2-2.83V6.5a1 1 0 0 1 .76-.97l9-2.25A1 1 0 0 1 18 4.25v11a3 3 0 1 1-2-2.83V7.53l-7 1.75V19Z" />
+      {off && <path d="m4 4 16 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}
+    </svg>
+  )
+}
+
 export function IconMouse() {
   return (
     <svg
