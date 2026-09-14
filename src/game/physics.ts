@@ -314,8 +314,9 @@ export class Physics {
     return Math.min(Physics.convexBump(halfW), hh * 0.5)
   }
 
-  /** Поверхность ракетки в точке relX ∈ [-1,1] относительно плоской грани:
-   *  «convex» — купол (центр выше краёв: −bump·(1−rel²)), «concave» — чаша
+  /** Поверхность ракетки в точке relX ∈ [-1,1] относительно плоской грани.
+   *  Результат — ВЫСОТА НАД ГРАНЬЮ (≥0): потребители делают y = yTop − surfaceAt.
+   *  «convex» — купол (центр выше краёв: +bump·(1−rel²)), «concave» — чаша
    *  (края подняты, центр на грани: +depth·rel²), «flat» — 0. ЕДИНАЯ формула
    *  для физики, ловли бонусов, оружия и рендера — форма и коллизии не могут
    *  разойтись. Новые формы (скины) добавляются здесь, потребители
@@ -323,8 +324,8 @@ export class Physics {
   static surfaceAt(halfW: number, relX: number, kind: PaddleShapeKind, hh = 0): number {
     if (kind === "flat") return 0
     if (kind === "concave") return Physics.concaveDepth(halfW, hh) * relX * relX
-    // convex: центр выше краёв на bump, края на грани.
-    return -Physics.convexBump(halfW) * (1 - relX * relX)
+    // convex: центр выше краёв на bump, края на грани (высота над гранью ≥ 0).
+    return Physics.convexBump(halfW) * (1 - relX * relX)
   }
 
   /** Отскок от изогнутой поверхности ракетки (купол или чаша). Поверхность —
@@ -338,7 +339,7 @@ export class Physics {
     // Глубина чаши глубже не входит в тело (concaveDepth), купол — convexBump.
     const bump = kind === "concave" ? Physics.concaveDepth(halfW, p.h) : Physics.convexBump(halfW)
     const sign = kind === "concave" ? -1 : 1
-    // Наклон поверхности: f'(x) = -sign·2·bump·rel / halfW (нормаль вверх).
+    // Наклон поверхности: f'(x) = sign·2·bump·rel / halfW (нормаль вверх).
     // Для convex (sign=+1) rel>0 → наклон вниз к краю, нормаль наружу вправо-
     // вверх; для concave — зеркально (к центру).
     const slope = (sign * 2 * bump * rel) / halfW
