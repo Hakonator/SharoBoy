@@ -1,9 +1,61 @@
-/** Крошечный WebAudio-синтезатор: короткие блипы на каждое действие. */
+/** Крошечный WebAudio-синтезатор: короткие блипы на каждое действие +
+ *  8-битная фоновая музыка (встроенный трекер, без внешних файлов). */
 export class SFX {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
   private noiseBuf: AudioBuffer | null = null
   muted = false
+
+  /* -------- 8-битный трекер -------- */
+  private musicOn = false
+  private musicTimer: number | null = null
+  private nextBeat = 0
+  private musicStep = 0
+  /** Мелодия (square-канал) и бас (triangle-канал). MIDI-ноты; -1 = пауза.
+   *  Ля минор, 8 долей в такте, грустный ретро-мотив с «качающим» басом. */
+  private static MELODY = [69, 76, 81, 76, 72, 79, 84, 79, 69, 76, 81, 76, 74, 71, 79, 83]
+  private static BASS = [45, -1, 45, -1, 41, -1, 41, -1, 45, -1, 45, -1, 40, -1, 43, -1]
+
+  /** MIDI-нота → частота Гц. */
+  private static midi(m: number): number {
+    return 440 * Math.pow(2, (m - 69) / 12)
+  }
+
+  /** Запускает зацикленную 8-битную тему (idempotent). */
+  startMusic() {
+    if (this.musicOn || !this.ctx || !this.master) return
+    this.musicOn = true
+    this.nextBeat = this.ctx.currentTime + 0.06
+    this.musicStep = 0
+    this.scheduleMusic()
+  }
+
+  stopMusic() {
+    this.musicOn = false
+    if (this.musicTimer !== null) {
+      clearTimeout(this.musicTimer)
+      this.musicTimer = null
+    }
+  }
+
+  /** Lookahead-секвенсор: планирует ноты заранее, чтобы луп не «спотыкался». */
+  private scheduleMusic = () => {
+    if (!this.musicOn || !this.ctx) return
+    const step = 60 / 144 / 2 // восьмая нота при 144 BPM
+    while (this.nextBeat < this.ctx.currentTime + 0.5) {
+      const i = this.musicStep % SFX.MELODY.length
+      const m = SFX.MELODY[i]
+      const b = SFX.BASS[i]
+      const t0 = this.ctx.currentTime
+      if (m >= 0)
+        this.blip(SFX.midi(m), step * 0.85, "square", 0.045, undefined, this.nextBeat - t0)
+      if (b >= 0)
+        this.blip(SFX.midi(b), step * 0.95, "triangle", 0.085, undefined, this.nextBeat - t0)
+      this.musicStep++
+      this.nextBeat += step
+    }
+    this.musicTimer = window.setTimeout(this.scheduleMusic, 50)
+  }
 
   ensure() {
     try {
@@ -22,6 +74,7 @@ export class SFX {
         for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1
       }
       if (this.ctx.state === "suspended") void this.ctx.resume()
+      this.startMusic()
     } catch {
       /* нет доступа к WebAudio — игра работает без звука */
       this.ctx = null
