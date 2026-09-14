@@ -1032,6 +1032,7 @@ export class Game {
   }
 
   toggleMute() {
+    this.sfx.ensure() // клик по кнопке — жест, легально создаёт AudioContext
     this.sfx.muted = !this.sfx.muted
     if (!this.sfx.muted) this.sfx.ui()
     this.pushHud()
@@ -1039,12 +1040,14 @@ export class Game {
 
   /** Переключить фоновую музыку (отдельно от эффектов). */
   toggleMusic() {
+    this.sfx.ensure() // клик по кнопке — жест, легально создаёт AudioContext
     this.sfx.musicMuted = !this.sfx.musicMuted
     this.pushHud()
   }
 
   /** Трек по фазе: в меню/финале — душевный медленный, в партии — боевой. */
   private applyTrack() {
+    this.sfx.ensure() // музыка обязана звучать с первого момента уровня
     this.sfx.setTrack(this.phase === "playing" || this.phase === "paused" ? "game" : "menu")
   }
 

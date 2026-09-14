@@ -564,7 +564,13 @@ export class SFX {
 
   /** Запускает зацикленную 8-битную тему (idempotent). */
   startMusic() {
-    if (this.musicOn || !this.ctx || !this.master) return
+    if (this.musicOn) {
+      // Страховка: если планировщик по какой-то причине остановился —
+      // перезапускаем его, иначе музыка «умирает» до перезагрузки.
+      if (this.musicTimer === null && !this.musicMuted) this.scheduleMusic()
+      return
+    }
+    if (!this.ctx || !this.master) return
     this.musicOn = true
     this.nextBeat = this.ctx.currentTime + 0.06
     this.musicStep = 0
@@ -581,7 +587,15 @@ export class SFX {
 
   /** Lookahead-секвенсор: планирует ноты заранее, чтобы луп не «спотыкался». */
   private scheduleMusic = () => {
-    if (!this.musicOn || !this.ctx || this.musicMuted) return
+    if (!this.musicOn || !this.ctx) return
+    if (this.musicMuted) {
+      // Музыка выключена: держим ритм-курсор актуальным и продолжаем тикать,
+      // чтобы при включении трек продолжился с текущего места без скачка.
+      this.nextBeat = this.ctx.currentTime + 0.06
+      this.musicStep = Math.floor(this.nextBeat / SFX.stepFor(this.track))
+      this.musicTimer = window.setTimeout(this.scheduleMusic, 100)
+      return
+    }
     const step = SFX.stepFor(this.track)
     const lead = this.track === "menu" ? SFX.MENU_LEAD : SFX.GAME_LEAD
     const bass = this.track === "menu" ? SFX.MENU_BASS : SFX.GAME_BASS
