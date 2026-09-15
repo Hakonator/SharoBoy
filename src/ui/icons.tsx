@@ -55,6 +55,35 @@ export function IconMusic({ off }: { off: boolean }) {
   )
 }
 
+/** Маленький ползунок уровня громкости — стоит рядом с иконкой музыки/звука.
+ *  Значение 0..1 приходит из HUD, onChange вызывается при перетаскивании. */
+export function VolSlider({
+  value,
+  onChange,
+  label,
+  className = "",
+}: {
+  value: number
+  onChange: (v: number) => void
+  label: string
+  className?: string
+}) {
+  const pct = Math.round(value * 100)
+  return (
+    <input
+      type="range"
+      min={0}
+      max={100}
+      step={1}
+      value={pct}
+      onChange={(e) => onChange(Number(e.target.value) / 100)}
+      aria-label={label}
+      title={`${label}: ${pct}%`}
+      className={`vol-slider pointer-events-auto ${className}`}
+    />
+  )
+}
+
 export function IconMouse() {
   return (
     <svg

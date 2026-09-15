@@ -132,6 +132,50 @@ canvas {
   color: #e6fbff;
   box-shadow: 0 0 14px rgba(53, 224, 255, 0.4);
 }
+/* Маленький ползунок громкости рядом с иконкой музыки/звука. */
+.vol-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 58px;
+  height: 14px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.vol-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 1px solid rgba(63, 148, 181, 0.4);
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(53, 224, 255, 0.4), rgba(8, 29, 42, 0.9));
+}
+.vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 8px;
+  height: 12px;
+  margin-top: -4px;
+  border: 1px solid #9df2ff;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #7cf5ff, #12b8d8);
+  box-shadow: 0 0 8px rgba(53, 224, 255, 0.5);
+}
+.vol-slider::-moz-range-track {
+  height: 6px;
+  border: 1px solid rgba(63, 148, 181, 0.4);
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(53, 224, 255, 0.4), rgba(8, 29, 42, 0.9));
+}
+.vol-slider::-moz-range-thumb {
+  width: 8px;
+  height: 12px;
+  border: 1px solid #9df2ff;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #7cf5ff, #12b8d8);
+  box-shadow: 0 0 8px rgba(53, 224, 255, 0.5);
+}
+.vol-slider:focus-visible {
+  outline: 1px solid var(--color-cyan-neon);
+  outline-offset: 2px;
+}
 .title-glow {
   text-shadow:
     0 0 18px rgba(53, 224, 255, 0.6),

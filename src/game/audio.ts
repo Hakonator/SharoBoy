@@ -1,3 +1,5 @@
+import { lsGet, lsSet } from "./utils"
+
 /** MP3-дорожки из src/assets/music/*.mp3 — единый набор для всех экранов,
  *  подхватывается автоматически (Vite glob). Пустая папка → встроенный трекер. */
 const FILE_TRACKS = import.meta.glob("../assets/music/*.mp3", {
@@ -9,9 +11,37 @@ const FILE_TRACKS = import.meta.glob("../assets/music/*.mp3", {
 /** Общий список MP3-файлов (стабильный порядок — для выбора «не тот же»). */
 const MUSIC_FILES: string[] = Object.values(FILE_TRACKS)
 
-/** Громкость файловой музыки и длительность плавного перехода (мс). */
+/** Базовая громкость эффектов (мастер-гейн) и файловой музыки. */
+const MASTER_VOLUME = 0.42
+/** Базовая громкость MP3-музыки — умножается на ползунок музыки. */
 const MUSIC_VOLUME = 0.4
+/** Длительность плавного перехода между треками (мс). */
 const MUSIC_FADE_MS = 900
+/** Ключи сохранения ползунков громкости (0..1). */
+const VOL_MUSIC_KEY = "sharoboy-vol-music"
+const VOL_SFX_KEY = "sharoboy-vol-sfx"
+
+/** Ограничить громкость диапазоном 0..1. */
+function clamp01(v: number): number {
+  return Math.max(0, Math.min(1, v))
+}
+
+/** Прочитать сохранённую громкость; мусор в хранилище → значение по умолчанию. */
+function loadVolume(key: string, def: number): number {
+  const raw = lsGet(key)
+  if (raw === null) return def
+  const n = Number(raw)
+  return Number.isFinite(n) ? clamp01(n) : def
+}
+
+/** Создать аудиоэлемент для MP3-трека. Возвращает null, если окружение без
+ *  медиа-элементов (тесты в node) — тогда музыка просто не играет. */
+function createAudio(src: string): HTMLAudioElement | null {
+  if (typeof Audio === "undefined") return null
+  const el = new Audio(src)
+  el.preload = "auto"
+  return el
+}
 
 type MusicKind = "menu" | "game"
 
@@ -20,11 +50,17 @@ type MusicKind = "menu" | "game"
 export class SFX {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
+  /** Отдельный тракт музыки: ползунок музыки не влияет на эффекты. */
+  private musicGain: GainNode | null = null
   private noiseBuf: AudioBuffer | null = null
   /** Выключить звуковые эффекты (не влияет на музыку). */
   muted = false
   /** Выключить фоновую музыку (не влияет на эффекты). */
   musicMuted = false
+  /** Громкость музыки 0..1 (ползунок у иконки ноты), сохраняется в localStorage. */
+  musicVolume: number
+  /** Громкость эффектов 0..1 (ползунок у иконки динамика), сохраняется. */
+  sfxVolume: number
   private musicOn = false
   private musicTimer: number | null = null
   private nextBeat = 0
@@ -37,6 +73,13 @@ export class SFX {
   private fileUrl: string | null = null
   /** Активные fade-переходы громкости: элемент → id интервала. */
   private fades = new Map<HTMLAudioElement, number>()
+  /** Слушатели первого ввода уже навешены (разблокировка автозвука). */
+  private unlockBound = false
+
+  constructor() {
+    this.musicVolume = loadVolume(VOL_MUSIC_KEY, 1)
+    this.sfxVolume = loadVolume(VOL_SFX_KEY, 1)
+  }
 
   /** MIDI-нота → частота Гц (С4 = 60). */
   private static midi(m: number): number {
@@ -57,13 +100,55 @@ export class SFX {
       return
     }
     if (this.fileAudio) {
-      this.fileAudio.volume = MUSIC_VOLUME
+      this.fileAudio.volume = this.fileVolume()
       void this.fileAudio.play().catch(() => {})
     } else if (this.musicOn) {
       // Трек был пропущен из-за mute — запускаем его при включении музыки
       if (this.fileMode) this.playFileMusic()
       else if (this.musicTimer === null) this.scheduleMusic()
     }
+  }
+
+  /** Громкость MP3-трека с учётом ползунка музыки. */
+  private fileVolume(): number {
+    return MUSIC_VOLUME * this.musicVolume
+  }
+
+  /** Ползунок громкости музыки (0..1): файл — сразу, синтез — через musicGain. */
+  setMusicVolume(v: number) {
+    this.musicVolume = clamp01(v)
+    lsSet(VOL_MUSIC_KEY, String(this.musicVolume))
+    if (this.musicGain) this.musicGain.gain.value = MASTER_VOLUME * this.musicVolume
+    if (this.fileAudio) this.fileAudio.volume = this.fileVolume()
+  }
+
+  /** Ползунок громкости эффектов (0..1): мастер-гейн WebAudio. */
+  setSfxVolume(v: number) {
+    this.sfxVolume = clamp01(v)
+    lsSet(VOL_SFX_KEY, String(this.sfxVolume))
+    if (this.master) this.master.gain.value = MASTER_VOLUME * this.sfxVolume
+  }
+
+  /** Запустить музыку сразу при открытии игры, не дожидаясь жеста. Браузеры
+   *  блокируют автозвук до первого ввода: пробуем немедленно, а если не
+   *  вышло — повторяем при первом клике/тапе/клавише. */
+  autostart() {
+    this.ensure()
+    if (this.ctx && this.ctx.state === "suspended") void this.ctx.resume()
+  }
+
+  /** Первый ввод пользователя — легальная разблокировка звука. */
+  private armGestureUnlock() {
+    if (this.unlockBound) return
+    if (typeof window === "undefined") return
+    this.unlockBound = true
+    const onInput = () => {
+      this.ensure()
+      if (this.ctx && this.ctx.state === "suspended") void this.ctx.resume()
+    }
+    window.addEventListener("pointerdown", onInput)
+    window.addEventListener("keydown", onInput)
+    window.addEventListener("touchstart", onInput, { passive: true })
   }
 
   /** Переключение фоновой музыки. Каждый вызов (старт уровня, переход на
@@ -73,8 +158,9 @@ export class SFX {
     this.track = track
     this.musicStep = 0
     this.fileMode = MUSIC_FILES.length > 0
-    if (!this.ctx) return // ensure ещё не был — настроится при первом жесте
-    this.nextBeat = this.ctx.currentTime + 0.05
+    // Файловая музыка работает и без WebAudio; секвенсору нужен контекст.
+    if (!this.ctx && !this.fileMode) return // ensure ещё не был — дождётся жеста
+    this.nextBeat = this.ctx ? this.ctx.currentTime + 0.05 : 0
     if (!this.musicOn) return
     if (this.fileMode) {
       if (!this.musicMuted) this.playFileMusic()
@@ -92,8 +178,9 @@ export class SFX {
     if (MUSIC_FILES.length > 1 && pick === this.fileUrl) {
       pick = MUSIC_FILES[(MUSIC_FILES.indexOf(pick) + 1) % MUSIC_FILES.length]
     }
+    const a = createAudio(pick)
+    if (!a) return // окружение без медиа-элементов (тесты) — музыки нет
     this.fileUrl = pick
-    const a = new Audio(pick)
     a.volume = 0
     a.addEventListener("ended", () => {
       // Трек кончился — следующий случайный из набора
@@ -103,7 +190,7 @@ export class SFX {
     if (prev && prev !== a) this.fadeAudio(prev, 0, () => prev.pause())
     this.fileAudio = a
     void a.play().catch(() => {})
-    this.fadeAudio(a, MUSIC_VOLUME)
+    this.fadeAudio(a, this.fileVolume())
   }
 
   /** Плавно меняет громкость элемента за MUSIC_FADE_MS. */
@@ -678,9 +765,10 @@ export class SFX {
       }
       return
     }
-    if (!this.ctx || !this.master) return
+    // MP3-режим не зависит от WebAudio — играет даже без контекста.
+    if (!this.fileMode && (!this.ctx || !this.master)) return
     this.musicOn = true
-    this.nextBeat = this.ctx.currentTime + 0.06
+    this.nextBeat = this.ctx ? this.ctx.currentTime + 0.06 : 0
     this.musicStep = 0
     if (this.fileMode && !this.musicMuted) this.playFileMusic()
     else if (!this.musicMuted) this.scheduleMusic()
@@ -726,11 +814,12 @@ export class SFX {
           isMenu ? "triangle" : "square",
           isMenu ? 0.05 : 0.06,
           undefined,
-          delay
+          delay,
+          this.musicGain
         )
-      if (b > 0) this.tone(SFX.midi(b), step, "triangle", 0.07, undefined, delay)
+      if (b > 0) this.tone(SFX.midi(b), step, "triangle", 0.07, undefined, delay, this.musicGain)
       if (th !== undefined && th > 0)
-        this.tone(SFX.midi(th), step * 0.7, "triangle", 0.045, undefined, delay)
+        this.tone(SFX.midi(th), step * 0.7, "triangle", 0.045, undefined, delay, this.musicGain)
       this.musicStep++
       this.nextBeat += step
     }
@@ -743,23 +832,32 @@ export class SFX {
         const AC =
           window.AudioContext ||
           (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-        if (!AC) return
-        this.ctx = new AC()
-        this.master = this.ctx.createGain()
-        this.master.gain.value = 0.42
-        this.master.connect(this.ctx.destination)
-        const len = Math.floor(this.ctx.sampleRate * 0.4)
-        this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate)
-        const data = this.noiseBuf.getChannelData(0)
-        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1
+        // Без WebAudio MP3-музыка всё равно возможна — контекст не обязателен.
+        if (AC) {
+          this.ctx = new AC()
+          this.master = this.ctx.createGain()
+          this.master.gain.value = MASTER_VOLUME * this.sfxVolume
+          this.master.connect(this.ctx.destination)
+          // Музыкальный тракт отдельный: ползунок звука не влияет на музыку.
+          this.musicGain = this.ctx.createGain()
+          this.musicGain.gain.value = MASTER_VOLUME * this.musicVolume
+          this.musicGain.connect(this.ctx.destination)
+          const len = Math.floor(this.ctx.sampleRate * 0.4)
+          this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate)
+          const data = this.noiseBuf.getChannelData(0)
+          for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1
+        }
       }
-      if (this.ctx.state === "suspended") void this.ctx.resume()
-      this.startMusic()
+      if (this.ctx && this.ctx.state === "suspended") void this.ctx.resume()
     } catch {
       /* нет доступа к WebAudio — игра работает без звука */
       this.ctx = null
       this.master = null
+      this.musicGain = null
     }
+    this.armGestureUnlock()
+    // Запуск вне try: MP3-музыка играет даже там, где WebAudio недоступен.
+    this.startMusic()
   }
 
   private tone(
@@ -768,7 +866,9 @@ export class SFX {
     type: OscillatorType,
     vol: number,
     slideTo?: number,
-    delay = 0
+    delay = 0,
+    /** Адресат звука: null — эффекты (мастер-гейн), musicGain — музыка. */
+    bus: GainNode | null = null
   ) {
     if (!this.ctx || !this.master) return
     const t = this.ctx.currentTime + delay
@@ -783,7 +883,7 @@ export class SFX {
     g.gain.exponentialRampToValueAtTime(Math.max(0.001, vol), t + 0.008)
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
     osc.connect(g)
-    g.connect(this.master)
+    g.connect(bus ?? this.master)
     osc.start(t)
     osc.stop(t + dur + 0.02)
   }

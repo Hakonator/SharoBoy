@@ -38,6 +38,8 @@ const INITIAL_HUD: HudData = {
   blocksLeft: 0,
   muted: false,
   musicMuted: false,
+  musicVolume: 1,
+  sfxVolume: 1,
   newAchievements: [],
   banner: null,
   stuck: true,
@@ -370,6 +372,8 @@ export default function App() {
         onPause={() => g()?.togglePause()}
         onMute={() => g()?.toggleMute()}
         onMusic={() => g()?.toggleMusic()}
+        onMusicVolume={(v) => g()?.setMusicVolume(v)}
+        onSfxVolume={(v) => g()?.setSfxVolume(v)}
       />
 
       {hud.phase === "menu" && (
@@ -398,6 +402,8 @@ export default function App() {
           onDebugStartGame={handleDebugStartGame}
           onMute={() => g()?.toggleMute()}
           onMusic={() => g()?.toggleMusic()}
+          onMusicVolume={(v) => g()?.setMusicVolume(v)}
+          onSfxVolume={(v) => g()?.setSfxVolume(v)}
         />
       )}
 

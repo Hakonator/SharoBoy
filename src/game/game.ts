@@ -848,6 +848,9 @@ export class Game {
     }
     this.last = performance.now()
     this.raf = requestAnimationFrame(this.loop)
+    // Музыка стартует сразу при запуске игры; если браузер требует жест,
+    // SFX сам повторит запуск при первом клике/тапе/клавише.
+    this.sfx.autostart()
     this.pushHud()
   }
 
@@ -860,6 +863,9 @@ export class Game {
     cancelAnimationFrame(this.raf)
     window.removeEventListener("resize", this.handleResize)
     this.input.destroy()
+    // Движок уничтожен (например, пересоздание в dev-режиме) — музыка не должна
+    // остаться играть «вторым» экземпляром.
+    this.sfx.stopMusic()
   }
 
   private loop = (t: number) => {
@@ -1043,6 +1049,20 @@ export class Game {
   toggleMusic() {
     this.sfx.ensure() // клик по кнопке — жест, легально создаёт AudioContext
     this.sfx.setMusicMuted(!this.sfx.musicMuted)
+    this.pushHud()
+  }
+
+  /** Ползунок громкости музыки (0..1). */
+  setMusicVolume(v: number) {
+    this.sfx.ensure()
+    this.sfx.setMusicVolume(v)
+    this.pushHud()
+  }
+
+  /** Ползунок громкости эффектов (0..1). */
+  setSfxVolume(v: number) {
+    this.sfx.ensure()
+    this.sfx.setSfxVolume(v)
     this.pushHud()
   }
 
@@ -1531,6 +1551,8 @@ export class Game {
       blocksLeft: this.blocks.length,
       muted: this.sfx.muted,
       musicMuted: this.sfx.musicMuted,
+      musicVolume: this.sfx.musicVolume,
+      sfxVolume: this.sfx.sfxVolume,
       banner: this.banner,
       stuck: this.balls.some((b) => b.stuck),
       newRecord: this.newRecord,

@@ -25,6 +25,10 @@ export interface HudData {
   muted: boolean
   /** Фоновая музыка выключена отдельно от эффектов. */
   musicMuted: boolean
+  /** Громкость музыки 0..1 (ползунок у иконки ноты). */
+  musicVolume: number
+  /** Громкость эффектов 0..1 (ползунок у иконки динамика). */
+  sfxVolume: number
   /** id достижений, открытых с прошлой отправки HUD (очередь для тостов). */
   newAchievements: string[]
   banner: string | null

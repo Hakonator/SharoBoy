@@ -23,6 +23,7 @@ import {
   EffectChip,
   ControlsPanel,
   FloatingBalls,
+  VolSlider,
 } from "./icons"
 
 /** Личная статистика игрока (из localStorage). */
@@ -155,12 +156,18 @@ export function HudOverlay({
   onPause,
   onMute,
   onMusic,
+  onMusicVolume,
+  onSfxVolume,
 }: {
   hud: HudData
   inGame: boolean
   onPause: () => void
   onMute: () => void
   onMusic: () => void
+  /** Ползунок громкости музыки (0..1). */
+  onMusicVolume: (v: number) => void
+  /** Ползунок громкости эффектов (0..1). */
+  onSfxVolume: (v: number) => void
 }) {
   return (
     <>
@@ -260,20 +267,36 @@ export function HudOverlay({
             >
               {hud.phase === "paused" ? <IconPlay /> : <IconPause />}
             </button>
-            <button
-              className="icon-btn pointer-events-auto flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
-              onClick={onMusic}
-              aria-label="Музыка"
-            >
-              <IconMusic off={hud.musicMuted} />
-            </button>
-            <button
-              className="icon-btn pointer-events-auto flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
-              onClick={onMute}
-              aria-label="Звук"
-            >
-              <IconSound off={hud.muted} />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                className="icon-btn pointer-events-auto flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
+                onClick={onMusic}
+                aria-label="Музыка"
+              >
+                <IconMusic off={hud.musicMuted} />
+              </button>
+              <VolSlider
+                value={hud.musicVolume}
+                onChange={onMusicVolume}
+                label="Громкость музыки"
+                className="hidden sm:block"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                className="icon-btn pointer-events-auto flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
+                onClick={onMute}
+                aria-label="Звук"
+              >
+                <IconSound off={hud.muted} />
+              </button>
+              <VolSlider
+                value={hud.sfxVolume}
+                onChange={onSfxVolume}
+                label="Громкость звука"
+                className="hidden sm:block"
+              />
+            </div>
           </div>
         </div>
       )}
@@ -411,6 +434,8 @@ export function MenuScreen({
   onDebugStartGame,
   onMute,
   onMusic,
+  onMusicVolume,
+  onSfxVolume,
 }: {
   hud: HudData
   stats: PlayerStats
@@ -445,6 +470,10 @@ export function MenuScreen({
   onMute: () => void
   /** Переключить фоновую музыку (кнопка в углу меню). */
   onMusic: () => void
+  /** Ползунок громкости музыки (0..1). */
+  onMusicVolume: (v: number) => void
+  /** Ползунок громкости эффектов (0..1). */
+  onSfxVolume: (v: number) => void
 }) {
   /** Есть улучшение, которое игрок уже может купить, — индикатор на секции. */
   const canBuyAny = UPGRADE_DEFS.some((u) => {
@@ -455,22 +484,28 @@ export function MenuScreen({
   return (
     <div className="absolute inset-0 z-40 overflow-y-auto">
       <FloatingBalls />
-      {/* Кнопки музыки и звука — одинаковые, компактные, в углу меню */}
-      <div className="absolute right-3 top-3 z-10 flex gap-1.5 sm:right-5 sm:top-5">
-        <button
-          className="icon-btn pointer-events-auto flex h-10 w-10 items-center justify-center"
-          onClick={onMusic}
-          aria-label="Музыка"
-        >
-          <IconMusic off={hud.musicMuted} />
-        </button>
-        <button
-          className="icon-btn pointer-events-auto flex h-10 w-10 items-center justify-center"
-          onClick={onMute}
-          aria-label="Звук"
-        >
-          <IconSound off={hud.muted} />
-        </button>
+      {/* Кнопки музыки и звука с ползунками громкости — в углу меню */}
+      <div className="absolute right-3 top-3 z-10 flex items-center gap-2 sm:right-5 sm:top-5 sm:gap-3">
+        <div className="flex items-center gap-1.5">
+          <button
+            className="icon-btn pointer-events-auto flex h-10 w-10 items-center justify-center"
+            onClick={onMusic}
+            aria-label="Музыка"
+          >
+            <IconMusic off={hud.musicMuted} />
+          </button>
+          <VolSlider value={hud.musicVolume} onChange={onMusicVolume} label="Громкость музыки" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            className="icon-btn pointer-events-auto flex h-10 w-10 items-center justify-center"
+            onClick={onMute}
+            aria-label="Звук"
+          >
+            <IconSound off={hud.muted} />
+          </button>
+          <VolSlider value={hud.sfxVolume} onChange={onSfxVolume} label="Громкость звука" />
+        </div>
       </div>
       <div className="relative flex min-h-full flex-col items-start justify-center gap-8 p-6 md:flex-row md:items-center md:gap-16 md:p-16 lg:p-24">
         <div className="anim-rise max-w-xl">
