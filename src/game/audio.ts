@@ -59,7 +59,11 @@ export class SFX {
     if (this.fileAudio) {
       this.fileAudio.volume = MUSIC_VOLUME
       void this.fileAudio.play().catch(() => {})
-    } else if (this.musicOn && this.musicTimer === null && !this.fileMode) this.scheduleMusic()
+    } else if (this.musicOn) {
+      // Трек был пропущен из-за mute — запускаем его при включении музыки
+      if (this.fileMode) this.playFileMusic()
+      else if (this.musicTimer === null) this.scheduleMusic()
+    }
   }
 
   /** Переключение фоновой музыки. Каждый вызов (старт уровня, переход на
