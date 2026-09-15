@@ -1,3 +1,20 @@
+/** MP3-дорожки из src/assets/music/<menu|game>/*.mp3 — подхватываются
+ *  автоматически (Vite glob). Пустые папки → играет встроенный трекер. */
+const FILE_TRACKS = {
+  menu: import.meta.glob("../assets/music/menu/*.mp3", {
+    query: "?url",
+    import: "default",
+    eager: true,
+  }) as Record<string, string>,
+  game: import.meta.glob("../assets/music/game/*.mp3", {
+    query: "?url",
+    import: "default",
+    eager: true,
+  }) as Record<string, string>,
+}
+
+type MusicKind = "menu" | "game"
+
 /** Крошечный WebAudio-синтезатор: короткие блипы на каждое действие +
  *  8-битная фоновая музыка (встроенный трекер, без внешних файлов). */
 export class SFX {
@@ -13,7 +30,16 @@ export class SFX {
   private nextBeat = 0
   private musicStep = 0
   /** Активный трек. */
-  private track: "menu" | "game" = "menu"
+  private track: MusicKind = "menu"
+  /** MP3-режим: играет файл из набора (вместо встроенного секвенсора). */
+  private fileAudio: HTMLAudioElement | null = null
+  private fileKind: MusicKind | null = null
+  private fileUrl: string | null = null
+
+  /** Список MP3-файлов для трека. */
+  private fileTracks(kind: MusicKind): string[] {
+    return Object.values(FILE_TRACKS[kind])
+  }
 
   /** MIDI-нота → частота Гц (С4 = 60). */
   private static midi(m: number): number {
@@ -21,16 +47,67 @@ export class SFX {
   }
 
   /** Размер шага (восьмая нота) для трека. Меню — медленно и «душевно». */
-  private static stepFor(track: "menu" | "game"): number {
+  private static stepFor(track: MusicKind): number {
     return track === "menu" ? 60 / 76 / 2 : 60 / 144 / 2
   }
 
-  /** Переключение фоновой музыки: меняет трек, цикл начинается заново. */
-  setTrack(track: "menu" | "game") {
-    if (this.track === track) return
+  /** Вкл/выкл музыку во время игры: файл — пауза/продолжение с места,
+   *  секвенсор — продолжение с актуального ритм-курсора. */
+  setMusicMuted(v: boolean) {
+    this.musicMuted = v
+    if (v) {
+      this.fileAudio?.pause()
+      return
+    }
+    if (this.fileAudio) void this.fileAudio.play().catch(() => {})
+    else if (this.musicOn && this.musicTimer === null && !this.fileKind) this.scheduleMusic()
+  }
+
+  /** Переключение фоновой музыки: меняет трек, цикл начинается заново.
+   *  Если для трека есть MP3 — играет случайный файл из набора. */
+  setTrack(track: MusicKind) {
+    const urls = this.fileTracks(track)
+    const fileMode = urls.length > 0
+    if (this.track === track && this.fileKind === (fileMode ? track : null)) return
     this.track = track
     this.musicStep = 0
-    if (this.ctx) this.nextBeat = this.ctx.currentTime + 0.05
+    this.fileKind = fileMode ? track : null
+    if (!this.ctx) return // ensure ещё не был — настроится при первом жесте
+    this.nextBeat = this.ctx.currentTime + 0.05
+    if (!this.musicOn) return
+    if (fileMode && !this.musicMuted) this.playFileMusic(track)
+    else {
+      this.stopFileMusic()
+      this.scheduleMusic()
+    }
+  }
+
+  /** Случайный MP3-трек из набора (без повтора предыдущего, если есть выбор). */
+  private playFileMusic(kind: MusicKind) {
+    const urls = this.fileTracks(kind)
+    if (!urls.length) return
+    this.stopFileMusic()
+    let pick = urls[Math.floor(Math.random() * urls.length)]
+    if (urls.length > 1 && pick === this.fileUrl) {
+      pick = urls[(urls.indexOf(pick) + 1) % urls.length]
+    }
+    this.fileUrl = pick
+    const a = new Audio(pick)
+    a.volume = 0.4
+    a.addEventListener("ended", () => {
+      // Трек кончился — следующий случайный из того же набора
+      if (this.fileKind === kind && !this.musicMuted) this.playFileMusic(kind)
+    })
+    this.fileAudio = a
+    void a.play().catch(() => {})
+  }
+
+  private stopFileMusic() {
+    if (this.fileAudio) {
+      this.fileAudio.pause()
+      this.fileAudio = null
+    }
+    this.fileUrl = null
   }
 
   /** Медленный душевный трек меню: квадрат-мелодия + тихий треугольник-бас.
@@ -565,20 +642,25 @@ export class SFX {
   /** Запускает зацикленную 8-битную тему (idempotent). */
   startMusic() {
     if (this.musicOn) {
-      // Страховка: если планировщик по какой-то причине остановился —
-      // перезапускаем его, иначе музыка «умирает» до перезагрузки.
-      if (this.musicTimer === null && !this.musicMuted) this.scheduleMusic()
+      // Страховка: если что-то остановилось — возобновляем (файл — с места,
+      // секвенсор — перезапуском), иначе музыка «умирает» до перезагрузки.
+      if (!this.musicMuted) {
+        if (this.fileAudio && this.fileAudio.paused) void this.fileAudio.play().catch(() => {})
+        if (this.musicTimer === null && !this.fileAudio) this.scheduleMusic()
+      }
       return
     }
     if (!this.ctx || !this.master) return
     this.musicOn = true
     this.nextBeat = this.ctx.currentTime + 0.06
     this.musicStep = 0
-    this.scheduleMusic()
+    if (this.fileKind && !this.musicMuted) this.playFileMusic(this.fileKind)
+    else if (!this.musicMuted) this.scheduleMusic()
   }
 
   stopMusic() {
     this.musicOn = false
+    this.stopFileMusic()
     if (this.musicTimer !== null) {
       clearTimeout(this.musicTimer)
       this.musicTimer = null
@@ -587,7 +669,7 @@ export class SFX {
 
   /** Lookahead-секвенсор: планирует ноты заранее, чтобы луп не «спотыкался». */
   private scheduleMusic = () => {
-    if (!this.musicOn || !this.ctx) return
+    if (!this.musicOn || !this.ctx || this.fileKind) return // mp3 управляет собой
     if (this.musicMuted) {
       // Музыка выключена: держим ритм-курсор актуальным и продолжаем тикать,
       // чтобы при включении трек продолжился с текущего места без скачка.

@@ -1042,7 +1042,7 @@ export class Game {
   /** Переключить фоновую музыку (отдельно от эффектов). */
   toggleMusic() {
     this.sfx.ensure() // клик по кнопке — жест, легально создаёт AudioContext
-    this.sfx.musicMuted = !this.sfx.musicMuted
+    this.sfx.setMusicMuted(!this.sfx.musicMuted)
     this.pushHud()
   }
 
