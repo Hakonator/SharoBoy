@@ -462,6 +462,7 @@ export class Game {
       slowActive: () => g.time < g.slowUntil,
       fastActive: () => g.time < g.fastUntil,
       magnetActive: () => g.time < g.magnetUntil,
+      paddleRotatable: () => g.isDebugEffectActive("paddleRotation"),
       wideActive: () => g.time < g.wideUntil,
       shrinkActive: () => g.time < g.shrinkUntil,
       paddleShape: () => g.paddleShapeKind(),

@@ -44,6 +44,9 @@ export interface PhysicsWorld {
   shrinkActive(): boolean
   /** Форма верхней поверхности ракетки (эффекты отладки). */
   paddleShape(): PaddleShapeKind
+  /** Активен ли поворотный эффект (ЛКМ/ПКМ меняют наклон ракетки) — в этом
+   *  режиме арканоидное «искажение» отскока отключается. */
+  paddleRotatable(): boolean
   addScore(n: number, x: number, y: number, color: string, size: number): void
   dropPower(x: number, y: number): void
   damageBoss(dmg: number, fromWeapon: boolean): void
@@ -262,22 +265,34 @@ export class Physics {
       this.collidePaddleShape(ball, rel, shape)
       return
     }
-    // Классический арканоидный отскок (как в изначальной версии): угол зависит
-    // от точки попадания (rel·1.05 рад ≈ ±60°) и от скорости движения ракетки —
-    // «искажение» траектории в зависимости от места отскока.
-    const ang = -Math.PI / 2 + rot + rel * 1.05 + clamp(p.vx * 0.0004, -0.3, 0.3)
-    const sp = Math.hypot(ball.vx, ball.vy) || ball.speed
-    ball.vx = Math.cos(ang) * sp
-    ball.vy = Math.sin(ang) * sp
-    // Нормаль к плоскости ракетки (с учётом поворота) — для выталкивания
+    // Поворотный эффект (ЛКМ/ПКМ) меняет наклон ракетки — отскок зеркальный
+    // по нормали ракетки, без арканоидного «искажения» (угол и так задаётся
+    // наклоном). Арканоидная механика — только на не-повёрнутой ракетке.
     const nx = Math.sin(rot)
     const ny = -Math.cos(rot)
-    // Страховка: отскок не должен отправлять мяч вниз (при сильном повороте)
-    if (ball.vy > 0) {
-      const s2 = Math.hypot(ball.vx, ball.vy) || 1
-      ball.vy = -ball.vy
-      const vxs = Math.sqrt(Math.max(s2 * s2 - ball.vy * ball.vy, 0))
-      ball.vx = Math.sign(ball.vx || 1) * vxs
+    if (this.g.paddleRotatable()) {
+      const dot = ball.vx * nx + ball.vy * ny
+      const rvx = ball.vx - 2 * dot * nx
+      let rvy = ball.vy - 2 * dot * ny
+      // Страховка: отскок не должен отправлять мяч вниз
+      if (rvy > 0) rvy = -rvy
+      ball.vx = rvx
+      ball.vy = rvy
+    } else {
+      // Классический арканоидный отскок (как в изначальной версии): угол зависит
+      // от точки попадания (rel·1.05 рад ≈ ±60°) и от скорости движения ракетки —
+      // «искажение» траектории в зависимости от места отскока.
+      const ang = -Math.PI / 2 + rot + rel * 1.05 + clamp(p.vx * 0.0004, -0.3, 0.3)
+      const sp = Math.hypot(ball.vx, ball.vy) || ball.speed
+      ball.vx = Math.cos(ang) * sp
+      ball.vy = Math.sin(ang) * sp
+      // Страховка: отскок не должен отправлять мяч вниз (при сильном наклоне)
+      if (ball.vy > 0) {
+        const s2 = Math.hypot(ball.vx, ball.vy) || 1
+        ball.vy = -ball.vy
+        const vxs = Math.sqrt(Math.max(s2 * s2 - ball.vy * ball.vy, 0))
+        ball.vx = Math.sign(ball.vx || 1) * vxs
+      }
     }
     // Корректируем позицию шара: выталкиваем вдоль нормали ракетки
     const pen = halfH + ball.r - Math.abs(ly) // глубина проникновения
