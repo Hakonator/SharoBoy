@@ -1369,6 +1369,7 @@ export class Game {
       this.sfx.levelClear()
       this.wave++
       this.buildWave(this.wave)
+      this.applyTrack() // новый случайный трек на новую волну
       this.clearAllEffects()
       this.balls = []
       this.serveBall()
@@ -1388,6 +1389,7 @@ export class Game {
     this.sfx.levelClear()
     this.level++
     this.buildLevel(this.level)
+    this.applyTrack() // новый случайный трек на новый уровень
     this.clearAllEffects()
     this.balls = []
     this.serveBall()

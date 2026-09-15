@@ -1,17 +1,17 @@
-/** MP3-дорожки из src/assets/music/<menu|game>/*.mp3 — подхватываются
- *  автоматически (Vite glob). Пустые папки → играет встроенный трекер. */
-const FILE_TRACKS = {
-  menu: import.meta.glob("../assets/music/menu/*.mp3", {
-    query: "?url",
-    import: "default",
-    eager: true,
-  }) as Record<string, string>,
-  game: import.meta.glob("../assets/music/game/*.mp3", {
-    query: "?url",
-    import: "default",
-    eager: true,
-  }) as Record<string, string>,
-}
+/** MP3-дорожки из src/assets/music/*.mp3 — единый набор для всех экранов,
+ *  подхватывается автоматически (Vite glob). Пустая папка → встроенный трекер. */
+const FILE_TRACKS = import.meta.glob("../assets/music/*.mp3", {
+  query: "?url",
+  import: "default",
+  eager: true,
+}) as Record<string, string>
+
+/** Общий список MP3-файлов (стабильный порядок — для выбора «не тот же»). */
+const MUSIC_FILES: string[] = Object.values(FILE_TRACKS)
+
+/** Громкость файловой музыки и длительность плавного перехода (мс). */
+const MUSIC_VOLUME = 0.4
+const MUSIC_FADE_MS = 900
 
 type MusicKind = "menu" | "game"
 
@@ -31,15 +31,12 @@ export class SFX {
   private musicStep = 0
   /** Активный трек. */
   private track: MusicKind = "menu"
-  /** MP3-режим: играет файл из набора (вместо встроенного секвенсора). */
+  /** MP3-режим: играет файл из общего набора (вместо встроенного секвенсора). */
   private fileAudio: HTMLAudioElement | null = null
-  private fileKind: MusicKind | null = null
+  private fileMode = MUSIC_FILES.length > 0
   private fileUrl: string | null = null
-
-  /** Список MP3-файлов для трека. */
-  private fileTracks(kind: MusicKind): string[] {
-    return Object.values(FILE_TRACKS[kind])
-  }
+  /** Активные fade-переходы громкости: элемент → id интервала. */
+  private fades = new Map<HTMLAudioElement, number>()
 
   /** MIDI-нота → частота Гц (С4 = 60). */
   private static midi(m: number): number {
@@ -59,50 +56,77 @@ export class SFX {
       this.fileAudio?.pause()
       return
     }
-    if (this.fileAudio) void this.fileAudio.play().catch(() => {})
-    else if (this.musicOn && this.musicTimer === null && !this.fileKind) this.scheduleMusic()
+    if (this.fileAudio) {
+      this.fileAudio.volume = MUSIC_VOLUME
+      void this.fileAudio.play().catch(() => {})
+    } else if (this.musicOn && this.musicTimer === null && !this.fileMode) this.scheduleMusic()
   }
 
-  /** Переключение фоновой музыки: меняет трек, цикл начинается заново.
-   *  Если для трека есть MP3 — играет случайный файл из набора. */
+  /** Переключение фоновой музыки. Каждый вызов (старт уровня, переход на
+   *  следующий уровень, выход в меню) запускает НОВЫЙ случайный MP3-трек из
+   *  набора с плавным переходом; без файлов — встроенный трекер по фазе. */
   setTrack(track: MusicKind) {
-    const urls = this.fileTracks(track)
-    const fileMode = urls.length > 0
-    if (this.track === track && this.fileKind === (fileMode ? track : null)) return
     this.track = track
     this.musicStep = 0
-    this.fileKind = fileMode ? track : null
+    this.fileMode = MUSIC_FILES.length > 0
     if (!this.ctx) return // ensure ещё не был — настроится при первом жесте
     this.nextBeat = this.ctx.currentTime + 0.05
     if (!this.musicOn) return
-    if (fileMode && !this.musicMuted) this.playFileMusic(track)
-    else {
+    if (this.fileMode) {
+      if (!this.musicMuted) this.playFileMusic()
+    } else {
       this.stopFileMusic()
       this.scheduleMusic()
     }
   }
 
-  /** Случайный MP3-трек из набора (без повтора предыдущего, если есть выбор). */
-  private playFileMusic(kind: MusicKind) {
-    const urls = this.fileTracks(kind)
-    if (!urls.length) return
-    this.stopFileMusic()
-    let pick = urls[Math.floor(Math.random() * urls.length)]
-    if (urls.length > 1 && pick === this.fileUrl) {
-      pick = urls[(urls.indexOf(pick) + 1) % urls.length]
+  /** Случайный MP3-трек из общего набора (без повтора предыдущего) с плавным
+   *  кроссфейдом: предыдущий трек гаснет, новый нарастает. */
+  private playFileMusic() {
+    if (!MUSIC_FILES.length) return
+    let pick = MUSIC_FILES[Math.floor(Math.random() * MUSIC_FILES.length)]
+    if (MUSIC_FILES.length > 1 && pick === this.fileUrl) {
+      pick = MUSIC_FILES[(MUSIC_FILES.indexOf(pick) + 1) % MUSIC_FILES.length]
     }
     this.fileUrl = pick
     const a = new Audio(pick)
-    a.volume = 0.4
+    a.volume = 0
     a.addEventListener("ended", () => {
-      // Трек кончился — следующий случайный из того же набора
-      if (this.fileKind === kind && !this.musicMuted) this.playFileMusic(kind)
+      // Трек кончился — следующий случайный из набора
+      if (this.musicOn && !this.musicMuted) this.playFileMusic()
     })
+    const prev = this.fileAudio
+    if (prev && prev !== a) this.fadeAudio(prev, 0, () => prev.pause())
     this.fileAudio = a
     void a.play().catch(() => {})
+    this.fadeAudio(a, MUSIC_VOLUME)
+  }
+
+  /** Плавно меняет громкость элемента за MUSIC_FADE_MS. */
+  private fadeAudio(a: HTMLAudioElement, target: number, done?: () => void) {
+    const runningId = this.fades.get(a)
+    if (runningId !== undefined) window.clearInterval(runningId)
+    const from = a.volume
+    const steps = 14
+    let i = 0
+    const id = window.setInterval(() => {
+      i++
+      a.volume = Math.max(0, Math.min(1, from + (target - from) * (i / steps)))
+      if (i >= steps) {
+        this.fades.delete(a)
+        window.clearInterval(id)
+        done?.()
+      }
+    }, MUSIC_FADE_MS / steps)
+    this.fades.set(a, id)
   }
 
   private stopFileMusic() {
+    for (const [el, id] of this.fades) {
+      window.clearInterval(id)
+      el.pause()
+    }
+    this.fades.clear()
     if (this.fileAudio) {
       this.fileAudio.pause()
       this.fileAudio = null
@@ -654,7 +678,7 @@ export class SFX {
     this.musicOn = true
     this.nextBeat = this.ctx.currentTime + 0.06
     this.musicStep = 0
-    if (this.fileKind && !this.musicMuted) this.playFileMusic(this.fileKind)
+    if (this.fileMode && !this.musicMuted) this.playFileMusic()
     else if (!this.musicMuted) this.scheduleMusic()
   }
 
@@ -669,7 +693,7 @@ export class SFX {
 
   /** Lookahead-секвенсор: планирует ноты заранее, чтобы луп не «спотыкался». */
   private scheduleMusic = () => {
-    if (!this.musicOn || !this.ctx || this.fileKind) return // mp3 управляет собой
+    if (!this.musicOn || !this.ctx || this.fileMode) return // mp3 управляет собой
     if (this.musicMuted) {
       // Музыка выключена: держим ритм-курсор актуальным и продолжаем тикать,
       // чтобы при включении трек продолжился с текущего места без скачка.
