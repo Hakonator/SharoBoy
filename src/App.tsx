@@ -136,9 +136,9 @@ export default function App() {
   const handleDebugStartGame = useCallback(() => {
     const game = gameRef.current
     if (!game) return
-    game.debugBossType = debugBoss === "octopus" ? "octopus" : null
-    if (debugBoss === "octopus") {
-      game.spawnOctopusBoss()
+    game.debugBossType = debugBoss === "octopus" || debugBoss === "kraken" ? debugBoss : null
+    if (debugBoss === "octopus" || debugBoss === "kraken") {
+      game.spawnDebugBoss(debugBoss)
     } else {
       // Пустой уровень со случайными блоками (стандартный _wave_ 1)
       game.startEndless()

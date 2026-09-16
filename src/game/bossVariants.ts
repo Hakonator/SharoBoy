@@ -37,6 +37,25 @@ const KIND_DEFAULTS: Record<
 }
 
 /**
+ * Вариант с фиксированными параметрами вида (без рандома).
+ * Используется и отбором по сиду, и отладочным спавном босса.
+ * @param tier ярус (масштабирует HP и число миньонов)
+ */
+export function fixedVariant(kind: BossVariantKind, tier = 2): BossVariant {
+  const d = KIND_DEFAULTS[kind]
+  return {
+    kind,
+    name: d.name,
+    // Сила масштабируется ярусом: HP растёт, миньонов прибавляется.
+    hp: 40 + (tier + 1) * 6 + (kind === "kraken" ? 10 : 0),
+    minions: kind === "king" ? clamp(d.minions + Math.floor(tier / 2), 3, 6) : 0,
+    tentacles: d.tentacles,
+    bombEvery: d.bombEvery,
+    angryAt: d.angryAt,
+  }
+}
+
+/**
  * Выбирает вариант финального босса для узла кампании.
  * @param seed сид забега (детерминированность в рамках карты)
  * @param tier ярус узла босса (0-based; влияет на силу и разблокировку видов)
@@ -47,17 +66,5 @@ export function pickBossVariant(seed: number, tier: number): BossVariant {
   // «Кракен» открывается со 2-го яруса боссов, до этого — король или осьминог.
   const pool: BossVariantKind[] = tier >= 1 ? ["king", "octopus", "kraken"] : ["king", "octopus"]
   const kind = pool[Math.floor(roll * pool.length) % pool.length]
-  const d = KIND_DEFAULTS[kind]
-  // Сила масштабируется ярусом: HP растёт, миньонов прибавляется.
-  const hp = 40 + (tier + 1) * 6 + (kind === "kraken" ? 10 : 0)
-  const minions = kind === "king" ? clamp(d.minions + Math.floor(tier / 2), 3, 6) : 0
-  return {
-    kind,
-    name: d.name,
-    hp,
-    minions,
-    tentacles: d.tentacles,
-    bombEvery: d.bombEvery,
-    angryAt: d.angryAt,
-  }
+  return fixedVariant(kind, tier)
 }

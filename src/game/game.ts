@@ -7,7 +7,7 @@ import { InputController } from "./input"
 import { evaluateAch } from "./achievements"
 import { Effects } from "./effects"
 import { buildBossArena, densityFactor, gridBlocks, layoutBlocks } from "./levelBuilder"
-import { pickBossVariant, type BossVariant } from "./bossVariants"
+import { fixedVariant, pickBossVariant, type BossVariant } from "./bossVariants"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
 import {
   generateCampaignMap,
@@ -91,7 +91,7 @@ export class Game {
   /** Режим отладки: позволяет тестировать новые механики и контент. */
   debug = false
   /** Принудительный тип босса для отладки (null = стандартное поведение). */
-  debugBossType: "octopus" | null = null
+  debugBossType: "octopus" | "kraken" | null = null
   /** Множитель урона шара (скрытая отладка: клавиша "-" на цифровой клавиатуре). */
   debugBallDamage = 1
   /** Активные эффекты отладки (для тестирования механик). */
@@ -739,39 +739,25 @@ export class Game {
     p.rot = (p.rot ?? 0) + (target - (p.rot ?? 0)) * Math.min(1, dt * ROT_SPEED)
   }
 
-  /** Принудительно спавнит босса-осьминога для тестирования. */
-  spawnOctopusBoss() {
-    this.debugBossType = "octopus"
+  /** Принудительно спавнит щупальцевого босса (осьминог/кракен) для тестирования. */
+  spawnDebugBoss(kind: "octopus" | "kraken") {
+    this.debugBossType = kind
     this.blocks = []
     this.balls = []
     this.powers = []
     this.projectiles = []
     this.bossSys.clear()
-    const boss = this.buildBoss("octopus")
+    // Канонические параметры вида (как в кампании на 3-м ярусе боссов).
+    const variant = fixedVariant(kind)
+    const boss = this.buildOctopusBoss(variant.hp, variant)
     this.bossSys.spawn(boss)
+    this.blocksInitial = Math.max(1, this.blocks.length)
+    this.setBanner(`ФИНАЛЬНЫЙ БОСС: ${variant.name}`)
     if (this.phase === "menu") {
       this.phase = "playing"
       this.serveBall()
     }
     this.pushHud()
-  }
-
-  /** Создаёт состояние босса по типу. */
-  private buildBoss(type: "default" | "octopus"): BossState {
-    if (type === "octopus") {
-      return this.buildOctopusBoss()
-    }
-    return {
-      x: this.w / 2,
-      y: this.h * 0.28,
-      baseY: this.h * 0.28,
-      r: 46,
-      hp: 30,
-      maxHp: 30,
-      t: 0,
-      flash: 0,
-      dropTimer: 3,
-    }
   }
 
   /**
