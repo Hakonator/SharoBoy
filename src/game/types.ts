@@ -112,6 +112,10 @@ export interface BossState {
   isOctopus?: boolean
   /** Таймер бросания бомб для осьминога. */
   bombTimer?: number
+  /** Интервал бросания бомб, сек (вариативность боссов; 0/undefined — не бросает). */
+  bombEvery?: number
+  /** Доля HP, при которой босс «злится» (вариативность; undefined — по умолчанию). */
+  angryAt?: number
   /** Исходное количество щупалец (для расчёта выражения рта). */
   totalTentacles?: number
 }

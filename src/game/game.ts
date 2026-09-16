@@ -7,6 +7,7 @@ import { InputController } from "./input"
 import { evaluateAch } from "./achievements"
 import { Effects } from "./effects"
 import { buildBossArena, densityFactor, gridBlocks, layoutBlocks } from "./levelBuilder"
+import { pickBossVariant, type BossVariant } from "./bossVariants"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
 import {
   generateCampaignMap,
@@ -91,6 +92,8 @@ export class Game {
   debug = false
   /** Принудительный тип босса для отладки (null = стандартное поведение). */
   debugBossType: "octopus" | null = null
+  /** Множитель урона шара (скрытая отладка: клавиша "-" на цифровой клавиатуре). */
+  debugBallDamage = 1
   /** Активные эффекты отладки (для тестирования механик). */
   debugEffects = new Set<string>()
 
@@ -164,6 +167,8 @@ export class Game {
   private onBossNode = false
   /** Номер забега: меняет сид карты, чтобы каждый старт был новым. */
   private runSeq = 0
+  /** Сид текущей карты кампании (для детерминированного выбора босса). */
+  private campaignSeed = 0
 
   private top: ScoreEntry[] = []
   private topEndless: ScoreEntry[] = []
@@ -199,6 +204,7 @@ export class Game {
       togglePause: () => this.togglePause(),
       toggleMute: () => this.toggleMute(),
       toggleMusic: () => this.toggleMusic(),
+      debugDamageUp: () => this.debugDamageUp(),
       onBlur: () => {
         if (this.phase === "playing") this.togglePause()
       },
@@ -425,6 +431,9 @@ export class Game {
       },
       get time() {
         return g.time
+      },
+      get debugBallDamage() {
+        return g.debugBallDamage
       },
       paddle: g.paddle,
       get blocksInitial() {
@@ -765,13 +774,20 @@ export class Game {
     }
   }
 
-  /** Босс-осьминог: тело + щупальца, которые нужно уничтожить первыми. */
-  private buildOctopusBoss(): BossState {
-    const octoHp = 50
+  /**
+   * Босс-осьминог: тело + щупальца, которые нужно уничтожить первыми.
+   * opts позволяет вариантам (осьминог/кракен) менять число щупалец,
+   * частоту бомб и порог агрессии.
+   */
+  private buildOctopusBoss(
+    hp = 50,
+    opts?: { tentacles?: number; bombEvery?: number; angryAt?: number }
+  ): BossState {
+    const octoHp = hp
     // Создаём щупальца вокруг тела босса — каждый из нескольких сегментов-шариков,
     // уменьшающихся к концу, как провода. Сегменты начинаются от кольца здоровья
     // босса и извиваются по длине, как змея.
-    const tentacleCount = 6
+    const tentacleCount = opts?.tentacles ?? 6
     const SEG_COUNT = 4
     const SEG_RADII = [25, 20, 15, 10] // от базы к кончику (+5px)
     const SEG_SPACING = 24 // расстояние между центрами сегментов
@@ -851,6 +867,8 @@ export class Game {
       dropTimer: 4,
       isOctopus: true,
       totalTentacles: tentacleCount,
+      bombEvery: opts?.bombEvery,
+      angryAt: opts?.angryAt,
     } as BossState & { isOctopus: true }
   }
 
@@ -1023,7 +1041,8 @@ export class Game {
 
   /** Генерирует карту забега и ставит игрока на стартовый узел (экран карты). */
   private startCampaignMap() {
-    this.campaign = generateCampaignMap((daySeed() * 31 + this.runSeq++) | 0)
+    this.campaignSeed = (daySeed() * 31 + this.runSeq++) | 0
+    this.campaign = generateCampaignMap(this.campaignSeed)
     this.campaignPlayerId = this.campaign.startId
     this.campaignVisited = [this.campaign.startId]
     this.campaignVisible = visibleFrom(this.campaign, this.campaignPlayerId)
@@ -1091,8 +1110,14 @@ export class Game {
     if (node.isBoss) {
       this.activeSpec = null
       this.onBossNode = true
-      this.buildBossLevel(40 + this.level * 6, Math.min(6, 3 + Math.floor(this.level / 3)), 4)
-      this.launchNodeBattle("ФИНАЛЬНЫЙ БОСС")
+      // Вариативность: тип финального босса детерминирован сидом карты и ярусом.
+      const variant = pickBossVariant(this.campaignSeed + node.id * 7919, node.tier)
+      if (variant.tentacles > 0) {
+        this.buildOctopusBossLevel(variant)
+      } else {
+        this.buildBossLevel(variant.hp, variant.minions, 4)
+      }
+      this.launchNodeBattle(`ФИНАЛЬНЫЙ БОСС: ${variant.name}`)
       return
     }
     this.onBossNode = false
@@ -1206,6 +1231,18 @@ export class Game {
     this.pushHud()
   }
 
+  /**
+   * Скрытая отладочная клавиша («-» на цифровой клавиатуре): увеличивает
+   * урон шара на +1 за нажатие. Работает в любом режиме (для тестирования).
+   */
+  debugDamageUp() {
+    this.debugBallDamage += 1
+    this.sfx.ensure()
+    this.sfx.ui()
+    console.log(`[ШАРОБОЙ][debug] урон шара: ${this.debugBallDamage}`)
+    this.pushHud()
+  }
+
   /** Ползунок громкости музыки (0..1). */
   setMusicVolume(v: number) {
     this.sfx.ensure()
@@ -1243,6 +1280,7 @@ export class Game {
     this.newRecord = false
     this.runBossKills = 0
     this.runLivesLost = 0
+    this.debugBallDamage = 1
     this.fx.clear()
     this.powers = []
     this.projectiles = []
@@ -1348,6 +1386,17 @@ export class Game {
     this.bossSys.spawn(boss)
     this.blocks = blocks
     this.blocksInitial = Math.max(1, blocks.length)
+  }
+
+  /** Финальный босс кампании — осьминог/кракен: тело + щупальца, параметры из варианта. */
+  private buildOctopusBossLevel(variant: BossVariant) {
+    this.bossSys.clear()
+    this.boomQueue = []
+    this.fieldShift = null
+    this.blocks = []
+    const boss = this.buildOctopusBoss(variant.hp, variant)
+    this.bossSys.spawn(boss)
+    this.blocksInitial = Math.max(1, this.blocks.length)
   }
 
   /** Скорость шара: в узле карты — по раскладке, иначе безопасный фолбэк. */

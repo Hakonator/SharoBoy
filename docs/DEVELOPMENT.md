@@ -200,7 +200,8 @@ session-pooler, т.к. прямой хост БД — IPv6-only). Вручную
     src/game/game.ts          движок: физика, уровни, босс, бонусы, прокачка
     src/game/levelBuilder.ts  генерация уровней (плотность зависит от пропорций поля)
     src/game/viewport.ts      эталонное разрешение 1920×1080 и масштаб мира
-    src/game/boss.ts          босс «Царь-шар» (фазы, негативные дропы)
+    src/game/boss.ts          босс «Царь-шар» (фазы, негативные дропы);
+                              финальный босс кампании — «Осьминог» (щупальца, бомбы)
     src/game/powers.ts        бонусы (позитивные и негативные дропы)
     src/game/achievements.ts  12 достижений (условия, localStorage)
     src/game/leaderboard.ts   клиент мирового топа (вызывает Edge Function)

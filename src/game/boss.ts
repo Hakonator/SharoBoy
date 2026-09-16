@@ -50,9 +50,10 @@ export class BossSystem {
     if (!bo) return
     bo.t += dt
     bo.flash = Math.max(0, bo.flash - dt * 4)
-    // Порог агрессии: осьминог «злится» при жизни менее половины,
-    // остальные боссы — при 40%.
-    const angry = bo.hp < bo.maxHp * (bo.isOctopus ? 0.5 : 0.4)
+    // Порог агрессии: настраивается вариантом босса (angryAt), по умолчанию —
+    // осьминог «злится» при половине здоровья, остальные — при 40%.
+    const angryAt = bo.angryAt ?? (bo.isOctopus ? 0.5 : 0.4)
+    const angry = bo.hp < bo.maxHp * angryAt
     const amp = clamp(this.g.w * 0.26, 120, 420)
     bo.x = this.g.w / 2 + Math.sin(bo.t * (angry ? (bo.isOctopus ? 1.5 : 1.1) : 0.6)) * amp
     bo.y = bo.baseY + Math.sin(bo.t * 1.7) * 22
@@ -109,12 +110,13 @@ export class BossSystem {
       })
     }
 
-    // Босс-осьминог: периодически бросает бомбы в ракетку
-    if (bo.isOctopus) {
-      bo.bombTimer = (bo.bombTimer ?? 4) - dt
+    // Боссы со щупальцами/бомбами: периодически бросают бомбы в ракетку.
+    const bombEvery = bo.bombEvery ?? (bo.isOctopus ? 5.2 : 0)
+    if (bombEvery > 0) {
+      bo.bombTimer = (bo.bombTimer ?? bombEvery) - dt
       if (bo.bombTimer <= 0) {
-        // Базовый интервал чуть увеличен (5.2с), в агрессии бомбы летят чаще (2.6с).
-        bo.bombTimer = angry ? 2.6 : 5.2
+        // В агрессии бомбы летят вдвое чаще.
+        bo.bombTimer = angry ? bombEvery / 2 : bombEvery
         // Создаём бомбу, летящую в направлении ракетки
         const paddle = this.g.paddle
         const dx = paddle.x - bo.x

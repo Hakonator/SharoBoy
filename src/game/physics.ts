@@ -53,6 +53,8 @@ export interface PhysicsWorld {
   /** Попадание бомбы осьминога по ракетке. */
   onBombHitPaddle(): void
   pushHud(): void
+  /** Множитель урона шара (отладка: увеличивается клавишей NumpadSubtract). */
+  readonly debugBallDamage: number
 }
 
 export class Physics {
@@ -412,7 +414,7 @@ export class Physics {
           ball.vx -= 2 * dot * wnx
           ball.vy -= 2 * dot * wny
         }
-        this.damageBlock(b)
+        this.damageBlock(b, g.debugBallDamage)
         return
       }
       g.sfx.burn()
@@ -441,7 +443,7 @@ export class Physics {
     }
     ball.squash = 1
     ball.sinceHit = 0
-    g.damageBoss(g.fireActive() ? 2 : 1, false)
+    g.damageBoss(g.debugBallDamage * (g.fireActive() ? 2 : 1), false)
   }
 
   /** Урон блоку; при разрушении — очки, эффекты, дроп бонуса, «матрёшка». */

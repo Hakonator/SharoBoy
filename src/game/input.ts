@@ -12,6 +12,12 @@ export interface InputKeys {
   space: boolean
 }
 
+/**
+ * Скрытая отладочная клавиша «-» на цифровой клавиатуре: каждое нажатие
+ * увеличивает урон шара на +1. ПЕРЕД РЕЛИЗОМ ВЫКЛЮЧИТЬ (false)!
+ */
+const DEBUG_DAMAGE_KEY = true
+
 /** Мост между контроллером ввода и игрой. */
 export interface InputHost {
   /** X ракетки — начальная точка виртуальной координаты при pointer lock. */
@@ -44,6 +50,8 @@ export interface InputHost {
   toggleMute(): void
   /** Переключение фоновой музыки (клавиша N). */
   toggleMusic(): void
+  /** Отладка: увеличить урон шара (клавиша "-" на цифровой клавиатуре). */
+  debugDamageUp(): void
   /** Окно потеряло фокус — хост ставит паузу, если партия шла. */
   onBlur(): void
 }
@@ -183,6 +191,8 @@ export class InputController {
     if (c === "KeyP" || c === "Escape") this.host.togglePause()
     if (c === "KeyM") this.host.toggleMute()
     if (c === "KeyN") this.host.toggleMusic()
+    // Скрытая отладочная клавиша: "-" на цифровой клавиатуре — увеличить урон шара.
+    if (DEBUG_DAMAGE_KEY && c === "NumpadSubtract") this.host.debugDamageUp()
   }
 
   private handleKeyUp = (e: KeyboardEvent) => {
