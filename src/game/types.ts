@@ -1,9 +1,12 @@
 /**
  * Общие типы сущностей движка и данных HUD.
- * Модуль без зависимостей — импортируется и движком, и UI.
+ * Модуль без рантайм-зависимостей — импортируется и движком, и UI
+ * (импорт view-типа карты — только для типов, в JS он стирается).
  */
 
-export type Phase = "menu" | "playing" | "paused" | "over" | "won"
+import type { CampaignMapView } from "./campaignMap"
+
+export type Phase = "menu" | "playing" | "paused" | "over" | "won" | "map"
 
 /** Форма верхней поверхности ракетки. Единая формула поверхности —
  *  Physics.surfaceAt; отскоки, ловля бонусов и пилоны оружия
@@ -48,6 +51,8 @@ export interface HudData {
   upgrades: Record<string, number>
   top: ScoreEntry[]
   topEndless: ScoreEntry[]
+  /** Рогаликовая карта кампании (null, когда её экран не активен). */
+  map: CampaignMapView | null
 }
 
 export interface ScoreEntry {

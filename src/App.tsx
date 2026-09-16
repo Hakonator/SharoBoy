@@ -16,6 +16,7 @@ import {
   BootErrorScreen,
   AchToasts,
   HudOverlay,
+  MapScreen,
   MenuScreen,
   PauseScreen,
   GameOverScreen,
@@ -30,7 +31,7 @@ const INITIAL_HUD: HudData = {
   best: 0,
   lives: 3,
   level: 1,
-  levelCount: 3,
+  levelCount: 4,
   levelName: "СТРЕЛА",
   mode: "campaign",
   wave: 0,
@@ -58,6 +59,7 @@ const INITIAL_HUD: HudData = {
   upgrades: {},
   top: [],
   topEndless: [],
+  map: null,
 }
 
 /** Сколько времени тост достижения висит на экране (мс). */
@@ -375,6 +377,14 @@ export default function App() {
         onMusicVolume={(v) => g()?.setMusicVolume(v)}
         onSfxVolume={(v) => g()?.setSfxVolume(v)}
       />
+
+      {hud.phase === "map" && (
+        <MapScreen
+          hud={hud}
+          onMapNode={(id) => g()?.enterMapNode(id)}
+          onMenu={() => g()?.toMenu()}
+        />
+      )}
 
       {hud.phase === "menu" && (
         <MenuScreen

@@ -9,6 +9,16 @@ import { Effects } from "./effects"
 import { buildBossArena, densityFactor, gridBlocks, layoutBlocks } from "./levelBuilder"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
 import {
+  generateCampaignMap,
+  isAdjacent,
+  nodeById,
+  outgoingIds,
+  visibleFrom,
+  type CampaignMap,
+  type CampaignMapView,
+  type CampaignNode,
+} from "./campaignMap"
+import {
   drawBackground,
   drawBalls,
   drawBlocks,
@@ -143,6 +153,18 @@ export class Game {
   private levelLostBall = false
   private effectsKey = ""
 
+  /** Карта забега кампании и позиция игрока на ней (для экрана карты). */
+  private campaign: CampaignMap | null = null
+  private campaignPlayerId = -1
+  private campaignVisited: number[] = []
+  private campaignVisible: number[] = []
+  /** Раскладка текущего боя (null вне карты и на узле финального босса). */
+  private activeSpec: LevelSpec | null = null
+  /** Идёт ли сейчас бой с финальным боссом (а не с обычным узлом). */
+  private onBossNode = false
+  /** Номер забега: меняет сид карты, чтобы каждый старт был новым. */
+  private runSeq = 0
+
   private top: ScoreEntry[] = []
   private topEndless: ScoreEntry[] = []
 
@@ -168,6 +190,7 @@ export class Game {
       primaryAction: () => {
         if (this.phase === "menu" || this.phase === "over" || this.phase === "won") this.startGame()
         else if (this.phase === "playing") this.launch()
+        else if (this.phase === "map") this.enterNextNodeOnAction()
       },
       launchIfPlaying: () => {
         if (this.phase === "playing") this.launch()
@@ -968,6 +991,7 @@ export class Game {
 
   /* ---------- управление игрой ---------- */
 
+  /** Старт забега: генерирует карту кампании и открывает экран карты (фог войны). */
   startGame() {
     this.sfx.ensure()
     this.sfx.ui()
@@ -975,15 +999,139 @@ export class Game {
     this.wave = 0
     this.waveSpec = null
     this.resetRun()
-    this.buildLevel(1)
+    this.startCampaignMap()
+  }
+
+  /** Прямой запуск боя уровня без карты — тесты движка и отладка раскладок. */
+  startLevelBattle(n: number) {
+    this.sfx.ensure()
+    this.sfx.ui()
+    this.mode = "campaign"
+    this.wave = 0
+    this.waveSpec = null
+    this.resetRun()
     this.applyUpgrades()
+    this.level = n
+    this.buildLevel(n)
+    this.levelLostBall = false
+    this.onBossNode = "boss" in LEVELS[n - 1]
+    this.activeSpec = this.onBossNode ? null : LEVELS[n - 1]
+    this.launchNodeBattle(LEVELS[n - 1].name)
+  }
+
+  /* ---------- карта кампании (рогалик слева-направо) ---------- */
+
+  /** Генерирует карту забега и ставит игрока на стартовый узел (экран карты). */
+  private startCampaignMap() {
+    this.campaign = generateCampaignMap((daySeed() * 31 + this.runSeq++) | 0)
+    this.campaignPlayerId = this.campaign.startId
+    this.campaignVisited = [this.campaign.startId]
+    this.campaignVisible = visibleFrom(this.campaign, this.campaignPlayerId)
+    this.onBossNode = false
+    this.activeSpec = null
+    this.phase = "map"
+    this.enterMapView()
+    this.sfx.ui()
+    this.applyTrack()
+    this.pushHud()
+  }
+
+  /** Возврат на экран карты из боя или со старта забега: поле очищено. */
+  private enterMapView() {
+    this.phase = "map"
+    this.input.releaseLock()
+    this.input.clearKeys()
+    this.balls = []
+    this.blocks = []
+    this.powers = []
+    this.projectiles = []
+    this.bossSys.clear()
+    this.boomQueue = []
+    this.fieldShift = null
+    this.banner = null
+    this.bannerTimer = 0
+    this.transition = 0
+    this.countdown = 0
+    this.fx.clear()
+    this.onBossNode = false
+    this.activeSpec = null
+    this.applyTrack()
+    this.pushHud()
+  }
+
+  /** Клик по узлу карты: переход разрешён только в узел, соседний с текущим. */
+  enterMapNode(id: number) {
+    if (this.phase !== "map" || !this.campaign) return
+    if (!isAdjacent(this.campaign, this.campaignPlayerId, id)) return
+    const node = nodeById(this.campaign, id)
+    if (!node) return
+    this.sfx.ensure()
+    this.sfx.ui()
+    this.campaignPlayerId = id
+    if (!this.campaignVisited.includes(id)) this.campaignVisited.push(id)
+    this.campaignVisible = visibleFrom(this.campaign, id)
+    this.startMapBattle(node)
+  }
+
+  /** Space/Enter на экране карты: входим в узел, если выбор однозначен. */
+  private enterNextNodeOnAction() {
+    if (!this.campaign) return
+    const next = outgoingIds(this.campaign, this.campaignPlayerId)
+    if (next.length === 1) this.enterMapNode(next[0])
+  }
+
+  /**
+   * Запуск боя на узле карты. Обычный узел — авторская раскладка кампании по
+   * кругу, узел босса — финальная арена, масштабирующаяся по ярусу.
+   */
+  private startMapBattle(node: CampaignNode) {
+    if (!this.campaign) return
+    this.level = node.tier + 1
+    this.levelLostBall = false
+    if (node.isBoss) {
+      this.activeSpec = null
+      this.onBossNode = true
+      this.buildBossLevel(40 + this.level * 6, Math.min(6, 3 + Math.floor(this.level / 3)), 4)
+      this.launchNodeBattle("ФИНАЛЬНЫЙ БОСС")
+      return
+    }
+    this.onBossNode = false
+    this.activeSpec = this.nodeSpecFor(node)
+    this.buildFromSpec(this.activeSpec)
+    this.launchNodeBattle(node.name)
+  }
+
+  /** Раскладка обычного узла: авторские уровни по кругу (босс исключён). */
+  private nodeSpecFor(node: CampaignNode): LevelSpec {
+    return LEVELS[node.tier % (LEVELS.length - 1)]
+  }
+
+  /** Общий вход в бой: подача шара, трек, баннер и бонусы прокачки. */
+  private launchNodeBattle(label: string) {
     this.magnetUntil = this.time + 4 * (this.upgrades.magnet ?? 0)
     this.laserArmed = (this.upgrades.laser ?? 0) > 0
     this.serveBall()
     this.phase = "playing"
     this.applyTrack()
-    this.setBanner(`УРОВЕНЬ 1 — ${LEVELS[0].name}`)
+    this.setBanner(label)
     this.pushHud()
+  }
+
+  /** Снимок карты для HUD (только пока активен экран карты). */
+  private currentMapView(): CampaignMapView | null {
+    if (!this.campaign || this.phase !== "map") return null
+    const map = this.campaign
+    return {
+      seed: map.seed,
+      tiers: map.tiers,
+      nodes: map.nodes,
+      edges: map.edges,
+      startId: map.startId,
+      bossId: map.bossId,
+      playerId: this.campaignPlayerId,
+      visited: [...this.campaignVisited],
+      visible: [...this.campaignVisible],
+    }
   }
 
   startEndless() {
@@ -1009,6 +1157,12 @@ export class Game {
     this.input.releaseLock()
     this.saveTop()
     this.phase = "menu"
+    this.campaign = null
+    this.campaignPlayerId = -1
+    this.campaignVisited = []
+    this.campaignVisible = []
+    this.activeSpec = null
+    this.onBossNode = false
     this.applyTrack()
     this.balls = []
     this.blocks = []
@@ -1076,6 +1230,12 @@ export class Game {
   private resetRun() {
     this.bossSys.clear()
     this.boomQueue = []
+    this.campaign = null
+    this.campaignPlayerId = -1
+    this.campaignVisited = []
+    this.campaignVisible = []
+    this.activeSpec = null
+    this.onBossNode = false
     this.score = 0
     this.lives = 3 + (this.upgrades.life ?? 0)
     this.combo = 0
@@ -1190,12 +1350,18 @@ export class Game {
     this.blocksInitial = Math.max(1, blocks.length)
   }
 
+  /** Скорость шара: в узле карты — по раскладке, иначе безопасный фолбэк. */
   private levelSpeed() {
-    return this.mode === "endless" ? (this.waveSpec?.speed ?? 400) : LEVELS[this.level - 1].speed
+    if (this.mode === "endless") return this.waveSpec?.speed ?? 400
+    if (this.activeSpec) return this.activeSpec.speed
+    return LEVELS[clamp(this.level - 1, 0, LEVELS.length - 1)].speed
   }
 
   private levelDisplayName() {
-    return this.mode === "endless" ? (this.waveSpec?.name ?? "ВОЛНА") : LEVELS[this.level - 1].name
+    if (this.mode === "endless") return this.waveSpec?.name ?? "ВОЛНА"
+    if (this.onBossNode) return "БОСС"
+    if (this.activeSpec) return this.activeSpec.name
+    return LEVELS[clamp(this.level - 1, 0, LEVELS.length - 1)].name
   }
 
   private serveBall() {
@@ -1397,13 +1563,21 @@ export class Game {
       this.pushHud()
       return
     }
-    if (this.level >= LEVELS.length) {
-      this.phase = "won"
-      this.input.releaseLock()
-      this.applyTrack()
-      this.sfx.win()
-      this.saveTop()
-      this.pushHud()
+    if (this.mode === "campaign") {
+      if (this.onBossNode) {
+        // Финальный босс карты повержен — забег пройден.
+        this.onBossNode = false
+        this.phase = "won"
+        this.input.releaseLock()
+        this.applyTrack()
+        this.sfx.win()
+        this.saveTop()
+        this.pushHud()
+        return
+      }
+      // Обычный узел зачищен — возвращаемся на карту за следующим шагом.
+      this.sfx.levelClear()
+      this.enterMapView()
       return
     }
     this.sfx.levelClear()
@@ -1543,7 +1717,7 @@ export class Game {
       best: this.best,
       lives: this.lives,
       level: this.mode === "endless" ? this.wave : this.level,
-      levelCount: this.mode === "endless" ? -1 : LEVELS.length,
+      levelCount: this.mode === "endless" ? -1 : (this.campaign?.tiers ?? LEVELS.length),
       levelName: this.levelDisplayName(),
       mode: this.mode,
       wave: this.wave,
@@ -1570,6 +1744,7 @@ export class Game {
       upgrades: { ...this.upgrades },
       top: this.top,
       topEndless: this.topEndless,
+      map: this.currentMapView(),
       newAchievements: this.achQueue.splice(0),
     })
   }
@@ -1621,7 +1796,7 @@ export class Game {
       slow: this.time < this.slowUntil,
       fast: this.time < this.fastUntil,
     })
-    if (this.phase !== "menu") {
+    if (this.phase !== "menu" && this.phase !== "map") {
       drawPaddle(ctx, {
         p: this.paddle,
         time: this.time,

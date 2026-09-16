@@ -349,6 +349,155 @@ export function HudOverlay({
   )
 }
 
+/**
+ * Экран рогаликовой карты кампании: узлы слева-направо, рёбра-связи и туман
+ * войны. Видны только посещённые и соседние узлы; кликабельны только соседние.
+ */
+export function MapScreen({
+  hud,
+  onMapNode,
+  onMenu,
+}: {
+  hud: HudData
+  onMapNode: (id: number) => void
+  onMenu: () => void
+}) {
+  const view = hud.map
+  if (!view) return null
+
+  const byId = new Map(view.nodes.map((n) => [n.id, n]))
+  const revealed = new Set<number>([...view.visited, ...view.visible])
+  const playerOut = new Set<number>(view.visible)
+  const revealedEdges = view.edges.filter((e) => revealed.has(e.from) && revealed.has(e.to))
+
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col bg-abyss/55">
+      {/* Верхний бар: счёт, жизни, рекорд и выход в меню */}
+      <div className="flex items-center justify-between gap-2 p-2 sm:p-4">
+        <div className="flex flex-wrap items-start gap-1.5 sm:gap-2">
+          <div className="hud-chip px-3 py-1.5">
+            <div className="hud-label">Счёт</div>
+            <div className="font-display text-lg leading-none text-foam tabular-nums sm:text-2xl">
+              {hud.score.toLocaleString("ru-RU")}
+            </div>
+          </div>
+          <div className="hud-chip px-3 py-1.5 sm:px-3.5 sm:py-2">
+            <div className="hud-label hidden sm:block">Жизни</div>
+            <div className="flex gap-1 sm:mt-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <IconBall
+                  key={i}
+                  color="#35e0ff"
+                  className={`h-3 w-3 sm:h-4 sm:w-4 ${
+                    i < hud.lives ? "opacity-100" : "opacity-20 grayscale"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="hud-chip hidden px-3.5 py-2 sm:block">
+            <div className="hud-label">Рекорд</div>
+            <div className="font-display text-xl leading-none text-gold tabular-nums sm:text-2xl">
+              {hud.best.toLocaleString("ru-RU")}
+            </div>
+          </div>
+          <button className="btn-ghost px-4 py-2 text-sm" onClick={onMenu}>
+            ✕ В меню
+          </button>
+        </div>
+      </div>
+
+      {/* Карта: рёбра в SVG, узлы — круглые кнопки в %-координатах */}
+      <div className="relative flex-1">
+        <svg
+          className="absolute inset-0 h-full w-full"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden
+        >
+          {revealedEdges.map((e) => {
+            const a = byId.get(e.from)
+            const b = byId.get(e.to)
+            if (!a || !b) return null
+            const active = view.playerId === e.from
+            return (
+              <line
+                key={`${e.from}-${e.to}`}
+                x1={a.x * 100}
+                y1={a.y * 100}
+                x2={b.x * 100}
+                y2={b.y * 100}
+                stroke={active ? "#35e0ff" : "rgba(63,148,181,0.45)"}
+                strokeWidth={active ? 1.2 : 0.7}
+                strokeDasharray={active ? undefined : "2.4 1.8"}
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            )
+          })}
+        </svg>
+
+        {view.nodes
+          .filter((n) => revealed.has(n.id))
+          .map((n) => {
+            const isCurrent = n.id === view.playerId
+            const clickable = playerOut.has(n.id)
+            const size = n.isBoss ? "h-12 w-12 sm:h-14 sm:w-14" : "h-7 w-7 sm:h-8 sm:w-8"
+            const tint = n.isBoss
+              ? "bg-coral shadow-[0_0_18px_rgba(255,106,92,0.85)]"
+              : isCurrent
+                ? "bg-cyan-neon shadow-[0_0_16px_rgba(53,224,255,0.9)]"
+                : clickable
+                  ? "bg-mint shadow-[0_0_14px_rgba(93,255,176,0.75)]"
+                  : "bg-deep border border-line"
+            return (
+              <button
+                key={n.id}
+                disabled={!clickable}
+                onClick={() => clickable && onMapNode(n.id)}
+                className={`absolute flex -translate-x-1/2 -translate-y-1/2 select-none flex-col items-center gap-1 ${
+                  clickable ? "cursor-pointer" : "cursor-default"
+                }`}
+                style={{ left: `${n.x * 100}%`, top: `${n.y * 100}%` }}
+                aria-label={clickable ? `Открыть узел ${n.name}` : n.name}
+              >
+                <span
+                  className={`flex items-center justify-center rounded-full font-display leading-none ${size} ${tint} ${
+                    clickable ? "transition-transform hover:scale-110 active:scale-95" : ""
+                  }`}
+                >
+                  {n.isBoss ? (
+                    <span className="text-[11px] text-abyss sm:text-sm">БОСС</span>
+                  ) : isCurrent ? (
+                    <span className="h-2 w-2 rounded-full bg-abyss sm:h-2.5 sm:w-2.5" />
+                  ) : null}
+                </span>
+                {clickable && (
+                  <span className="whitespace-nowrap font-display text-[10px] tracking-wider text-foam drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs">
+                    {n.name}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+      </div>
+
+      {/* Подсказка снизу */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
+        <div className="hud-chip px-5 py-2 text-center font-display text-xs tracking-widest text-cyan-neon sm:text-sm">
+          {playerOut.size > 1
+            ? "ВЫБЕРИ ОДИН ИЗ ПУТЕЙ"
+            : playerOut.size === 1
+              ? "ВЫБЕРИ СЛЕДУЮЩИЙ УЗЕЛ"
+              : "ПУТЬ ЗАВЕРШЁН"}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** Короткая метка категории экрана для списка мирового топа «Все». */
 function screenTag(screenClass: string | null | undefined): string | null {
   if (!screenClass) return null

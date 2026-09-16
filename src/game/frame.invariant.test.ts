@@ -165,6 +165,8 @@ type GameInternals = {
   powers: { push: (pw: unknown) => unknown }
   physics: { damageBlock: (b: unknown, dmg: number) => void }
   startGame: () => void
+  /** Прямой запуск боя уровня без карты (используется в тестах). */
+  startLevelBattle: (n: number) => void
   launch: () => void
   destroy: () => void
 }
@@ -315,7 +317,7 @@ describe("инвариант альфы при отрисовке (мигани�
 
   it("после разбивания блока шар и ракетка не мигают (кольцо, искры, попап, бонус)", () => {
     const { g, step, paints, shake, restoreRandom } = makeEnv()
-    g.startGame()
+    g.startLevelBattle(1)
     step(80) // баннер старта угасает (2.2 с → порог фриза 1.1 с)
     g.launch()
     step(3)
@@ -338,7 +340,7 @@ describe("инвариант альфы при отрисовке (мигани�
 
   it("после ловли бонуса шар и ракетка не мигают (всплеск, попап, HUD)", () => {
     const { g, step, paints, shake, restoreRandom } = makeEnv()
-    g.startGame()
+    g.startLevelBattle(1)
     step(80)
     g.launch()
     step(3)
