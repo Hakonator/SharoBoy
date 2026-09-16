@@ -742,6 +742,11 @@ export class Game {
   /** Принудительно спавнит щупальцевого босса (осьминог/кракен) для тестирования. */
   spawnDebugBoss(kind: "octopus" | "kraken") {
     this.debugBossType = kind
+    // Арена отладки живёт по правилам бесконечного режима: mode по умолчанию
+    // «campaign», и после убийства босса onLevelCleared ушёл бы на экран карты,
+    // которого в отладке нет (campaign = null) — поле зависало пустым.
+    this.mode = "endless"
+    this.onBossNode = false
     this.blocks = []
     this.balls = []
     this.powers = []
