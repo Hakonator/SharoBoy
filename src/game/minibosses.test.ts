@@ -54,7 +54,8 @@ describe("minibosses", () => {
 
   it("у медузы купол с бахромой и пятью щупальцами-цепочками", () => {
     const jelly = buildJelly(W, H, TOP)
-    expect(jelly.filter((b) => b.mbPart === "dome").length).toBe(11) // 4 купол + 7 бахрома
+    expect(jelly.filter((b) => b.mbPart === "dome").length).toBe(2) // купол без лишних шариков
+    expect(jelly.filter((b) => b.mbPart === "fringe").length).toBe(7) // бахрома
     expect(jelly.filter((b) => b.mbPart === "tentacle").length).toBe(20) // 5 × 4
   })
 

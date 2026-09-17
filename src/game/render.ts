@@ -302,8 +302,8 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
 
 /** Медуза: пульсирующий купол и волнующиеся щупальца-цепочки. */
 function drawJelly(ctx: Ctx, parts: Block[], time: number) {
-  const domeBig = parts.filter((p) => p.mbPart === "dome" && p.ry >= 20)
-  const fringe = parts.filter((p) => p.mbPart === "dome" && p.ry < 20)
+  const domeBig = parts.filter((p) => p.mbPart === "dome")
+  const fringe = parts.filter((p) => p.mbPart === "fringe")
   const tents = parts.filter((p) => p.mbPart === "tentacle")
   if (!domeBig.length) return
   const d = bboxOf(domeBig)

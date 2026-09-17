@@ -99,7 +99,7 @@ export interface Block {
   /** Блок мини-босса кампании: за уничтожение всех — шанс дропа жизни. */
   isMiniboss?: boolean
   /** Роль части существа минибосса — для специализированной отрисовки силуэта. */
-  mbPart?: "body" | "tail" | "dorsal" | "pectoral" | "eye" | "dome" | "tentacle"
+  mbPart?: "body" | "tail" | "dorsal" | "pectoral" | "eye" | "dome" | "fringe" | "tentacle"
 }
 
 /** Пузырёк воздуха, выпускаемый рыбой-минибоссом изо рта. */
