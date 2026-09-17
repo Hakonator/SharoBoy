@@ -918,6 +918,34 @@ export class Game {
     this.mouthBubbles = this.mouthBubbles.filter((b) => b.t < b.life)
   }
 
+  /** Кильватер рыбы: шары рядом с проплывающей рыбой слегка сносит по её ходу. */
+  private applyFishWake(dt: number) {
+    if (!this.fishMouth || this.minibossHp <= 0 || this.phase !== "playing") return
+    const bodyParts = this.blocks.filter((b) => b.isMiniboss && b.mbPart === "body")
+    if (!bodyParts.length) return
+    const minX = Math.min(...bodyParts.map((b) => b.x - b.rx))
+    const maxX = Math.max(...bodyParts.map((b) => b.x + b.rx))
+    const minY = Math.min(...bodyParts.map((b) => b.y - b.ry))
+    const maxY = Math.max(...bodyParts.map((b) => b.y + b.ry))
+    const fx = (minX + maxX) / 2
+    const fy = (minY + maxY) / 2
+    const f = bodyParts[0].swayFreq
+    const amp = bodyParts[0].swayAmp
+    const fishVx = Math.cos(this.time * f) * amp * f // скорость рыбы, px/с
+    const R = 180
+    for (const ball of this.balls) {
+      if (ball.stuck) continue
+      const dx = ball.x - fx
+      const dy = ball.y - fy
+      // эллипс влияния: тянется шире по горизонтали — за хвостом и перед носом
+      const d = Math.hypot(dx, dy * 1.4)
+      if (d < R) {
+        const k = (1 - d / R) * 0.55
+        ball.x += fishVx * dt * k
+      }
+    }
+  }
+
   /** Смерть минибосса: цепочка взрывов по силуэту и шанс дропа жизни. */
   private killMiniboss() {
     const doomed = this.blocks.filter((b) => b.isMiniboss)
@@ -1752,6 +1780,7 @@ export class Game {
     for (const b of this.blocks) b.flash = Math.max(0, b.flash - dt * 5)
 
     this.updateMouthBubbles(dt)
+    this.applyFishWake(dt)
 
     if (
       this.blocks.length === 0 &&

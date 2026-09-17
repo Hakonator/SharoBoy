@@ -175,12 +175,16 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   const t = bboxOf(tail)
   const midY = b.y + b.h / 2
   const flash = Math.max(...parts.map((p) => p.flash))
-  // плавный разворот: зеркалим весь силуэт вокруг центра тела по ходу движения
+  // плавный разворот: боковой силуэт «схлопывается» по X вокруг центра тела,
+  // а в середине разворота сквозь него проступает вид с носа (передний силуэт)
   const facing = fishFacing(parts, time)
   const fx = b.x + b.w / 2
+  const sideA = Math.min(1, Math.abs(facing) * 4)
+  const frontA = Math.max(0, 1 - Math.abs(facing) / 0.25)
   ctx.save()
+  ctx.globalAlpha = sideA
   ctx.translate(fx, 0)
-  ctx.scale(facing, 1)
+  ctx.scale((Math.sign(facing) || 1) * Math.max(Math.abs(facing), 0.06), 1)
   ctx.translate(-fx, 0)
   // хвост отстаёт от корпуса: рыба плывёт по синусоиде, хвост качается в противофазе
   const swing = -Math.cos(time * FISH_SWAY_FREQ) * 0.17 + Math.sin(time * 2.1) * 0.035
@@ -208,10 +212,10 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   ctx.lineWidth = 1.5
   ctx.stroke()
   if (flash > 0.05) {
-    ctx.globalAlpha = Math.min(flash, 1) * 0.45
+    ctx.globalAlpha = sideA * Math.min(flash, 1) * 0.45
     ctx.fillStyle = "#ffffff"
     ctx.fill()
-    ctx.globalAlpha = 1
+    ctx.globalAlpha = sideA
   }
   ctx.restore()
 
@@ -349,14 +353,99 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
 
   // вспышка урона на теле (хвост вспыхивает в своём блоке выше)
   if (flash > 0.05) {
-    ctx.globalAlpha = Math.min(flash, 1) * 0.5
+    ctx.globalAlpha = sideA * Math.min(flash, 1) * 0.5
     ctx.fillStyle = "#ffffff"
     ctx.beginPath()
     ctx.ellipse(b.x + b.w / 2, midY, b.w / 2, b.h / 2, 0, 0, Math.PI * 2)
     ctx.fill()
-    ctx.globalAlpha = 1
+    ctx.globalAlpha = sideA
   }
   ctx.restore()
+
+  // передний силуэт: проявляется, когда боковой почти схлопнулся
+  if (frontA > 0.02) {
+    ctx.save()
+    ctx.globalAlpha = frontA
+    drawFishFront(ctx, b, midY, time, flash)
+    ctx.restore()
+  }
+}
+
+/** Вид рыбы с носа (анфас): проявляется в середине разворота вместо «схлопнутого» бокового силуэта. */
+function drawFishFront(ctx: Ctx, b: MbBox, midY: number, time: number, flash: number) {
+  const cx = b.x + b.w / 2
+  const w = b.h * 0.85 // ширина головы анфас
+  const h = b.h
+  // хвос�� чуть виднеется за телом
+  ctx.beginPath()
+  ctx.ellipse(cx, midY, w * 0.22, h * 0.5, 0, 0, Math.PI * 2)
+  ctx.fillStyle = TIER[1].dark
+  ctx.fill()
+  // спинной плавник
+  ctx.beginPath()
+  ctx.moveTo(cx - w * 0.3, midY - h * 0.32)
+  ctx.quadraticCurveTo(cx, midY - h * 0.95, cx + w * 0.3, midY - h * 0.32)
+  ctx.closePath()
+  ctx.fillStyle = TIER[1].base
+  ctx.fill()
+  ctx.strokeStyle = TIER[1].dark
+  ctx.lineWidth = 1
+  ctx.stroke()
+  // грудные плавники по бокам
+  for (const s of [-1, 1]) {
+    ctx.beginPath()
+    ctx.moveTo(cx + s * w * 0.42, midY)
+    ctx.quadraticCurveTo(cx + s * w * 0.95, midY + h * 0.25, cx + s * w * 0.55, midY + h * 0.5)
+    ctx.quadraticCurveTo(cx + s * w * 0.32, midY + h * 0.35, cx + s * w * 0.42, midY)
+    ctx.closePath()
+    ctx.fillStyle = TIER[1].base
+    ctx.fill()
+    ctx.stroke()
+  }
+  // тело анфас: вертикальный овал с градиентом (спина светлее)
+  const bg = ctx.createLinearGradient(0, midY - h / 2, 0, midY + h / 2)
+  bg.addColorStop(0, TIER[2].light)
+  bg.addColorStop(0.55, TIER[2].base)
+  bg.addColorStop(1, TIER[2].dark)
+  ctx.beginPath()
+  ctx.ellipse(cx, midY, w / 2, h / 2, 0, 0, Math.PI * 2)
+  ctx.fillStyle = bg
+  ctx.fill()
+  ctx.strokeStyle = TIER[2].dark
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+  // глаза по бокам головы
+  const er = h * 0.11
+  for (const s of [-1, 1]) {
+    ctx.beginPath()
+    ctx.arc(cx + s * w * 0.26, midY - h * 0.14, er, 0, Math.PI * 2)
+    ctx.fillStyle = "#f4feff"
+    ctx.fill()
+    ctx.strokeStyle = "rgba(4,18,28,0.6)"
+    ctx.lineWidth = 1
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(cx + s * w * 0.26, midY - h * 0.14, er * 0.5, 0, Math.PI * 2)
+    ctx.fillStyle = "#04121c"
+    ctx.fill()
+  }
+  // рот анфас: тёмный овал, чуть приоткрывается синхронно с боковым видом
+  const open = Math.max(0, Math.sin(time * 0.85))
+  ctx.beginPath()
+  ctx.ellipse(cx, midY + h * 0.22, w * 0.16, h * 0.05 + open * 3, 0, 0, Math.PI * 2)
+  ctx.fillStyle = "#32060b"
+  ctx.fill()
+  ctx.strokeStyle = "rgba(122,74,8,0.85)"
+  ctx.lineWidth = 2
+  ctx.stroke()
+  // вспышка урона
+  if (flash > 0.05) {
+    ctx.globalAlpha *= Math.min(flash, 1) * 0.5
+    ctx.fillStyle = "#ffffff"
+    ctx.beginPath()
+    ctx.ellipse(cx, midY, w / 2, h / 2, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
 }
 
 /** Медуза: пульсирующий купол и волнующиеся щупальца-цепочки. */
