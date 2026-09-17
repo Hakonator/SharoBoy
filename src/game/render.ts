@@ -156,7 +156,10 @@ const FISH_SWAY_FREQ = 0.45
 export function fishFacing(parts: Block[], time: number): number {
   const f = parts.find((p) => p.mbPart === "body")?.swayFreq ?? 0
   if (!f) return 1
-  const v = Math.cos(time * f) * 2.2
+  // разворот занимает ~1.5 с независимо от скорости патруля:
+  // нормируем cos так, чтобы зона перехода соответствовала фиксированному времени
+  const half = Math.min(1.5, f * 0.75) // θ = f·T/2 при T = 1.5 с
+  const v = Math.cos(time * f) / Math.cos(half)
   return Math.max(-1, Math.min(1, v))
 }
 
@@ -273,22 +276,24 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     ctx.restore()
   }
 
-  // рот: вырез из двух дуг — верхней и нижней губы, периодически приоткрывается
-  // (из этой точки game.ts выпускает пузырьки — по стороне, куда смотрит рыба)
+  // рот: вырез из двух дуг — верхняя губа почти неподвижна, нижняя челюсть
+  // чуть-чуть опускается (приоткрытие), синхронно с раскрытием
   const open = Math.max(0, Math.sin(time * 0.85))
+  const drop = open * 4 // опускание нижней челюсти, px
   const mx = b.x + b.w - 24
   const my = midY + b.h * 0.16
   const len = b.w * 0.13
-  const gape = 1.2 + open * b.h * 0.13
+  const gU = 1.1 // раскрытие верхней губы (постоянное, узкое)
+  const gL = 1.1 + drop // нижняя губа уходит вниз вместе с челюстью
   const nx = mx + len
-  // полость рта: вырез между внутренними кромками губ (угол рта → нос → обратно)
+  // полость рта: вырез между кромками губ (угол рта → нос → обратно)
   ctx.beginPath()
   ctx.moveTo(mx, my)
-  ctx.quadraticCurveTo(mx + len * 0.45, my - gape * 1.5, nx, my - gape)
-  ctx.quadraticCurveTo(nx + 2, my, nx, my + gape)
-  ctx.quadraticCurveTo(mx + len * 0.45, my + gape * 1.7, mx, my)
+  ctx.quadraticCurveTo(mx + len * 0.45, my - gU * 1.5, nx, my - gU)
+  ctx.quadraticCurveTo(nx + 2, my + (gL - gU) * 0.4, nx, my + gL)
+  ctx.quadraticCurveTo(mx + len * 0.45, my + gL * 1.7, mx, my)
   ctx.closePath()
-  const cg = ctx.createLinearGradient(0, my - gape, 0, my + gape)
+  const cg = ctx.createLinearGradient(0, my - gU, 0, my + gL)
   cg.addColorStop(0, "#7c1620")
   cg.addColorStop(1, "#32060b")
   ctx.fillStyle = cg
@@ -300,13 +305,13 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   ]) {
     ctx.beginPath()
     ctx.moveTo(mx, my)
-    ctx.quadraticCurveTo(mx + len * 0.42, my - gape * 2.4, nx + 1, my - gape * 1.35)
+    ctx.quadraticCurveTo(mx + len * 0.42, my - gU * 2.4, nx + 1, my - gU * 1.35)
     ctx.strokeStyle = pass.c
     ctx.lineWidth = pass.w
     ctx.stroke()
     ctx.beginPath()
     ctx.moveTo(mx, my)
-    ctx.quadraticCurveTo(mx + len * 0.42, my + gape * 2.6, nx + 1, my + gape * 1.4)
+    ctx.quadraticCurveTo(mx + len * 0.42, my + gL * 2.6, nx + 1, my + gL * 1.4)
     ctx.strokeStyle = pass.c
     ctx.lineWidth = pass.w
     ctx.stroke()
