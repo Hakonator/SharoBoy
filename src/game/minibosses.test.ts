@@ -4,6 +4,7 @@ import {
   buildFish,
   buildJelly,
   carveLevelBlocks,
+  MINIBOSS_HP,
   MINIBOSS_LIFE_CHANCE,
   MINIBOSS_NODE_CHANCE,
   minibossName,
@@ -20,17 +21,16 @@ function expectValidCreature(blocks: Block[]) {
   expect(blocks.length).toBeGreaterThan(0)
   for (const b of blocks) {
     expect(b.isMiniboss).toBe(true)
-    expect(b.circle).toBe(true)
     expect(b.dead).toBe(false)
     expect([1, 2, 3]).toContain(b.hp)
     expect(b.tier).toBe(b.hp)
     expect(b.maxHp).toBe(b.hp)
-    // существо целиком в пределах поля и не уползает в зону ракетки
-    expect(b.x).toBeGreaterThan(0)
-    expect(b.x).toBeLessThan(W)
-    expect(b.y).toBeGreaterThan(TOP - 1)
-    expect(b.y).toBeLessThan(H * 0.85)
-    // существует "плавание" и одна фаза на всё существо (цельность)
+    // существо целиком в пределах поля: ниже HUD-зоны, выше зоны ракетки
+    expect(b.x - b.rx).toBeGreaterThan(0)
+    expect(b.x + b.rx).toBeLessThan(W)
+    expect(b.y - b.ry).toBeGreaterThan(TOP - 1)
+    expect(b.y + b.ry).toBeLessThan(H * 0.85)
+    // существует «плавание» и одна фаза на всё существо (цельность)
     expect(b.swayAmp).toBeGreaterThan(0)
     expect(b.swayPh).toBe(0)
   }
@@ -42,12 +42,22 @@ describe("minibosses", () => {
     expectValidCreature(buildJelly(W, H, TOP))
   })
 
-  it("у рыбы есть хвост и ядро, у медузы — щупальца из мягких блоков", () => {
+  it("у рыбы есть плавники (1 HP), тело (2 HP) и глаз (3 HP)", () => {
     const fish = buildFish(W, H, TOP)
-    expect(fish.some((b) => b.hp === 3)).toBe(true) // ядро
-    expect(fish.some((b) => b.hp === 1)).toBe(true) // хвост
+    expect(fish.filter((b) => b.hp === 2).length).toBeGreaterThanOrEqual(3) // тело
+    expect(fish.filter((b) => b.hp === 1).length).toBeGreaterThanOrEqual(4) // хвост+плавники
+    expect(fish.filter((b) => b.hp === 3).length).toBe(1) // глаз
+  })
+
+  it("у медузы розовый купол и зелёные щупальца-цепочки", () => {
     const jelly = buildJelly(W, H, TOP)
-    expect(jelly.filter((b) => b.hp === 1).length).toBeGreaterThanOrEqual(9) // юбка+щупальца
+    expect(jelly.filter((b) => b.hp === 3).length).toBeGreaterThanOrEqual(11) // купол+бахрома
+    expect(jelly.filter((b) => b.hp === 1).length).toBeGreaterThanOrEqual(20) // 5 щупалец × 4
+  })
+
+  it("пул HP существа задан константой и заметно выше «суммарного» HP блоков", () => {
+    expect(MINIBOSS_HP.fish).toBeGreaterThan(100)
+    expect(MINIBOSS_HP.jelly).toBeGreaterThan(100)
   })
 
   it("шанс жизни за минибосса — 80%", () => {

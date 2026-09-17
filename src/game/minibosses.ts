@@ -1,10 +1,12 @@
 /**
  * Мини-боссы кампании: стилизованные обитатели водной фауны (рыба, медуза),
- * собранные из круглых блоков в цельный силуэт. Появляются в обычных боевых
- * узлах кампании с фиксированным шансом — детерминированно по сиду карты,
- * одна и та же карта всегда даёт минибоссов в одних и тех же узлах.
- * За уничтожение минибосса полагается жизнь с шансом MINIBOSS_LIFE_CHANCE —
- * других источников жизней в кампании нет.
+ * собранные из перекрывающихся эллипсов в цельный силуэт. Блоки существа
+ * неразрушаемы — урон идёт в общий пул HP (MINIBOSS_HP), над существом
+ * рисуется полоска здоровья; при обнулении пула существо взрывается целиком.
+ * Появляются в обычных боевых узлах кампании с фиксированным шансом —
+ * детерминированно по сиду карты, одна и та же карта всегда даёт минибоссов
+ * в одних и тех же узлах. За уничтожение полагается жизнь с шансом
+ * MINIBOSS_LIFE_CHANCE — других источников жизней в кампании нет.
  *
  * Чистые функции без обращений к движку — модуль тестируется автономно.
  */
@@ -39,33 +41,40 @@ export function rollMiniboss(seed: number, nodeId: number): MinibossKind | null 
   return rng() < 0.5 ? "fish" : "jelly"
 }
 
-/** Фабрика круглого блока существа: цельный силуэт, лёгкое «плавание» через sway. */
-function makeMinibossBlock(opts: {
+/** Общий запас HP существа: блоки минибосса не разрушаются поодиночке. */
+export const MINIBOSS_HP: Record<MinibossKind, number> = {
+  fish: 140,
+  jelly: 120,
+}
+
+/** Фабрика части существа: эллипс с наклоном, «плавание» через sway. */
+function makePart(opts: {
   x: number
   y: number
-  r: number
-  hp: 1 | 2 | 3
+  rx: number
+  ry: number
+  rot?: number
+  tier: 1 | 2 | 3
   swayAmp: number
   swayFreq: number
-  swayPh: number
 }): Block {
   return {
     x: opts.x,
     y: opts.y,
-    rx: opts.r,
-    ry: opts.r,
-    rot: 0,
-    circle: true,
-    hp: opts.hp,
-    maxHp: opts.hp,
-    tier: opts.hp,
+    rx: opts.rx,
+    ry: opts.ry,
+    rot: opts.rot ?? 0,
+    circle: Math.abs(opts.rx - opts.ry) < 0.6 && !(opts.rot ?? 0),
+    hp: opts.tier,
+    maxHp: opts.tier,
+    tier: opts.tier,
     flash: 0,
     seed: rand(0, Math.PI * 2),
     dead: false,
     x0: opts.x,
     swayAmp: opts.swayAmp,
     swayFreq: opts.swayFreq,
-    swayPh: opts.swayPh,
+    swayPh: 0, // одна фаза на всё существо — плывёт как единое целое
     bomb: false,
     splits: false,
     isMiniboss: true,
@@ -73,83 +82,63 @@ function makeMinibossBlock(opts: {
 }
 
 /**
- * Собирает существо из ASCII-карты: «X» — тело (2 HP, золотой), «C» — ядро
- * (3 HP), строчные «x» — мягкие части: хвост/юбка/щупальца (1 HP, зелёный).
- * Соседние блоки слегка перекрываются, чтобы силуэт читался как одно
- * существо, а не россыпь шаров.
+ * Рыба: обтекаемое тело из перекрывающихся эллипсов, раздвоенный хвост,
+ * спинной и грудной плавники, глаз. Плывёт носом вправо, патрулирует поле.
+ * Тиры: тело — 2 (золото), плавники — 1 (зелень), глаз — 3 (акцент).
  */
-function buildFromMap(
-  map: string[],
-  opts: {
-    cx: number
-    cy: number
-    r: number
-    spacing: number
-    swayAmp: number
-    swayFreq: number
-  }
-): Block[] {
-  const blocks: Block[] = []
-  const rows = map.length
-  const cols = Math.max(...map.map((row) => row.length))
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const ch = map[r][c]
-      if (!ch || ch === ".") continue
-      const hp: 1 | 2 | 3 = ch === "C" ? 3 : ch === "x" ? 1 : 2
-      blocks.push(
-        makeMinibossBlock({
-          x: opts.cx + (c - (cols - 1) / 2) * opts.spacing,
-          y: opts.cy + (r - (rows - 1) / 2) * opts.spacing,
-          r: opts.r,
-          hp,
-          swayAmp: opts.swayAmp,
-          swayFreq: opts.swayFreq,
-          swayPh: 0, // одна фаза на всё существо — плывёт как единое целое
-        })
-      )
+export function buildFish(w: number, h: number, top: number): Block[] {
+  void h
+  const cx = w / 2
+  const cy = top + 165
+  const S = { swayAmp: 26, swayFreq: 0.45 }
+  const p = (x: number, y: number, rx: number, ry: number, tier: 1 | 2 | 3, rot?: number) =>
+    makePart({ x: cx + x, y: cy + y, rx, ry, tier, rot, ...S })
+  return [
+    // тело: три эллипса, сужающиеся к хвосту и к носу
+    p(0, 0, 52, 30, 2),
+    p(-36, 3, 38, 24, 2),
+    p(36, -3, 38, 24, 2),
+    // раздвоенный хвост
+    p(-58, 0, 12, 10, 1),
+    p(-68, -12, 20, 11, 1, -0.65),
+    p(-68, 12, 20, 11, 1, 0.65),
+    // спинной плавник
+    p(0, -34, 20, 10, 1),
+    // грудной плавник
+    p(14, 18, 14, 8, 1, 0.5),
+    // глаз
+    p(46, -10, 5, 5, 3),
+  ]
+}
+
+/**
+ * Медуза: пышный купол с бахромой по нижнему краю и пятью щупальцами-цепочками.
+ * Тиры: купол — 3 (розовый), щупальца — 1 (зелень).
+ */
+export function buildJelly(w: number, h: number, top: number): Block[] {
+  void h
+  const cx = w / 2
+  const cy = top + 160
+  const S = { swayAmp: 14, swayFreq: 0.6 }
+  const p = (x: number, y: number, rx: number, ry: number, tier: 1 | 2 | 3, rot?: number) =>
+    makePart({ x: cx + x, y: cy + y, rx, ry, tier, rot, ...S })
+  const blocks: Block[] = [
+    // купол: большой эллипс плюс «наползание» сверху и по бокам
+    p(0, 0, 48, 34, 3),
+    p(0, -12, 40, 26, 3),
+    p(-30, -6, 24, 18, 3),
+    p(30, -6, 24, 18, 3),
+  ]
+  // бахрома по нижнему краю купола
+  for (let i = -3; i <= 3; i++) blocks.push(p(i * 12, 24, 8, 8, 3))
+  // щупальца: пять цепочек из четырёх шариков с лёгким изгибом
+  for (let t = 0; t < 5; t++) {
+    const tx = -32 + t * 16
+    for (let s = 0; s < 4; s++) {
+      blocks.push(p(tx + (s % 2 ? 3 : -3), 36 + s * 14, 6.5, 6.5, 1))
     }
   }
   return blocks
-}
-
-/** Рыба-шар: тело с ядром и хвостом, неспешно патрулирует по горизонтали. */
-export function buildFish(w: number, h: number, top: number): Block[] {
-  void h
-  const R = 14
-  return buildFromMap(["...XXXX...", ".xXXXXXXX.", "xxXCCXXXXX", ".xXXXXXXX.", "...XXXX..."], {
-    cx: w / 2,
-    cy: top + 140,
-    r: R,
-    spacing: R * 2 - 6,
-    swayAmp: 26,
-    swayFreq: 0.45,
-  })
-}
-
-/** Медуза: купол с мягкой юбкой и щупальцами, плавно покачивается. */
-export function buildJelly(w: number, h: number, top: number): Block[] {
-  void h
-  const R = 14
-  return buildFromMap(
-    [
-      "..XXXXX...",
-      ".XXXXXXX..",
-      "XXXXXXXXX.",
-      ".xxxxxxx..",
-      "..x.x.x...",
-      "..x.x.x...",
-      "..x.x.x...",
-    ],
-    {
-      cx: w / 2,
-      cy: top + 130,
-      r: R,
-      spacing: R * 2 - 6,
-      swayAmp: 14,
-      swayFreq: 0.6,
-    }
-  )
 }
 
 /** Нормализованная проверка пересечения кругов с запасом (pad, px). */

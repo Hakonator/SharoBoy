@@ -13,6 +13,7 @@ import {
   buildJelly,
   carveLevelBlocks,
   minibossName,
+  MINIBOSS_HP,
   MINIBOSS_LIFE_CHANCE,
   rollMiniboss,
   type MinibossKind,
@@ -34,6 +35,7 @@ import {
   drawBlocks,
   drawBoss,
   drawLaserBeams,
+  drawMinibossBar,
   drawPaddle,
   drawParticles,
   drawPowers,
@@ -101,10 +103,9 @@ export class Game {
   debug = false
   /** Принудительный тип босса для отладки (null = стандартное поведение). */
   debugBossType: "octopus" | "kraken" | null = null
-  /** Сколько блоков минибосса ещё живо в текущем уровне (0 — минибосса нет). */
-  private minibossLeft = 0
-  /** Жизнь за минибосса уже разыграна (выпала или не выпала). */
-  private minibossLifeDone = true
+  /** Остаток общего пула HP минибосса (0 — минибосса в уровне нет / убит). */
+  private minibossHp = 0
+  private minibossMaxHp = 0
   /** Точка дропа жизни — центр уничтоженного существа. */
   private minibossDropX = 0
   private minibossDropY = 0
@@ -520,6 +521,7 @@ export class Game {
       addScore: (n, x, y, color, size) => g.addScore(n, x, y, color, size),
       dropPower: (x, y) => g.powersSys.dropPower(x, y),
       damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
+      damageMiniboss: (dmg) => g.damageMiniboss(dmg),
       onBombHitPaddle: () => g.onBombHitPaddle(),
       pushHud: () => g.pushHud(),
     }
@@ -807,8 +809,8 @@ export class Game {
   /* ---------- мини-боссы кампании ---------- */
 
   resetMiniboss() {
-    this.minibossLeft = 0
-    this.minibossLifeDone = true
+    this.minibossHp = 0
+    this.minibossMaxHp = 0
   }
 
   /** Добавляет существо-минибосса к текущему уровню (освободив ему место). */
@@ -819,8 +821,8 @@ export class Game {
     // Существу нужен целостный силуэт: убираем обычные блоки, с которыми оно налегает.
     this.blocks = [...carveLevelBlocks(this.blocks, creature), ...creature]
     this.blocksInitial = Math.max(1, this.blocks.length)
-    this.minibossLeft = creature.length
-    this.minibossLifeDone = false
+    this.minibossMaxHp = MINIBOSS_HP[kind]
+    this.minibossHp = this.minibossMaxHp
     this.minibossDropX = creature.reduce((s, b) => s + b.x, 0) / creature.length
     this.minibossDropY = creature.reduce((s, b) => s + b.y, 0) / creature.length
     this.fx.popups.push({
@@ -836,42 +838,70 @@ export class Game {
   }
 
   /**
-   * Гибель минибосса: когда уничтожен последний его блок, разыгрывается
-   * жизнь (MINIBOSS_LIFE_CHANCE). Зачистка уровня подождёт, пока упавший
-   * бонус не будет пойман или потерян — см. условие onLevelCleared.
+   * Урон в общий пул HP минибосса (блоки существа неразрушаемы — вызывается
+   * из Physics.damageBlock). Тело вспыхивает, при обнулении пула существо
+   * взрывается цепочкой и разыгрывается жизнь (MINIBOSS_LIFE_CHANCE).
    */
-  private updateMiniboss() {
-    if (this.phase !== "playing" || this.minibossLeft <= 0) return
-    const alive = this.blocks.reduce((n, b) => n + (b.isMiniboss && !b.dead ? 1 : 0), 0)
-    if (alive >= this.minibossLeft) return
-    this.minibossLeft = alive
-    if (alive > 0 || this.minibossLifeDone) return
-    this.minibossLifeDone = true
-    if (Math.random() >= MINIBOSS_LIFE_CHANCE) return
-    this.powers.push({
-      x: this.minibossDropX,
-      y: this.minibossDropY,
-      vy: 150,
-      type: "life",
-      t: 0,
-    })
-    this.fx.rings.push({
-      x: this.minibossDropX,
-      y: this.minibossDropY,
-      r: 8,
-      maxR: 120,
-      color: "rgba(93,255,176,0.85)",
-      t: 0,
-    })
+  damageMiniboss(dmg: number) {
+    if (this.minibossHp <= 0) return
+    this.minibossHp -= dmg
+    this.addRawScore(5)
+    for (const b of this.blocks) if (b.isMiniboss) b.flash = 1
+    if (this.minibossHp <= 0) this.killMiniboss()
+    this.pushHud()
+  }
+
+  /** Смерть минибосса: цепочка взрывов по силуэту и шанс дропа жизни. */
+  private killMiniboss() {
+    const doomed = this.blocks.filter((b) => b.isMiniboss)
+    let i = 0
+    for (const b of doomed) {
+      this.boomQueue.push({ x: b.x, y: b.y, at: this.time + 0.06 + i * 0.05 })
+      b.dead = true
+      i++
+    }
+    this.blocks = this.blocks.filter((b) => !b.dead)
+    this.minibossHp = 0
+    this.minibossMaxHp = 0
+    this.addRawScore(800)
     this.fx.popups.push({
       x: this.minibossDropX,
       y: this.minibossDropY,
-      text: "ЖИЗНЬ!",
-      color: "#5dffb0",
+      text: "+800",
+      color: "#ffc94d",
       t: 0,
-      size: 22,
+      size: 26,
     })
-    this.sfx.power()
+    this.flash = 1
+    this.hitStop = Math.max(this.hitStop, 0.3)
+    this.shake = Math.min(this.shake + 10, 14)
+    this.sfx.bossDie()
+    if (Math.random() < MINIBOSS_LIFE_CHANCE) {
+      this.powers.push({
+        x: this.minibossDropX,
+        y: this.minibossDropY,
+        vy: 150,
+        type: "life",
+        t: 0,
+      })
+      this.fx.rings.push({
+        x: this.minibossDropX,
+        y: this.minibossDropY,
+        r: 8,
+        maxR: 120,
+        color: "rgba(93,255,176,0.85)",
+        t: 0,
+      })
+      this.fx.popups.push({
+        x: this.minibossDropX,
+        y: this.minibossDropY - 40,
+        text: "ЖИЗНЬ!",
+        color: "#5dffb0",
+        t: 0,
+        size: 22,
+      })
+      this.sfx.power()
+    }
     this.pushHud()
   }
 
@@ -1652,8 +1682,6 @@ export class Game {
 
     for (const b of this.blocks) b.flash = Math.max(0, b.flash - dt * 5)
 
-    this.updateMiniboss()
-
     if (
       this.blocks.length === 0 &&
       !this.bossSys.boss &&
@@ -1936,6 +1964,7 @@ export class Game {
     drawBackground(ctx, w, h, this.combo, this.bubbles)
     drawShieldLine(ctx, w, h, this.time, this.shield, this.phase === "menu")
     drawBlocks(ctx, this.blocks, this.time)
+    drawMinibossBar(ctx, this.minibossHp, this.minibossMaxHp, this.blocks)
     drawBoss(ctx, this.bossSys.boss, this.balls, this.blocks)
     drawRings(ctx, this.fx.rings)
     drawPowers(ctx, this.powers)
