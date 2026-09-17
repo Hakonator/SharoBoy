@@ -1728,6 +1728,14 @@ export class Game {
           this.w - b.rx - 4
         )
       }
+      // вертикальный дрейф медузы: вся медуза целиком (одна фаза bobPh)
+      if (b.bobAmp && b.bobFreq) {
+        b.y = clamp(
+          (b.y0 ?? b.y) + Math.sin(this.time * b.bobFreq + (b.bobPh ?? 0)) * b.bobAmp,
+          b.ry + 4,
+          this.h * 0.75
+        )
+      }
     }
 
     // плавный дрейф поля

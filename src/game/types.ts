@@ -78,6 +78,11 @@ export interface Block {
   swayAmp: number
   swayFreq: number
   swayPh: number
+  /** Базовая Y для вертикального дрейфа (медуза); undefined/без bobAmp — дрейфа нет. */
+  y0?: number
+  bobAmp?: number
+  bobFreq?: number
+  bobPh?: number
   bomb: boolean
   boomQueued?: boolean
   splits: boolean

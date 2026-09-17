@@ -58,6 +58,9 @@ function makePart(opts: {
   part: Block["mbPart"]
   swayAmp: number
   swayFreq: number
+  bobAmp?: number
+  bobFreq?: number
+  bobPh?: number
 }): Block {
   return {
     x: opts.x,
@@ -73,9 +76,13 @@ function makePart(opts: {
     seed: rand(0, Math.PI * 2),
     dead: false,
     x0: opts.x,
+    y0: opts.y,
     swayAmp: opts.swayAmp,
     swayFreq: opts.swayFreq,
     swayPh: 0, // одна фаза на всё существо — плывёт как единое целое
+    bobAmp: opts.bobAmp ?? 0,
+    bobFreq: opts.bobFreq ?? 0,
+    bobPh: opts.bobPh ?? 0,
     bomb: false,
     splits: false,
     isMiniboss: true,
@@ -127,10 +134,19 @@ export function buildFish(w: number, h: number, top: number): Block[] {
  * Тиры: купол — 3 (розовый), щупальца — 1 (зелень).
  */
 export function buildJelly(w: number, h: number, top: number): Block[] {
-  void h
   const cx = w / 2
   const cy = top + 160
-  const S = { swayAmp: 14, swayFreq: 0.6 }
+  // Медленный патруль влево-вправо (без разворота) + вертикальный дрейф со
+  // случайной фазой и некратной частотой — траектория выглядит случайной,
+  // но ограничена: щупальца не опускаются ниже ~65% высоты поля.
+  const bobAmp = Math.max(10, Math.min(28, h * 0.65 - cy - 90))
+  const S = {
+    swayAmp: Math.max(14, cx - 56),
+    swayFreq: 0.18,
+    bobAmp,
+    bobFreq: 0.1 + rand(0, 0.05),
+    bobPh: rand(0, Math.PI * 2),
+  }
   const p = (
     x: number,
     y: number,
