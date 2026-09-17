@@ -118,7 +118,8 @@ export class WeaponsSystem {
       }
     }
     if (best) {
-      g.damageBlock(best, 3)
+      // Минибоссы невосприимчивы к лазеру: урон им наносит только шар.
+      if (!best.isMiniboss) g.damageBlock(best, 3)
       g.fx.burst(px, best.y + bestHH, "#7cf5ff", 8, 180)
       g.fx.rings.push({
         x: px,
@@ -187,6 +188,8 @@ export class WeaponsSystem {
     const R = 90
     for (const b of [...g.blocks]) {
       if (b.dead) continue
+      // Минибоссы невосприимчивы к взрывам ракет: урон им наносит только шар.
+      if (b.isMiniboss) continue
       if (Math.hypot(b.x - x, b.y - y) < R + Math.max(b.rx, b.ry)) g.damageBlock(b, 3)
     }
     if (g.boss && Math.hypot(g.boss.x - x, g.boss.y - y) < R + g.boss.r) g.damageBoss(3, true)

@@ -36,6 +36,7 @@ import {
   drawBoss,
   drawLaserBeams,
   drawMinibossBar,
+  drawMinibosses,
   drawPaddle,
   drawParticles,
   drawPowers,
@@ -1964,6 +1965,7 @@ export class Game {
     drawBackground(ctx, w, h, this.combo, this.bubbles)
     drawShieldLine(ctx, w, h, this.time, this.shield, this.phase === "menu")
     drawBlocks(ctx, this.blocks, this.time)
+    drawMinibosses(ctx, this.blocks)
     drawMinibossBar(ctx, this.minibossHp, this.minibossMaxHp, this.blocks)
     drawBoss(ctx, this.bossSys.boss, this.balls, this.blocks)
     drawRings(ctx, this.fx.rings)

@@ -42,22 +42,25 @@ describe("minibosses", () => {
     expectValidCreature(buildJelly(W, H, TOP))
   })
 
-  it("у рыбы есть плавники (1 HP), тело (2 HP) и глаз (3 HP)", () => {
+  it("у рыбы есть все части силуэта: тело, хвост, плавники и глаз", () => {
     const fish = buildFish(W, H, TOP)
-    expect(fish.filter((b) => b.hp === 2).length).toBeGreaterThanOrEqual(3) // тело
-    expect(fish.filter((b) => b.hp === 1).length).toBeGreaterThanOrEqual(4) // хвост+плавники
-    expect(fish.filter((b) => b.hp === 3).length).toBe(1) // глаз
+    const partOf = (s: string) => fish.filter((b) => b.mbPart === s).length
+    expect(partOf("body")).toBe(3)
+    expect(partOf("tail")).toBe(3)
+    expect(partOf("dorsal")).toBe(1)
+    expect(partOf("pectoral")).toBe(1)
+    expect(partOf("eye")).toBe(1)
   })
 
-  it("у медузы розовый купол и зелёные щупальца-цепочки", () => {
+  it("у медузы купол с бахромой и пятью щупальцами-цепочками", () => {
     const jelly = buildJelly(W, H, TOP)
-    expect(jelly.filter((b) => b.hp === 3).length).toBeGreaterThanOrEqual(11) // купол+бахрома
-    expect(jelly.filter((b) => b.hp === 1).length).toBeGreaterThanOrEqual(20) // 5 щупалец × 4
+    expect(jelly.filter((b) => b.mbPart === "dome").length).toBe(11) // 4 купол + 7 бахрома
+    expect(jelly.filter((b) => b.mbPart === "tentacle").length).toBe(20) // 5 × 4
   })
 
-  it("пул HP существа задан константой и заметно выше «суммарного» HP блоков", () => {
-    expect(MINIBOSS_HP.fish).toBeGreaterThan(100)
-    expect(MINIBOSS_HP.jelly).toBeGreaterThan(100)
+  it("пул HP существа снижен и задан константой", () => {
+    expect(MINIBOSS_HP.fish).toBe(60)
+    expect(MINIBOSS_HP.jelly).toBe(50)
   })
 
   it("шанс жизни за минибосса — 80%", () => {

@@ -98,6 +98,8 @@ export interface Block {
   hitsPaddle?: boolean
   /** Блок мини-босса кампании: за уничтожение всех — шанс дропа жизни. */
   isMiniboss?: boolean
+  /** Роль части существа минибосса — для специализированной отрисовки силуэта. */
+  mbPart?: "body" | "tail" | "dorsal" | "pectoral" | "eye" | "dome" | "tentacle"
 }
 
 export interface BossState {

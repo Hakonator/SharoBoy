@@ -121,6 +121,253 @@ function drawBomb(ctx: Ctx, b: Block, x: number, y: number, time: number) {
   ctx.restore()
 }
 
+/* ---------- мини-боссы: специализированная отрисовка силуэтов ---------- */
+
+/** Габариты группы частей существа. */
+interface MbBox {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+function bboxOf(parts: Block[]): MbBox {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const p of parts) {
+    minX = Math.min(minX, p.x - p.rx)
+    maxX = Math.max(maxX, p.x + p.rx)
+    minY = Math.min(minY, p.y - p.ry)
+    maxY = Math.max(maxY, p.y + p.ry)
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+}
+
+/** Рыба: хвост-лопасти → спинной плавник → тело с градиентом → жабры → глаз. */
+function drawFish(ctx: Ctx, parts: Block[]) {
+  const body = parts.filter((p) => p.mbPart === "body")
+  const tail = parts.filter((p) => p.mbPart === "tail")
+  const dorsal = parts.find((p) => p.mbPart === "dorsal")
+  const pectoral = parts.find((p) => p.mbPart === "pectoral")
+  const eye = parts.find((p) => p.mbPart === "eye")
+  if (!body.length || !tail.length) return
+  const b = bboxOf(body)
+  const t = bboxOf(tail)
+  const midY = b.y + b.h / 2
+  const flash = Math.max(...parts.map((p) => p.flash))
+
+  // хвост: две лопасти от сустава с выемкой посередине
+  const jointX = b.x + b.w * 0.04
+  ctx.beginPath()
+  ctx.moveTo(jointX, midY)
+  ctx.lineTo(t.x - t.w * 0.12, t.y)
+  ctx.lineTo(t.x + t.w * 0.55, t.y + t.h / 2)
+  ctx.lineTo(t.x - t.w * 0.12, t.y + t.h)
+  ctx.closePath()
+  const tg = ctx.createLinearGradient(0, t.y, 0, t.y + t.h)
+  tg.addColorStop(0, TIER[1].light)
+  tg.addColorStop(1, TIER[1].dark)
+  ctx.fillStyle = tg
+  ctx.fill()
+  ctx.strokeStyle = TIER[1].dark
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+
+  // спинной плавник: треугольник над спиной
+  if (dorsal) {
+    ctx.beginPath()
+    ctx.moveTo(dorsal.x - dorsal.rx * 1.05, b.y + 7)
+    ctx.lineTo(dorsal.x, dorsal.y - dorsal.ry * 1.15)
+    ctx.lineTo(dorsal.x + dorsal.rx * 1.05, b.y + 7)
+    ctx.closePath()
+    ctx.fillStyle = TIER[1].base
+    ctx.fill()
+    ctx.strokeStyle = TIER[1].dark
+    ctx.stroke()
+  }
+
+  // тело: эллипс с вертикальным градиентом (спина светлая, брюхо тёмное)
+  const bg = ctx.createLinearGradient(0, b.y, 0, b.y + b.h)
+  bg.addColorStop(0, TIER[2].light)
+  bg.addColorStop(0.55, TIER[2].base)
+  bg.addColorStop(1, TIER[2].dark)
+  ctx.beginPath()
+  ctx.ellipse(b.x + b.w / 2, midY, b.w / 2, b.h / 2, 0, 0, Math.PI * 2)
+  ctx.fillStyle = bg
+  ctx.fill()
+  ctx.strokeStyle = TIER[2].dark
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+
+  // жабры: дуга ближе к голове
+  ctx.beginPath()
+  ctx.ellipse(b.x + b.w * 0.66, midY, b.w * 0.085, b.h * 0.34, 0, -1.15, 1.15)
+  ctx.strokeStyle = "rgba(176,114,10,0.75)"
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+
+  // грудной плавник поверх тела
+  if (pectoral) {
+    ctx.beginPath()
+    ctx.ellipse(
+      pectoral.x,
+      pectoral.y,
+      pectoral.rx * 1.05,
+      pectoral.ry * 0.8,
+      pectoral.rot,
+      0,
+      Math.PI * 2
+    )
+    ctx.fillStyle = TIER[1].base
+    ctx.fill()
+    ctx.strokeStyle = TIER[1].dark
+    ctx.lineWidth = 1
+    ctx.stroke()
+  }
+
+  // глаз: белок, зрачок (смещён к носу), блик
+  if (eye) {
+    const r = eye.rx * 1.7
+    ctx.beginPath()
+    ctx.arc(eye.x, eye.y, r, 0, Math.PI * 2)
+    ctx.fillStyle = "#f4feff"
+    ctx.fill()
+    ctx.strokeStyle = "rgba(4,18,28,0.6)"
+    ctx.lineWidth = 1
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(eye.x + r * 0.28, eye.y, r * 0.52, 0, Math.PI * 2)
+    ctx.fillStyle = "#04121c"
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(eye.x + r * 0.1, eye.y - r * 0.24, r * 0.16, 0, Math.PI * 2)
+    ctx.fillStyle = "#ffffff"
+    ctx.fill()
+  }
+
+  // вспышка урона
+  if (flash > 0.05) {
+    ctx.globalAlpha = Math.min(flash, 1) * 0.5
+    ctx.fillStyle = "#ffffff"
+    ctx.beginPath()
+    ctx.ellipse(b.x + b.w / 2, midY, b.w / 2, b.h / 2, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.beginPath()
+    ctx.moveTo(jointX, midY)
+    ctx.lineTo(t.x - t.w * 0.12, t.y)
+    ctx.lineTo(t.x + t.w * 0.55, t.y + t.h / 2)
+    ctx.lineTo(t.x - t.w * 0.12, t.y + t.h)
+    ctx.closePath()
+    ctx.fill()
+    ctx.globalAlpha = 1
+  }
+}
+
+/** Медуза: щупальца-цепочки → купол с фестончатым краем → бахрома → блик. */
+function drawJelly(ctx: Ctx, parts: Block[]) {
+  const domeBig = parts.filter((p) => p.mbPart === "dome" && p.ry >= 20)
+  const fringe = parts.filter((p) => p.mbPart === "dome" && p.ry < 20)
+  const tents = parts.filter((p) => p.mbPart === "tentacle")
+  if (!domeBig.length) return
+  const d = bboxOf(domeBig)
+  const cx = d.x + d.w / 2
+  const flash = Math.max(...parts.map((p) => p.flash))
+
+  // щупальца: сглаженные цепочки из блоков (рисуются под куполом)
+  const sorted = [...tents].sort((a, b) => a.x - b.x || a.y - b.y)
+  const chains: Block[][] = []
+  for (const p of sorted) {
+    const last = chains[chains.length - 1]
+    if (last && p.x - last[0].x < 9) last.push(p)
+    else chains.push([p])
+  }
+  ctx.lineCap = "round"
+  for (const chain of chains) {
+    if (chain.length < 2) continue
+    const pts = [...chain].sort((a, b) => a.y - b.y)
+    for (const pass of [
+      { width: 5, color: "rgba(15,143,91,0.35)" },
+      { width: 2.5, color: TIER[1].base },
+    ]) {
+      ctx.beginPath()
+      ctx.moveTo(pts[0].x, pts[0].y)
+      for (let i = 1; i < pts.length; i++) {
+        const mx = (pts[i - 1].x + pts[i].x) / 2
+        const my = (pts[i - 1].y + pts[i].y) / 2
+        ctx.quadraticCurveTo(pts[i - 1].x, pts[i - 1].y, mx, my)
+      }
+      ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y)
+      ctx.strokeStyle = pass.color
+      ctx.lineWidth = pass.width
+      ctx.stroke()
+    }
+  }
+
+  // купол: верх — гладкая арка, низ — фестоны
+  ctx.beginPath()
+  ctx.moveTo(d.x, d.y + d.h)
+  const n = 7
+  const wseg = d.w / n
+  for (let i = 0; i < n; i++) {
+    const sx = d.x + wseg * i
+    ctx.quadraticCurveTo(sx + wseg / 2, d.y + d.h + 9, sx + wseg, d.y + d.h)
+  }
+  ctx.bezierCurveTo(d.x + d.w, d.y + d.h * 0.35, d.x + d.w * 0.72, d.y, cx, d.y)
+  ctx.bezierCurveTo(d.x + d.w * 0.28, d.y, d.x, d.y + d.h * 0.35, d.x, d.y + d.h)
+  ctx.closePath()
+  const dg = ctx.createLinearGradient(0, d.y, 0, d.y + d.h)
+  dg.addColorStop(0, TIER[3].light)
+  dg.addColorStop(0.6, TIER[3].base)
+  dg.addColorStop(1, TIER[3].dark)
+  ctx.fillStyle = dg
+  ctx.fill()
+  ctx.strokeStyle = TIER[3].dark
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+
+  // бахрома по нижнему краю
+  for (const f of fringe) {
+    ctx.beginPath()
+    ctx.arc(f.x, f.y, f.rx, 0, Math.PI * 2)
+    ctx.fillStyle = TIER[3].base
+    ctx.fill()
+    ctx.strokeStyle = TIER[3].dark
+    ctx.lineWidth = 1
+    ctx.stroke()
+  }
+
+  // блик внутри купола
+  ctx.globalAlpha = 0.35
+  ctx.beginPath()
+  ctx.ellipse(cx - d.w * 0.12, d.y + d.h * 0.38, d.w * 0.22, d.h * 0.16, -0.4, 0, Math.PI * 2)
+  ctx.fillStyle = "#ffffff"
+  ctx.fill()
+  ctx.globalAlpha = 1
+
+  // вспышка урона
+  if (flash > 0.05) {
+    ctx.globalAlpha = Math.min(flash, 1) * 0.5
+    ctx.fillStyle = "#ffffff"
+    ctx.beginPath()
+    ctx.ellipse(cx, d.y + d.h * 0.55, d.w / 2, d.h * 0.55, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.globalAlpha = 1
+  }
+}
+
+/**
+ * Отрисовка минибоссов: блоки существа не рисуются генериком, вместо этого
+ * части собираются в реалистичный силуэт (рыба/медуза) по тегам mbPart.
+ */
+export function drawMinibosses(ctx: Ctx, blocks: Block[]) {
+  const parts = blocks.filter((b) => b.isMiniboss && !b.dead && b.mbPart)
+  if (!parts.length) return
+  if (parts.some((p) => p.mbPart === "dome")) drawJelly(ctx, parts)
+  else drawFish(ctx, parts)
+}
+
 /**
  * Полоска HP над мини-боссом: общий пул существа по текущим границам его
  * блоков. Ничего не рисует, если минибосса нет или он уже уничтожен.
@@ -161,6 +408,8 @@ export function drawMinibossBar(ctx: Ctx, hp: number, maxHp: number, blocks: Blo
 export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
   for (const b of blocks) {
     if (b.dead) continue
+    // Минибоссы рисуются специализированным рендером (drawMinibosses).
+    if (b.isMiniboss) continue
     if (b.bomb) {
       drawBomb(ctx, b, b.x, b.y, time)
       continue

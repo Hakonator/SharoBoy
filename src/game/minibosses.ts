@@ -43,8 +43,8 @@ export function rollMiniboss(seed: number, nodeId: number): MinibossKind | null 
 
 /** Общий запас HP существа: блоки минибосса не разрушаются поодиночке. */
 export const MINIBOSS_HP: Record<MinibossKind, number> = {
-  fish: 140,
-  jelly: 120,
+  fish: 60,
+  jelly: 50,
 }
 
 /** Фабрика части существа: эллипс с наклоном, «плавание» через sway. */
@@ -55,6 +55,7 @@ function makePart(opts: {
   ry: number
   rot?: number
   tier: 1 | 2 | 3
+  part: Block["mbPart"]
   swayAmp: number
   swayFreq: number
 }): Block {
@@ -78,6 +79,7 @@ function makePart(opts: {
     bomb: false,
     splits: false,
     isMiniboss: true,
+    mbPart: opts.part,
   }
 }
 
@@ -91,23 +93,30 @@ export function buildFish(w: number, h: number, top: number): Block[] {
   const cx = w / 2
   const cy = top + 165
   const S = { swayAmp: 26, swayFreq: 0.45 }
-  const p = (x: number, y: number, rx: number, ry: number, tier: 1 | 2 | 3, rot?: number) =>
-    makePart({ x: cx + x, y: cy + y, rx, ry, tier, rot, ...S })
+  const p = (
+    x: number,
+    y: number,
+    rx: number,
+    ry: number,
+    tier: 1 | 2 | 3,
+    part: Block["mbPart"],
+    rot?: number
+  ) => makePart({ x: cx + x, y: cy + y, rx, ry, tier, part, rot, ...S })
   return [
     // тело: три эллипса, сужающиеся к хвосту и к носу
-    p(0, 0, 52, 30, 2),
-    p(-36, 3, 38, 24, 2),
-    p(36, -3, 38, 24, 2),
+    p(0, 0, 52, 30, 2, "body"),
+    p(-36, 3, 38, 24, 2, "body"),
+    p(36, -3, 38, 24, 2, "body"),
     // раздвоенный хвост
-    p(-58, 0, 12, 10, 1),
-    p(-68, -12, 20, 11, 1, -0.65),
-    p(-68, 12, 20, 11, 1, 0.65),
+    p(-58, 0, 12, 10, 1, "tail"),
+    p(-68, -12, 20, 11, 1, "tail", -0.65),
+    p(-68, 12, 20, 11, 1, "tail", 0.65),
     // спинной плавник
-    p(0, -34, 20, 10, 1),
+    p(0, -34, 20, 10, 1, "dorsal"),
     // грудной плавник
-    p(14, 18, 14, 8, 1, 0.5),
+    p(14, 18, 14, 8, 1, "pectoral", 0.5),
     // глаз
-    p(46, -10, 5, 5, 3),
+    p(46, -10, 5, 5, 3, "eye"),
   ]
 }
 
@@ -120,22 +129,29 @@ export function buildJelly(w: number, h: number, top: number): Block[] {
   const cx = w / 2
   const cy = top + 160
   const S = { swayAmp: 14, swayFreq: 0.6 }
-  const p = (x: number, y: number, rx: number, ry: number, tier: 1 | 2 | 3, rot?: number) =>
-    makePart({ x: cx + x, y: cy + y, rx, ry, tier, rot, ...S })
+  const p = (
+    x: number,
+    y: number,
+    rx: number,
+    ry: number,
+    tier: 1 | 2 | 3,
+    part: Block["mbPart"],
+    rot?: number
+  ) => makePart({ x: cx + x, y: cy + y, rx, ry, tier, part, rot, ...S })
   const blocks: Block[] = [
     // купол: большой эллипс плюс «наползание» сверху и по бокам
-    p(0, 0, 48, 34, 3),
-    p(0, -12, 40, 26, 3),
-    p(-30, -6, 24, 18, 3),
-    p(30, -6, 24, 18, 3),
+    p(0, 0, 48, 34, 3, "dome"),
+    p(0, -12, 40, 26, 3, "dome"),
+    p(-30, -6, 24, 18, 3, "dome"),
+    p(30, -6, 24, 18, 3, "dome"),
   ]
   // бахрома по нижнему краю купола
-  for (let i = -3; i <= 3; i++) blocks.push(p(i * 12, 24, 8, 8, 3))
+  for (let i = -3; i <= 3; i++) blocks.push(p(i * 12, 24, 8, 8, 3, "dome"))
   // щупальца: пять цепочек из четырёх шариков с лёгким изгибом
   for (let t = 0; t < 5; t++) {
     const tx = -32 + t * 16
     for (let s = 0; s < 4; s++) {
-      blocks.push(p(tx + (s % 2 ? 3 : -3), 36 + s * 14, 6.5, 6.5, 1))
+      blocks.push(p(tx + (s % 2 ? 3 : -3), 36 + s * 14, 6.5, 6.5, 1, "tentacle"))
     }
   }
   return blocks
