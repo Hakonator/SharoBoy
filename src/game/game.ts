@@ -45,6 +45,7 @@ import {
   drawRings,
   drawShieldLine,
   drawMouthBubbles,
+  fishFacing,
 } from "./render"
 import type {
   Ball,
@@ -876,6 +877,19 @@ export class Game {
   /** Пузырьки изо рта рыбы: периодический выдох + подъём с покачиванием. */
   private updateMouthBubbles(dt: number) {
     if (this.fishMouth && this.minibossHp > 0 && this.phase === "playing") {
+      // рот следует за силуэтом: пузырьки выходят с носа той стороны, куда
+      // рыба сейчас повёрнута (плавный разворот — fishFacing из render.ts)
+      const bodyParts = this.blocks.filter((b) => b.isMiniboss && b.mbPart === "body")
+      let facing = 1
+      if (bodyParts.length) {
+        facing = fishFacing(bodyParts, this.time)
+        const minX = Math.min(...bodyParts.map((b) => b.x - b.rx))
+        const maxX = Math.max(...bodyParts.map((b) => b.x + b.rx))
+        const midY =
+          (Math.min(...bodyParts.map((b) => b.y)) + Math.max(...bodyParts.map((b) => b.y))) / 2
+        this.mouthX = facing >= 0 ? maxX - 12 : minX + 12
+        this.mouthY = midY + 9
+      }
       this.mouthBubbleTimer -= dt
       if (this.mouthBubbleTimer <= 0) {
         this.mouthBubbleTimer = rand(1.1, 2.4)
@@ -884,7 +898,7 @@ export class Game {
           this.mouthBubbles.push({
             x: this.mouthX + rand(-2, 2),
             y: this.mouthY + rand(-2, 2),
-            vx: rand(6, 18),
+            vx: rand(6, 18) * (facing >= 0 ? 1 : -1),
             vy: -rand(34, 62),
             r: rand(2, 4.5),
             t: 0,

@@ -149,6 +149,17 @@ function bboxOf(parts: Block[]): MbBox {
 /** Частота sway рыбы — синхронизирована с buildFish (minibosses.ts). */
 const FISH_SWAY_FREQ = 0.45
 
+/**
+ * Гладкое направление взгляда рыбы [-1..1]: скорость патруля ∝ cos(time·freq),
+ * поэтому на поворотах рыба плавно «переворачивается» (масштаб по X через 0).
+ */
+export function fishFacing(parts: Block[], time: number): number {
+  const f = parts.find((p) => p.mbPart === "body")?.swayFreq ?? 0
+  if (!f) return 1
+  const v = Math.cos(time * f) * 2.2
+  return Math.max(-1, Math.min(1, v))
+}
+
 /** Рыба: анимированные хвост и плавники, рот; части собираются по тегам. */
 function drawFish(ctx: Ctx, parts: Block[], time: number) {
   const body = parts.filter((p) => p.mbPart === "body")
@@ -161,6 +172,13 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   const t = bboxOf(tail)
   const midY = b.y + b.h / 2
   const flash = Math.max(...parts.map((p) => p.flash))
+  // плавный разворот: зеркалим весь силуэт вокруг центра тела по ходу движения
+  const facing = fishFacing(parts, time)
+  const fx = b.x + b.w / 2
+  ctx.save()
+  ctx.translate(fx, 0)
+  ctx.scale(facing, 1)
+  ctx.translate(-fx, 0)
   // хвост отстаёт от корпуса: рыба плывёт по синусоиде, хвост качается в противофазе
   const swing = -Math.cos(time * FISH_SWAY_FREQ) * 0.17 + Math.sin(time * 2.1) * 0.035
   const jointX = b.x + b.w * 0.05
@@ -255,19 +273,44 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     ctx.restore()
   }
 
-  // рот: периодически приоткрывается (тут же появляются пузырьки)
+  // рот: вырез из двух дуг — верхней и нижней губы, периодически приоткрывается
+  // (из этой точки game.ts выпускает пузырьки — по стороне, куда смотрит рыба)
   const open = Math.max(0, Math.sin(time * 0.85))
-  const mx = b.x + b.w - 4
-  const my = midY + b.h * 0.14
+  const mx = b.x + b.w - 24
+  const my = midY + b.h * 0.16
+  const len = b.w * 0.13
+  const gape = 1.2 + open * b.h * 0.13
+  const nx = mx + len
+  // полость рта: вырез между внутренними кромками губ (угол рта → нос → обратно)
   ctx.beginPath()
-  ctx.ellipse(mx, my, 7, 1.6 + 4.4 * open, -0.16, 0, Math.PI * 2)
-  ctx.fillStyle = open > 0.08 ? "rgba(156,31,18,0.9)" : "rgba(156,31,18,0.55)"
+  ctx.moveTo(mx, my)
+  ctx.quadraticCurveTo(mx + len * 0.45, my - gape * 1.5, nx, my - gape)
+  ctx.quadraticCurveTo(nx + 2, my, nx, my + gape)
+  ctx.quadraticCurveTo(mx + len * 0.45, my + gape * 1.7, mx, my)
+  ctx.closePath()
+  const cg = ctx.createLinearGradient(0, my - gape, 0, my + gape)
+  cg.addColorStop(0, "#7c1620")
+  cg.addColorStop(1, "#32060b")
+  ctx.fillStyle = cg
   ctx.fill()
-  ctx.beginPath()
-  ctx.ellipse(mx, my, 7.8, 2.4 + 4.4 * open, -0.16, 0.35, 2.2)
-  ctx.strokeStyle = "rgba(156,31,18,0.8)"
-  ctx.lineWidth = 1.2
-  ctx.stroke()
+  // губы: тёмная складка по внешнему краю каждой дуги + влажный блик под ней
+  for (const pass of [
+    { w: 3.4, c: "rgba(122,74,8,0.85)" },
+    { w: 1.3, c: "rgba(255,214,140,0.6)" },
+  ]) {
+    ctx.beginPath()
+    ctx.moveTo(mx, my)
+    ctx.quadraticCurveTo(mx + len * 0.42, my - gape * 2.4, nx + 1, my - gape * 1.35)
+    ctx.strokeStyle = pass.c
+    ctx.lineWidth = pass.w
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(mx, my)
+    ctx.quadraticCurveTo(mx + len * 0.42, my + gape * 2.6, nx + 1, my + gape * 1.4)
+    ctx.strokeStyle = pass.c
+    ctx.lineWidth = pass.w
+    ctx.stroke()
+  }
 
   // глаз: белок, зрачок (смещён к носу), блик
   if (eye) {
@@ -298,6 +341,7 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     ctx.fill()
     ctx.globalAlpha = 1
   }
+  ctx.restore()
 }
 
 /** Медуза: пульсирующий купол и волнующиеся щупальца-цепочки. */

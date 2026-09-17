@@ -92,7 +92,8 @@ export function buildFish(w: number, h: number, top: number): Block[] {
   void h
   const cx = w / 2
   const cy = top + 165
-  const S = { swayAmp: 26, swayFreq: 0.45 }
+  // патрулирует всё поле: амплитуда — почти до стен (с запасом на нос и хвост)
+  const S = { swayAmp: Math.max(26, cx - 110), swayFreq: 0.45 }
   const p = (
     x: number,
     y: number,
