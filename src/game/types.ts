@@ -102,6 +102,18 @@ export interface Block {
   mbPart?: "body" | "tail" | "dorsal" | "pectoral" | "eye" | "dome" | "tentacle"
 }
 
+/** Пузырёк воздуха, выпускаемый рыбой-минибоссом изо рта. */
+export interface MouthBubble {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  r: number
+  t: number
+  life: number
+  ph: number
+}
+
 export interface BossState {
   x: number
   y: number

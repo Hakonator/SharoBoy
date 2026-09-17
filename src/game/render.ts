@@ -8,6 +8,7 @@ import type {
   Block,
   BossState,
   Bubble,
+  MouthBubble,
   PaddleShapeKind,
   PaddleState,
   Particle,
@@ -145,8 +146,11 @@ function bboxOf(parts: Block[]): MbBox {
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
 }
 
-/** Рыба: хвост-лопасти → спинной плавник → тело с градиентом → жабры → глаз. */
-function drawFish(ctx: Ctx, parts: Block[]) {
+/** Частота sway рыбы — синхронизирована с buildFish (minibosses.ts). */
+const FISH_SWAY_FREQ = 0.45
+
+/** Рыба: анимированные хвост и плавники, рот; части собираются по тегам. */
+function drawFish(ctx: Ctx, parts: Block[], time: number) {
   const body = parts.filter((p) => p.mbPart === "body")
   const tail = parts.filter((p) => p.mbPart === "tail")
   const dorsal = parts.find((p) => p.mbPart === "dorsal")
@@ -157,16 +161,24 @@ function drawFish(ctx: Ctx, parts: Block[]) {
   const t = bboxOf(tail)
   const midY = b.y + b.h / 2
   const flash = Math.max(...parts.map((p) => p.flash))
+  // хвост отстаёт от корпуса: рыба плывёт по синусоиде, хвост качается в противофазе
+  const swing = -Math.cos(time * FISH_SWAY_FREQ) * 0.17 + Math.sin(time * 2.1) * 0.035
+  const jointX = b.x + b.w * 0.05
+  const L = (jointX - (t.x - t.w * 0.15)) * 1.25 + 20
+  const H = t.h * 1.6 + 22
 
-  // хвост: две лопасти от сустава с выемкой посередине
-  const jointX = b.x + b.w * 0.04
+  ctx.save()
+  ctx.translate(jointX, midY)
+  ctx.rotate(swing)
+  // массивный раздвоенный хвост: две лопасти с выемкой, плавные кривые
   ctx.beginPath()
-  ctx.moveTo(jointX, midY)
-  ctx.lineTo(t.x - t.w * 0.12, t.y)
-  ctx.lineTo(t.x + t.w * 0.55, t.y + t.h / 2)
-  ctx.lineTo(t.x - t.w * 0.12, t.y + t.h)
+  ctx.moveTo(0, 0)
+  ctx.quadraticCurveTo(-L * 0.42, -H * 0.34, -L, -H * 0.74)
+  ctx.quadraticCurveTo(-L * 0.5, -H * 0.16, -L * 0.46, 0)
+  ctx.quadraticCurveTo(-L * 0.5, H * 0.16, -L, H * 0.74)
+  ctx.quadraticCurveTo(-L * 0.42, H * 0.34, 0, 0)
   ctx.closePath()
-  const tg = ctx.createLinearGradient(0, t.y, 0, t.y + t.h)
+  const tg = ctx.createLinearGradient(-L, -H * 0.7, 0, H * 0.7)
   tg.addColorStop(0, TIER[1].light)
   tg.addColorStop(1, TIER[1].dark)
   ctx.fillStyle = tg
@@ -174,17 +186,45 @@ function drawFish(ctx: Ctx, parts: Block[]) {
   ctx.strokeStyle = TIER[1].dark
   ctx.lineWidth = 1.5
   ctx.stroke()
-
-  // спинной плавник: треугольник над спиной
-  if (dorsal) {
+  // лучи плавника
+  ctx.strokeStyle = "rgba(15,143,91,0.45)"
+  ctx.lineWidth = 1
+  for (const k of [-0.55, 0, 0.55]) {
     ctx.beginPath()
-    ctx.moveTo(dorsal.x - dorsal.rx * 1.05, b.y + 7)
-    ctx.lineTo(dorsal.x, dorsal.y - dorsal.ry * 1.15)
-    ctx.lineTo(dorsal.x + dorsal.rx * 1.05, b.y + 7)
+    ctx.moveTo(-L * 0.14, 0)
+    ctx.lineTo(-L * 0.85, k * H * 0.6)
+    ctx.stroke()
+  }
+  if (flash > 0.05) {
+    ctx.globalAlpha = Math.min(flash, 1) * 0.45
+    ctx.fillStyle = "#ffffff"
+    ctx.fill()
+    ctx.globalAlpha = 1
+  }
+  ctx.restore()
+
+  // спинной плавник: колышется рябью
+  if (dorsal) {
+    const ripple = Math.sin(time * 2.3) * 3.5
+    ctx.beginPath()
+    ctx.moveTo(dorsal.x - dorsal.rx * 1.35, b.y + 8)
+    ctx.quadraticCurveTo(
+      dorsal.x - dorsal.rx * 0.3,
+      dorsal.y - dorsal.ry * 0.95,
+      dorsal.x + ripple,
+      dorsal.y - dorsal.ry * 1.45
+    )
+    ctx.quadraticCurveTo(
+      dorsal.x + dorsal.rx * 0.55,
+      dorsal.y - dorsal.ry * 0.35,
+      dorsal.x + dorsal.rx * 1.35,
+      b.y + 8
+    )
     ctx.closePath()
     ctx.fillStyle = TIER[1].base
     ctx.fill()
     ctx.strokeStyle = TIER[1].dark
+    ctx.lineWidth = 1
     ctx.stroke()
   }
 
@@ -208,24 +248,35 @@ function drawFish(ctx: Ctx, parts: Block[]) {
   ctx.lineWidth = 1.5
   ctx.stroke()
 
-  // грудной плавник поверх тела
+  // грудной плавник: гребёт с небольшой амплитудой
   if (pectoral) {
+    const row = Math.sin(time * 2.7 + 0.8) * 0.3
+    ctx.save()
+    ctx.translate(pectoral.x - 3, pectoral.y - 2)
+    ctx.rotate(pectoral.rot + row)
     ctx.beginPath()
-    ctx.ellipse(
-      pectoral.x,
-      pectoral.y,
-      pectoral.rx * 1.05,
-      pectoral.ry * 0.8,
-      pectoral.rot,
-      0,
-      Math.PI * 2
-    )
+    ctx.ellipse(pectoral.rx, 0, pectoral.rx * 1.3, pectoral.ry * 0.8, 0, 0, Math.PI * 2)
     ctx.fillStyle = TIER[1].base
     ctx.fill()
     ctx.strokeStyle = TIER[1].dark
     ctx.lineWidth = 1
     ctx.stroke()
+    ctx.restore()
   }
+
+  // рот: периодически приоткрывается (тут же появляются пузырьки)
+  const open = Math.max(0, Math.sin(time * 0.85))
+  const mx = b.x + b.w - 4
+  const my = midY + b.h * 0.14
+  ctx.beginPath()
+  ctx.ellipse(mx, my, 7, 1.6 + 4.4 * open, -0.16, 0, Math.PI * 2)
+  ctx.fillStyle = open > 0.08 ? "rgba(156,31,18,0.9)" : "rgba(156,31,18,0.55)"
+  ctx.fill()
+  ctx.beginPath()
+  ctx.ellipse(mx, my, 7.8, 2.4 + 4.4 * open, -0.16, 0.35, 2.2)
+  ctx.strokeStyle = "rgba(156,31,18,0.8)"
+  ctx.lineWidth = 1.2
+  ctx.stroke()
 
   // глаз: белок, зрачок (смещён к носу), блик
   if (eye) {
@@ -247,19 +298,12 @@ function drawFish(ctx: Ctx, parts: Block[]) {
     ctx.fill()
   }
 
-  // вспышка урона
+  // вспышка урона на теле (хвост вспыхивает в своём блоке выше)
   if (flash > 0.05) {
     ctx.globalAlpha = Math.min(flash, 1) * 0.5
     ctx.fillStyle = "#ffffff"
     ctx.beginPath()
     ctx.ellipse(b.x + b.w / 2, midY, b.w / 2, b.h / 2, 0, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.beginPath()
-    ctx.moveTo(jointX, midY)
-    ctx.lineTo(t.x - t.w * 0.12, t.y)
-    ctx.lineTo(t.x + t.w * 0.55, t.y + t.h / 2)
-    ctx.lineTo(t.x - t.w * 0.12, t.y + t.h)
-    ctx.closePath()
     ctx.fill()
     ctx.globalAlpha = 1
   }
@@ -360,12 +404,33 @@ function drawJelly(ctx: Ctx, parts: Block[]) {
 /**
  * Отрисовка минибоссов: блоки существа не рисуются генериком, вместо этого
  * части собираются в реалистичный силуэт (рыба/медуза) по тегам mbPart.
+ * time нужен для анимации плавников/хвоста рыбы.
  */
-export function drawMinibosses(ctx: Ctx, blocks: Block[]) {
+export function drawMinibosses(ctx: Ctx, blocks: Block[], time: number) {
   const parts = blocks.filter((b) => b.isMiniboss && !b.dead && b.mbPart)
   if (!parts.length) return
   if (parts.some((p) => p.mbPart === "dome")) drawJelly(ctx, parts)
-  else drawFish(ctx, parts)
+  else drawFish(ctx, parts, time)
+}
+
+/** Пузырьк�� воздуха изо рта рыбы: поднимаются, покачиваясь, и лопаются. */
+export function drawMouthBubbles(ctx: Ctx, bubbles: MouthBubble[]) {
+  for (const b of bubbles) {
+    const a = Math.max(0, 1 - b.t / b.life)
+    ctx.globalAlpha = a
+    ctx.beginPath()
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2)
+    ctx.fillStyle = "rgba(234,247,255,0.14)"
+    ctx.fill()
+    ctx.strokeStyle = "rgba(234,247,255,0.75)"
+    ctx.lineWidth = 1
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(b.x - b.r * 0.3, b.y - b.r * 0.32, Math.max(b.r * 0.22, 0.7), 0, Math.PI * 2)
+    ctx.fillStyle = "rgba(255,255,255,0.85)"
+    ctx.fill()
+  }
+  ctx.globalAlpha = 1
 }
 
 /**

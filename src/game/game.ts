@@ -44,12 +44,14 @@ import {
   drawPopups,
   drawRings,
   drawShieldLine,
+  drawMouthBubbles,
 } from "./render"
 import type {
   Ball,
   Block,
   BossState,
   Bubble,
+  MouthBubble,
   PaddleShapeKind,
   PaddleState,
   Phase,
@@ -110,6 +112,12 @@ export class Game {
   /** Точка дропа жизни — центр уничтоженного существа. */
   private minibossDropX = 0
   private minibossDropY = 0
+  /** Пузырьки воздуха изо рта рыбы-минибосса. */
+  private mouthBubbles: MouthBubble[] = []
+  private mouthBubbleTimer = 0
+  private mouthX = 0
+  private mouthY = 0
+  private fishMouth = false
   /** Множитель урона шара (скрытая отладка: клавиша "-" на цифровой клавиатуре). */
   debugBallDamage = 1
   /** Активные эффекты отладки (для тестирования механик). */
@@ -812,6 +820,8 @@ export class Game {
   resetMiniboss() {
     this.minibossHp = 0
     this.minibossMaxHp = 0
+    this.mouthBubbles = []
+    this.fishMouth = false
   }
 
   /** Добавляет существо-минибосса к текущему уровню (освободив ему место). */
@@ -826,6 +836,17 @@ export class Game {
     this.minibossHp = this.minibossMaxHp
     this.minibossDropX = creature.reduce((s, b) => s + b.x, 0) / creature.length
     this.minibossDropY = creature.reduce((s, b) => s + b.y, 0) / creature.length
+    // У рыбы запоминаем точку рта (нос) — оттуда пойдут пузырьки воздуха.
+    if (kind === "fish") {
+      const bodyParts = creature.filter((b) => b.mbPart === "body")
+      const maxX = Math.max(...bodyParts.map((b) => b.x + b.rx))
+      const midY =
+        (Math.min(...bodyParts.map((b) => b.y)) + Math.max(...bodyParts.map((b) => b.y))) / 2
+      this.mouthX = maxX - 2
+      this.mouthY = midY + 5
+      this.fishMouth = true
+      this.mouthBubbleTimer = rand(0.5, 1.2)
+    }
     this.fx.popups.push({
       x: this.minibossDropX,
       y: this.minibossDropY - 70,
@@ -852,6 +873,37 @@ export class Game {
     this.pushHud()
   }
 
+  /** Пузырьки изо рта рыбы: периодический выдох + подъём с покачиванием. */
+  private updateMouthBubbles(dt: number) {
+    if (this.fishMouth && this.minibossHp > 0 && this.phase === "playing") {
+      this.mouthBubbleTimer -= dt
+      if (this.mouthBubbleTimer <= 0) {
+        this.mouthBubbleTimer = rand(1.1, 2.4)
+        const n = 1 + Math.floor(rand(0, 3))
+        for (let i = 0; i < n; i++) {
+          this.mouthBubbles.push({
+            x: this.mouthX + rand(-2, 2),
+            y: this.mouthY + rand(-2, 2),
+            vx: rand(6, 18),
+            vy: -rand(34, 62),
+            r: rand(2, 4.5),
+            t: 0,
+            life: rand(1.3, 2.4),
+            ph: rand(0, Math.PI * 2),
+          })
+        }
+      }
+    }
+    for (const b of this.mouthBubbles) {
+      b.t += dt
+      b.x += (b.vx + Math.sin(b.t * 4 + b.ph) * 14) * dt
+      b.y += b.vy * dt
+      b.vy -= 8 * dt // подъём ускоряется, как у настоящего пузырька
+      b.r += 1.6 * dt
+    }
+    this.mouthBubbles = this.mouthBubbles.filter((b) => b.t < b.life)
+  }
+
   /** Смерть минибосса: цепочка взрывов по силуэту и шанс дропа жизни. */
   private killMiniboss() {
     const doomed = this.blocks.filter((b) => b.isMiniboss)
@@ -864,6 +916,8 @@ export class Game {
     this.blocks = this.blocks.filter((b) => !b.dead)
     this.minibossHp = 0
     this.minibossMaxHp = 0
+    this.mouthBubbles = []
+    this.fishMouth = false
     this.addRawScore(800)
     this.fx.popups.push({
       x: this.minibossDropX,
@@ -1683,6 +1737,8 @@ export class Game {
 
     for (const b of this.blocks) b.flash = Math.max(0, b.flash - dt * 5)
 
+    this.updateMouthBubbles(dt)
+
     if (
       this.blocks.length === 0 &&
       !this.bossSys.boss &&
@@ -1965,7 +2021,8 @@ export class Game {
     drawBackground(ctx, w, h, this.combo, this.bubbles)
     drawShieldLine(ctx, w, h, this.time, this.shield, this.phase === "menu")
     drawBlocks(ctx, this.blocks, this.time)
-    drawMinibosses(ctx, this.blocks)
+    drawMinibosses(ctx, this.blocks, this.time)
+    drawMouthBubbles(ctx, this.mouthBubbles)
     drawMinibossBar(ctx, this.minibossHp, this.minibossMaxHp, this.blocks)
     drawBoss(ctx, this.bossSys.boss, this.balls, this.blocks)
     drawRings(ctx, this.fx.rings)
