@@ -28,7 +28,7 @@ export interface PowersWorld {
   readonly blocks: Block[]
   readonly boss: BossState | null
   readonly blocksInitial: number
-  /** Текущий режим партии: в кампании свои правила дропа (без аэродропа и жизней из блоков). */
+  /** Текущий режим партии: в кампании жизни выпадают только с минибоссов. */
   readonly mode: "campaign" | "endless"
   powers: PowerUp[]
   fieldShift: null | { t: number; dur: number; dx: number; dy: number }
@@ -167,7 +167,7 @@ export class PowersSystem {
   private pickPowerType(): PowerType {
     const g = this.g
     const fewBlocks = g.blocks.length <= Math.max(5, g.blocksInitial * 0.3)
-    const table: [PowerType, number][] = [
+    let table: [PowerType, number][] = [
       ["wide", 12],
       ["multi", 12],
       ["life", 6],
@@ -179,6 +179,8 @@ export class PowersSystem {
       ["fast", 14],
       ["shrink", 10],
     ]
+    // В кампании жизни выпадают только с минибоссов — из общих дропов исключены.
+    if (g.mode === "campaign") table = table.filter(([t]) => t !== "life")
     const filtered = g.boss ? table.filter(([t]) => t !== "laser" && t !== "rocket") : table
     let sum = 0
     for (const [, w] of filtered) sum += w
@@ -194,8 +196,6 @@ export class PowersSystem {
     const g = this.g
     if (Math.random() < 0.24) {
       const type = this.pickPowerType()
-      // В кампании жизни выпадают только с минибоссов — из блоков исключены.
-      if (type === "life" && g.mode === "campaign") return
       const skip =
         (type === "multi" && g.balls.length >= 4) ||
         (type === "life" && g.lives >= 5) ||
@@ -208,8 +208,6 @@ export class PowersSystem {
   periodicPowerDrop(dt: number) {
     const g = this.g
     if (g.boss) return
-    // В кампании аэродропа нет совсем: бонусы только с блоков, жизни — с минибоссов.
-    if (g.mode === "campaign") return
     g.skyDropTimer -= dt
     if (g.skyDropTimer > 0) return
     g.skyDropTimer = rand(18, 27)
