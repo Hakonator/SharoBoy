@@ -96,6 +96,8 @@ export interface Block {
   bombVy?: number
   /** Бомба бьёт по ракетке (а не по блокам). */
   hitsPaddle?: boolean
+  /** Блок мини-босса кампании: за уничтожение всех — шанс дропа жизни. */
+  isMiniboss?: boolean
 }
 
 export interface BossState {

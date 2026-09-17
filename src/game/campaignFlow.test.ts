@@ -188,6 +188,9 @@ describe("сквозной цикл кампании по карте", () => {
       transition: number
       bannerTimer: number
       countdown: number
+      minibossLeft: number
+      minibossLifeDone: boolean
+      powers: unknown[]
     }
     const map = raw.campaign
     expect(map).toBeTruthy()
@@ -225,6 +228,10 @@ describe("сквозной цикл кампании по карте", () => {
       raw.transition = 0
       raw.bannerTimer = 0
       raw.countdown = 0
+      // минибосс тоже мгновенно «мёртв» и жизнь за него не разыгрываем
+      raw.minibossLeft = 0
+      raw.minibossLifeDone = true
+      raw.powers.length = 0
       step(3)
 
       if (target.isBoss) {

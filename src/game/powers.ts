@@ -28,6 +28,8 @@ export interface PowersWorld {
   readonly blocks: Block[]
   readonly boss: BossState | null
   readonly blocksInitial: number
+  /** Текущий режим партии: в кампании свои правила дропа (без аэродропа и жизней из блоков). */
+  readonly mode: "campaign" | "endless"
   powers: PowerUp[]
   fieldShift: null | { t: number; dur: number; dx: number; dy: number }
   spawnTimer: number
@@ -192,6 +194,8 @@ export class PowersSystem {
     const g = this.g
     if (Math.random() < 0.24) {
       const type = this.pickPowerType()
+      // В кампании жизни выпадают только с минибоссов — из блоков исключены.
+      if (type === "life" && g.mode === "campaign") return
       const skip =
         (type === "multi" && g.balls.length >= 4) ||
         (type === "life" && g.lives >= 5) ||
@@ -204,6 +208,8 @@ export class PowersSystem {
   periodicPowerDrop(dt: number) {
     const g = this.g
     if (g.boss) return
+    // В кампании аэродропа нет совсем: бонусы только с блоков, жизни — с минибоссов.
+    if (g.mode === "campaign") return
     g.skyDropTimer -= dt
     if (g.skyDropTimer > 0) return
     g.skyDropTimer = rand(18, 27)

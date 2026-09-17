@@ -8,6 +8,15 @@ import { evaluateAch } from "./achievements"
 import { Effects } from "./effects"
 import { buildBossArena, densityFactor, gridBlocks, layoutBlocks } from "./levelBuilder"
 import { fixedVariant, pickBossVariant, type BossVariant } from "./bossVariants"
+import {
+  buildFish,
+  buildJelly,
+  carveLevelBlocks,
+  minibossName,
+  MINIBOSS_LIFE_CHANCE,
+  rollMiniboss,
+  type MinibossKind,
+} from "./minibosses"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
 import {
   generateCampaignMap,
@@ -92,6 +101,13 @@ export class Game {
   debug = false
   /** Принудительный тип босса для отладки (null = стандартное поведение). */
   debugBossType: "octopus" | "kraken" | null = null
+  /** Сколько блоков минибосса ещё живо в текущем уровне (0 — минибосса нет). */
+  private minibossLeft = 0
+  /** Жизнь за минибосса уже разыграна (выпала или не выпала). */
+  private minibossLifeDone = true
+  /** Точка дропа жизни — центр уничтоженного существа. */
+  private minibossDropX = 0
+  private minibossDropY = 0
   /** Множитель урона шара (скрытая отладка: клавиша "-" на цифровой клавиатуре). */
   debugBallDamage = 1
   /** Активные эффекты отладки (для тестирования механик). */
@@ -286,6 +302,9 @@ export class Game {
     // eslint-disable-next-line @typescript-eslint/no-this-alias -- геттерам хоста нужно живое замыкание на Game
     const g = this
     return {
+      get mode() {
+        return g.mode
+      },
       get w() {
         return g.w
       },
@@ -752,6 +771,7 @@ export class Game {
     this.powers = []
     this.projectiles = []
     this.bossSys.clear()
+    this.resetMiniboss()
     // Канонические параметры вида (как в кампании на 3-м ярусе боссов).
     const variant = fixedVariant(kind)
     const boss = this.buildOctopusBoss(variant.hp, variant)
@@ -762,6 +782,96 @@ export class Game {
       this.phase = "playing"
       this.serveBall()
     }
+    this.pushHud()
+  }
+
+  /** Отладочный спавн минибосса: обычная волна 1 + существо для тестирования. */
+  spawnDebugMiniboss(kind: MinibossKind) {
+    this.debugBossType = null
+    this.mode = "endless"
+    this.onBossNode = false
+    this.balls = []
+    this.powers = []
+    this.projectiles = []
+    this.bossSys.clear()
+    this.boomQueue = []
+    this.resetMiniboss()
+    this.buildWave(1)
+    this.addMiniboss(kind)
+    if (this.phase === "menu") this.phase = "playing"
+    this.serveBall()
+    this.setBanner(`МИНИ-БОСС: ${minibossName(kind)}`)
+    this.pushHud()
+  }
+
+  /* ---------- мини-боссы кампании ---------- */
+
+  resetMiniboss() {
+    this.minibossLeft = 0
+    this.minibossLifeDone = true
+  }
+
+  /** Добавляет существо-минибосса к текущему уровню (освободив ему место). */
+  private addMiniboss(kind: MinibossKind) {
+    const top = this.blockTop()
+    const creature =
+      kind === "fish" ? buildFish(this.w, this.h, top) : buildJelly(this.w, this.h, top)
+    // Существу нужен целостный силуэт: убираем обычные блоки, с которыми оно налегает.
+    this.blocks = [...carveLevelBlocks(this.blocks, creature), ...creature]
+    this.blocksInitial = Math.max(1, this.blocks.length)
+    this.minibossLeft = creature.length
+    this.minibossLifeDone = false
+    this.minibossDropX = creature.reduce((s, b) => s + b.x, 0) / creature.length
+    this.minibossDropY = creature.reduce((s, b) => s + b.y, 0) / creature.length
+    this.fx.popups.push({
+      x: this.minibossDropX,
+      y: this.minibossDropY - 70,
+      text: `МИНИ-БОСС: ${minibossName(kind)}`,
+      color: "#ffc94d",
+      t: 0,
+      size: 22,
+    })
+    this.sfx.power()
+    this.pushHud()
+  }
+
+  /**
+   * Гибель минибосса: когда уничтожен последний его блок, разыгрывается
+   * жизнь (MINIBOSS_LIFE_CHANCE). Зачистка уровня подождёт, пока упавший
+   * бонус не будет пойман или потерян — см. условие onLevelCleared.
+   */
+  private updateMiniboss() {
+    if (this.phase !== "playing" || this.minibossLeft <= 0) return
+    const alive = this.blocks.reduce((n, b) => n + (b.isMiniboss && !b.dead ? 1 : 0), 0)
+    if (alive >= this.minibossLeft) return
+    this.minibossLeft = alive
+    if (alive > 0 || this.minibossLifeDone) return
+    this.minibossLifeDone = true
+    if (Math.random() >= MINIBOSS_LIFE_CHANCE) return
+    this.powers.push({
+      x: this.minibossDropX,
+      y: this.minibossDropY,
+      vy: 150,
+      type: "life",
+      t: 0,
+    })
+    this.fx.rings.push({
+      x: this.minibossDropX,
+      y: this.minibossDropY,
+      r: 8,
+      maxR: 120,
+      color: "rgba(93,255,176,0.85)",
+      t: 0,
+    })
+    this.fx.popups.push({
+      x: this.minibossDropX,
+      y: this.minibossDropY,
+      text: "ЖИЗНЬ!",
+      color: "#5dffb0",
+      t: 0,
+      size: 22,
+    })
+    this.sfx.power()
     this.pushHud()
   }
 
@@ -1114,6 +1224,10 @@ export class Game {
     this.onBossNode = false
     this.activeSpec = this.nodeSpecFor(node)
     this.buildFromSpec(this.activeSpec)
+    // Минибосс появляется в обычном узле с шансом MINIBOSS_NODE_CHANCE,
+    // детерминированно по сиду карты: одна карта — одни и те же минибоссы.
+    const miniboss = rollMiniboss(this.campaignSeed, node.id)
+    if (miniboss) this.addMiniboss(miniboss)
     this.launchNodeBattle(node.name)
   }
 
@@ -1326,6 +1440,7 @@ export class Game {
     this.bossSys.clear()
     this.boomQueue = []
     this.fieldShift = null
+    this.resetMiniboss()
     const top = this.blockTop()
     if ("boss" in spec) {
       const { boss, blocks } = buildBossArena(
@@ -1373,6 +1488,7 @@ export class Game {
   }
 
   private buildBossLevel(hp: number, minions: number, bombs: number) {
+    this.resetMiniboss()
     const { boss, blocks } = buildBossArena(hp, minions, bombs, this.w, this.h, this.blockTop())
     this.bossSys.spawn(boss)
     this.blocks = blocks
@@ -1384,6 +1500,7 @@ export class Game {
     this.bossSys.clear()
     this.boomQueue = []
     this.fieldShift = null
+    this.resetMiniboss()
     this.blocks = []
     const boss = this.buildOctopusBoss(variant.hp, variant)
     this.bossSys.spawn(boss)
@@ -1535,11 +1652,15 @@ export class Game {
 
     for (const b of this.blocks) b.flash = Math.max(0, b.flash - dt * 5)
 
+    this.updateMiniboss()
+
     if (
       this.blocks.length === 0 &&
       !this.bossSys.boss &&
       this.transition <= 0 &&
-      this.phase === "playing"
+      this.phase === "playing" &&
+      // Зачистка ждёт упавшую за минибосса жизнь: её нужно успеть поймать.
+      !this.powers.some((p) => p.type === "life")
     ) {
       this.onLevelCleared()
     }

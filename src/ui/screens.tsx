@@ -875,6 +875,8 @@ export function MenuScreen({
                           { id: "", label: "Нет" },
                           { id: "octopus", label: "🐙 Осьминог" },
                           { id: "kraken", label: "🦑 Кракен" },
+                          { id: "minibossFish", label: "🐟 Рыба (мини)" },
+                          { id: "minibossJelly", label: "🪼 Медуза (мини)" },
                         ].map((b) => (
                           <label
                             key={b.id}

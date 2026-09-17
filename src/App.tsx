@@ -139,6 +139,10 @@ export default function App() {
     game.debugBossType = debugBoss === "octopus" || debugBoss === "kraken" ? debugBoss : null
     if (debugBoss === "octopus" || debugBoss === "kraken") {
       game.spawnDebugBoss(debugBoss)
+    } else if (debugBoss === "minibossFish") {
+      game.spawnDebugMiniboss("fish")
+    } else if (debugBoss === "minibossJelly") {
+      game.spawnDebugMiniboss("jelly")
     } else {
       // Пустой уровень со случайными блоками (стандартный _wave_ 1)
       game.startEndless()
