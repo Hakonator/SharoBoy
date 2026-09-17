@@ -303,8 +303,12 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   cg.addColorStop(1, "#32060b")
   ctx.fillStyle = cg
   ctx.fill()
-  // губы: тёмная складка по внешнему краю каждой дуги + влажный блик под ней;
-  // у нижней дуги контрольная точка уходит вниз быстрее концов — челюсть гнётся
+  // нижняя губа: одна общая дуга — и для губы, и для челюстной складки.
+  // Контрольная точка уходит вниз быстрее концов — челюсть гнётся при открытии
+  const jawCx = mx + len * 0.42
+  const jawCy = my + gL * 2.0 + drop * 1.2
+  const jawEx = nx + 1
+  const jawEy = my + gL * 1.4
   for (const pass of [
     { w: 3.4, c: "rgba(122,74,8,0.85)" },
     { w: 1.3, c: "rgba(255,214,140,0.6)" },
@@ -317,16 +321,16 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     ctx.stroke()
     ctx.beginPath()
     ctx.moveTo(mx, my)
-    ctx.quadraticCurveTo(mx + len * 0.42, my + gL * 2.0 + drop * 1.2, nx + 1, my + gL * 1.4)
+    ctx.quadraticCurveTo(jawCx, jawCy, jawEx, jawEy)
     ctx.strokeStyle = pass.c
     ctx.lineWidth = pass.w
     ctx.stroke()
   }
-  // складка челюсти на морде: от угла рта вниз к подбородку, провисает вслед
-  // за опусканием нижней губы — нижний контур лица деформируется вместе с ней
+  // складка челюсти на морде — та же дуга, что у нижней губы, со сдвигом вниз:
+  // жёсткая привязка к губе гарантирует синхронную деформацию без запаздывания
   ctx.beginPath()
-  ctx.moveTo(mx - 1, my + 2)
-  ctx.quadraticCurveTo(mx + len * 0.3, my + 4 + drop * 1.4, nx - 1, my + gL + 3.5)
+  ctx.moveTo(mx - 1, my + gL)
+  ctx.quadraticCurveTo(jawCx, jawCy + 3.2, jawEx, jawEy + 3.2)
   ctx.strokeStyle = "rgba(122,74,8,0.5)"
   ctx.lineWidth = 1.6
   ctx.stroke()
