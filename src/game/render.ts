@@ -186,15 +186,6 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   ctx.strokeStyle = TIER[1].dark
   ctx.lineWidth = 1.5
   ctx.stroke()
-  // лучи плавника
-  ctx.strokeStyle = "rgba(15,143,91,0.45)"
-  ctx.lineWidth = 1
-  for (const k of [-0.55, 0, 0.55]) {
-    ctx.beginPath()
-    ctx.moveTo(-L * 0.14, 0)
-    ctx.lineTo(-L * 0.85, k * H * 0.6)
-    ctx.stroke()
-  }
   if (flash > 0.05) {
     ctx.globalAlpha = Math.min(flash, 1) * 0.45
     ctx.fillStyle = "#ffffff"
@@ -309,8 +300,8 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   }
 }
 
-/** Медуза: щупальца-цепочки → купол с фестончатым краем → бахрома → блик. */
-function drawJelly(ctx: Ctx, parts: Block[]) {
+/** Медуза: пульсирующий купол и волнующиеся щупальца-цепочки. */
+function drawJelly(ctx: Ctx, parts: Block[], time: number) {
   const domeBig = parts.filter((p) => p.mbPart === "dome" && p.ry >= 20)
   const fringe = parts.filter((p) => p.mbPart === "dome" && p.ry < 20)
   const tents = parts.filter((p) => p.mbPart === "tentacle")
@@ -318,8 +309,16 @@ function drawJelly(ctx: Ctx, parts: Block[]) {
   const d = bboxOf(domeBig)
   const cx = d.x + d.w / 2
   const flash = Math.max(...parts.map((p) => p.flash))
+  // пульс: купол сжимается по ширине и вытягивается по высоте, низ на месте
+  const pulse = Math.sin(time * 2.2)
+  const w = d.w * (1 + 0.05 * pulse)
+  const h = d.h * (1 - 0.07 * pulse)
+  const left = cx - w / 2
+  const right = cx + w / 2
+  const top = d.y + d.h - h
+  const bottom = d.y + d.h
 
-  // щупальца: сглаженные цепочки из блоков (рисуются под куполом)
+  // щупальца: цепочки, качающиеся волной с амплитудой, растущей к кончикам
   const sorted = [...tents].sort((a, b) => a.x - b.x || a.y - b.y)
   const chains: Block[][] = []
   for (const p of sorted) {
@@ -328,9 +327,14 @@ function drawJelly(ctx: Ctx, parts: Block[]) {
     else chains.push([p])
   }
   ctx.lineCap = "round"
-  for (const chain of chains) {
+  for (let ci = 0; ci < chains.length; ci++) {
+    const chain = chains[ci]
     if (chain.length < 2) continue
-    const pts = [...chain].sort((a, b) => a.y - b.y)
+    const base = [...chain].sort((a, b) => a.y - b.y)
+    const pts = base.map((p, i) => ({
+      x: p.x + Math.sin(time * 2.4 + ci * 0.9 + i * 0.85) * (2.5 + i * 2.8),
+      y: p.y + Math.cos(time * 2.2 + ci * 0.9 + i * 0.85) * 1.6 * i,
+    }))
     for (const pass of [
       { width: 5, color: "rgba(15,143,91,0.35)" },
       { width: 2.5, color: TIER[1].base },
@@ -349,19 +353,19 @@ function drawJelly(ctx: Ctx, parts: Block[]) {
     }
   }
 
-  // купол: верх — гладкая арка, низ — фестоны
+  // купол: верх — гладкая арка, низ — фестоны, всё дышит пульсом
   ctx.beginPath()
-  ctx.moveTo(d.x, d.y + d.h)
+  ctx.moveTo(left, bottom)
   const n = 7
-  const wseg = d.w / n
+  const wseg = w / n
   for (let i = 0; i < n; i++) {
-    const sx = d.x + wseg * i
-    ctx.quadraticCurveTo(sx + wseg / 2, d.y + d.h + 9, sx + wseg, d.y + d.h)
+    const sx = left + wseg * i
+    ctx.quadraticCurveTo(sx + wseg / 2, bottom + 9 + pulse * 2, sx + wseg, bottom)
   }
-  ctx.bezierCurveTo(d.x + d.w, d.y + d.h * 0.35, d.x + d.w * 0.72, d.y, cx, d.y)
-  ctx.bezierCurveTo(d.x + d.w * 0.28, d.y, d.x, d.y + d.h * 0.35, d.x, d.y + d.h)
+  ctx.bezierCurveTo(right, top + h * 0.35, right - w * 0.28, top, cx, top)
+  ctx.bezierCurveTo(left + w * 0.28, top, left, top + h * 0.35, left, bottom)
   ctx.closePath()
-  const dg = ctx.createLinearGradient(0, d.y, 0, d.y + d.h)
+  const dg = ctx.createLinearGradient(0, top, 0, bottom)
   dg.addColorStop(0, TIER[3].light)
   dg.addColorStop(0.6, TIER[3].base)
   dg.addColorStop(1, TIER[3].dark)
@@ -371,10 +375,10 @@ function drawJelly(ctx: Ctx, parts: Block[]) {
   ctx.lineWidth = 1.5
   ctx.stroke()
 
-  // бахрома по нижнему краю
+  // бахрома по нижнему краю — следует за пульсом по ширине
   for (const f of fringe) {
     ctx.beginPath()
-    ctx.arc(f.x, f.y, f.rx, 0, Math.PI * 2)
+    ctx.arc(cx + (f.x - cx) * (w / d.w), f.y, f.rx, 0, Math.PI * 2)
     ctx.fillStyle = TIER[3].base
     ctx.fill()
     ctx.strokeStyle = TIER[3].dark
@@ -382,10 +386,10 @@ function drawJelly(ctx: Ctx, parts: Block[]) {
     ctx.stroke()
   }
 
-  // блик внутри купола
-  ctx.globalAlpha = 0.35
+  // блик внутри купола — чуть дышит вместе с пульсом
+  ctx.globalAlpha = 0.3 + 0.08 * pulse
   ctx.beginPath()
-  ctx.ellipse(cx - d.w * 0.12, d.y + d.h * 0.38, d.w * 0.22, d.h * 0.16, -0.4, 0, Math.PI * 2)
+  ctx.ellipse(cx - w * 0.12, top + h * 0.38, w * 0.22, h * 0.16, -0.4, 0, Math.PI * 2)
   ctx.fillStyle = "#ffffff"
   ctx.fill()
   ctx.globalAlpha = 1
@@ -395,7 +399,7 @@ function drawJelly(ctx: Ctx, parts: Block[]) {
     ctx.globalAlpha = Math.min(flash, 1) * 0.5
     ctx.fillStyle = "#ffffff"
     ctx.beginPath()
-    ctx.ellipse(cx, d.y + d.h * 0.55, d.w / 2, d.h * 0.55, 0, 0, Math.PI * 2)
+    ctx.ellipse(cx, top + h * 0.55, w / 2, h * 0.55, 0, 0, Math.PI * 2)
     ctx.fill()
     ctx.globalAlpha = 1
   }
@@ -404,12 +408,12 @@ function drawJelly(ctx: Ctx, parts: Block[]) {
 /**
  * Отрисовка минибоссов: блоки существа не рисуются генериком, вместо этого
  * части собираются в реалистичный силуэт (рыба/медуза) по тегам mbPart.
- * time нужен для анимации плавников/хвоста рыбы.
+ * time нужен для анимации плавников/хвоста рыбы и пульса медузы.
  */
 export function drawMinibosses(ctx: Ctx, blocks: Block[], time: number) {
   const parts = blocks.filter((b) => b.isMiniboss && !b.dead && b.mbPart)
   if (!parts.length) return
-  if (parts.some((p) => p.mbPart === "dome")) drawJelly(ctx, parts)
+  if (parts.some((p) => p.mbPart === "dome")) drawJelly(ctx, parts, time)
   else drawFish(ctx, parts, time)
 }
 
