@@ -286,19 +286,21 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   const gU = 1.1 // раскрытие верхней губы (постоянное, узкое)
   const gL = 1.1 + drop // нижняя губа уходит вниз вместе с челюстью
   const nx = mx + len
-  // полость рта: вырез между кромками губ (угол рта → нос → обратно)
+  // полость рта: вырез между кромками губ (угол рта → нос → обратно);
+  // нижняя кромка прогибается сильнее концов — дуга челюсти гнётся при открытии
   ctx.beginPath()
   ctx.moveTo(mx, my)
   ctx.quadraticCurveTo(mx + len * 0.45, my - gU * 1.5, nx, my - gU)
   ctx.quadraticCurveTo(nx + 2, my + (gL - gU) * 0.4, nx, my + gL)
-  ctx.quadraticCurveTo(mx + len * 0.45, my + gL * 1.7, mx, my)
+  ctx.quadraticCurveTo(mx + len * 0.45, my + gL * 1.1 + drop * 0.9, mx, my)
   ctx.closePath()
   const cg = ctx.createLinearGradient(0, my - gU, 0, my + gL)
   cg.addColorStop(0, "#7c1620")
   cg.addColorStop(1, "#32060b")
   ctx.fillStyle = cg
   ctx.fill()
-  // губы: тёмная складка по внешнему краю каждой дуги + влажный блик под ней
+  // губы: тёмная складка по внешнему краю каждой дуги + влажный блик под ней;
+  // у нижней дуги контрольная точка уходит вниз быстрее концов — челюсть гнётся
   for (const pass of [
     { w: 3.4, c: "rgba(122,74,8,0.85)" },
     { w: 1.3, c: "rgba(255,214,140,0.6)" },
@@ -311,11 +313,19 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     ctx.stroke()
     ctx.beginPath()
     ctx.moveTo(mx, my)
-    ctx.quadraticCurveTo(mx + len * 0.42, my + gL * 2.6, nx + 1, my + gL * 1.4)
+    ctx.quadraticCurveTo(mx + len * 0.42, my + gL * 2.0 + drop * 1.2, nx + 1, my + gL * 1.4)
     ctx.strokeStyle = pass.c
     ctx.lineWidth = pass.w
     ctx.stroke()
   }
+  // складка челюсти на морде: от угла рта вниз к подбородку, провисает вслед
+  // за опусканием нижней губы — нижний контур лица деформируется вместе с ней
+  ctx.beginPath()
+  ctx.moveTo(mx - 1, my + 2)
+  ctx.quadraticCurveTo(mx + len * 0.3, my + 4 + drop * 1.4, nx - 1, my + gL + 3.5)
+  ctx.strokeStyle = "rgba(122,74,8,0.5)"
+  ctx.lineWidth = 1.6
+  ctx.stroke()
 
   // глаз: белок, зрачок (смещён к носу), блик
   if (eye) {
