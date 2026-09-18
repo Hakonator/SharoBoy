@@ -217,30 +217,39 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   }
   ctx.restore()
 
-  // спинной плавник: колышется рябью
+  // спинной плавник: наклонённая к хвосту трапеция, верх колышется рябью
   if (dorsal) {
-    const ripple = Math.sin(time * 2.3) * 3.5
+    const ripple = Math.sin(time * 2.3) * 3
+    const baseY = midY - b.h * 0.28
     ctx.beginPath()
-    ctx.moveTo(dorsal.x - dorsal.rx * 1.35, b.y + 8)
-    ctx.quadraticCurveTo(
-      dorsal.x - dorsal.rx * 0.3,
-      dorsal.y - dorsal.ry * 0.95,
-      dorsal.x + ripple,
-      dorsal.y - dorsal.ry * 1.45
-    )
-    ctx.quadraticCurveTo(
-      dorsal.x + dorsal.rx * 0.55,
-      dorsal.y - dorsal.ry * 0.35,
-      dorsal.x + dorsal.rx * 1.35,
-      b.y + 8
-    )
+    ctx.moveTo(dorsal.x - dorsal.rx * 1.3, baseY)
+    ctx.lineTo(dorsal.x + dorsal.rx * 1.45, baseY)
+    ctx.lineTo(dorsal.x + dorsal.rx * 1.05 + ripple, dorsal.y - dorsal.ry * 1.35)
+    ctx.lineTo(dorsal.x - dorsal.rx * 0.15 + ripple * 0.5, dorsal.y - dorsal.ry * 1.05)
     ctx.closePath()
-    ctx.fillStyle = TIER[1].base
+    const dg = ctx.createLinearGradient(0, baseY, 0, dorsal.y - dorsal.ry * 1.35)
+    dg.addColorStop(0, TIER[1].base)
+    dg.addColorStop(1, TIER[1].light)
+    ctx.fillStyle = dg
     ctx.fill()
     ctx.strokeStyle = TIER[1].dark
     ctx.lineWidth = 1
     ctx.stroke()
   }
+
+  // нижний (анальный) плавник: наклонённая трапеция на брюхе у хвоста
+  const rippleA = Math.sin(time * 2.5 + 1.2) * 2.5
+  ctx.beginPath()
+  ctx.moveTo(b.x + b.w * 0.2, midY + b.h * 0.34)
+  ctx.lineTo(b.x + b.w * 0.37, midY + b.h * 0.45)
+  ctx.lineTo(b.x + b.w * 0.33 + rippleA, midY + b.h * 0.62)
+  ctx.lineTo(b.x + b.w * 0.22 + rippleA * 0.5, midY + b.h * 0.5)
+  ctx.closePath()
+  ctx.fillStyle = TIER[1].base
+  ctx.fill()
+  ctx.strokeStyle = TIER[1].dark
+  ctx.lineWidth = 1
+  ctx.stroke()
 
   // тело: цельный вытянутый овал — одна замкнутая кривая без стыков:
   // максимальная высота ближе к голове, плавное сужение к хвосту
@@ -253,12 +262,27 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   const tailX = b.x + b.w * 0.03
   const topH = b.h * 0.5
   const peakX = b.x + b.w * 0.62 // самое высокое сечение
+  // геометрия рта — общая для контура тела, полости и челюсти
+  const p0x = b.x + b.w * 0.8 // угол рта (шарнир челюсти)
+  const p0y = midY + b.h * 0.12
+  const lx = b.x + b.w * 0.99 // кончик верхней губы у носа
+  const ly = midY + b.h * 0.02
+  const midX = (p0x + lx) / 2
+  const midM = (p0y + ly) / 2
   ctx.beginPath()
-  // верхняя кромка: нос → спина → сужение к хвосту
-  ctx.moveTo(noseX, midY)
+  // верхняя кромка: кончик губы → нос → спина → сужение к хвосту
+  ctx.moveTo(lx, ly)
   ctx.bezierCurveTo(
-    noseX - b.w * 0.02,
-    midY - topH * 0.7,
+    noseX - b.w * 0.01,
+    midY - topH * 0.45,
+    b.x + b.w * 0.95,
+    midY - topH * 0.8,
+    b.x + b.w * 0.85,
+    midY - topH * 0.93
+  )
+  ctx.bezierCurveTo(
+    b.x + b.w * 0.75,
+    midY - topH,
     peakX + b.w * 0.1,
     midY - topH,
     peakX,
@@ -270,11 +294,19 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     tailX + b.w * 0.08,
     midY - topH * 0.55,
     tailX,
-    midY - topH * 0.3
+    midY - topH * 0.2
   )
-  // хвостовой торец
-  ctx.lineTo(tailX, midY + topH * 0.3)
-  // нижняя кромка: зеркало верхней
+  // переход в хвост: скруглённый торец вместо острого среза — стебель
+  // плавно перетекает в лопасти хвостового плавника
+  ctx.bezierCurveTo(
+    tailX - b.w * 0.018,
+    midY - topH * 0.08,
+    tailX - b.w * 0.018,
+    midY + topH * 0.08,
+    tailX,
+    midY + topH * 0.2
+  )
+  // нижняя кромка: брюхо → подъём к углу рта
   ctx.bezierCurveTo(
     tailX + b.w * 0.08,
     midY + topH * 0.55,
@@ -283,14 +315,9 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     peakX,
     midY + topH
   )
-  ctx.bezierCurveTo(
-    peakX + b.w * 0.1,
-    midY + topH,
-    noseX - b.w * 0.02,
-    midY + topH * 0.7,
-    noseX,
-    midY
-  )
+  ctx.bezierCurveTo(peakX + b.w * 0.12, midY + topH, p0x + b.w * 0.1, midY + topH * 0.72, p0x, p0y)
+  // вырез рта: верхняя губа от угла рта к кончику — замыкает контур носа
+  ctx.quadraticCurveTo(midX, midM - b.h * 0.05, lx, ly)
   ctx.closePath()
   ctx.fill()
   // брюшная тень для объёма
@@ -330,12 +357,6 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   // поэтому челюсть, губа и полость всегда сомкнуты без щелей
   const open = Math.max(0, Math.sin(time * 0.85))
   const phi = open * 0.3 // угол открытия челюсти, рад (~17°)
-  const p0x = b.x + b.w * 0.78 // шарнир (угол рта)
-  const p0y = midY + b.h * 0.1
-  const lx = b.x + b.w * 0.985 // кончик губ у самого носа
-  const ly = midY + b.h * 0.04
-  const midX = (p0x + lx) / 2
-  const midM = (p0y + ly) / 2
   const rot = (x: number, y: number) => {
     const dx = x - p0x
     const dy = y - p0y
