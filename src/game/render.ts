@@ -265,8 +265,9 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   const topH = b.h * 0.5
   const peakX = b.x + b.w * 0.62 // самое высокое сечение
   // геометрия рта — общая для контура тела, полости и челюсти
+  // угол рта лежит на линии брюха: челюсть продолжается прямо в нижний контур
   const p0x = b.x + b.w * 0.8 // угол рта (шарнир челюсти)
-  const p0y = midY + b.h * 0.12
+  const p0y = midY + b.h * 0.28
   const lx = b.x + b.w * 0.99 // кончик верхней губы у носа
   const ly = midY + b.h * 0.02
   const midX = (p0x + lx) / 2
@@ -308,7 +309,7 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     tailX,
     midY + topH * 0.2
   )
-  // нижняя кромка: брюхо → подъём к углу рта
+  // нижняя кромка: брюхо → касательный выход к углу рта (без излома)
   ctx.bezierCurveTo(
     tailX + b.w * 0.08,
     midY + topH * 0.55,
@@ -317,7 +318,7 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     peakX,
     midY + topH
   )
-  ctx.bezierCurveTo(peakX + b.w * 0.12, midY + topH, p0x + b.w * 0.1, midY + topH * 0.72, p0x, p0y)
+  ctx.bezierCurveTo(peakX + b.w * 0.12, midY + topH, p0x + b.w * 0.06, p0y + b.h * 0.1, p0x, p0y)
   // вырез рта: верхняя губа от угла рта к кончику — замыкает контур носа
   ctx.quadraticCurveTo(midX, midM - b.h * 0.05, lx, ly)
   ctx.closePath()
@@ -400,12 +401,13 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   ctx.moveTo(p0x, p0y)
   ctx.quadraticCurveTo(midX, midM + b.h * 0.03, lx, ly) // линия смыкания рта
   // подбородок: кривая от кончика губы к шарниру; касательная у шарнира
-  // совпадает с направлением брюха — челюсть плавно переходит в тело
+  // совпадает с касательной брюха (p0x + 0.06w, p0y + 0.1h) — челюсть
+  // seamlessly продолжается нижней линией тела, без треугольного зазора
   ctx.bezierCurveTo(
-    midX + b.w * 0.02,
+    midX + b.w * 0.01,
+    p0y - b.h * 0.12,
+    p0x + b.w * 0.06,
     p0y + b.h * 0.1,
-    p0x + b.w * 0.08,
-    p0y + b.h * 0.19,
     p0x,
     p0y
   )
