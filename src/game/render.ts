@@ -242,30 +242,62 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     ctx.stroke()
   }
 
-  // тело: три перекрывающихся эллипса с единым градиентом — силуэт гладкий,
-  // радиусы постоянные (форму меняет только общий масштаб разворота)
+  // тело: цельный вытянутый овал — одна замкнутая кривая без стыков:
+  // максимальная высота ближе к голове, плавное сужение к хвосту
   const bg = ctx.createLinearGradient(0, b.y, 0, b.y + b.h)
   bg.addColorStop(0, TIER[2].light)
   bg.addColorStop(0.55, TIER[2].base)
   bg.addColorStop(1, TIER[2].dark)
   ctx.fillStyle = bg
-  // задняя часть, сужающаяся к хвосту
+  const noseX = b.x + b.w
+  const tailX = b.x + b.w * 0.03
+  const topH = b.h * 0.5
+  const peakX = b.x + b.w * 0.62 // самое высокое сечение
   ctx.beginPath()
-  ctx.ellipse(b.x + b.w * 0.16, midY + b.h * 0.02, b.w * 0.3, b.h * 0.4, 0, 0, Math.PI * 2)
+  // верхняя кромка: нос → спина → сужение к хвосту
+  ctx.moveTo(noseX, midY)
+  ctx.bezierCurveTo(
+    noseX - b.w * 0.02,
+    midY - topH * 0.7,
+    peakX + b.w * 0.1,
+    midY - topH,
+    peakX,
+    midY - topH
+  )
+  ctx.bezierCurveTo(
+    peakX - b.w * 0.28,
+    midY - topH,
+    tailX + b.w * 0.08,
+    midY - topH * 0.55,
+    tailX,
+    midY - topH * 0.3
+  )
+  // хвостовой торец
+  ctx.lineTo(tailX, midY + topH * 0.3)
+  // нижняя кромка: зеркало верхней
+  ctx.bezierCurveTo(
+    tailX + b.w * 0.08,
+    midY + topH * 0.55,
+    peakX - b.w * 0.28,
+    midY + topH,
+    peakX,
+    midY + topH
+  )
+  ctx.bezierCurveTo(
+    peakX + b.w * 0.1,
+    midY + topH,
+    noseX - b.w * 0.02,
+    midY + topH * 0.7,
+    noseX,
+    midY
+  )
+  ctx.closePath()
   ctx.fill()
-  // корпус
-  ctx.beginPath()
-  ctx.ellipse(b.x + b.w * 0.38, midY, b.w * 0.4, b.h * 0.5, 0, 0, Math.PI * 2)
-  ctx.fill()
-  // голова
-  ctx.beginPath()
-  ctx.ellipse(b.x + b.w * 0.74, midY - b.h * 0.02, b.w * 0.26, b.h * 0.48, 0, 0, Math.PI * 2)
-  ctx.fill()
-  // брюшная тень для объёма (вместо обводки — стыки частей не видны)
+  // брюшная тень для объёма
   ctx.globalAlpha = 0.16
   ctx.fillStyle = TIER[2].dark
   ctx.beginPath()
-  ctx.ellipse(b.x + b.w * 0.42, midY + b.h * 0.3, b.w * 0.4, b.h * 0.16, 0, 0, Math.PI * 2)
+  ctx.ellipse(b.x + b.w * 0.45, midY + b.h * 0.28, b.w * 0.38, b.h * 0.13, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.globalAlpha = 1
 
