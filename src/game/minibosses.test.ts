@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   buildFish,
   buildJelly,
+  campaignMinibosses,
   carveLevelBlocks,
   MINIBOSS_HP,
   MINIBOSS_LIFE_CHANCE,
@@ -10,6 +11,7 @@ import {
   minibossName,
   rollMiniboss,
 } from "./minibosses"
+import { generateCampaignMap } from "./campaignMap"
 import type { Block } from "./types"
 
 const W = 960
@@ -88,6 +90,22 @@ describe("minibosses", () => {
     expect(hits / N).toBeGreaterThan(MINIBOSS_NODE_CHANCE - 0.05)
     expect(hits / N).toBeLessThan(MINIBOSS_NODE_CHANCE + 0.05)
     expect(kinds).toEqual(new Set(["fish", "jelly"]))
+  })
+
+  it("campaignMinibosses: расклад детерминирован и минимум один минибосс в забеге", () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const map = generateCampaignMap(seed)
+      const a = campaignMinibosses(seed, map.nodes)
+      const b = campaignMinibosses(seed, map.nodes)
+      expect(a).toEqual(b)
+      expect(a.size, `сид ${seed}: забег без минибоссов`).toBeGreaterThanOrEqual(1)
+      for (const [id, kind] of a) {
+        const node = map.nodes.find((n) => n.id === id)!
+        expect(node.isBoss).toBe(false)
+        expect(node.tier).toBeGreaterThan(0)
+        expect(["fish", "jelly"]).toContain(kind)
+      }
+    }
   })
 
   it("carveLevelBlocks убирает только blocks, налегающие на существо", () => {

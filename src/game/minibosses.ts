@@ -41,6 +41,31 @@ export function rollMiniboss(seed: number, nodeId: number): MinibossKind | null 
   return rng() < 0.5 ? "fish" : "jelly"
 }
 
+/**
+ * Расклад минибоссов по всем узлам карты забега. Детерминирован сидом карты,
+ * с гарантией хотя бы одного существа за забег: при 15% на узел карта может
+ * остаться без единого минибосса, а с ними не работает единственный источник
+ * жизней кампании. Стартовый узел (tier 0) боем не является — исключён.
+ */
+export function campaignMinibosses(
+  seed: number,
+  nodes: ReadonlyArray<{ id: number; tier: number; isBoss: boolean }>
+): Map<number, MinibossKind> {
+  const out = new Map<number, MinibossKind>()
+  for (const n of nodes) {
+    if (n.isBoss || n.tier === 0) continue
+    const kind = rollMiniboss(seed, n.id)
+    if (kind) out.set(n.id, kind)
+  }
+  if (out.size === 0) {
+    const fallback = nodes
+      .filter((n) => !n.isBoss && n.tier > 0)
+      .sort((a, b) => a.tier - b.tier || a.id - b.id)[0]
+    if (fallback) out.set(fallback.id, seed % 2 ? "fish" : "jelly")
+  }
+  return out
+}
+
 /** Общий запас HP существа: блоки минибосса не разрушаются поодиночке. */
 export const MINIBOSS_HP: Record<MinibossKind, number> = {
   fish: 60,

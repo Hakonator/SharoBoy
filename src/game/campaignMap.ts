@@ -9,6 +9,7 @@
  */
 
 import { clamp, mulberry32 } from "./utils"
+import type { MinibossKind } from "./minibosses"
 
 /** Количество ярусов карты (последний ярус — босс). */
 export const MAP_TIERS = 11
@@ -68,6 +69,8 @@ export interface CampaignMapView {
   edges: CampaignEdge[]
   startId: number
   bossId: number
+  /** Расклад минибоссов по узлам (детерминирован сидом карты). */
+  minibosses: Record<number, MinibossKind>
   /** Текущая позиция игрока (узел, на котором он стоит). */
   playerId: number
   /** Узлы, пройденные игроком (путь остаётся видимым). */

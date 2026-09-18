@@ -369,6 +369,9 @@ export function MapScreen({
   const revealed = new Set<number>([...view.visited, ...view.visible])
   const playerOut = new Set<number>(view.visible)
   const revealedEdges = view.edges.filter((e) => revealed.has(e.from) && revealed.has(e.to))
+  // маркеры минибоссов на раскрытых узлах: 🐟 рыба, 🪼 медуза (источник жизней)
+  const mbIcon: Record<string, string> = { fish: "🐟", jelly: "🪼" }
+  const revealedMb = Object.keys(view.minibosses).filter((id) => revealed.has(Number(id)))
 
   return (
     <div className="absolute inset-0 z-10 flex flex-col bg-abyss/55">
@@ -464,7 +467,7 @@ export function MapScreen({
                 aria-label={clickable ? `Открыть узел ${n.name}` : n.name}
               >
                 <span
-                  className={`flex items-center justify-center rounded-full font-display leading-none ${size} ${tint} ${
+                  className={`relative flex items-center justify-center rounded-full font-display leading-none ${size} ${tint} ${
                     clickable ? "transition-transform hover:scale-110 active:scale-95" : ""
                   }`}
                 >
@@ -473,6 +476,14 @@ export function MapScreen({
                   ) : isCurrent ? (
                     <span className="h-2 w-2 rounded-full bg-abyss sm:h-2.5 sm:w-2.5" />
                   ) : null}
+                  {!n.isBoss && view.minibosses[n.id] && (
+                    <span
+                      className="absolute -right-1.5 -top-2 text-xs drop-shadow-[0_1px_0_rgba(4,18,26,0.9)] sm:text-sm"
+                      aria-label={`Мини-босс: ${view.minibosses[n.id] === "fish" ? "рыба" : "медуза"}`}
+                    >
+                      {mbIcon[view.minibosses[n.id]]}
+                    </span>
+                  )}
                 </span>
                 {clickable && (
                   <span className="whitespace-nowrap font-display text-[10px] tracking-wider text-foam drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs">
@@ -484,8 +495,13 @@ export function MapScreen({
           })}
       </div>
 
-      {/* Подсказка снизу */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
+      {/* Подсказка снизу + легенда минибоссов, если они видны на карте */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex flex-col items-center gap-1 px-4">
+        {revealedMb.length > 0 && (
+          <div className="hud-chip px-3 py-1 text-center font-display text-[10px] tracking-wider text-mint sm:text-xs">
+            🐟🪼 МИНИ-БОСС В УЗЛЕ — ПОБЕДИ И ПОЛУЧИ ЖИЗНЬ
+          </div>
+        )}
         <div className="hud-chip px-5 py-2 text-center font-display text-xs tracking-widest text-cyan-neon sm:text-sm">
           {playerOut.size > 1
             ? "ВЫБЕРИ ОДИН ИЗ ПУТЕЙ"

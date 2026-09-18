@@ -11,11 +11,11 @@ import { fixedVariant, pickBossVariant, type BossVariant } from "./bossVariants"
 import {
   buildFish,
   buildJelly,
+  campaignMinibosses,
   carveLevelBlocks,
   minibossName,
   MINIBOSS_HP,
   MINIBOSS_LIFE_CHANCE,
-  rollMiniboss,
   type MinibossKind,
 } from "./minibosses"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
@@ -185,6 +185,8 @@ export class Game {
 
   /** Карта забега кампании и позиция игрока на ней (для экрана карты). */
   private campaign: CampaignMap | null = null
+  /** Детерминированный расклад минибоссов по узлам текущего забега. */
+  private campaignMinibossMap: Map<number, MinibossKind> = new Map()
   private campaignPlayerId = -1
   private campaignVisited: number[] = []
   private campaignVisible: number[] = []
@@ -1279,6 +1281,7 @@ export class Game {
   private startCampaignMap() {
     this.campaignSeed = (daySeed() * 31 + this.runSeq++) | 0
     this.campaign = generateCampaignMap(this.campaignSeed)
+    this.campaignMinibossMap = campaignMinibosses(this.campaignSeed, this.campaign.nodes)
     this.campaignPlayerId = this.campaign.startId
     this.campaignVisited = [this.campaign.startId]
     this.campaignVisible = visibleFrom(this.campaign, this.campaignPlayerId)
@@ -1359,9 +1362,10 @@ export class Game {
     this.onBossNode = false
     this.activeSpec = this.nodeSpecFor(node)
     this.buildFromSpec(this.activeSpec)
-    // Минибосс появляется в обычном узле с шансом MINIBOSS_NODE_CHANCE,
-    // детерминированно по сиду карты: одна карта — одни и те же минибоссы.
-    const miniboss = rollMiniboss(this.campaignSeed, node.id)
+    // Минибосс берётся из детерминированного расклада по карте забега
+    // (campaignMinibosses): одна карта — одни и те же минибоссы, и минимум
+    // один существо за забег гарантировано.
+    const miniboss = this.campaignMinibossMap.get(node.id)
     if (miniboss) this.addMiniboss(miniboss)
     this.launchNodeBattle(node.name)
   }
@@ -1396,6 +1400,7 @@ export class Game {
       playerId: this.campaignPlayerId,
       visited: [...this.campaignVisited],
       visible: [...this.campaignVisible],
+      minibosses: Object.fromEntries(this.campaignMinibossMap),
     }
   }
 
