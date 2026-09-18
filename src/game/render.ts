@@ -176,15 +176,17 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   const midY = b.y + b.h / 2
   const flash = Math.max(...parts.map((p) => p.flash))
   // плавный разворот: боковой силуэт «схлопывается» по X вокруг центра тела,
-  // а в середине разворота сквозь него проступает вид с носа (передний силуэт)
+  // а в середине разворота через smoothstep-перекрытие проступает вид с носа —
+  // сумма альф всегда 1, поэтому смена видов выглядит морфом, без мигания
   const facing = fishFacing(parts, time)
   const fx = b.x + b.w / 2
-  const sideA = Math.min(1, Math.abs(facing) * 4)
-  const frontA = Math.max(0, 1 - Math.abs(facing) / 0.25)
+  const turnT = Math.min(1, Math.abs(facing) / 0.35)
+  const sideA = turnT * turnT * (3 - 2 * turnT) // smoothstep
+  const frontA = 1 - sideA
   ctx.save()
   ctx.globalAlpha = sideA
   ctx.translate(fx, 0)
-  ctx.scale((Math.sign(facing) || 1) * Math.max(Math.abs(facing), 0.06), 1)
+  ctx.scale((Math.sign(facing) || 1) * Math.max(Math.abs(facing), 0.12), 1)
   ctx.translate(-fx, 0)
   // хвост отстаёт от корпуса: рыба плывёт по синусоиде, хвост качается в противофазе
   const swing = -Math.cos(time * FISH_SWAY_FREQ) * 0.17 + Math.sin(time * 2.1) * 0.035
@@ -366,10 +368,16 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   }
   ctx.restore()
 
-  // передний силуэт: проявляется, когда боковой почти схлопнулся
+  // передний силуэт: плавно «дорастает» (0.72 → 1) и доворачивается по ходу
+  // разворота (крен) — рыба входит в поворот носом и выравнивается к середине
   if (frontA > 0.02) {
     ctx.save()
     ctx.globalAlpha = frontA
+    const fs = 0.72 + 0.28 * (1 - turnT)
+    ctx.translate(fx, midY)
+    ctx.rotate(facing * 1.1)
+    ctx.scale(fs, fs)
+    ctx.translate(-fx, -midY)
     drawFishFront(ctx, b, midY, time, flash)
     ctx.restore()
   }
