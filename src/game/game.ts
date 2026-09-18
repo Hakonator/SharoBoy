@@ -890,22 +890,30 @@ export class Game {
         this.mouthX = facing >= 0 ? maxX - 12 : minX + 12
         this.mouthY = midY + 9
       }
-      this.mouthBubbleTimer -= dt
-      if (this.mouthBubbleTimer <= 0) {
-        this.mouthBubbleTimer = rand(1.1, 2.4)
-        const n = 1 + Math.floor(rand(0, 3))
-        for (let i = 0; i < n; i++) {
-          this.mouthBubbles.push({
-            x: this.mouthX + rand(-2, 2),
-            y: this.mouthY + rand(-2, 2),
-            vx: rand(6, 18) * (facing >= 0 ? 1 : -1),
-            vy: -rand(34, 62),
-            r: rand(2, 4.5),
-            t: 0,
-            life: rand(1.3, 2.4),
-            ph: rand(0, Math.PI * 2),
-          })
+      // выдох только когда рот открыт — та же фаза sin(t·0.85), что в отрисовке
+      const open = Math.max(0, Math.sin(this.time * 0.85))
+      if (open > 0.35) {
+        this.mouthBubbleTimer -= dt
+        if (this.mouthBubbleTimer <= 0) {
+          this.mouthBubbleTimer = rand(1.1, 2.4)
+          const n = 1 + Math.floor(rand(0, 3))
+          for (let i = 0; i < n; i++) {
+            this.mouthBubbles.push({
+              x: this.mouthX + rand(-2, 2),
+              y: this.mouthY + rand(-2, 2),
+              vx: rand(6, 18) * (facing >= 0 ? 1 : -1),
+              vy: -rand(34, 62),
+              r: rand(2, 4.5),
+              t: 0,
+              life: rand(1.3, 2.4),
+              ph: rand(0, Math.PI * 2),
+            })
+          }
         }
+      } else {
+        // пока рот закрыт, таймер держим почти заряженным — выдох начинается
+        // сразу после открытия рта
+        this.mouthBubbleTimer = Math.min(this.mouthBubbleTimer, 0.15)
       }
     }
     for (const b of this.mouthBubbles) {

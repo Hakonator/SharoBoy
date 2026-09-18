@@ -222,11 +222,12 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   if (dorsal) {
     const ripple = Math.sin(time * 2.3) * 3
     const baseY = midY - b.h * 0.28
+    const dx = dorsal.x + b.w * 0.12 // плавник смещён к середине спины
     ctx.beginPath()
-    ctx.moveTo(dorsal.x + dorsal.rx * 1.7, baseY) // переднее основание (к голове)
-    ctx.lineTo(dorsal.x - dorsal.rx * 1.8, baseY) // заднее основание (к хвосту)
-    ctx.lineTo(dorsal.x - dorsal.rx * 1.75 + ripple * 0.5, dorsal.y + dorsal.ry * 0.1)
-    ctx.lineTo(dorsal.x - dorsal.rx * 1.35 + ripple, dorsal.y - dorsal.ry * 0.2)
+    ctx.moveTo(dx + dorsal.rx * 1.7, baseY) // переднее основание (к голове)
+    ctx.lineTo(dx - dorsal.rx * 1.8, baseY) // заднее основание (к хвосту)
+    ctx.lineTo(dx - dorsal.rx * 1.75 + ripple * 0.5, dorsal.y + dorsal.ry * 0.1)
+    ctx.lineTo(dx - dorsal.rx * 1.35 + ripple, dorsal.y - dorsal.ry * 0.2)
     ctx.closePath()
     const dg = ctx.createLinearGradient(0, baseY, 0, dorsal.y - dorsal.ry * 0.2)
     dg.addColorStop(0, TIER[1].base)
