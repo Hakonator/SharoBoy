@@ -1,6 +1,6 @@
 /**
- * ���������� ��������� ������� ����� � ������ ������� ��� Canvas 2D.
- * ��� ������ ��������� ������� � Game; ���� ���������� ������ ������.
+ * Пиксельный рендеринг игровой сцены — чистые функции над Canvas 2D.
+ * Вся логика состояния остаётся в Game; сюда передаются снимки данных.
  */
 import { POWER_META, TIER } from "./palette"
 import type {
@@ -23,7 +23,7 @@ import { clamp, rotatedExtents } from "./utils"
 
 type Ctx = CanvasRenderingContext2D
 
-/** ���������� ������������� (������ ����, ��� �������/�������). */
+/** Скруглённый прямоугольник (строит путь, без заливки/обводки). */
 function roundRect(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
   const rr = Math.min(r, w / 2, h / 2)
   ctx.beginPath()
@@ -108,7 +108,7 @@ function drawBomb(ctx: Ctx, b: Block, x: number, y: number, time: number) {
   ctx.lineWidth = 2.5
   ctx.stroke()
   ctx.shadowBlur = 0
-  // ������
+  // фитиль
   ctx.strokeStyle = "#8a6b4a"
   ctx.lineWidth = 2.5
   ctx.beginPath()
@@ -122,9 +122,9 @@ function drawBomb(ctx: Ctx, b: Block, x: number, y: number, time: number) {
   ctx.restore()
 }
 
-/* ---------- ����-�����: ������������������ ��������� �������� ---------- */
+/* ---------- мини-боссы: специализированная отрисовка силуэтов ---------- */
 
-/** �������� ������ ������ ��������. */
+/** Габариты группы частей существа. */
 interface MbBox {
   x: number
   y: number
@@ -146,24 +146,23 @@ function bboxOf(parts: Block[]): MbBox {
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
 }
 
-/** ������� sway ���� � ���������������� � buildFish (minibosses.ts). */
+/** Частота sway рыбы — синхронизирована с buildFish (minibosses.ts). */
 const FISH_SWAY_FREQ = 0.45
 
 /**
- * ������� ����������� ������� ���� [-1..1]: �������� ������� ? cos(time�freq),
- * ������� �� ��������� ���� ������ ������������������ (������� �� X ����� 0).
+ * Направление взгляда рыбы [-1..1]: скорость патруля ∝ cos(time·freq).
+ * Разворот быстрый и гладкий: рыба почти всё время смотрит по ходу движения
+ * и за ~0.35 с переходит через середину — без долгого «схлопывания».
  */
 export function fishFacing(parts: Block[], time: number): number {
   const f = parts.find((p) => p.mbPart === "body")?.swayFreq ?? 0
   if (!f) return 1
-  // �������� �������� ~1.5 � ���������� �� �������� �������:
-  // ��������� cos ���, ����� ���� �������� ��������������� �������������� �������
-  const half = Math.min(1.5, f * 0.75) // ? = f�T/2 ��� T = 1.5 �
-  const v = Math.cos(time * f) / Math.cos(half)
-  return Math.max(-1, Math.min(1, v))
+  // tanh резко спрямляет cos у нуля: ширина зоны перехода подобрана так,
+  // чтобы флип занимал ~0.35 с при частоте патруля рыбы
+  return Math.tanh(Math.cos(time * f) * 48)
 }
 
-/** ����: ������������� ����� � ��������, ���; ����� ���������� �� �����. */
+/** Рыба: анимированные хвост и плавники, рот; части собираются по тегам. */
 function drawFish(ctx: Ctx, parts: Block[], time: number) {
   const body = parts.filter((p) => p.mbPart === "body")
   const tail = parts.filter((p) => p.mbPart === "tail")
@@ -175,19 +174,17 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   const t = bboxOf(tail)
   const midY = b.y + b.h / 2
   const flash = Math.max(...parts.map((p) => p.flash))
-  // ������� ��������: ������ ��������� �� X ������ ������ ����, � �����
-  // �������������� ����������� �� Y � ���� ������������� � �������.
-  // ���������� ���� ������� ���: ������ ������������� ����������
+  // разворот: быстрый гладкий флип по X вокруг центра тела + лёгкое
+  // округление по Y в момент поворота — контур меняется непрерывно
   const facing = fishFacing(parts, time)
   const fx = b.x + b.w / 2
-  const sx = (Math.sign(facing) || 1) * Math.max(Math.abs(facing), 0.12)
-  const sy = Math.min(1.45, 1 / Math.sqrt(Math.max(Math.abs(sx), 0.35)))
-  const turnT = 1 - Math.min(1, Math.abs(facing) / 0.35) // 1 � �������� ���������
+  const sx = (Math.sign(facing) || 1) * Math.max(Math.abs(facing), 0.25)
+  const sy = 1 + 0.2 * (1 - Math.abs(facing))
   ctx.save()
   ctx.translate(fx, midY)
   ctx.scale(sx, sy)
   ctx.translate(-fx, -midY)
-  // ����� ������ �� �������: ���� ����� �� ���������, ����� �������� � �����������
+  // хвост отстаёт от корпуса: рыба плывёт по синусоиде, хвост качается в противофазе
   const swing = -Math.cos(time * FISH_SWAY_FREQ) * 0.17 + Math.sin(time * 2.1) * 0.035
   const jointX = b.x + b.w * 0.05
   const L = (jointX - (t.x - t.w * 0.15)) * 1.25 + 20
@@ -196,7 +193,7 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   ctx.save()
   ctx.translate(jointX, midY)
   ctx.rotate(swing)
-  // ��������� ����������� �����: ��� ������� � �������, ������� ������
+  // массивный раздвоенный хвост: две лопасти с выемкой, плавные кривые
   ctx.beginPath()
   ctx.moveTo(0, 0)
   ctx.quadraticCurveTo(-L * 0.42, -H * 0.34, -L, -H * 0.74)
@@ -220,7 +217,7 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   }
   ctx.restore()
 
-  // ������� �������: ��������� �����
+  // спинной плавник: колышется рябью
   if (dorsal) {
     const ripple = Math.sin(time * 2.3) * 3.5
     ctx.beginPath()
@@ -245,34 +242,26 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     ctx.stroke()
   }
 
-  // ����: ��� ��������������� ������� (��������� ���������) � ������ �����
-  // ������������� �������; ������ �� �����, ������� ������ ����������
+  // тело: три перекрывающихся эллипса с единым градиентом — силуэт гладкий,
+  // радиусы постоянные (форму меняет только общий масштаб разворота)
   const bg = ctx.createLinearGradient(0, b.y, 0, b.y + b.h)
   bg.addColorStop(0, TIER[2].light)
   bg.addColorStop(0.55, TIER[2].base)
   bg.addColorStop(1, TIER[2].dark)
   ctx.fillStyle = bg
-  // ������ �����, ���������� � ������
+  // задняя часть, сужающаяся к хвосту
   ctx.beginPath()
   ctx.ellipse(b.x + b.w * 0.16, midY + b.h * 0.02, b.w * 0.3, b.h * 0.4, 0, 0, Math.PI * 2)
   ctx.fill()
-  // ������
+  // корпус
   ctx.beginPath()
   ctx.ellipse(b.x + b.w * 0.38, midY, b.w * 0.4, b.h * 0.5, 0, 0, Math.PI * 2)
   ctx.fill()
-  // ������: ��������� �������, ����������� � ������� ��� ���������
+  // голова
   ctx.beginPath()
-  ctx.ellipse(
-    b.x + b.w * 0.74,
-    midY - b.h * 0.02,
-    b.w * 0.26,
-    b.h * 0.48 * (1 + 0.32 * turnT),
-    0,
-    0,
-    Math.PI * 2
-  )
+  ctx.ellipse(b.x + b.w * 0.74, midY - b.h * 0.02, b.w * 0.26, b.h * 0.48, 0, 0, Math.PI * 2)
   ctx.fill()
-  // ������� ���� ��� ������ (������ ������� � ����� ������ �� �����)
+  // брюшная тень для объёма (вместо обводки — стыки частей не видны)
   ctx.globalAlpha = 0.16
   ctx.fillStyle = TIER[2].dark
   ctx.beginPath()
@@ -280,14 +269,14 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   ctx.fill()
   ctx.globalAlpha = 1
 
-  // �����: ���� ����� � ������
+  // жабры: дуга ближе к голове
   ctx.beginPath()
   ctx.ellipse(b.x + b.w * 0.66, midY, b.w * 0.085, b.h * 0.34, 0, -1.15, 1.15)
   ctx.strokeStyle = "rgba(176,114,10,0.75)"
   ctx.lineWidth = 1.5
   ctx.stroke()
 
-  // ������� �������: ����� � ��������� ����������
+  // грудной плавник: гребёт с небольшой амплитудой
   if (pectoral) {
     const row = Math.sin(time * 2.7 + 0.8) * 0.3
     ctx.save()
@@ -303,15 +292,16 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     ctx.restore()
   }
 
-  // ���: ��������� ������ �������. ������ ��������� � ������ � ���� ��� �
-  // �������������� ���� �� ���� phi � ���������� �� ���� ��� ������� �� ��
-  // �� ����� �� ����������: �������, ���� � ������� ����� �� ����� �������
+  // рот: шарнирная нижняя челюсть у самого носа. Тёмная полость — это вырез
+  // в передней части головы: верхняя дуга неподвижна, нижняя кромка полости —
+  // повернутая линия смыкания, и лоскут челюсти рисуется ровно по ней,
+  // поэтому челюсть, губа и полость всегда сомкнуты без щелей
   const open = Math.max(0, Math.sin(time * 0.85))
-  const phi = open * 0.2 // ���� �������� �������, ��� (~11�)
-  const p0x = b.x + b.w * 0.76 // ������ (���� ���)
-  const p0y = midY + b.h * 0.16
-  const lx = b.x + b.w * 0.93 // ������ ��� � ����
-  const ly = midY + b.h * 0.1
+  const phi = open * 0.3 // угол открытия челюсти, рад (~17°)
+  const p0x = b.x + b.w * 0.78 // шарнир (угол рта)
+  const p0y = midY + b.h * 0.1
+  const lx = b.x + b.w * 0.985 // кончик губ у самого носа
+  const ly = midY + b.h * 0.04
   const midX = (p0x + lx) / 2
   const midM = (p0y + ly) / 2
   const rot = (x: number, y: number) => {
@@ -322,57 +312,60 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     return { x: p0x + dx * c - dy * s, y: p0y + dx * s + dy * c }
   }
   const li = rot(lx, ly)
-  const ci = rot(midX, midM + b.h * 0.02)
-  // �������: ����������� ������� ���� + ��������� ���������� ������ �������
+  const ci = rot(midX, midM + b.h * 0.03)
+  // полость: заметно тёмный клин между верхней дугой и челюстью
   ctx.beginPath()
   ctx.moveTo(p0x, p0y)
-  ctx.quadraticCurveTo(midX, midM - b.h * 0.06, lx, ly)
+  ctx.quadraticCurveTo(midX, midM - b.h * 0.05, lx, ly)
   ctx.quadraticCurveTo(ci.x, ci.y, li.x, li.y)
   ctx.closePath()
-  const cg = ctx.createLinearGradient(0, p0y - 6, 0, p0y + 12)
-  cg.addColorStop(0, "#7c1620")
-  cg.addColorStop(1, "#32060b")
+  const cg = ctx.createLinearGradient(0, p0y - 4, 0, p0y + 14)
+  cg.addColorStop(0, "#8a1a24")
+  cg.addColorStop(1, "#1a0305")
   ctx.fillStyle = cg
   ctx.fill()
-  // ������ �������-������: ��� �� ������, ��� �� ����, ��� � ������ �������
+  // нижняя челюсть-лоскут: тот же шарнир, тот же угол, что у кромки полости
   ctx.save()
   ctx.translate(p0x, p0y)
   ctx.rotate(phi)
   ctx.translate(-p0x, -p0y)
   ctx.beginPath()
   ctx.moveTo(p0x, p0y)
-  ctx.quadraticCurveTo(midX, midM + b.h * 0.02, lx, ly) // ����� �������� ���
-  ctx.quadraticCurveTo(midX + b.w * 0.02, p0y + b.h * 0.15, p0x, p0y + b.h * 0.17) // ����������
+  ctx.quadraticCurveTo(midX, midM + b.h * 0.03, lx, ly) // линия смыкания рта
+  ctx.quadraticCurveTo(midX + b.w * 0.02, p0y + b.h * 0.14, p0x, p0y + b.h * 0.16) // подбородок
   ctx.closePath()
   ctx.fillStyle = bg
   ctx.fill()
-  // ���� �� ����� ��������: ������� � ������� ���� � ���� ������ � ��������
+  ctx.strokeStyle = "rgba(0,0,0,0.25)" // тень под челюстью — отделяет её от головы
+  ctx.lineWidth = 1.2
+  ctx.stroke()
+  // губы по линии смыкания: складка и влажный блик — едут вместе с челюстью
   for (const pass of [
     { w: 3.2, c: "rgba(122,74,8,0.85)" },
     { w: 1.2, c: "rgba(255,214,140,0.6)" },
   ]) {
     ctx.beginPath()
     ctx.moveTo(p0x, p0y)
-    ctx.quadraticCurveTo(midX, midM + b.h * 0.02, lx, ly)
+    ctx.quadraticCurveTo(midX, midM + b.h * 0.03, lx, ly)
     ctx.strokeStyle = pass.c
     ctx.lineWidth = pass.w
     ctx.stroke()
   }
   ctx.restore()
-  // ������� ����: ����������� ������� � ���� �� ������� ����
+  // верхняя губа: неподвижные складка и блик по верхней дуге
   for (const pass of [
     { w: 3.2, c: "rgba(122,74,8,0.85)" },
     { w: 1.2, c: "rgba(255,214,140,0.6)" },
   ]) {
     ctx.beginPath()
     ctx.moveTo(p0x, p0y)
-    ctx.quadraticCurveTo(midX, midM - b.h * 0.06, lx, ly)
+    ctx.quadraticCurveTo(midX, midM - b.h * 0.05, lx, ly)
     ctx.strokeStyle = pass.c
     ctx.lineWidth = pass.w
     ctx.stroke()
   }
 
-  // ����: �����, ������ (������ � ����), ����
+  // глаз: белок, зрачок (смещён к носу), блик
   if (eye) {
     const r = eye.rx * 1.7
     ctx.beginPath()
@@ -392,7 +385,7 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     ctx.fill()
   }
 
-  // ������� ����� �� ���� (����� ���������� � ���� ����� ����)
+  // вспышка урона на теле (хвост вспыхивает в своём блоке выше)
   if (flash > 0.05) {
     ctx.globalAlpha = Math.min(flash, 1) * 0.5
     ctx.fillStyle = "#ffffff"
@@ -404,7 +397,7 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   ctx.restore()
 }
 
-/** ������: ������������ ����� � ����������� ��������-�������. */
+/** Медуза: пульсирующий купол и волнующиеся щупальца-цепочки. */
 function drawJelly(ctx: Ctx, parts: Block[], time: number) {
   const domeBig = parts.filter((p) => p.mbPart === "dome")
   const fringe = parts.filter((p) => p.mbPart === "fringe")
@@ -413,7 +406,7 @@ function drawJelly(ctx: Ctx, parts: Block[], time: number) {
   const d = bboxOf(domeBig)
   const cx = d.x + d.w / 2
   const flash = Math.max(...parts.map((p) => p.flash))
-  // �����: ����� ��������� �� ������ � ������������ �� ������, ��� �� �����
+  // пульс: купол сжимается по ширине и вытягивается по высоте, низ на месте
   const pulse = Math.sin(time * 2.2)
   const w = d.w * (1 + 0.05 * pulse)
   const h = d.h * (1 - 0.07 * pulse)
@@ -422,7 +415,7 @@ function drawJelly(ctx: Ctx, parts: Block[], time: number) {
   const top = d.y + d.h - h
   const bottom = d.y + d.h
 
-  // ��������: �������, ���������� ������ � ����������, �������� � ��������
+  // щупальца: цепочки, качающиеся волной с амплитудой, растущей к кончикам
   const sorted = [...tents].sort((a, b) => a.x - b.x || a.y - b.y)
   const chains: Block[][] = []
   for (const p of sorted) {
@@ -457,7 +450,7 @@ function drawJelly(ctx: Ctx, parts: Block[], time: number) {
     }
   }
 
-  // �����: ���� � ������� ����, ��� � �������, �� ����� �������
+  // купол: верх — гладкая арка, низ — фестоны, всё дышит пульсом
   ctx.beginPath()
   ctx.moveTo(left, bottom)
   const n = 7
@@ -479,7 +472,7 @@ function drawJelly(ctx: Ctx, parts: Block[], time: number) {
   ctx.lineWidth = 1.5
   ctx.stroke()
 
-  // ������� �� ������� ���� � ������� �� ������� �� ������
+  // бахрома по нижнему краю — следует за пульсом по ширине
   for (const f of fringe) {
     ctx.beginPath()
     ctx.arc(cx + (f.x - cx) * (w / d.w), f.y, f.rx, 0, Math.PI * 2)
@@ -490,7 +483,7 @@ function drawJelly(ctx: Ctx, parts: Block[], time: number) {
     ctx.stroke()
   }
 
-  // ���� ������ ������ � ���� ����� ������ � �������
+  // блик внутри купола — чуть дышит вместе с пульсом
   ctx.globalAlpha = 0.3 + 0.08 * pulse
   ctx.beginPath()
   ctx.ellipse(cx - w * 0.12, top + h * 0.38, w * 0.22, h * 0.16, -0.4, 0, Math.PI * 2)
@@ -498,7 +491,7 @@ function drawJelly(ctx: Ctx, parts: Block[], time: number) {
   ctx.fill()
   ctx.globalAlpha = 1
 
-  // ������� �����
+  // вспышка урона
   if (flash > 0.05) {
     ctx.globalAlpha = Math.min(flash, 1) * 0.5
     ctx.fillStyle = "#ffffff"
@@ -510,9 +503,9 @@ function drawJelly(ctx: Ctx, parts: Block[], time: number) {
 }
 
 /**
- * ��������� ����������: ����� �������� �� �������� ���������, ������ �����
- * ����� ���������� � ������������ ������ (����/������) �� ����� mbPart.
- * time ����� ��� �������� ���������/������ ���� � ������ ������.
+ * Отрисовка минибоссов: блоки существа не рисуются генериком, вместо этого
+ * части собираются в реалистичный силуэт (рыба/медуза) по тегам mbPart.
+ * time нужен для анимации плавников/хвоста рыбы и пульса медузы.
  */
 export function drawMinibosses(ctx: Ctx, blocks: Block[], time: number) {
   const parts = blocks.filter((b) => b.isMiniboss && !b.dead && b.mbPart)
@@ -521,7 +514,7 @@ export function drawMinibosses(ctx: Ctx, blocks: Block[], time: number) {
   else drawFish(ctx, parts, time)
 }
 
-/** �������?? ������� ��� ��� ����: �����������, �����������, � ��������. */
+/** Пузырьк�� воздуха изо рта рыбы: поднимаются, покачиваясь, и лопаются. */
 export function drawMouthBubbles(ctx: Ctx, bubbles: MouthBubble[]) {
   for (const b of bubbles) {
     const a = Math.max(0, 1 - b.t / b.life)
@@ -542,8 +535,8 @@ export function drawMouthBubbles(ctx: Ctx, bubbles: MouthBubble[]) {
 }
 
 /**
- * ������� HP ��� ����-������: ����� ��� �������� �� ������� �������� ���
- * ������. ������ �� ������, ���� ��������� ��� ��� �� ��� ���������.
+ * Полоска HP над мини-боссом: общий пул существа по текущим границам его
+ * блоков. Ничего не рисует, если минибосса нет или он уже уничтожен.
  */
 export function drawMinibossBar(ctx: Ctx, hp: number, maxHp: number, blocks: Block[]) {
   if (hp <= 0 || maxHp <= 0) return
@@ -561,17 +554,17 @@ export function drawMinibossBar(ctx: Ctx, hp: number, maxHp: number, blocks: Blo
   const x = minX
   const y = minY - 18
   const pct = clamp(hp / maxHp, 0, 1)
-  // ��������
+  // подложка
   ctx.fillStyle = "rgba(4,16,26,0.78)"
   roundRect(ctx, x - 2, y - 2, w + 4, 12, 6)
   ctx.fill()
-  // ����������: ������ > ����� > ������� �� ������� HP
+  // заполнение: зелёный → жёлтый → розовый по остатку HP
   ctx.fillStyle = pct > 0.5 ? "#5dffb0" : pct > 0.25 ? "#ffc94d" : "#ff5ca8"
   if (pct > 0.02) {
     roundRect(ctx, x, y, Math.max(w * pct, 4), 8, 4)
     ctx.fill()
   }
-  // �����
+  // рамка
   ctx.strokeStyle = "rgba(234,247,255,0.55)"
   ctx.lineWidth = 1
   roundRect(ctx, x - 2, y - 2, w + 4, 12, 6)
@@ -581,7 +574,7 @@ export function drawMinibossBar(ctx: Ctx, hp: number, maxHp: number, blocks: Blo
 export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
   for (const b of blocks) {
     if (b.dead) continue
-    // ��������� �������� ������������������ �������� (drawMinibosses).
+    // Минибоссы рисуются специализированным рендером (drawMinibosses).
     if (b.isMiniboss) continue
     if (b.bomb) {
       drawBomb(ctx, b, b.x, b.y, time)
@@ -613,7 +606,7 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
     }
     ctx.restore()
 
-    // �������
+    // трещины
     const dmg = b.maxHp - b.hp
     if (dmg > 0) {
       ctx.strokeStyle = "rgba(4,18,26,0.5)"
@@ -628,7 +621,7 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
       }
     }
 
-    // ����� HP
+    // пипсы HP
     if (b.maxHp > 1 && b.hp > 1) {
       ctx.fillStyle = "rgba(4,18,26,0.75)"
       for (let i = 0; i < b.hp; i++) {
@@ -638,7 +631,7 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
       }
     }
 
-    // ��������: ����-������ ������
+    // «матрёшка»: мини-шарики внутри
     if (b.splits) {
       ctx.fillStyle = "rgba(255,255,255,0.85)"
       for (let i = 0; i < 3; i++) {
@@ -698,7 +691,7 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
     ctx.arc(0, 0, bo.r, 0, Math.PI * 2)
     ctx.fill()
   }
-  // ������
+  // корона
   ctx.fillStyle = "#ffc94d"
   ctx.beginPath()
   const cy0 = -bo.r * 0.92
@@ -711,7 +704,7 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
   ctx.lineTo(bo.r * 0.42, cy0)
   ctx.closePath()
   ctx.fill()
-  // ����� ������ �� �����
+  // глаза следят за шаром
   const target = balls.find((b) => !b.stuck)
   let ex = 0
   let ey = 0
@@ -732,17 +725,17 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
     ctx.arc(sx * bo.r * 0.32 + ex, -bo.r * 0.15 + ey, bo.r * 0.09, 0, Math.PI * 2)
     ctx.fill()
   }
-  // ���
+  // рот
   ctx.strokeStyle = "#3c0a26"
   ctx.lineWidth = bo.r * 0.07
   ctx.lineCap = "round"
   ctx.beginPath()
   if (bo.isOctopus) {
-    // ��������� ���� ��������� ������� �� ����� ����� �������.
-    // ̸����� ����� ��������� �� blocks, ������� �������� ����������
-    // ������� �������� � bo.totalTentacles.
-    // ������ �������� � ������ (���� �����), �������� � ������ �
-    // ������ �������������� �����, �� ������ � �������� ���� (����).
+    // Выражение лица осьминога зависит от числа живых щупалец.
+    // Мёртвые блоки удаляются из blocks, поэтому исходное количество
+    // щупалец хранится в bo.totalTentacles.
+    // больше половины — улыбка (дуга вверх), половина и меньше —
+    // прямая горизонтальная линия, ни одного — грустная дуга (вниз).
     const alive = new Set<number>()
     for (const b of blocks) {
       if (!b.isTentacle || b.dead) continue
@@ -750,14 +743,14 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
     }
     const total = bo.totalTentacles ?? 1
     if (alive.size === 0) {
-      // ������: ���� ����
+      // грусть: дуга вниз
       ctx.arc(0, bo.r * 0.48, bo.r * 0.3, Math.PI + 0.15, Math.PI * 2 - 0.15)
     } else if (alive.size * 2 <= total) {
-      // �������� ������� � ������: ������ �������������� �����
+      // половина щупалец и меньше: прямая горизонтальная линия
       ctx.moveTo(-bo.r * 0.3, bo.r * 0.42)
       ctx.lineTo(bo.r * 0.3, bo.r * 0.42)
     } else {
-      // ������ ��������: ������ (���� �����)
+      // больше половины: улыбка (дуга вверх)
       ctx.arc(0, bo.r * 0.28, bo.r * 0.3, 0.15, Math.PI - 0.15)
     }
   } else if (angry) {
@@ -771,7 +764,7 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
   ctx.stroke()
   ctx.restore()
 
-  // �������� ��������� � ��������-������ ����� ���� �� ������.
+  // Щупальца осьминога — сегменты-шарики вдоль луча от центра.
   if (bo.isOctopus) {
     const tentacles = blocks.filter((b) => b.isTentacle && !b.dead) as (Block & {
       tentacleId: number
@@ -784,14 +777,14 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
       byId.set(t.tentacleId, arr)
     }
     const segColor = (t: (typeof tentacles)[0]) => {
-      // ���� �������� �� ��� ������������ �������� � ������, ����� ������� ��������.
+      // Цвет сегмента по его собственному здоровью — темнее, когда сегмент повреждён.
       const frac = clamp((t.hp ?? 1) / (t.maxHp ?? 1), 0, 1)
       if (frac > 0.6) return `rgba(93,255,176,${0.85})`
       if (frac > 0.3) return `rgba(255,201,77,${0.8})`
       return `rgba(255,70,70,${0.75})`
     }
     for (const segs of byId.values()) {
-      // ������ ����� ����� ���������� (�����).
+      // Рисуем связи между сегментами (линии).
       if (segs.length > 1) {
         segs.sort((a, b) => a.tentacleSeg! - b.tentacleSeg!)
         ctx.strokeStyle = "rgba(40,40,60,0.55)"
@@ -803,7 +796,7 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
         }
         ctx.stroke()
       }
-      // ������ ��������-������.
+      // Рисуем сегменты-шарики.
       for (const seg of segs) {
         const r = seg.rx
         ctx.save()
@@ -825,7 +818,7 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
         ctx.arc(seg.x, seg.y, r, 0, Math.PI * 2)
         ctx.fill()
         ctx.shadowBlur = 0
-        // � Yank-��������� � ����� � ���������� ��������.
+        // У Yank-уцепление с колой — постепенно светится.
         if (seg.hp < seg.maxHp) {
           ctx.fillStyle = `rgba(255,255,255,${(1 - seg.hp / seg.maxHp) * 0.4})`
           ctx.beginPath()
@@ -848,9 +841,9 @@ export function drawRings(ctx: Ctx, rings: Ring[]) {
     ctx.lineWidth = 3 * a + 1
     ctx.stroke()
   }
-  /* ����������� ����������: ������ �������� �� �������/����/�������, �
-     ��������� globalAlpha ����� �� �� �� ����� ����� (������� �����
-     ������� � ring ���� ~0.4 � � ��� ����� �������� �� 1 �� 0). */
+  /* Обязательно сбрасываем: кольца рисуются до бонусов/шара/ракетки, и
+     «протёкший» globalAlpha гасил бы их до конца кадра (мигание после
+     касаний — ring живёт ~0.4 с и его альфа затухает от 1 до 0). */
   ctx.globalAlpha = 1
 }
 
@@ -883,14 +876,14 @@ function drawCoin(ctx: Ctx, pw: PowerUp) {
   ctx.font = '700 12px "Russo One", sans-serif'
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
-  ctx.fillText("?", 0, 1.5)
+  ctx.fillText("★", 0, 1.5)
   ctx.restore()
 }
 
 export function drawPowers(ctx: Ctx, powers: PowerUp[]) {
   for (const pw of powers) {
     const meta = POWER_META[pw.type]
-    // ����� ����� ������ � ������ ��������� �������
+    // столб света сверху в первые мгновения падения
     if (pw.t < 0.5 && pw.y > 0) {
       const a = (0.5 - pw.t) / 0.5
       ctx.fillStyle = meta.color + "30"
@@ -929,13 +922,13 @@ export function drawPowers(ctx: Ctx, powers: PowerUp[]) {
   }
 }
 
-/** ������ ������ ��� ��������� �������� �����. */
+/** Снимок данных для отрисовки лазерных лучей. */
 export interface LaserBeamView extends RenderView {
   laserUntil: number
   paddle: PaddleState
   blocks: Block[]
   boss: BossState | null
-  /** ����� ������� ����������� �������: ������ ����� �� ���. */
+  /** Форма верхней поверхности ракетки: пилоны стоят на ней. */
   shape?: PaddleShapeKind
 }
 
@@ -945,8 +938,8 @@ export function drawLaserBeams(ctx: Ctx, v: LaserBeamView) {
   if (cyc >= 0.17) return
   const onAmt = 1 - cyc / 0.17
   const p = v.paddle
-  // ������ ������ ����� �� ����������� ����� ������� (Physics.surfaceAt):
-  // ����� ���� �����, ���� � ����; ��� ������������ ����� ������ �� 8px.
+  // Пилоны лазера стоят на поверхности формы ракетки (Physics.surfaceAt):
+  // купол выше грани, чаша — ниже; над поверхностью пилон торчит на 8px.
   for (const s of [-0.36, 0.36]) {
     const px = p.x + p.w * s
     const dome = Physics.surfaceAt(p.w / 2, s, v.shape ?? "flat", p.h)
@@ -1022,7 +1015,7 @@ export function drawProjectiles(ctx: Ctx, projectiles: Projectile[], time: numbe
   }
 }
 
-/** ������ ������ ��� ��������� �����. */
+/** Снимок данных для отрисовки шаров. */
 export interface BallView extends RenderView {
   fire: boolean
   slow: boolean
@@ -1080,7 +1073,7 @@ export function drawBalls(ctx: Ctx, balls: Ball[], v: BallView) {
   }
 }
 
-/** ������ ������ ��� ��������� ������� (��������� + ������� ��������). */
+/** Снимок данных для отрисовки ракетки (положение + таймеры эффектов). */
 export interface PaddleView extends RenderView {
   p: PaddleState
   wideUntil: number
@@ -1089,7 +1082,7 @@ export interface PaddleView extends RenderView {
   laserArmed: boolean
   rocketUntil: number
   magnetUntil: number
-  /** ����� ������� �����������: �convex� � �����, �concave� � ����. */
+  /** Форма верхней поверхности: «convex» — купол, «concave» — чаша. */
   shape?: PaddleShapeKind
 }
 
@@ -1100,7 +1093,7 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   const hh = p.h * (1 - p.squash * 0.3)
   ctx.save()
   ctx.translate(p.x, p.y)
-  // � ������ ������� ������� �������������� �� ���/���, ����� � ����� ������ �� ��������
+  // В режиме отладки ракетка поворачивается по ЛКМ/ПКМ, иначе — лёгкий наклон от скорости
   ctx.rotate(p.rot ?? clamp(p.vx * 0.00011, -0.1, 0.1))
   const wide = time < v.wideUntil
   const shrink = !wide && time < v.shrinkUntil
@@ -1123,8 +1116,8 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   ctx.fillStyle = g
   const shape = v.shape ?? "flat"
   if (shape === "convex") {
-    // ����� � ����� ���������� ������� hh (�������� ?): ���� ���������,
-    // ������ ����������� � �� �� ����, ��������� �� hh ����. ����� ���������.
+    // Купол — лента постоянной толщины hh (парабола ∩): верх приподнят,
+    // нижняя поверхность — та же дуга, сдвинутая на hh вниз. Торцы скруглены.
     const bump = Physics.convexBump(ww / 2)
     const rr = Math.min(hh * 0.5, 9)
     const cap = bump * 0.16
@@ -1146,25 +1139,25 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     ctx.closePath()
     ctx.fill()
   } else if (shape === "concave") {
-    // ���� � ����� ���������� ������� hh, �������� ������. ���� � ��� � ���� ?
-    // (���� ������� �� bump, ����� �� �����; ��� � �� �� ���� ���� �� hh),
-    // ����� � ��������� ������� hh/2 (��� � ������): ������� �������-�����.
+    // Чаша — лента постоянной толщины hh, инверсия купола. Верх и низ — дуги ∪
+    // (края подняты на bump, центр на грани; низ — та же дуга ниже на hh),
+    // торцы — полукруги радиуса hh/2 (как у купола): гладкая капсула-конец.
     const depth = Physics.convexBump(ww / 2)
-    const topE = -hh / 2 - depth // ���� ����� (������)
-    const topC = -hh / 2 // ����� ����� �� �����
-    const botE = topE + hh // ���� ����
-    const botC = topC + hh // ����� ����
-    const hr = hh / 2 // ������ ��������� ���������
-    const cy = topE + hr // ����� ������ (�������� �������)
+    const topE = -hh / 2 - depth // край верха (поднят)
+    const topC = -hh / 2 // центр верха на грани
+    const botE = topE + hh // край низа
+    const botC = topC + hh // центр низа
+    const hr = hh / 2 // радиус торцового полукруга
+    const cy = topE + hr // центр торцов (середина толщины)
     const cxL = -ww / 2 + hr
     const cxR = ww / 2 - hr
     ctx.beginPath()
-    // ����� ����� > ������� ���� > ������ �����
+    // левый торец → верхняя дуга → правый торец
     ctx.moveTo(cxL, topE)
     ctx.quadraticCurveTo(-ww / 4, topC, 0, topC)
     ctx.quadraticCurveTo(ww / 4, topC, cxR, topE)
     ctx.arc(cxR, cy, hr, -Math.PI / 2, Math.PI / 2, false)
-    // ������ ���� (�� �� ?-���� �� hh ����)
+    // нижняя дуга (та же ∪-дуга на hh ниже)
     ctx.quadraticCurveTo(ww / 4, botC, 0, botC)
     ctx.quadraticCurveTo(-ww / 4, botC, cxL, botE)
     ctx.arc(cxL, cy, hr, -Math.PI / 2, Math.PI / 2, true)
@@ -1187,7 +1180,7 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     ctx.quadraticCurveTo(ww / 4, topC + 5, ww / 2 - 8, -hh / 2 + 2)
     ctx.stroke()
   } else if (shape === "concave") {
-    // ���� ����� ������� ?-���� ���� (������� ����������).
+    // Блик вдоль верхней ∪-дуги чаши (зеркало купольного).
     const depth = Physics.convexBump(ww / 2)
     const topE = -hh / 2 - depth
     const topC = -hh / 2
@@ -1202,7 +1195,7 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     roundRect(ctx, -ww / 2 + 6, -hh / 2 + 2.5, ww - 12, 4, 2)
     ctx.fill()
   }
-  // ��� �� ����� � � ���� ��� � ������ ��������� ��������� (������� �� depth)
+  // Оси по бокам — у чаши они в центре торцового полукруга (подняты на depth)
   const hubY = shape === "concave" ? -Physics.convexBump(ww / 2) : 0
   ctx.fillStyle = "rgba(4,18,26,0.35)"
   ctx.beginPath()
@@ -1211,8 +1204,8 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   ctx.fill()
   const laserOn = time < v.laserUntil
   const rocketOn = time < v.rocketUntil
-  // ������ ������ (�����, ������) ����� �� ����������� ����� ������� ���
-  // ����� ������: Physics.surfaceAt (����� ���� �����, ���� � ����).
+  // Пилоны оружия (лазер, ракета) стоят на поверхности формы ракетки под
+  // своей точкой: Physics.surfaceAt (купол выше грани, чаша — ниже).
   const domeBump = (s: number) => Physics.surfaceAt(ww / 2, s, shape, hh)
   const topAt = (s: number) => -hh / 2 - domeBump(s)
   if (laserOn || v.laserArmed) {
