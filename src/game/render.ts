@@ -217,18 +217,18 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   }
   ctx.restore()
 
-  // спинной плавник: трапеция с крутым передним скатом (от головы) и почти
-  // отвесной задней кромкой, кончик уходит назад к хвосту; верх колышется
+  // спинной плавник: широкий, низкий; кончик уходит назад к хвосту, передняя
+  // кромка — крутой скат, задняя почти отвесна; верх колышется рябью
   if (dorsal) {
     const ripple = Math.sin(time * 2.3) * 3
     const baseY = midY - b.h * 0.28
     ctx.beginPath()
-    ctx.moveTo(dorsal.x + dorsal.rx * 1.45, baseY) // переднее основание (к голове)
-    ctx.lineTo(dorsal.x - dorsal.rx * 1.3, baseY) // заднее основание (к хвосту)
-    ctx.lineTo(dorsal.x - dorsal.rx * 1.25 + ripple * 0.5, dorsal.y - dorsal.ry * 1.0)
-    ctx.lineTo(dorsal.x - dorsal.rx * 1.0 + ripple, dorsal.y - dorsal.ry * 1.35)
+    ctx.moveTo(dorsal.x + dorsal.rx * 1.7, baseY) // переднее основание (к голове)
+    ctx.lineTo(dorsal.x - dorsal.rx * 1.8, baseY) // заднее основание (к хвосту)
+    ctx.lineTo(dorsal.x - dorsal.rx * 1.75 + ripple * 0.5, dorsal.y + dorsal.ry * 0.1)
+    ctx.lineTo(dorsal.x - dorsal.rx * 1.35 + ripple, dorsal.y - dorsal.ry * 0.2)
     ctx.closePath()
-    const dg = ctx.createLinearGradient(0, baseY, 0, dorsal.y - dorsal.ry * 1.35)
+    const dg = ctx.createLinearGradient(0, baseY, 0, dorsal.y - dorsal.ry * 0.2)
     dg.addColorStop(0, TIER[1].base)
     dg.addColorStop(1, TIER[1].light)
     ctx.fillStyle = dg
@@ -238,14 +238,14 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     ctx.stroke()
   }
 
-  // нижний (анальный) плавник: та же схема — кончик назад, передняя кромка
-  // сильно наклонена, задняя почти отвесна
+  // нижний (анальный) плавник: широкий и низкий, кончик назад, передняя
+  // кромка сильно наклонена, задняя почти отвесна
   const rippleA = Math.sin(time * 2.5 + 1.2) * 2.5
   ctx.beginPath()
-  ctx.moveTo(b.x + b.w * 0.37, midY + b.h * 0.45) // переднее основание
-  ctx.lineTo(b.x + b.w * 0.2, midY + b.h * 0.34) // заднее основание
-  ctx.lineTo(b.x + b.w * 0.205 + rippleA * 0.5, midY + b.h * 0.5)
-  ctx.lineTo(b.x + b.w * 0.24 + rippleA, midY + b.h * 0.6)
+  ctx.moveTo(b.x + b.w * 0.42, midY + b.h * 0.46) // переднее основание
+  ctx.lineTo(b.x + b.w * 0.15, midY + b.h * 0.22) // заднее основание
+  ctx.lineTo(b.x + b.w * 0.165 + rippleA * 0.5, midY + b.h * 0.42)
+  ctx.lineTo(b.x + b.w * 0.21 + rippleA, midY + b.h * 0.5)
   ctx.closePath()
   ctx.fillStyle = TIER[1].base
   ctx.fill()
@@ -331,14 +331,14 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   ctx.fill()
   ctx.globalAlpha = 1
 
-  // жабры: три дуги на боку; при открытии рта дуги приоткрываются —
-  // угловой раствор и высота растут синхронно с ртом
+  // жабры: три дуги на боку ближе к хвосту (чтобы не задевать глаз);
+  // при открытии рта дуги приоткрываются — раствор и высота растут с ртом
   const open = Math.max(0, Math.sin(time * 0.85))
   const gillOpen = open * 0.5
   for (let g = 0; g < 3; g++) {
     ctx.beginPath()
     ctx.ellipse(
-      b.x + b.w * (0.56 + g * 0.07),
+      b.x + b.w * (0.44 + g * 0.07),
       midY,
       b.w * 0.055,
       b.h * (0.26 + g * 0.02) * (1 + gillOpen * 0.2),
