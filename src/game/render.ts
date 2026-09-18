@@ -217,16 +217,16 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   }
   ctx.restore()
 
-  // спинной плавник: трапеция с крутым передним скатом и почти отвесной
-  // задней кромкой (как у акулы), верх колышется рябью
+  // спинной плавник: трапеция с крутым передним скатом (от головы) и почти
+  // отвесной задней кромкой, кончик уходит назад к хвосту; верх колышется
   if (dorsal) {
     const ripple = Math.sin(time * 2.3) * 3
     const baseY = midY - b.h * 0.28
     ctx.beginPath()
-    ctx.moveTo(dorsal.x - dorsal.rx * 1.3, baseY)
-    ctx.lineTo(dorsal.x + dorsal.rx * 1.45, baseY)
-    ctx.lineTo(dorsal.x + dorsal.rx * 1.3 + ripple, dorsal.y - dorsal.ry * 1.35)
-    ctx.lineTo(dorsal.x + dorsal.rx * 0.3 + ripple * 0.5, dorsal.y - dorsal.ry * 1.0)
+    ctx.moveTo(dorsal.x + dorsal.rx * 1.45, baseY) // переднее основание (к голове)
+    ctx.lineTo(dorsal.x - dorsal.rx * 1.3, baseY) // заднее основание (к хвосту)
+    ctx.lineTo(dorsal.x - dorsal.rx * 1.25 + ripple * 0.5, dorsal.y - dorsal.ry * 1.0)
+    ctx.lineTo(dorsal.x - dorsal.rx * 1.0 + ripple, dorsal.y - dorsal.ry * 1.35)
     ctx.closePath()
     const dg = ctx.createLinearGradient(0, baseY, 0, dorsal.y - dorsal.ry * 1.35)
     dg.addColorStop(0, TIER[1].base)
@@ -238,14 +238,14 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     ctx.stroke()
   }
 
-  // нижний (анальный) плавник: передняя кромка сильно наклонена к хвосту,
-  // задняя почти отвесна
+  // нижний (анальный) плавник: та же схема — кончик назад, передняя кромка
+  // сильно наклонена, задняя почти отвесна
   const rippleA = Math.sin(time * 2.5 + 1.2) * 2.5
   ctx.beginPath()
-  ctx.moveTo(b.x + b.w * 0.2, midY + b.h * 0.34)
-  ctx.lineTo(b.x + b.w * 0.37, midY + b.h * 0.45)
-  ctx.lineTo(b.x + b.w * 0.36 + rippleA, midY + b.h * 0.6)
-  ctx.lineTo(b.x + b.w * 0.285 + rippleA * 0.5, midY + b.h * 0.5)
+  ctx.moveTo(b.x + b.w * 0.37, midY + b.h * 0.45) // переднее основание
+  ctx.lineTo(b.x + b.w * 0.2, midY + b.h * 0.34) // заднее основание
+  ctx.lineTo(b.x + b.w * 0.205 + rippleA * 0.5, midY + b.h * 0.5)
+  ctx.lineTo(b.x + b.w * 0.24 + rippleA, midY + b.h * 0.6)
   ctx.closePath()
   ctx.fillStyle = TIER[1].base
   ctx.fill()
@@ -399,7 +399,16 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   ctx.beginPath()
   ctx.moveTo(p0x, p0y)
   ctx.quadraticCurveTo(midX, midM + b.h * 0.03, lx, ly) // линия смыкания рта
-  ctx.quadraticCurveTo(midX + b.w * 0.02, p0y + b.h * 0.14, p0x, p0y + b.h * 0.16) // подбородок
+  // подбородок: кривая от кончика губы к шарниру; касательная у шарнира
+  // совпадает с направлением брюха — челюсть плавно переходит в тело
+  ctx.bezierCurveTo(
+    midX + b.w * 0.02,
+    p0y + b.h * 0.1,
+    p0x + b.w * 0.08,
+    p0y + b.h * 0.19,
+    p0x,
+    p0y
+  )
   ctx.closePath()
   ctx.fillStyle = bg
   ctx.fill()
