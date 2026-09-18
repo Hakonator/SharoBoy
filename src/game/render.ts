@@ -217,15 +217,16 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   }
   ctx.restore()
 
-  // спинной плавник: наклонённая к хвосту трапеция, верх колышется рябью
+  // спинной плавник: трапеция с крутым передним скатом и почти отвесной
+  // задней кромкой (как у акулы), верх колышется рябью
   if (dorsal) {
     const ripple = Math.sin(time * 2.3) * 3
     const baseY = midY - b.h * 0.28
     ctx.beginPath()
     ctx.moveTo(dorsal.x - dorsal.rx * 1.3, baseY)
     ctx.lineTo(dorsal.x + dorsal.rx * 1.45, baseY)
-    ctx.lineTo(dorsal.x + dorsal.rx * 1.05 + ripple, dorsal.y - dorsal.ry * 1.35)
-    ctx.lineTo(dorsal.x - dorsal.rx * 0.15 + ripple * 0.5, dorsal.y - dorsal.ry * 1.05)
+    ctx.lineTo(dorsal.x + dorsal.rx * 1.3 + ripple, dorsal.y - dorsal.ry * 1.35)
+    ctx.lineTo(dorsal.x + dorsal.rx * 0.3 + ripple * 0.5, dorsal.y - dorsal.ry * 1.0)
     ctx.closePath()
     const dg = ctx.createLinearGradient(0, baseY, 0, dorsal.y - dorsal.ry * 1.35)
     dg.addColorStop(0, TIER[1].base)
@@ -237,13 +238,14 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
     ctx.stroke()
   }
 
-  // нижний (анальный) плавник: наклонённая трапеция на брюхе у хвоста
+  // нижний (анальный) плавник: передняя кромка сильно наклонена к хвосту,
+  // задняя почти отвесна
   const rippleA = Math.sin(time * 2.5 + 1.2) * 2.5
   ctx.beginPath()
   ctx.moveTo(b.x + b.w * 0.2, midY + b.h * 0.34)
   ctx.lineTo(b.x + b.w * 0.37, midY + b.h * 0.45)
-  ctx.lineTo(b.x + b.w * 0.33 + rippleA, midY + b.h * 0.62)
-  ctx.lineTo(b.x + b.w * 0.22 + rippleA * 0.5, midY + b.h * 0.5)
+  ctx.lineTo(b.x + b.w * 0.36 + rippleA, midY + b.h * 0.6)
+  ctx.lineTo(b.x + b.w * 0.285 + rippleA * 0.5, midY + b.h * 0.5)
   ctx.closePath()
   ctx.fillStyle = TIER[1].base
   ctx.fill()
@@ -328,12 +330,25 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   ctx.fill()
   ctx.globalAlpha = 1
 
-  // жабры: дуга ближе к голове
-  ctx.beginPath()
-  ctx.ellipse(b.x + b.w * 0.66, midY, b.w * 0.085, b.h * 0.34, 0, -1.15, 1.15)
-  ctx.strokeStyle = "rgba(176,114,10,0.75)"
-  ctx.lineWidth = 1.5
-  ctx.stroke()
+  // жабры: три дуги на боку; при открытии рта дуги приоткрываются —
+  // угловой раствор и высота растут синхронно с ртом
+  const open = Math.max(0, Math.sin(time * 0.85))
+  const gillOpen = open * 0.5
+  for (let g = 0; g < 3; g++) {
+    ctx.beginPath()
+    ctx.ellipse(
+      b.x + b.w * (0.56 + g * 0.07),
+      midY,
+      b.w * 0.055,
+      b.h * (0.26 + g * 0.02) * (1 + gillOpen * 0.2),
+      0,
+      -(1.05 + gillOpen),
+      1.05 + gillOpen
+    )
+    ctx.strokeStyle = `rgba(176,114,10,${0.7 - g * 0.18})`
+    ctx.lineWidth = 1.5 - g * 0.2
+    ctx.stroke()
+  }
 
   // грудной плавник: гребёт с небольшой амплитудой
   if (pectoral) {
@@ -355,7 +370,6 @@ function drawFish(ctx: Ctx, parts: Block[], time: number) {
   // в передней части головы: верхняя дуга неподвижна, нижняя кромка полости —
   // повернутая линия смыкания, и лоскут челюсти рисуется ровно по ней,
   // поэтому челюсть, губа и полость всегда сомкнуты без щелей
-  const open = Math.max(0, Math.sin(time * 0.85))
   const phi = open * 0.3 // угол открытия челюсти, рад (~17°)
   const rot = (x: number, y: number) => {
     const dx = x - p0x
