@@ -13,8 +13,8 @@ export interface InputKeys {
 }
 
 /**
- * Скрытая отладочная клавиша «-» на цифровой клавиатуре: каждое нажатие
- * увеличивает урон шара на +1. ПЕРЕД РЕЛИЗОМ ВЫКЛЮЧИТЬ (false)!
+ * ВРЕМЕННЫЙ флаг отладочных клавиш цифровой клавиатуры: «-» — +1 к урону
+ * шара, «+» — мгновенная зачистка текущего уровня. ПЕРЕД РЕЛИЗОМ ВЫКЛЮЧИТЬ!
  */
 const DEBUG_DAMAGE_KEY = true
 
@@ -52,6 +52,9 @@ export interface InputHost {
   toggleMusic(): void
   /** Отладка: увеличить урон шара (клавиша "-" на цифровой клавиатуре). */
   debugDamageUp(): void
+  /** Отладка: мгновенно зачистить текущий уровень (клавиша "+" на цифровой
+   *  клавиатуре) — для быстрого прохождения уровней при тестировании. */
+  debugSkipLevel(): void
   /** Окно потеряло фокус — хост ставит паузу, если партия шла. */
   onBlur(): void
 }
@@ -193,6 +196,8 @@ export class InputController {
     if (c === "KeyN") this.host.toggleMusic()
     // Скрытая отладочная клавиша: "-" на цифровой клавиатуре — увеличить урон шара.
     if (DEBUG_DAMAGE_KEY && c === "NumpadSubtract") this.host.debugDamageUp()
+    // Скрытая отладочная клавиша: "+" на цифровой клавиатуре — зачистить уровень.
+    if (DEBUG_DAMAGE_KEY && c === "NumpadAdd") this.host.debugSkipLevel()
   }
 
   private handleKeyUp = (e: KeyboardEvent) => {

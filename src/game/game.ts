@@ -243,6 +243,7 @@ export class Game {
       toggleMute: () => this.toggleMute(),
       toggleMusic: () => this.toggleMusic(),
       debugDamageUp: () => this.debugDamageUp(),
+      debugSkipLevel: () => this.debugSkipLevel(),
       onBlur: () => {
         if (this.phase === "playing") this.togglePause()
       },
@@ -1554,6 +1555,28 @@ export class Game {
     this.sfx.ensure()
     this.sfx.ui()
     console.log(`[ШАРОБОЙ][debug] урон шара: ${this.debugBallDamage}`)
+    this.pushHud()
+  }
+
+  /**
+   * Скрытая отладочная клавиша («+» на цифровой клавиатуре): мгновенная
+   * зачистка текущего уровня — блоки, минибоссы и босс убираются без взрывов
+   * и без розыгрыша жизни, после чего обычный цикл сам переведёт кампанию
+   * на карту (или бесконечный режим на следующую волну). ВРЕМЕННАЯ помощь
+   * для быстрого прохождения уровней при отладке.
+   */
+  debugSkipLevel() {
+    this.sfx.ensure()
+    if (this.phase !== "playing") return
+    this.minibosses = []
+    this.mouthBubbles = []
+    this.fishMouth = false
+    this.blocks = []
+    this.bossSys.clear()
+    this.boomQueue = []
+    // зачистка ждёт упавшую жизнь — для мгновенного перехода убираем её
+    this.powers = this.powers.filter((p) => p.type !== "life")
+    console.log("[ШАРОБОЙ][debug] уровень зачищен клавишей «+»")
     this.pushHud()
   }
 
