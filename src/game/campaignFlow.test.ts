@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { Game } from "./game"
-import type { CampaignMapView, CampaignNode } from "./campaignMap"
+import { EVENT_MAX_BACK_TIERS, type CampaignMapView, type CampaignNode } from "./campaignMap"
 
 /**
  * Сквозной прогон рогаликового цикла кампании на НАСТОЯЩЕМ движке:
@@ -230,16 +230,21 @@ describe("сквозной цикл кампании по карте", () => {
       // узел, на котором реально идёт бой (событие может телепортировать назад)
       let battleNode = target
       if (target.isEvent) {
-        // событие: сначала экран с сообщением, фишка ещё на месте
-        expect(g.phase).toBe("map")
-        expect(hudLog[hudLog.length - 1].campaignEvent).toBeTruthy()
-        g.dismissCampaignEvent()
-        // после подтверждения фишка перемещена на узел назначения и бой
-        // уже стартовал; узлом назначения не может быть узел-событие —
-        // цепочка телепортов на одном ходу исключена
-        expect(g.phase).toBe("playing")
-        battleNode = map.nodes.find((n) => n.id === raw.campaignPlayerId)!
-        expect(battleNode.isEvent).toBe(false)
+        if (hudLog[hudLog.length - 1].campaignEvent) {
+          // первое срабатывание: экран с сообщением, фишка ещё на месте
+          g.dismissCampaignEvent()
+          // после подтверждения фишка перемещена на узел назначения и бой
+          // уже стартовал; узлом назначения не может быть узел-событие —
+          // цепочка телепортов на одном ходу исключена; и отбросить событие
+          // может не дальше чем на EVENT_MAX_BACK_TIERS зон назад
+          expect(g.phase).toBe("playing")
+          battleNode = map.nodes.find((n) => n.id === raw.campaignPlayerId)!
+          expect(battleNode.isEvent).toBe(false)
+          expect(battleNode.tier).toBeGreaterThanOrEqual(target.tier - EVENT_MAX_BACK_TIERS)
+        } else {
+          // повторный вход в уже сработавшее событие — обычный бой на месте
+          expect(g.phase).toBe("playing")
+        }
       }
 
       expect(raw.campaignPlayerId).toBe(battleNode.id)
@@ -275,6 +280,79 @@ describe("сквозной цикл кампании по карте", () => {
     }
 
     expect(bossFought).toBe(true)
+    g.destroy()
+  })
+
+  it("событие-телепорт не отбрасывает дальше 3 зон назад", () => {
+    const { g, step } = makeEnv()
+    g.startGame()
+    step(2)
+    const raw = g as unknown as {
+      campaign: {
+        nodes: CampaignNode[]
+        edges: { from: number; to: number }[]
+      }
+      campaignPlayerId: number
+      campaignVisited: number[]
+      bossSys: { clear: () => void }
+      transition: number
+      bannerTimer: number
+      countdown: number
+      minibosses: unknown[]
+      powers: []
+    }
+    const map = raw.campaign
+    expect(map).toBeTruthy()
+
+    /** Мгновенная зачистка боя (как в сквозном прогоне выше). */
+    const clearBattle = () => {
+      step(3)
+      g.blocks.length = 0
+      raw.bossSys.clear()
+      raw.transition = 0
+      raw.bannerTimer = 0
+      raw.countdown = 0
+      raw.minibosses.length = 0
+      raw.powers.length = 0
+      step(3)
+    }
+
+    let guard = 0
+    let events = 0
+    let reachedBoss = false
+    while (!reachedBoss && guard++ < 300) {
+      const from = raw.campaignPlayerId
+      const outs = map.edges.filter((e) => e.from === from).map((e) => e.to)
+      expect(outs.length).toBeGreaterThan(0)
+      // приоритет событиям: гарантируем, что телепорты реально прогоняются.
+      // Уже посещённые события пропускаем — иначе пинг-понг «событие↔узел»:
+      // телепорт возвращается в узел, из которого снова вход в то же событие.
+      const evOuts = outs.filter(
+        (id) => map.nodes.find((n) => n.id === id)!.isEvent && !raw.campaignVisited.includes(id)
+      )
+      const targetId = evOuts.length ? evOuts[0] : outs[0]
+      const target = map.nodes.find((n) => n.id === targetId)!
+      g.enterMapNode(targetId)
+
+      // первое срабатывание события: оверлей → подтверждение → телепорт
+      const firstTrigger = target.isEvent && g.phase === "map"
+      if (firstTrigger) g.dismissCampaignEvent()
+
+      // любой узел заканчивается боем: телепорт на цель или бой на месте
+      // (повторный вход в уже сработавшее событие — обычный бой)
+      expect(g.phase).toBe("playing")
+      const battleNode = map.nodes.find((n) => n.id === raw.campaignPlayerId)!
+      if (firstTrigger) {
+        // телепорт: цель — не-событие не дальше 3 зон назад
+        expect(battleNode.isEvent).toBe(false)
+        expect(battleNode.tier).toBeGreaterThanOrEqual(target.tier - EVENT_MAX_BACK_TIERS)
+        events++
+      }
+      clearBattle()
+      reachedBoss = battleNode.isBoss
+    }
+    expect(reachedBoss, "дошли до босса").toBe(true)
+    expect(events).toBeGreaterThan(0)
     g.destroy()
   })
 

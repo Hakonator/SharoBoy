@@ -21,6 +21,7 @@ import {
 } from "./minibosses"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
 import {
+  EVENT_MAX_BACK_TIERS,
   EVENT_TEXTS,
   generateCampaignMap,
   isAdjacent,
@@ -201,6 +202,8 @@ export class Game {
   private campaignEvent: string | null = null
   /** Узел назначения события-телепорта (бой стартует после подтверждения). */
   private campaignEventTarget = -1
+  /** Узлы-события, которые уже сработали (повторный вход — обычный бой). */
+  private campaignSpentEvents: number[] = []
   private campaignPlayerId = -1
   private campaignVisited: number[] = []
   private campaignVisible: number[] = []
@@ -1321,6 +1324,7 @@ export class Game {
     this.minibossPity = 0
     this.campaignEvent = null
     this.campaignEventTarget = -1
+    this.campaignSpentEvents = []
     this.campaignPlayerId = this.campaign.startId
     this.campaignVisited = [this.campaign.startId]
     this.campaignVisible = visibleFrom(this.campaign, this.campaignPlayerId)
@@ -1367,6 +1371,14 @@ export class Game {
     this.campaignPlayerId = id
     if (!this.campaignVisited.includes(id)) this.campaignVisited.push(id)
     if (node.isEvent) {
+      if (this.campaignSpentEvents.includes(id)) {
+        // стихия уже сработала однажды: повторный вход — обычный бой в этой
+        // зоне (иначе узел-«бутылочное горлышко» телепортировал бы вечно)
+        this.campaignVisible = visibleFrom(this.campaign, id)
+        this.startMapBattle(node)
+        return
+      }
+      this.campaignSpentEvents.push(id)
       this.resolveCampaignEvent(node)
       return
     }
@@ -1376,22 +1388,33 @@ export class Game {
 
   /**
    * Узел-событие: боя нет — подводная стихия (водоворот, течение, гейзер)
-   * уносит игрока в один из уже пройденных узлов. Расклад события (узел
-   * назначения и текст) рандомизируется прямо в момент срабатывания — живым
-   * ГПСЧ, а не детерминированным раскладом карты. Целями не могут быть
-   * узлы-события: цепочка телепортов на одном ходу исключена. Само перемещение
-   * фишки и старт боя на узле назначения происходят в dismissCampaignEvent,
-   * после того как игрок прочитал сообщение. В будущем здесь же появится
-   * вариант «остаться на месте за кристаллы».
+   * уносит игрока в один из уже пройденных узлов, но не дальше чем на
+   * EVENT_MAX_BACK_TIERS зон назад. Расклад события (узел назначения и текст)
+   * рандомизируется прямо в момент срабатывания — живым ГПСЧ, а не
+   * детерминированным раскладом карты. Целями не могут быть узлы-события:
+   * цепочка телепортов на одном ходу исключена. Само перемещение фишки и старт
+   * боя на узле назначения происходят в dismissCampaignEvent, после того как
+   * игрок прочитал сообщение. Событие срабатывает один за забег: повторный
+   * вход в узел-событие — обычный бой (см. enterMapNode). В будущем здесь же
+   * появится вариант «остаться на месте за кристаллы».
    */
   private resolveCampaignEvent(node: CampaignNode) {
     if (!this.campaign) return
     const options = this.campaignVisited.filter((v) => {
       if (v === node.id) return false
       const visited = nodeById(this.campaign!, v)
-      return !!visited && !visited.isEvent
+      // не-событийные узлы не дальше EVENT_MAX_BACK_TIERS зон назад
+      return !!visited && !visited.isEvent && visited.tier >= node.tier - EVENT_MAX_BACK_TIERS
     })
-    const to = options.length ? options[Math.floor(Math.random() * options.length)] : -1
+    if (!options.length) {
+      // редкий случай: окно из 3 зон съедено цепочкой событий — стихия стихла,
+      // игрок остаётся на месте и идёт дальше с этого узла
+      this.campaignVisible = visibleFrom(this.campaign, node.id)
+      this.phase = "map"
+      this.pushHud()
+      return
+    }
+    const to = options[Math.floor(Math.random() * options.length)]
     this.campaignEventTarget = to
     const target = to >= 0 ? nodeById(this.campaign, to) : undefined
     const template = EVENT_TEXTS[Math.floor(Math.random() * EVENT_TEXTS.length)]
@@ -1535,6 +1558,7 @@ export class Game {
     this.minibossPity = 0
     this.campaignEvent = null
     this.campaignEventTarget = -1
+    this.campaignSpentEvents = []
     this.campaignPlayerId = -1
     this.campaignVisited = []
     this.campaignVisible = []

@@ -20,6 +20,8 @@ export const MAX_BRANCHES = 4
 export const MAX_TIER_WIDTH = 4
 /** Доля узлов-событий среди обычных узлов (бой не проводится, телепорт назад). */
 export const EVENT_NODE_CHANCE = 0.12
+/** Событие отбрасывает игрока не дальше чем на это число ярусов («зон») назад. */
+export const EVENT_MAX_BACK_TIERS = 3
 
 /** Имена боевых узлов. */
 const NODE_NAMES = [
