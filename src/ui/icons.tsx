@@ -114,6 +114,68 @@ export function IconBall({ color, className }: { color: string; className?: stri
   )
 }
 
+/**
+ * Иконки существ карты кампании — единый неоновый силуэтный стиль: цветное
+ * тело, блик, тёмный глаз с искрой (вместо эмодзи, которые на части систем
+ * отображаются квадратами). Цвета — палитра игры.
+ */
+
+/** Рыба-минибосс (источник жизни) — cyan. */
+export function IconFish({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} aria-hidden>
+      <path d="M13.4 10 18 6.7c-.25 2.2-.25 4.4 0 6.6L13.4 10Z" fill="#1fb9d6" />
+      <ellipse cx="8.1" cy="10" rx="5.7" ry="3.8" fill="#35e0ff" />
+      <path d="M8.4 6.3c1.1-.1 2.2.2 3.1.9-1 .6-2.1.9-3.2.8-.3-.5-.3-1.2.1-1.7Z" fill="#1fb9d6" />
+      <ellipse cx="8.6" cy="11.5" rx="4.2" ry="1.5" fill="#9deeff" opacity="0.45" />
+      <circle cx="5.4" cy="9" r="0.95" fill="rgba(4,18,26,0.92)" />
+      <circle cx="5.7" cy="8.7" r="0.3" fill="#eafcff" />
+    </svg>
+  )
+}
+
+/** Медуза-минибосс (источник жизни) — pink, купол и волнистые щупальца. */
+export function IconJelly({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} aria-hidden>
+      <path
+        d="M3.6 11.2C3.6 7 6.4 4.2 10 4.2s6.4 2.8 6.4 7c-2.1.9-4.2 1.3-6.4 1.3s-4.3-.4-6.4-1.3Z"
+        fill="#ff5ca8"
+      />
+      <ellipse cx="10" cy="9.2" rx="3.6" ry="1.7" fill="#ffa9cd" opacity="0.5" />
+      <g fill="none" stroke="#ff8ac2" strokeWidth="1.3" strokeLinecap="round">
+        <path d="M5.6 12.4c-.5 1.4-1.4 1.9-1.2 3.4" />
+        <path d="M8.6 12.8c-.3 1.4.6 2 .4 3.5" />
+        <path d="M11.4 12.8c.3 1.4-.6 2-.4 3.5" />
+        <path d="M14.4 12.4c.5 1.4 1.4 1.9 1.2 3.4" />
+      </g>
+    </svg>
+  )
+}
+
+/** Осьминог — финальный босс глубин: купол-голова с глазами и кудрявые щупальца. */
+export function IconOctopus({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} aria-hidden>
+      <path
+        d="M10 2.8c3.7 0 6.3 2.7 6.3 6 0 1.5-.5 2.8-1.2 3.7H4.9c-.7-.9-1.2-2.2-1.2-3.7 0-3.3 2.6-6 6.3-6Z"
+        fill="#ff6a5c"
+      />
+      <ellipse cx="7.9" cy="5.6" rx="2.4" ry="1.1" fill="#ffb0a6" opacity="0.5" />
+      <g fill="none" stroke="#ff6a5c" strokeWidth="1.5" strokeLinecap="round">
+        <path d="M4.9 12.6c-.6 1.6-2.2 1.9-1.9 3.6" />
+        <path d="M8.3 12.8c-.3 1.6.8 2.1.5 3.8" />
+        <path d="M11.7 12.8c.3 1.6-.8 2.1-.5 3.8" />
+        <path d="M15.1 12.6c.6 1.6 2.2 1.9 1.9 3.6" />
+      </g>
+      <circle cx="7.6" cy="8.7" r="0.95" fill="rgba(4,18,26,0.92)" />
+      <circle cx="12.4" cy="8.7" r="0.95" fill="rgba(4,18,26,0.92)" />
+      <circle cx="7.9" cy="8.4" r="0.3" fill="#ffe9e6" />
+      <circle cx="12.7" cy="8.4" r="0.3" fill="#ffe9e6" />
+    </svg>
+  )
+}
+
 export function IconChevron() {
   return (
     <svg

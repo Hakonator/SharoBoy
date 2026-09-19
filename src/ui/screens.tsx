@@ -19,6 +19,9 @@ import {
   IconPlay,
   IconPause,
   IconSound,
+  IconFish,
+  IconJelly,
+  IconOctopus,
   Key,
   EffectChip,
   ControlsPanel,
@@ -371,9 +374,14 @@ export function MapScreen({
   const revealed = new Set<number>([...view.visited, ...view.visible])
   const playerOut = new Set<number>(view.visible)
   const revealedEdges = view.edges.filter((e) => revealed.has(e.from) && revealed.has(e.to))
-  // маркеры минибоссов — только на УЖЕ ПОСЕЩЁННЫХ узлах: до боя локация
-  // хранит сюрприз. 🐟 рыба, 🪼 медуза (источник жизней)
-  const mbIcon: Record<string, string> = { fish: "🐟", jelly: "🪼" }
+  // маркеры существ — только на УЖЕ ПОСЕЩЁННЫХ узлах: до боя локация хранит
+  // сюрприз. SVG-иконки в едином стиле вместо эмодзи (на части систем эмодзи
+  // показывались квадратами). рыба/медуза — источник жизней, осьминог — босс
+  const mbIcon: Record<string, (p: { className?: string }) => ReactNode> = {
+    fish: IconFish,
+    jelly: IconJelly,
+  }
+  const mbName: Record<string, string> = { fish: "рыба", jelly: "медуза" }
   const visitedMb = view.visited.filter((id) => (view.minibosses[id]?.length ?? 0) > 0)
 
   return (
@@ -479,21 +487,27 @@ export function MapScreen({
                     }`}
                   >
                     {n.isBoss ? (
-                      <span className="text-[11px] text-abyss sm:text-sm">БОСС</span>
+                      <IconOctopus className="h-6 w-6 sm:h-7 sm:w-7" />
                     ) : isCurrent ? (
                       <span className="h-2 w-2 rounded-full bg-abyss sm:h-2.5 sm:w-2.5" />
                     ) : null}
                     {!n.isBoss && showMb && (
                       <span
-                        className="absolute -right-1.5 -top-2 whitespace-nowrap text-xs drop-shadow-[0_1px_0_rgba(4,18,26,0.9)] sm:text-sm"
-                        aria-label={`Мини-босс: ${mbKinds
-                          .map((k) => (k === "fish" ? "рыба" : "медуза"))
-                          .join(" и ")}`}
+                        className="absolute -right-2 -top-2.5 flex items-center gap-0.5 drop-shadow-[0_1px_0_rgba(4,18,26,0.9)]"
+                        aria-label={`Мини-босс: ${mbKinds.map((k) => mbName[k] ?? k).join(" и ")}`}
                       >
-                        {mbKinds.map((k) => mbIcon[k]).join("")}
+                        {mbKinds.map((k) => {
+                          const Icon = mbIcon[k]
+                          return Icon ? <Icon key={k} className="h-3 w-3 sm:h-4 sm:w-4" /> : null
+                        })}
                       </span>
                     )}
                   </span>
+                  {n.isBoss && !clickable && (
+                    <span className="whitespace-nowrap font-display text-[10px] tracking-widest text-coral drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs">
+                      БОСС
+                    </span>
+                  )}
                   {clickable && (
                     <span className="whitespace-nowrap font-display text-[10px] tracking-wider text-foam drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs">
                       {n.name}
@@ -505,13 +519,21 @@ export function MapScreen({
         </div>
       </div>
 
-      {/* Подсказка снизу + легенда минибоссов, если игрок уже их встречал */}
+      {/* Подсказка снизу + легенда существ, если игрок уже их встречал */}
       <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex flex-col items-center gap-1 px-4">
         {visitedMb.length > 0 && (
-          <div className="hud-chip px-3 py-1 text-center font-display text-[10px] tracking-wider text-mint sm:text-xs">
-            🐟🪼 МИНИ-БОСС В УЗЛЕ — ПОБЕДИ И ПОЛУЧИ ЖИЗНЬ
+          <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-mint sm:text-xs">
+            <span className="flex items-center gap-0.5">
+              <IconFish className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <IconJelly className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            </span>
+            МИНИ-БОСС В УЗЛЕ — ПОБЕДИ И ПОЛУЧИ ЖИЗНЬ
           </div>
         )}
+        <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-coral sm:text-xs">
+          <IconOctopus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          ФИНАЛЬНЫЙ БОСС ГЛУБИН
+        </div>
         <div className="hud-chip px-5 py-2 text-center font-display text-xs tracking-widest text-cyan-neon sm:text-sm">
           {playerOut.size > 1
             ? "ВЫБЕРИ ОДИН ИЗ ПУТЕЙ"

@@ -831,7 +831,7 @@ export class SFX {
           // карта: ноты долгие и «тающие» — эффект подводной загадки
           isMap ? step * 4 : step * 0.8,
           isMenu || isMap ? "triangle" : "square",
-          isMap ? 0.04 : isMenu ? 0.05 : 0.06,
+          isMap ? 0.07 : isMenu ? 0.05 : 0.06,
           undefined,
           delay,
           this.musicGain
@@ -842,7 +842,7 @@ export class SFX {
           // карта: бас — почти органный пунктик, тянется через такт
           isMap ? step * 7 : step,
           "triangle",
-          isMap ? 0.05 : 0.07,
+          isMap ? 0.09 : 0.07,
           undefined,
           delay,
           this.musicGain
