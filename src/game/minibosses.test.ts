@@ -5,13 +5,15 @@ import {
   buildJelly,
   campaignMinibosses,
   carveLevelBlocks,
+  minibossHpFor,
   MINIBOSS_HP,
+  MINIBOSS_HP_GROWTH,
   MINIBOSS_LIFE_CHANCE,
   MINIBOSS_NODE_CHANCE,
   minibossName,
   rollMiniboss,
 } from "./minibosses"
-import { generateCampaignMap } from "./campaignMap"
+import { generateCampaignMap, MAP_TIERS } from "./campaignMap"
 import type { Block } from "./types"
 
 const W = 960
@@ -78,18 +80,48 @@ describe("minibosses", () => {
 
   it("минибоссы выпадают примерно в MINIBOSS_NODE_CHANCE доле узлов, оба вида", () => {
     let hits = 0
+    let duets = 0
     const kinds = new Set<string>()
     const N = 4000
     for (let seed = 1; seed <= N; seed++) {
-      const kind = rollMiniboss(seed, seed % 17)
-      if (kind) {
+      const kindsInNode = rollMiniboss(seed, seed % 17)
+      if (kindsInNode.length) {
         hits++
-        kinds.add(kind)
+        kinds.add(kindsInNode[0])
+        if (kindsInNode.length === 2) duets++
       }
     }
     expect(hits / N).toBeGreaterThan(MINIBOSS_NODE_CHANCE - 0.05)
     expect(hits / N).toBeLessThan(MINIBOSS_NODE_CHANCE + 0.05)
     expect(kinds).toEqual(new Set(["fish", "jelly"]))
+    // дуэты существуют и заметно реже одиночных существ
+    expect(duets).toBeGreaterThan(0)
+    expect(duets / hits).toBeLessThan(0.5)
+  })
+
+  it("в дуэте всегда рыба и медуза вместе", () => {
+    for (let seed = 1; seed <= 2000; seed++) {
+      const kinds = rollMiniboss(seed, seed)
+      if (kinds.length === 2) {
+        expect(new Set(kinds)).toEqual(new Set(["fish", "jelly"]))
+      }
+    }
+  })
+
+  it("HP минибосса растёт по мере приближения к финальному боссу", () => {
+    for (const kind of ["fish", "jelly"] as const) {
+      // первый боевой ярус — базовый пул, последний боевой — максимум роста
+      expect(minibossHpFor(kind, 1, MAP_TIERS)).toBe(MINIBOSS_HP[kind])
+      expect(minibossHpFor(kind, MAP_TIERS - 2, MAP_TIERS)).toBe(
+        Math.round(MINIBOSS_HP[kind] * (1 + MINIBOSS_HP_GROWTH))
+      )
+      // монотонный неубывающий рост между ярусами
+      for (let t = 2; t < MAP_TIERS; t++) {
+        expect(minibossHpFor(kind, t, MAP_TIERS)).toBeGreaterThanOrEqual(
+          minibossHpFor(kind, t - 1, MAP_TIERS)
+        )
+      }
+    }
   })
 
   it("campaignMinibosses: расклад детерминирован и минимум один минибосс в забеге", () => {
@@ -98,13 +130,18 @@ describe("minibosses", () => {
       const a = campaignMinibosses(seed, map.nodes)
       const b = campaignMinibosses(seed, map.nodes)
       expect(a).toEqual(b)
-      expect(a.size, `сид ${seed}: забег без минибоссов`).toBeGreaterThanOrEqual(1)
-      for (const [id, kind] of a) {
+      let creatures = 0
+      for (const [id, kinds] of a) {
         const node = map.nodes.find((n) => n.id === id)!
         expect(node.isBoss).toBe(false)
+        expect(node.isEvent).toBe(false)
         expect(node.tier).toBeGreaterThan(0)
-        expect(["fish", "jelly"]).toContain(kind)
+        expect(kinds.length).toBeGreaterThanOrEqual(1)
+        expect(kinds.length).toBeLessThanOrEqual(2)
+        for (const kind of kinds) expect(["fish", "jelly"]).toContain(kind)
+        creatures += kinds.length
       }
+      expect(creatures, `сид ${seed}: забег без минибоссов`).toBeGreaterThanOrEqual(1)
     }
   })
 

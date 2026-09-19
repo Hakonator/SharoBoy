@@ -50,8 +50,9 @@ export interface PhysicsWorld {
   addScore(n: number, x: number, y: number, color: string, size: number): void
   dropPower(x: number, y: number): void
   damageBoss(dmg: number, fromWeapon: boolean): void
-  /** Урон в общий пул HP минибосса (блоки существа неразрушаемы). */
-  damageMiniboss(dmg: number): void
+  /** Урон в пул HP минибосса, по блоку которого пришёл удар (блоки существа
+   *  неразрушаемы) — существ в уровне может быть несколько. */
+  damageMiniboss(dmg: number, block: Block): void
   /** Попадание бомбы осьминога по ракетке. */
   onBombHitPaddle(): void
   pushHud(): void
@@ -451,10 +452,10 @@ export class Physics {
   /** Урон блоку; при разрушении — очки, эффекты, дроп бонуса, «матрёшка». */
   damageBlock(b: Block, dmg = 1) {
     const g = this.g
-    // Блоки минибосса неразрушаемы: урон идёт в общий пул HP существа.
+    // Блоки минибосса неразрушаемы: урон идёт в пул HP его существа.
     if (b.isMiniboss) {
       b.flash = 1
-      g.damageMiniboss(dmg)
+      g.damageMiniboss(dmg, b)
       return
     }
     b.hp -= dmg

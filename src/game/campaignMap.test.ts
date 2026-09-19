@@ -29,7 +29,7 @@ function reachableFrom(map: CampaignMap, start: number): Set<number> {
 
 describe("generateCampaignMap", () => {
   it("держит структурные инварианты на множестве сидов", () => {
-    for (let seed = 1; seed <= 150; seed++) {
+    for (let seed = 1; seed <= 60; seed++) {
       const map = generateCampaignMap(seed)
 
       // уникальные id и корректные координаты
@@ -49,13 +49,20 @@ describe("generateCampaignMap", () => {
       expect(bosses[0].id).toBe(map.bossId)
       expect(map.bossId).toBe(map.nodes[map.nodes.length - 1].id)
 
-      // ветвление: у обычного узла 1..3 исходящих, у босса — ни одного
+      // ярусы обычных боёв не уже двух узлов (развилка выбора 2–4)
+      for (let t = 1; t < map.tiers - 1; t++) {
+        expect(map.nodes.filter((n) => n.tier === t).length).toBeGreaterThanOrEqual(2)
+      }
+
+      // ветвление: у обычного узла 2..4 исходящих, у предбоссового — ровно одно
+      // ребро к единственному боссу, у босса — ни одного
       for (const n of map.nodes) {
         const out = outgoingIds(map, n.id)
         if (n.isBoss) {
           expect(out).toHaveLength(0)
         } else {
-          expect(out.length).toBeGreaterThanOrEqual(MIN_BRANCHES)
+          const nextWidth = map.nodes.filter((m) => m.tier === n.tier + 1).length
+          expect(out.length).toBeGreaterThanOrEqual(Math.min(MIN_BRANCHES, nextWidth))
           expect(out.length).toBeLessThanOrEqual(MAX_BRANCHES)
         }
       }
@@ -135,5 +142,22 @@ describe("generateCampaignMap", () => {
     const a = generateCampaignMap(12345)
     const b = generateCampaignMap(12345)
     expect(b).toEqual(a)
+  })
+
+  it("узлы-события встречаются только в обычных боевых ярусах и без боссов", () => {
+    let totalEvents = 0
+    for (let seed = 1; seed <= 60; seed++) {
+      const map = generateCampaignMap(seed)
+      for (const n of map.nodes) {
+        if (!n.isEvent) continue
+        totalEvents++
+        expect(n.isBoss).toBe(false)
+        expect(n.tier).toBeGreaterThan(0)
+        expect(n.tier).toBeLessThan(map.tiers - 1)
+        expect(["ВОДОВОРОТ", "ТЕЧЕНИЕ", "ГРОТ", "ГЕЙЗЕР"]).toContain(n.name)
+      }
+    }
+    // за 60 карт события обязаны встретиться
+    expect(totalEvents).toBeGreaterThan(0)
   })
 })

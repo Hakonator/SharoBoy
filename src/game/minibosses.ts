@@ -1,9 +1,10 @@
 /**
  * Мини-боссы кампании: стилизованные обитатели водной фауны (рыба, медуза),
  * собранные из перекрывающихся эллипсов в цельный силуэт. Блоки существа
- * неразрушаемы — урон идёт в общий пул HP (MINIBOSS_HP), над существом
- * рисуется полоска здоровья; при обнулении пула существо взрывается целиком.
- * Появляются в обычных боевых узлах кампании с фиксированным шансом —
+ * неразрушаемы — урон идёт в пул HP каждого существа (MINIBOSS_HP, растёт по
+ * мере приближения к финальному боссу), над существом рисуется полоска
+ * здоровья; при обнулении пула существо взрывается целиком. Появляются в
+ * обычных боевых узлах кампании с фиксированным шансом (иногда парой) —
  * детерминированно по сиду карты, одна и та же карта всегда даёт минибоссов
  * в одних и тех же узлах. За уничтожение полагается жизнь с шансом
  * MINIBOSS_LIFE_CHANCE — других источников жизней в кампании нет.
@@ -11,14 +12,18 @@
  * Чистые функции без обращений к движку — модуль тестируется автономно.
  */
 import type { Block } from "./types"
-import { mulberry32, rand } from "./utils"
+import { clamp, mulberry32, rand } from "./utils"
 
 export type MinibossKind = "fish" | "jelly"
 
-/** Шанс появления минибосса в обычном узле кампании (по задумке: 10–20%). */
-export const MINIBOSS_NODE_CHANCE = 0.15
+/** Шанс появления минибосса в обычном узле кампании (≈20%). */
+export const MINIBOSS_NODE_CHANCE = 0.2
+/** Шанс, что в узле появятся сразу ДВА существа (рыба + медуза). */
+export const MINIBOSS_DUET_CHANCE = 0.25
 /** Шанс дропа жизни за полностью уничтоженного минибосса. */
 export const MINIBOSS_LIFE_CHANCE = 0.8
+/** Прирост HP на предпоследнем ярусе относительно базового (60 → 150 у рыбы). */
+export const MINIBOSS_HP_GROWTH = 1.5
 
 const NAMES: Record<MinibossKind, string> = {
   fish: "РЫБА-ШАР",
@@ -30,38 +35,42 @@ export function minibossName(kind: MinibossKind): string {
 }
 
 /**
- * Детерминированный розыгрыш минибосса для узла кампании.
+ * Детерминированный розыгрыш минибоссов для узла кампании: обычно одно
+ * существо, с шансом MINIBOSS_DUET_CHANCE — пара (рыба + медуза).
  * @param seed сид карты кампании
  * @param nodeId идентификатор узла
- * @returns вид минибосса или null — в этом узле минибосса нет
+ * @returns список видов существ в узле (пустой — минибоссов нет)
  */
-export function rollMiniboss(seed: number, nodeId: number): MinibossKind | null {
+export function rollMiniboss(seed: number, nodeId: number): MinibossKind[] {
   const rng = mulberry32((seed + nodeId * 104729) | 0 || 1)
-  if (rng() >= MINIBOSS_NODE_CHANCE) return null
-  return rng() < 0.5 ? "fish" : "jelly"
+  if (rng() >= MINIBOSS_NODE_CHANCE) return []
+  const kind: MinibossKind = rng() < 0.5 ? "fish" : "jelly"
+  if (rng() < MINIBOSS_DUET_CHANCE) return [kind, kind === "fish" ? "jelly" : "fish"]
+  return [kind]
 }
 
 /**
  * Расклад минибоссов по всем узлам карты забега. Детерминирован сидом карты,
- * с гарантией хотя бы одного существа за забег: при 15% на узел карта может
+ * с гарантией хотя бы одного существа за забег: при 20% на узел карта может
  * остаться без единого минибосса, а с ними не работает единственный источник
- * жизней кампании. Стартовый узел (tier 0) боем не является — исключён.
+ * жизней кампании. Стартовый узел (tier 0), босс и узлы-события исключены —
+ * боёв в них не бывает.
  */
 export function campaignMinibosses(
   seed: number,
-  nodes: ReadonlyArray<{ id: number; tier: number; isBoss: boolean }>
-): Map<number, MinibossKind> {
-  const out = new Map<number, MinibossKind>()
+  nodes: ReadonlyArray<{ id: number; tier: number; isBoss: boolean; isEvent: boolean }>
+): Map<number, MinibossKind[]> {
+  const out = new Map<number, MinibossKind[]>()
   for (const n of nodes) {
-    if (n.isBoss || n.tier === 0) continue
-    const kind = rollMiniboss(seed, n.id)
-    if (kind) out.set(n.id, kind)
+    if (n.isBoss || n.isEvent || n.tier === 0) continue
+    const kinds = rollMiniboss(seed, n.id)
+    if (kinds.length) out.set(n.id, kinds)
   }
   if (out.size === 0) {
     const fallback = nodes
-      .filter((n) => !n.isBoss && n.tier > 0)
+      .filter((n) => !n.isBoss && !n.isEvent && n.tier > 0)
       .sort((a, b) => a.tier - b.tier || a.id - b.id)[0]
-    if (fallback) out.set(fallback.id, seed % 2 ? "fish" : "jelly")
+    if (fallback) out.set(fallback.id, [seed % 2 ? "fish" : "jelly"])
   }
   return out
 }
@@ -70,6 +79,16 @@ export function campaignMinibosses(
 export const MINIBOSS_HP: Record<MinibossKind, number> = {
   fish: 60,
   jelly: 50,
+}
+
+/**
+ * HP минибосса на ярусе: линейный рост от базового значения на первом боевом
+ * ярусе (tier 1) до (1 + MINIBOSS_HP_GROWTH) базового на последнем боевом
+ * ярусе перед финальным боссом — чем дальше по карте, тем жирнее существа.
+ */
+export function minibossHpFor(kind: MinibossKind, tier: number, tiers: number): number {
+  const progress = clamp((tier - 1) / Math.max(1, tiers - 3), 0, 1)
+  return Math.round(MINIBOSS_HP[kind] * (1 + MINIBOSS_HP_GROWTH * progress))
 }
 
 /** Фабрика части существа: эллипс с наклоном, «плавание» через sway. */
@@ -86,6 +105,7 @@ function makePart(opts: {
   bobAmp?: number
   bobFreq?: number
   bobPh?: number
+  group?: number
 }): Block {
   return {
     x: opts.x,
@@ -111,6 +131,7 @@ function makePart(opts: {
     bomb: false,
     splits: false,
     isMiniboss: true,
+    mbGroup: opts.group ?? 0,
     mbPart: opts.part,
   }
 }
@@ -120,7 +141,7 @@ function makePart(opts: {
  * спинной и грудной плавники, глаз. Плывёт носом вправо, патрулирует поле.
  * Тиры: тело — 2 (золото), плавники — 1 (зелень), глаз — 3 (акцент).
  */
-export function buildFish(w: number, h: number, top: number): Block[] {
+export function buildFish(w: number, h: number, top: number, group = 0): Block[] {
   void h
   const cx = w / 2
   const cy = top + 165
@@ -135,7 +156,7 @@ export function buildFish(w: number, h: number, top: number): Block[] {
     tier: 1 | 2 | 3,
     part: Block["mbPart"],
     rot?: number
-  ) => makePart({ x: cx + x, y: cy + y, rx, ry, tier, part, rot, ...S })
+  ) => makePart({ x: cx + x, y: cy + y, rx, ry, tier, part, rot, group, ...S })
   return [
     // тело: три эллипса, сужающиеся к хвосту и к носу
     p(0, 0, 52, 30, 2, "body"),
@@ -158,7 +179,7 @@ export function buildFish(w: number, h: number, top: number): Block[] {
  * Медуза: пышный купол с бахромой по нижнему краю и пятью щупальцами-цепочками.
  * Тиры: купол — 3 (розовый), щупальца — 1 (зелень).
  */
-export function buildJelly(w: number, h: number, top: number): Block[] {
+export function buildJelly(w: number, h: number, top: number, group = 0): Block[] {
   const cx = w / 2
   const cy = top + 160
   // Медленный патруль влево-вправо (без разворота) + вертикальный дрейф со
@@ -180,7 +201,7 @@ export function buildJelly(w: number, h: number, top: number): Block[] {
     tier: 1 | 2 | 3,
     part: Block["mbPart"],
     rot?: number
-  ) => makePart({ x: cx + x, y: cy + y, rx, ry, tier, part, rot, ...S })
+  ) => makePart({ x: cx + x, y: cy + y, rx, ry, tier, part, rot, group, ...S })
   const blocks: Block[] = [
     // купол: большой эллипс плюс «наползание» сверху
     p(0, 0, 48, 34, 3, "dome"),

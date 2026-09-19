@@ -53,6 +53,8 @@ export interface HudData {
   topEndless: ScoreEntry[]
   /** Рогаликовая карта кампании (null, когда её экран не активен). */
   map: CampaignMapView | null
+  /** Текст активного события на карте (null — события нет / уже закрыто). */
+  campaignEvent: string | null
 }
 
 export interface ScoreEntry {
@@ -103,6 +105,8 @@ export interface Block {
   hitsPaddle?: boolean
   /** Блок мини-босса кампании: за уничтожение всех — шанс дропа жизни. */
   isMiniboss?: boolean
+  /** Номер существа в уровне (минибоссов может быть несколько) — привязка HP. */
+  mbGroup?: number
   /** Роль части существа минибосса — для специализированной отрисовки силуэта. */
   mbPart?: "body" | "tail" | "dorsal" | "pectoral" | "eye" | "dome" | "fringe" | "tentacle"
 }

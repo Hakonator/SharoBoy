@@ -26,6 +26,7 @@ interface GameInternals {
   startGame: () => void
   startLevelBattle: (n: number) => void
   enterMapNode: (id: number) => void
+  dismissCampaignEvent: () => void
   enterNextNodeOnAction: () => void
   toMenu: () => void
   destroy: () => void
@@ -158,9 +159,9 @@ describe("сквозной цикл кампании по карте", () => {
     expect(view, "пока активен экран карты HUD обязан нести снимок карты").toBeTruthy()
     expect(view!.playerId).toBe(view!.startId)
     expect(view!.visited).toEqual([view!.startId])
-    // туман войны: видны ровно соседи текущего узла (1..3)
-    expect(view!.visible.length).toBeGreaterThanOrEqual(1)
-    expect(view!.visible.length).toBeLessThanOrEqual(3)
+    // туман войны: видны ровно соседи текущего узла (развилка 2–4)
+    expect(view!.visible.length).toBeGreaterThanOrEqual(2)
+    expect(view!.visible.length).toBeLessThanOrEqual(4)
     // ни один узел вне пути и его соседей не раскрыт
     const revealed = new Set([...view!.visited, ...view!.visible])
     expect(revealed.size).toBeLessThan(view!.nodes.length)
@@ -188,7 +189,7 @@ describe("сквозной цикл кампании по карте", () => {
       transition: number
       bannerTimer: number
       countdown: number
-      minibossHp: number
+      minibosses: unknown[]
       powers: unknown[]
     }
     const map = raw.campaign
@@ -197,12 +198,16 @@ describe("сквозной цикл кампании по карте", () => {
     let guard = 0
     let bossFought = false
     while (!bossFought) {
-      if (guard++ > 40) throw new Error("не дошли до босса за разумное число шагов")
+      if (guard++ > 150) throw new Error("не дошли до босса за разумное число шагов")
 
       const from = raw.campaignPlayerId
       const outs = map.edges.filter((e) => e.from === from).map((e) => e.to)
       expect(outs.length, "у не-боссового узла обязан быть путь вперёд").toBeGreaterThan(0)
-      const target = map.nodes.find((n) => n.id === outs[0])!
+      // боевые узлы предпочтительнее: узлы-события не продвигают по ярусам,
+      // а телепортируют назад (обход их в тесте отдельной веткой ниже)
+      const battleOuts = outs.filter((id) => !map.nodes.find((n) => n.id === id)!.isEvent)
+      const targetId = battleOuts.length ? battleOuts[0] : outs[0]
+      const target = map.nodes.find((n) => n.id === targetId)!
       expect(target).toBeTruthy()
 
       // несоседний узел игнорируется (позиция игрока не меняется)
@@ -213,7 +218,17 @@ describe("сквозной цикл кампании по карте", () => {
         expect(g.phase).toBe("map")
       }
 
-      g.enterMapNode(target.id)
+      g.enterMapNode(targetId)
+      expect(g.phase === "map" || g.phase === "playing").toBe(true)
+
+      if (target.isEvent) {
+        // событие не запускает бой: игрока относит в один из посещённых узлов
+        expect(g.phase).toBe("map")
+        expect(raw.campaignVisited).toContain(raw.campaignPlayerId)
+        g.dismissCampaignEvent()
+        continue
+      }
+
       expect(raw.campaignPlayerId).toBe(target.id)
       expect(g.phase).toBe("playing")
       expect(g.onBossNode).toBe(target.isBoss)
@@ -227,8 +242,8 @@ describe("сквозной цикл кампании по карте", () => {
       raw.transition = 0
       raw.bannerTimer = 0
       raw.countdown = 0
-      // минибосс тоже мгновенно «мёртв» и жизнь за него не разыгрываем
-      raw.minibossHp = 0
+      // минибоссы тоже мгновенно «мертвы» и жизнь за них не разыгрываем
+      raw.minibosses.length = 0
       raw.powers.length = 0
       step(3)
 

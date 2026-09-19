@@ -60,6 +60,7 @@ const INITIAL_HUD: HudData = {
   top: [],
   topEndless: [],
   map: null,
+  campaignEvent: null,
 }
 
 /** Сколько времени тост достижения висит на экране (мс). */
@@ -386,6 +387,7 @@ export default function App() {
         <MapScreen
           hud={hud}
           onMapNode={(id) => g()?.enterMapNode(id)}
+          onEventDismiss={() => g()?.dismissCampaignEvent()}
           onMenu={() => g()?.toMenu()}
         />
       )}

@@ -13,6 +13,7 @@ import {
   buildJelly,
   campaignMinibosses,
   carveLevelBlocks,
+  minibossHpFor,
   minibossName,
   MINIBOSS_HP,
   MINIBOSS_LIFE_CHANCE,
@@ -20,6 +21,7 @@ import {
 } from "./minibosses"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
 import {
+  EVENT_TEXTS,
   generateCampaignMap,
   isAdjacent,
   nodeById,
@@ -107,12 +109,17 @@ export class Game {
   debug = false
   /** Принудительный тип босса для отладки (null = стандартное поведение). */
   debugBossType: "octopus" | "kraken" | null = null
-  /** Остаток общего пула HP минибосса (0 — минибосса в уровне нет / убит). */
-  private minibossHp = 0
-  private minibossMaxHp = 0
-  /** Точка дропа жизни — центр уничтоженного существа. */
-  private minibossDropX = 0
-  private minibossDropY = 0
+  /** Живые существа-минибоссы уровня (их может быть несколько): у каждого свой
+   *  пул HP, номер группы (mbGroup блоков) и центр для дропа жизни. */
+  private minibosses: {
+    kind: MinibossKind
+    group: number
+    hp: number
+    maxHp: number
+    dropX: number
+    dropY: number
+  }[] = []
+  private mbGroupSeq = 0
   /** Пузырьки воздуха изо рта рыбы-минибосса. */
   private mouthBubbles: MouthBubble[] = []
   private mouthBubbleTimer = 0
@@ -186,7 +193,9 @@ export class Game {
   /** Карта забега кампании и позиция игрока на ней (для экрана карты). */
   private campaign: CampaignMap | null = null
   /** Детерминированный расклад минибоссов по узлам текущего забега. */
-  private campaignMinibossMap: Map<number, MinibossKind> = new Map()
+  private campaignMinibossMap: Map<number, MinibossKind[]> = new Map()
+  /** Активное событие на карте (текст для оверлея; null — события нет). */
+  private campaignEvent: string | null = null
   private campaignPlayerId = -1
   private campaignVisited: number[] = []
   private campaignVisible: number[] = []
@@ -533,7 +542,7 @@ export class Game {
       addScore: (n, x, y, color, size) => g.addScore(n, x, y, color, size),
       dropPower: (x, y) => g.powersSys.dropPower(x, y),
       damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
-      damageMiniboss: (dmg) => g.damageMiniboss(dmg),
+      damageMiniboss: (dmg, block) => g.damageMiniboss(dmg, block),
       onBombHitPaddle: () => g.onBombHitPaddle(),
       pushHud: () => g.pushHud(),
     }
@@ -821,24 +830,26 @@ export class Game {
   /* ---------- мини-боссы кампании ---------- */
 
   resetMiniboss() {
-    this.minibossHp = 0
-    this.minibossMaxHp = 0
+    this.minibosses = []
+    this.mbGroupSeq = 0
     this.mouthBubbles = []
     this.fishMouth = false
   }
 
   /** Добавляет существо-минибосса к текущему уровню (освободив ему место). */
-  private addMiniboss(kind: MinibossKind) {
+  private addMiniboss(kind: MinibossKind, hp = MINIBOSS_HP[kind]) {
     const top = this.blockTop()
+    const group = ++this.mbGroupSeq
     const creature =
-      kind === "fish" ? buildFish(this.w, this.h, top) : buildJelly(this.w, this.h, top)
+      kind === "fish"
+        ? buildFish(this.w, this.h, top, group)
+        : buildJelly(this.w, this.h, top, group)
     // Существу нужен целостный силуэт: убираем обычные блоки, с которыми оно налегает.
     this.blocks = [...carveLevelBlocks(this.blocks, creature), ...creature]
     this.blocksInitial = Math.max(1, this.blocks.length)
-    this.minibossMaxHp = MINIBOSS_HP[kind]
-    this.minibossHp = this.minibossMaxHp
-    this.minibossDropX = creature.reduce((s, b) => s + b.x, 0) / creature.length
-    this.minibossDropY = creature.reduce((s, b) => s + b.y, 0) / creature.length
+    const dropX = creature.reduce((s, b) => s + b.x, 0) / creature.length
+    const dropY = creature.reduce((s, b) => s + b.y, 0) / creature.length
+    this.minibosses.push({ kind, group, hp, maxHp: hp, dropX, dropY })
     // У рыбы запоминаем точку рта (нос) — оттуда пойдут пузырьки воздуха.
     if (kind === "fish") {
       const bodyParts = creature.filter((b) => b.mbPart === "body")
@@ -851,8 +862,8 @@ export class Game {
       this.mouthBubbleTimer = rand(0.5, 1.2)
     }
     this.fx.popups.push({
-      x: this.minibossDropX,
-      y: this.minibossDropY - 70,
+      x: dropX,
+      y: dropY - 70,
       text: `МИНИ-БОСС: ${minibossName(kind)}`,
       color: "#ffc94d",
       t: 0,
@@ -863,25 +874,32 @@ export class Game {
   }
 
   /**
-   * Урон в общий пул HP минибосса (блоки существа неразрушаемы — вызывается
-   * из Physics.damageBlock). Тело вспыхивает, при обнулении пула существо
-   * взрывается цепочкой и разыгрывается жизнь (MINIBOSS_LIFE_CHANCE).
+   * Урон в пул HP конкретного существа (блоки минибосса неразрушаемы —
+   * вызывается из Physics.damageBlock с блоком, принявшим удар). Тело
+   * вспыхивает, при обнулении пула существо взрывается цепочкой и
+   * разыгрывается жизнь (MINIBOSS_LIFE_CHANCE).
    */
-  damageMiniboss(dmg: number) {
-    if (this.minibossHp <= 0) return
-    this.minibossHp -= dmg
+  damageMiniboss(dmg: number, block: Block) {
+    const creature = this.minibosses.find((c) => c.group === (block.mbGroup ?? 0))
+    if (!creature || creature.hp <= 0) return
+    creature.hp -= dmg
     this.addRawScore(5)
-    for (const b of this.blocks) if (b.isMiniboss) b.flash = 1
-    if (this.minibossHp <= 0) this.killMiniboss()
+    for (const b of this.blocks) {
+      if (b.isMiniboss && (b.mbGroup ?? 0) === creature.group) b.flash = 1
+    }
+    if (creature.hp <= 0) this.killMiniboss(creature)
     this.pushHud()
   }
 
   /** Пузырьки изо рта рыбы: периодический выдох + подъём с покачиванием. */
   private updateMouthBubbles(dt: number) {
-    if (this.fishMouth && this.minibossHp > 0 && this.phase === "playing") {
+    const fish = this.minibosses.find((c) => c.kind === "fish")
+    if (this.fishMouth && fish && fish.hp > 0 && this.phase === "playing") {
       // рот следует за силуэтом: пузырьки выходят с носа той стороны, куда
       // рыба сейчас повёрнута (плавный разворот — fishFacing из render.ts)
-      const bodyParts = this.blocks.filter((b) => b.isMiniboss && b.mbPart === "body")
+      const bodyParts = this.blocks.filter(
+        (b) => b.isMiniboss && b.mbPart === "body" && (b.mbGroup ?? 0) === fish.group
+      )
       let facing = 1
       if (bodyParts.length) {
         facing = fishFacing(bodyParts, this.time)
@@ -930,8 +948,11 @@ export class Game {
 
   /** Кильватер рыбы: шары рядом с проплывающей рыбой слегка сносит по её ходу. */
   private applyFishWake(dt: number) {
-    if (!this.fishMouth || this.minibossHp <= 0 || this.phase !== "playing") return
-    const bodyParts = this.blocks.filter((b) => b.isMiniboss && b.mbPart === "body")
+    const fish = this.minibosses.find((c) => c.kind === "fish")
+    if (!this.fishMouth || !fish || fish.hp <= 0 || this.phase !== "playing") return
+    const bodyParts = this.blocks.filter(
+      (b) => b.isMiniboss && b.mbPart === "body" && (b.mbGroup ?? 0) === fish.group
+    )
     if (!bodyParts.length) return
     const minX = Math.min(...bodyParts.map((b) => b.x - b.rx))
     const maxX = Math.max(...bodyParts.map((b) => b.x + b.rx))
@@ -956,9 +977,16 @@ export class Game {
     }
   }
 
-  /** Смерть минибосса: цепочка взрывов по силуэту и шанс дропа жизни. */
-  private killMiniboss() {
-    const doomed = this.blocks.filter((b) => b.isMiniboss)
+  /** Смерть минибосса: цепочка взрывов по его силуэту и шанс дропа жизни. */
+  private killMiniboss(creature: {
+    kind: MinibossKind
+    group: number
+    hp: number
+    maxHp: number
+    dropX: number
+    dropY: number
+  }) {
+    const doomed = this.blocks.filter((b) => b.isMiniboss && (b.mbGroup ?? 0) === creature.group)
     let i = 0
     for (const b of doomed) {
       this.boomQueue.push({ x: b.x, y: b.y, at: this.time + 0.06 + i * 0.05 })
@@ -966,14 +994,16 @@ export class Game {
       i++
     }
     this.blocks = this.blocks.filter((b) => !b.dead)
-    this.minibossHp = 0
-    this.minibossMaxHp = 0
-    this.mouthBubbles = []
-    this.fishMouth = false
+    this.minibosses = this.minibosses.filter((c) => c.group !== creature.group)
+    // рыба погибла — пузырьки изо рта и кильватер больше не нужны
+    if (creature.kind === "fish") {
+      this.mouthBubbles = []
+      this.fishMouth = false
+    }
     this.addRawScore(800)
     this.fx.popups.push({
-      x: this.minibossDropX,
-      y: this.minibossDropY,
+      x: creature.dropX,
+      y: creature.dropY,
       text: "+800",
       color: "#ffc94d",
       t: 0,
@@ -985,23 +1015,23 @@ export class Game {
     this.sfx.bossDie()
     if (Math.random() < MINIBOSS_LIFE_CHANCE) {
       this.powers.push({
-        x: this.minibossDropX,
-        y: this.minibossDropY,
+        x: creature.dropX,
+        y: creature.dropY,
         vy: 150,
         type: "life",
         t: 0,
       })
       this.fx.rings.push({
-        x: this.minibossDropX,
-        y: this.minibossDropY,
+        x: creature.dropX,
+        y: creature.dropY,
         r: 8,
         maxR: 120,
         color: "rgba(93,255,176,0.85)",
         t: 0,
       })
       this.fx.popups.push({
-        x: this.minibossDropX,
-        y: this.minibossDropY - 40,
+        x: creature.dropX,
+        y: creature.dropY - 40,
         text: "ЖИЗНЬ!",
         color: "#5dffb0",
         t: 0,
@@ -1282,6 +1312,7 @@ export class Game {
     this.campaignSeed = (daySeed() * 31 + this.runSeq++) | 0
     this.campaign = generateCampaignMap(this.campaignSeed)
     this.campaignMinibossMap = campaignMinibosses(this.campaignSeed, this.campaign.nodes)
+    this.campaignEvent = null
     this.campaignPlayerId = this.campaign.startId
     this.campaignVisited = [this.campaign.startId]
     this.campaignVisible = visibleFrom(this.campaign, this.campaignPlayerId)
@@ -1327,8 +1358,41 @@ export class Game {
     this.sfx.ui()
     this.campaignPlayerId = id
     if (!this.campaignVisited.includes(id)) this.campaignVisited.push(id)
+    if (node.isEvent) {
+      this.resolveCampaignEvent(node)
+      return
+    }
     this.campaignVisible = visibleFrom(this.campaign, id)
     this.startMapBattle(node)
+  }
+
+  /**
+   * Узел-событие: боя нет — подводная стихия (водоворот, течение, гейзер)
+   * детерминированно уносит игрока в один из уже пройденных узлов. В будущем
+   * здесь же появится вариант «остаться на месте за кристаллы».
+   */
+  private resolveCampaignEvent(node: CampaignNode) {
+    if (!this.campaign) return
+    const rng = mulberry32((this.campaignSeed + node.id * 7919) | 0 || 1)
+    const options = this.campaignVisited.filter((v) => v !== node.id)
+    const to = options.length ? options[Math.floor(rng() * options.length)] : this.campaignPlayerId
+    this.campaignPlayerId = to
+    if (!this.campaignVisited.includes(to)) this.campaignVisited.push(to)
+    this.campaignVisible = visibleFrom(this.campaign, to)
+    const target = nodeById(this.campaign, to)
+    const template = EVENT_TEXTS[Math.floor(rng() * EVENT_TEXTS.length)]
+    this.campaignEvent = template.replace("{place}", target ? target.name : "НЕИЗВЕСТНОЕ МЕСТО")
+    this.onBossNode = false
+    this.activeSpec = null
+    this.phase = "map"
+    this.sfx.power()
+    this.pushHud()
+  }
+
+  /** Закрытие экрана события («плыть дальше» — телепорт уже произошёл). */
+  dismissCampaignEvent() {
+    this.campaignEvent = null
+    this.pushHud()
   }
 
   /** Space/Enter на экране карты: входим в узел, если выбор однозначен. */
@@ -1346,6 +1410,7 @@ export class Game {
     if (!this.campaign) return
     this.level = node.tier + 1
     this.levelLostBall = false
+    this.campaignEvent = null
     if (node.isBoss) {
       this.activeSpec = null
       this.onBossNode = true
@@ -1362,11 +1427,13 @@ export class Game {
     this.onBossNode = false
     this.activeSpec = this.nodeSpecFor(node)
     this.buildFromSpec(this.activeSpec)
-    // Минибосс берётся из детерминированного расклада по карте забега
-    // (campaignMinibosses): одна карта — одни и те же минибоссы, и минимум
-    // один существо за забег гарантировано.
-    const miniboss = this.campaignMinibossMap.get(node.id)
-    if (miniboss) this.addMiniboss(miniboss)
+    // Минибоссы берутся из детерминированного расклада по карте забега
+    // (campaignMinibosses): одна карта — одни и те же существа, минимум один
+    // минибосс за забег гарантирован, в узле может быть и пара. HP существ
+    // растёт по мере приближения к финальному боссу.
+    for (const kind of this.campaignMinibossMap.get(node.id) ?? []) {
+      this.addMiniboss(kind, minibossHpFor(kind, node.tier, this.campaign.tiers))
+    }
     this.launchNodeBattle(node.name)
   }
 
@@ -1428,6 +1495,8 @@ export class Game {
     this.saveTop()
     this.phase = "menu"
     this.campaign = null
+    this.campaignMinibossMap = new Map()
+    this.campaignEvent = null
     this.campaignPlayerId = -1
     this.campaignVisited = []
     this.campaignVisible = []
@@ -2055,6 +2124,7 @@ export class Game {
       top: this.top,
       topEndless: this.topEndless,
       map: this.currentMapView(),
+      campaignEvent: this.campaignEvent,
       newAchievements: this.achQueue.splice(0),
     })
   }
@@ -2087,7 +2157,7 @@ export class Game {
     drawBlocks(ctx, this.blocks, this.time)
     drawMinibosses(ctx, this.blocks, this.time)
     drawMouthBubbles(ctx, this.mouthBubbles)
-    drawMinibossBar(ctx, this.minibossHp, this.minibossMaxHp, this.blocks)
+    drawMinibossBar(ctx, this.minibosses, this.blocks)
     drawBoss(ctx, this.bossSys.boss, this.balls, this.blocks)
     drawRings(ctx, this.fx.rings)
     drawPowers(ctx, this.powers)

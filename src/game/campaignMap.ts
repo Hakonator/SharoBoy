@@ -12,14 +12,16 @@ import { clamp, mulberry32 } from "./utils"
 import type { MinibossKind } from "./minibosses"
 
 /** Количество ярусов карты (последний ярус — босс). */
-export const MAP_TIERS = 11
-/** Нижняя и верхняя границы числа ветвей из одного узла. */
-export const MIN_BRANCHES = 1
-export const MAX_BRANCHES = 3
+export const MAP_TIERS = 30
+/** Нижняя и верхняя границы числа ветвей из одного узла (развилка 2–4). */
+export const MIN_BRANCHES = 2
+export const MAX_BRANCHES = 4
 /** Предельная ширина яруса (число узлов в столбце). */
 export const MAX_TIER_WIDTH = 4
+/** Доля узлов-событий среди обычных узлов (бой не проводится, телепорт назад). */
+export const EVENT_NODE_CHANCE = 0.12
 
-/** Имена боевых узлов: пока все узлы, кроме босса, — обычный бой. */
+/** Имена боевых узлов. */
 const NODE_NAMES = [
   "АВАНПОСТ",
   "ПАТРУЛЬ",
@@ -33,6 +35,21 @@ const NODE_NAMES = [
   "ФАРВАТЕР",
 ]
 
+/** Имена узлов-событий: боя нет, событие переносит игрока на пройденный узел. */
+const EVENT_NAMES = ["ВОДОВОРОТ", "ТЕЧЕНИЕ", "ГРОТ", "ГЕЙЗЕР"]
+
+/**
+ * Тексты событий-телепортов (подводная тематика); плейсхолдер {place}
+ * заменяется на имя узла, куда отнесло игрока.
+ */
+export const EVENT_TEXTS = [
+  "ВОДОВОРОТ ЗАСАСАЛ ТЕБЯ И ВЫБРОСИЛ В {place}!",
+  "ПОДВОДНОЕ ТЕЧЕНИЕ УНЕСЛО ШАР ПРЯМО К {place}.",
+  "СТАЯ ЛЕТУЧИХ РЫБ ПОДХВАТИЛА И ВЫНЕСЛА ТЕБЯ В {place}…",
+  "ДРЕВНИЙ ГРОТ ОБВАЛИЛСЯ — ПОТОК ВЫНЕС ТЕБЯ В {place}.",
+  "ГЕЙЗЕР ПОДБРОСИЛ ТЕБЯ К ПОВЕРХНОСТИ, И ВОЛНА ПРИБИЛА К {place}.",
+]
+
 export interface CampaignNode {
   /** Сквозной числовой идентификатор узла. */
   id: number
@@ -43,6 +60,8 @@ export interface CampaignNode {
   y: number
   /** Единственный финальный босс карты. */
   isBoss: boolean
+  /** Узел-событие: без боя, переносит игрока на один из пройденных узлов. */
+  isEvent: boolean
   /** Отображаемое имя узла. */
   name: string
 }
@@ -69,8 +88,9 @@ export interface CampaignMapView {
   edges: CampaignEdge[]
   startId: number
   bossId: number
-  /** Расклад минибоссов по узлам (детерминирован сидом карты). */
-  minibosses: Record<number, MinibossKind>
+  /** Расклад минибоссов по узлам (детерминирован сидом карты); в узле может
+   *  быть и пара существ. */
+  minibosses: Record<number, MinibossKind[]>
   /** Текущая позиция игрока (узел, на котором он стоит). */
   playerId: number
   /** Узлы, пройденные игроком (путь остаётся видимым). */
@@ -80,16 +100,18 @@ export interface CampaignMapView {
 }
 
 /**
- * Создаёт карту забега. Ширины ярусов блуждают от 1 (старт) с шагом ±1,
- * не превышая MAX_TIER_WIDTH, и принудительно сходятся к 1 на ярусе босса.
- * Каждый не-боссовый узел получает 1–3 ребра в следующий ярус, а каждый узел
- * следующего яруса — хотя бы одного родителя (достижимость от старта).
+ * Создаёт карту забега. Ширины ярусов блуждают с шагом ±1 в пределах 2..4
+ * (развилка выбора 2–4 ветви) и принудительно сходятся к 1 на ярусе босса.
+ * Каждый не-боссовый узел получает 2–4 ребра в следующий ярус (у предбоссового
+ * яруса — ровно одно, к единственному боссу), а каждый узел следующего яруса —
+ * хотя бы одного родителя (достижимость от старта). Часть обычных узлов
+ * становится узлами-событиями (без боя, детерминированно по сиду).
  */
 export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): CampaignMap {
   const seed = seedIn | 0 || 1
   const rng = mulberry32(seed)
 
-  /* Ширины ярусов: старт 1, дрейф ±1, последний ярус — единственный босс. */
+  /* Ширины ярусов: старт 1, далее дрейф в коридоре 2..4, последний ярус — босс. */
   const widths = [1]
   for (let t = 1; t < tiers - 1; t++) widths.push(pickWidth(rng, widths[t - 1]))
   widths.push(1)
@@ -102,13 +124,19 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
     const ys = tierYs(rng, widths[t])
     for (let i = 0; i < widths[t]; i++) {
       const isBoss = t === tiers - 1
+      const isEvent = !isBoss && t > 0 && rng() < EVENT_NODE_CHANCE
       nodes.push({
         id,
         tier: t,
         x: 0.04 + (t / Math.max(1, tiers - 1)) * 0.92,
         y: ys[i],
         isBoss,
-        name: isBoss ? "БОСС" : NODE_NAMES[Math.floor(rng() * NODE_NAMES.length)],
+        isEvent,
+        name: isBoss
+          ? "БОСС"
+          : isEvent
+            ? EVENT_NAMES[Math.floor(rng() * EVENT_NAMES.length)]
+            : NODE_NAMES[Math.floor(rng() * NODE_NAMES.length)],
       })
       row.push(id)
       id++
@@ -128,13 +156,12 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
   }
 }
 
-/** Ширина следующего яруса: дрейф ±1; рост ограничен числом ветвей родителя,
- *  иначе узкий ярус не смог бы «накормить» широкий без превышения 3 ветвей. */
+/** Ширина следующего яруса: дрейф ±1 в коридоре 2..MAX_TIER_WIDTH — развилка
+ *  выбора узлов держится в границах MIN_BRANCHES..MAX_BRANCHES. */
 function pickWidth(rng: () => number, prev: number): number {
   const roll = rng()
-  if (roll < 0.5) return prev
-  if (roll < 0.8) return Math.min(prev + 1, MAX_TIER_WIDTH, MAX_BRANCHES * prev)
-  return Math.max(1, prev - 1)
+  const w = roll < 0.45 ? prev : roll < 0.75 ? prev + 1 : prev - 1
+  return clamp(w, 2, MAX_TIER_WIDTH)
 }
 
 /** Вертикальная раскладка узлов яруса: равномерно по слотам + лёгкий джиттер. */
@@ -151,7 +178,8 @@ function tierYs(rng: () => number, w: number): number[] {
 /**
  * Связывает ярусы. Сначала гарантирует каждому узлу следующего яруса хотя бы
  * одного родителя, затем добирает каждый текущий узел до его целевой степени
- * ветвления (1..3). Порядок важен: без первого шага часть узлов оказалась бы
+ * ветвления (2..4, но не больше числа узлов следующего яруса — перед боссом
+ * тот единственный). Порядок важен: без первого шага часть узлов оказалась бы
  * недостижимой от старта, без второго — часть узлов была бы тупиками.
  */
 function linkTiers(rng: () => number, perTier: number[][]): CampaignEdge[] {
