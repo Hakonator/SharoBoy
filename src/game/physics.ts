@@ -9,6 +9,9 @@ import { TIER } from "./palette"
 import type { Ball, Block, BossState, PaddleState, PaddleShapeKind, PowerUp } from "./types"
 import { clamp, rand } from "./utils"
 
+/** Урон огненного ядра: множитель от обычного урона шара. */
+export const FIREBALL_DAMAGE_MULT = 3
+
 /** Узкий срез ввода, нужный ракетке (структурно совместим с InputController). */
 export interface PaddleInput {
   readonly keys: { left: boolean; right: boolean }
@@ -411,17 +414,21 @@ export class Physics {
       ball.x = b.x + plx * cs - ply * sn + wnx * 0.8
       ball.y = b.y + plx * sn + ply * cs + wny * 0.8
       ball.sinceHit = 0
-      if (!fire) {
-        const dot = ball.vx * wnx + ball.vy * wny
-        if (dot < 0) {
-          ball.vx -= 2 * dot * wnx
-          ball.vy -= 2 * dot * wny
-        }
-        this.damageBlock(b, g.debugBallDamage)
-        return
+      if (fire && !b.isMiniboss) {
+        // обычные блоки огонь прожигает насквозь (без отскока)
+        g.sfx.burn()
+        this.damageBlock(b, g.debugBallDamage * FIREBALL_DAMAGE_MULT)
+        continue
       }
-      g.sfx.burn()
-      this.damageBlock(b, 2)
+      // блоки минибоссов (и любые — у обычного шара) отскакивают: «прожигание»
+      // насквозь превращало минибосса в машинку урона; огонь бьёт ×3 от обычного
+      const dot = ball.vx * wnx + ball.vy * wny
+      if (dot < 0) {
+        ball.vx -= 2 * dot * wnx
+        ball.vy -= 2 * dot * wny
+      }
+      this.damageBlock(b, g.debugBallDamage * (fire ? FIREBALL_DAMAGE_MULT : 1))
+      return
     }
   }
 
@@ -446,7 +453,7 @@ export class Physics {
     }
     ball.squash = 1
     ball.sinceHit = 0
-    g.damageBoss(g.debugBallDamage * (g.fireActive() ? 2 : 1), false)
+    g.damageBoss(g.debugBallDamage * (g.fireActive() ? FIREBALL_DAMAGE_MULT : 1), false)
   }
 
   /** Урон блоку; при разрушении — очки, эффекты, дроп бонуса, «матрёшка». */
