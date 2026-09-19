@@ -88,24 +88,39 @@ describe("SFX: раздельные ползунки громкости музы
     expect(s.musicMuted).toBe(false)
   })
 
-  it("pauseMusic/resumeMusic — временная пауза, не трогающая настройки игрока", () => {
+  it("у карты кампании свой трек — без MP3-кроссфейдов", () => {
     stubStorage()
     const s = new SFX()
-    s.setMusicMuted(true)
-    // Игра глушит музыку на карте кампании…
-    s.pauseMusic()
-    const paused = () => (s as unknown as { musicPaused: boolean }).musicPaused
-    expect(paused()).toBe(true)
-    // …пользовательские переключатели при этом не изменяются
-    expect(s.musicMuted).toBe(true)
-    // resumeMusic снимает только игровую паузу, mute остаётся как был
-    s.resumeMusic()
-    expect(paused()).toBe(false)
-    expect(s.musicMuted).toBe(true)
-    // Повторный pause/resume и вызовы без паузы не падают в тестовом окружении
-    s.pauseMusic()
-    s.resumeMusic()
-    s.resumeMusic()
-    expect(paused()).toBe(false)
+    s.setTrack("map")
+    const internals = s as unknown as { track: string; fileMode: boolean }
+    expect(internals.track).toBe("map")
+    // На карте играет тихий встроенный секвенсор, MP3-набор не тратится
+    expect(internals.fileMode).toBe(false)
+    // Обычные фазы по-прежнему используют MP3, если файлы есть
+    s.setTrack("game")
+    expect(internals.track).toBe("game")
+  })
+
+  it("тема карты — медленная, разреженная и в пределах MIDI", () => {
+    const sfx = SFX as unknown as {
+      stepFor: (t: "menu" | "game" | "map") => number
+      MAP_LEAD: number[]
+      MAP_BASS: number[]
+    }
+    // темп карты — самый медленный из трёх
+    expect(sfx.stepFor("map")).toBeGreaterThan(sfx.stepFor("menu"))
+    expect(sfx.stepFor("menu")).toBeGreaterThan(sfx.stepFor("game"))
+    const lead = sfx.MAP_LEAD
+    const bass = sfx.MAP_BASS
+    expect(lead.length).toBe(bass.length)
+    // все значения — валидный MIDI (0 = пауза)
+    for (const n of [...lead, ...bass]) {
+      expect(n).toBeGreaterThanOrEqual(0)
+      expect(n).toBeLessThan(100)
+    }
+    // ненавязчивость: пауз больше, чем нот, минимум двое к одному
+    const notes = lead.filter((n) => n > 0).length
+    expect(notes).toBeGreaterThan(0)
+    expect(lead.length - notes).toBeGreaterThan(notes * 2)
   })
 })

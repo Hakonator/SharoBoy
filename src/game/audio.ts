@@ -43,7 +43,7 @@ function createAudio(src: string): HTMLAudioElement | null {
   return el
 }
 
-type MusicKind = "menu" | "game"
+type MusicKind = "menu" | "game" | "map"
 
 /** Крошечный WebAudio-синтезатор: короткие блипы на каждое действие +
  *  8-битная фоновая музыка (встроенный трекер, без внешних файлов). */
@@ -67,8 +67,6 @@ export class SFX {
   private musicStep = 0
   /** Активный трек. */
   private track: MusicKind = "menu"
-  /** Музыка временно заглушена игрой (карта кампании) — не путать с mute. */
-  private musicPaused = false
   /** MP3-режим: играет файл из общего набора (вместо встроенного секвенсора). */
   private fileAudio: HTMLAudioElement | null = null
   private fileMode = MUSIC_FILES.length > 0
@@ -88,9 +86,10 @@ export class SFX {
     return 440 * Math.pow(2, (m - 69) / 12)
   }
 
-  /** Размер шага (восьмая нота) для трека. Меню — медленно и «душевно». */
+  /** Размер шага (восьмая нота) для трека. Меню — медленно и «душевно»,
+   *  карта кампании — совсем неторопливо и загадочно. */
   private static stepFor(track: MusicKind): number {
-    return track === "menu" ? 60 / 76 / 2 : 60 / 144 / 2
+    return track === "menu" ? 60 / 76 / 2 : track === "map" ? 60 / 48 / 2 : 60 / 144 / 2
   }
 
   /** Вкл/выкл музыку во время игры: файл — пауза/продолжение с места,
@@ -155,11 +154,12 @@ export class SFX {
 
   /** Переключение фоновой музыки. Каждый вызов (старт уровня, переход на
    *  следующий уровень, выход в меню) запускает НОВЫЙ случайный MP3-трек из
-   *  набора с плавным переходом; без файлов — встроенный трекер по фазе. */
+   *  набора с плавным переходом; для карты кампании MP3 не тратится — там
+   *  играет собственный тихий синт-трек; без файлов — встроенный трекер. */
   setTrack(track: MusicKind) {
     this.track = track
     this.musicStep = 0
-    this.fileMode = MUSIC_FILES.length > 0
+    this.fileMode = track !== "map" && MUSIC_FILES.length > 0
     // Файловая музыка работает и без WebAudio; секвенсору нужен контекст.
     if (!this.ctx && !this.fileMode) return // ensure ещё не был — дождётся жеста
     this.nextBeat = this.ctx ? this.ctx.currentTime + 0.05 : 0
@@ -175,7 +175,6 @@ export class SFX {
   /** Случайный MP3-трек из общего набора (без повтора предыдущего) с плавным
    *  кроссфейдом: предыдущий трек гаснет, новый нарастает. */
   private playFileMusic() {
-    if (this.musicPaused) return // карта кампании: музыку заглушила игра
     if (!MUSIC_FILES.length) return
     let pick = MUSIC_FILES[Math.floor(Math.random() * MUSIC_FILES.length)]
     if (MUSIC_FILES.length > 1 && pick === this.fileUrl) {
@@ -228,23 +227,20 @@ export class SFX {
     this.fileUrl = null
   }
 
-  /** Временная пауза фоновой музыки без изменения пользовательских настроек
-   *  (экран карты кампании: игрок проводит там секунды, и постоянные
-   *  кроссфейды треков только раздражают). Возобновление — resumeMusic(). */
-  pauseMusic() {
-    this.musicPaused = true
-    this.stopFileMusic()
-    if (this.musicTimer !== null) {
-      clearTimeout(this.musicTimer)
-      this.musicTimer = null
-    }
-  }
-
-  /** Возобновление музыки после pauseMusic(): сама по себе трек не запускает —
-   *  это делает следующий setTrack() (вход в бой/меню). */
-  resumeMusic() {
-    this.musicPaused = false
-  }
+  /** Медленная загадочная тема карты кампании: редкие «тающие» ноты ля минора
+   *  над тяжёлым органным басом (Am–F–Dm–E). 64 восьмых (~40 c при 48 BPM),
+   *  больше 80% такта — паузы: мелодия лишь иногда проступает из глубины. */
+  private static MAP_LEAD = [
+    57, 0, 0, 0, 0, 0, 64, 0, 0, 0, 60, 0, 0, 0, 0, 0, 53, 0, 0, 0, 0, 0, 60, 0, 0, 0, 57, 0, 0, 0,
+    0, 0, 50, 0, 0, 0, 0, 0, 57, 0, 0, 0, 53, 0, 0, 0, 0, 0, 52, 0, 0, 0, 0, 0, 59, 0, 0, 0, 56, 0,
+    0, 0, 0, 0,
+  ]
+  /** Бас карты: корень аккорда раз в такт + квинта к концу — тянущийся пунктик. */
+  private static MAP_BASS = [
+    45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 45, 0, 0, 0, 41, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 41, 0, 0,
+    0, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 38, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 47, 0,
+    0, 0,
+  ]
 
   /** Медленный душевный трек меню: квадрат-мелодия + тихий треугольник-бас.
    *  Ля минор, 64 восьмых (~25 c при 76 BPM). Задумчивое арпеджио. */
@@ -806,7 +802,6 @@ export class SFX {
 
   /** Lookahead-секвенсор: планирует ноты заранее, чтобы луп не «спотыкался». */
   private scheduleMusic = () => {
-    if (this.musicPaused) return // карта кампании: музыку заглушила игра
     if (!this.musicOn || !this.ctx || this.fileMode) return // mp3 управляет собой
     if (this.musicMuted) {
       // Музыка выключена: держим ритм-курсор актуальным и продолжаем тикать,
@@ -817,9 +812,10 @@ export class SFX {
       return
     }
     const step = SFX.stepFor(this.track)
-    const lead = this.track === "menu" ? SFX.MENU_LEAD : SFX.GAME_LEAD
-    const bass = this.track === "menu" ? SFX.MENU_BASS : SFX.GAME_BASS
-    const theme = this.track === "menu" ? null : SFX.GAME_THEME
+    const isMap = this.track === "map"
+    const lead = this.track === "menu" ? SFX.MENU_LEAD : isMap ? SFX.MAP_LEAD : SFX.GAME_LEAD
+    const bass = this.track === "menu" ? SFX.MENU_BASS : isMap ? SFX.MAP_BASS : SFX.GAME_BASS
+    const theme = this.track === "game" ? SFX.GAME_THEME : null
     const L = lead.length
     while (this.nextBeat < this.ctx.currentTime + 0.5) {
       const i = this.musicStep % L
@@ -832,14 +828,25 @@ export class SFX {
       if (m > 0)
         this.tone(
           SFX.midi(m),
-          step * 0.8,
-          isMenu ? "triangle" : "square",
-          isMenu ? 0.05 : 0.06,
+          // карта: ноты долгие и «тающие» — эффект подводной загадки
+          isMap ? step * 4 : step * 0.8,
+          isMenu || isMap ? "triangle" : "square",
+          isMap ? 0.04 : isMenu ? 0.05 : 0.06,
           undefined,
           delay,
           this.musicGain
         )
-      if (b > 0) this.tone(SFX.midi(b), step, "triangle", 0.07, undefined, delay, this.musicGain)
+      if (b > 0)
+        this.tone(
+          SFX.midi(b),
+          // карта: бас — почти органный пунктик, тянется через такт
+          isMap ? step * 7 : step,
+          "triangle",
+          isMap ? 0.05 : 0.07,
+          undefined,
+          delay,
+          this.musicGain
+        )
       if (th !== undefined && th > 0)
         this.tone(SFX.midi(th), step * 0.7, "triangle", 0.045, undefined, delay, this.musicGain)
       this.musicStep++
