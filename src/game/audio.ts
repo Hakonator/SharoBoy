@@ -67,6 +67,8 @@ export class SFX {
   private musicStep = 0
   /** Активный трек. */
   private track: MusicKind = "menu"
+  /** Музыка временно заглушена игрой (карта кампании) — не путать с mute. */
+  private musicPaused = false
   /** MP3-режим: играет файл из общего набора (вместо встроенного секвенсора). */
   private fileAudio: HTMLAudioElement | null = null
   private fileMode = MUSIC_FILES.length > 0
@@ -173,6 +175,7 @@ export class SFX {
   /** Случайный MP3-трек из общего набора (без повтора предыдущего) с плавным
    *  кроссфейдом: предыдущий трек гаснет, новый нарастает. */
   private playFileMusic() {
+    if (this.musicPaused) return // карта кампании: музыку заглушила игра
     if (!MUSIC_FILES.length) return
     let pick = MUSIC_FILES[Math.floor(Math.random() * MUSIC_FILES.length)]
     if (MUSIC_FILES.length > 1 && pick === this.fileUrl) {
@@ -223,6 +226,24 @@ export class SFX {
       this.fileAudio = null
     }
     this.fileUrl = null
+  }
+
+  /** Временная пауза фоновой музыки без изменения пользовательских настроек
+   *  (экран карты кампании: игрок проводит там секунды, и постоянные
+   *  кроссфейды треков только раздражают). Возобновление — resumeMusic(). */
+  pauseMusic() {
+    this.musicPaused = true
+    this.stopFileMusic()
+    if (this.musicTimer !== null) {
+      clearTimeout(this.musicTimer)
+      this.musicTimer = null
+    }
+  }
+
+  /** Возобновление музыки после pauseMusic(): сама по себе трек не запускает —
+   *  это делает следующий setTrack() (вход в бой/меню). */
+  resumeMusic() {
+    this.musicPaused = false
   }
 
   /** Медленный душевный трек меню: квадрат-мелодия + тихий треугольник-бас.
@@ -785,6 +806,7 @@ export class SFX {
 
   /** Lookahead-секвенсор: планирует ноты заранее, чтобы луп не «спотыкался». */
   private scheduleMusic = () => {
+    if (this.musicPaused) return // карта кампании: музыку заглушила игра
     if (!this.musicOn || !this.ctx || this.fileMode) return // mp3 управляет собой
     if (this.musicMuted) {
       // Музыка выключена: держим ритм-курсор актуальным и продолжаем тикать,

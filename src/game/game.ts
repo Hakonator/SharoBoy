@@ -1411,6 +1411,7 @@ export class Game {
       // игрок остаётся на месте и идёт дальше с этого узла
       this.campaignVisible = visibleFrom(this.campaign, node.id)
       this.phase = "map"
+      this.applyTrack()
       this.pushHud()
       return
     }
@@ -1422,6 +1423,7 @@ export class Game {
     this.onBossNode = false
     this.activeSpec = null
     this.phase = "map"
+    this.applyTrack()
     this.sfx.power()
     this.pushHud()
   }
@@ -1655,9 +1657,16 @@ export class Game {
     this.pushHud()
   }
 
-  /** Трек по фазе: в меню/финале — душевный медленный, в партии — боевой. */
+  /** Трек по фазе: в меню/финале — душевный медленный, в партии — боевой.
+   *  На карте кампании музыка глушится: игрок проводит там секунды, и каждый
+   *  вход/выход на карту гонял кроссфейды треков туда-обратно. */
   private applyTrack() {
     this.sfx.ensure() // музыка обязана звучать с первого момента уровня
+    if (this.phase === "map") {
+      this.sfx.pauseMusic()
+      return
+    }
+    this.sfx.resumeMusic()
     this.sfx.setTrack(this.phase === "playing" || this.phase === "paused" ? "game" : "menu")
   }
 

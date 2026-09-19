@@ -87,4 +87,25 @@ describe("SFX: раздельные ползунки громкости музы
     s.setMusicMuted(false)
     expect(s.musicMuted).toBe(false)
   })
+
+  it("pauseMusic/resumeMusic — временная пауза, не трогающая настройки игрока", () => {
+    stubStorage()
+    const s = new SFX()
+    s.setMusicMuted(true)
+    // Игра глушит музыку на карте кампании…
+    s.pauseMusic()
+    const paused = () => (s as unknown as { musicPaused: boolean }).musicPaused
+    expect(paused()).toBe(true)
+    // …пользовательские переключатели при этом не изменяются
+    expect(s.musicMuted).toBe(true)
+    // resumeMusic снимает только игровую паузу, mute остаётся как был
+    s.resumeMusic()
+    expect(paused()).toBe(false)
+    expect(s.musicMuted).toBe(true)
+    // Повторный pause/resume и вызовы без паузы не падают в тестовом окружении
+    s.pauseMusic()
+    s.resumeMusic()
+    s.resumeMusic()
+    expect(paused()).toBe(false)
+  })
 })

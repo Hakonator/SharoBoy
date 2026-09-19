@@ -304,6 +304,10 @@ describe("сквозной цикл кампании по карте", () => {
     const map = raw.campaign
     expect(map).toBeTruthy()
 
+    /** Пауза музыки: на карте заглушена, в бою играет. */
+    const musicPaused = () => (g as unknown as { sfx: { musicPaused: boolean } }).sfx.musicPaused
+    expect(musicPaused(), "на экране карты музыка заглушена").toBe(true)
+
     /** Мгновенная зачистка боя (как в сквозном прогоне выше). */
     const clearBattle = () => {
       step(3)
@@ -341,6 +345,7 @@ describe("сквозной цикл кампании по карте", () => {
       // любой узел заканчивается боем: телепорт на цель или бой на месте
       // (повторный вход в уже сработавшее событие — обычный бой)
       expect(g.phase).toBe("playing")
+      expect(musicPaused(), "в бою музыка возобновлена").toBe(false)
       const battleNode = map.nodes.find((n) => n.id === raw.campaignPlayerId)!
       if (firstTrigger) {
         // телепорт: цель — не-событие не дальше 3 зон назад
