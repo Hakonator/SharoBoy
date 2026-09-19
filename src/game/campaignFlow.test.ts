@@ -122,8 +122,14 @@ function makeEnv() {
     getContext: () => ctx,
   } as unknown as HTMLCanvasElement
 
-  const hudLog: { phase: string; map: CampaignMapView | null }[] = []
-  const game = new Game(canvas, (h) => hudLog.push({ phase: h.phase, map: h.map }))
+  const hudLog: {
+    phase: string
+    map: CampaignMapView | null
+    campaignEvent: string | null
+  }[] = []
+  const game = new Game(canvas, (h) =>
+    hudLog.push({ phase: h.phase, map: h.map, campaignEvent: h.campaignEvent })
+  )
   ;(game as unknown as { attach: () => void }).attach()
   let t = 1000
   ;(game as unknown as { last: number }).last = t
@@ -221,17 +227,24 @@ describe("сквозной цикл кампании по карте", () => {
       g.enterMapNode(targetId)
       expect(g.phase === "map" || g.phase === "playing").toBe(true)
 
+      // узел, на котором реально идёт бой (событие может телепортировать назад)
+      let battleNode = target
       if (target.isEvent) {
-        // событие не запускает бой: игрока относит в один из посещённых узлов
+        // событие: сначала экран с сообщением, фишка ещё на месте
         expect(g.phase).toBe("map")
-        expect(raw.campaignVisited).toContain(raw.campaignPlayerId)
+        expect(hudLog[hudLog.length - 1].campaignEvent).toBeTruthy()
         g.dismissCampaignEvent()
-        continue
+        // после подтверждения фишка перемещена на узел назначения и бой
+        // уже стартовал; узлом назначения не может быть узел-событие —
+        // цепочка телепортов на одном ходу исключена
+        expect(g.phase).toBe("playing")
+        battleNode = map.nodes.find((n) => n.id === raw.campaignPlayerId)!
+        expect(battleNode.isEvent).toBe(false)
       }
 
-      expect(raw.campaignPlayerId).toBe(target.id)
+      expect(raw.campaignPlayerId).toBe(battleNode.id)
       expect(g.phase).toBe("playing")
-      expect(g.onBossNode).toBe(target.isBoss)
+      expect(g.onBossNode).toBe(battleNode.isBoss)
       // во время боя снимок карты в HUD отсутствует
       expect(hudLog[hudLog.length - 1].map).toBeNull()
 
@@ -247,17 +260,17 @@ describe("сквозной цикл кампании по карте", () => {
       raw.powers.length = 0
       step(3)
 
-      if (target.isBoss) {
+      if (battleNode.isBoss) {
         bossFought = true
         expect(g.phase, "после финального босса забег завершён").toBe("won")
       } else {
         expect(g.phase, "обычный узел возвращает на карту").toBe("map")
-        expect(raw.campaignPlayerId).toBe(target.id)
-        expect(raw.campaignVisited).toContain(target.id)
+        expect(raw.campaignPlayerId).toBe(battleNode.id)
+        expect(raw.campaignVisited).toContain(battleNode.id)
         expect(raw.campaignVisible).toEqual(
-          map.edges.filter((e) => e.from === target.id).map((e) => e.to)
+          map.edges.filter((e) => e.from === battleNode.id).map((e) => e.to)
         )
-        expect(hudLog[hudLog.length - 1].map?.playerId).toBe(target.id)
+        expect(hudLog[hudLog.length - 1].map?.playerId).toBe(battleNode.id)
       }
     }
 

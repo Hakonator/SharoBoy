@@ -17,6 +17,7 @@ import {
   minibossName,
   MINIBOSS_HP,
   MINIBOSS_LIFE_CHANCE,
+  rollMiniboss,
   type MinibossKind,
 } from "./minibosses"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
@@ -196,6 +197,8 @@ export class Game {
   private campaignMinibossMap: Map<number, MinibossKind[]> = new Map()
   /** Активное событие на карте (текст для оверлея; null — события нет). */
   private campaignEvent: string | null = null
+  /** Узел назначения события-телепорта (бой стартует после подтверждения). */
+  private campaignEventTarget = -1
   private campaignPlayerId = -1
   private campaignVisited: number[] = []
   private campaignVisible: number[] = []
@@ -1314,6 +1317,7 @@ export class Game {
     this.campaign = generateCampaignMap(this.campaignSeed)
     this.campaignMinibossMap = campaignMinibosses(this.campaignSeed, this.campaign.nodes)
     this.campaignEvent = null
+    this.campaignEventTarget = -1
     this.campaignPlayerId = this.campaign.startId
     this.campaignVisited = [this.campaign.startId]
     this.campaignVisible = visibleFrom(this.campaign, this.campaignPlayerId)
@@ -1369,19 +1373,25 @@ export class Game {
 
   /**
    * Узел-событие: боя нет — подводная стихия (водоворот, течение, гейзер)
-   * детерминированно уносит игрока в один из уже пройденных узлов. В будущем
-   * здесь же появится вариант «остаться на месте за кристаллы».
+   * уносит игрока в один из уже пройденных узлов. Расклад события (узел
+   * назначения и текст) рандомизируется прямо в момент срабатывания — живым
+   * ГПСЧ, а не детерминированным раскладом карты. Целями не могут быть
+   * узлы-события: цепочка телепортов на одном ходу исключена. Само перемещение
+   * фишки и старт боя на узле назначения происходят в dismissCampaignEvent,
+   * после того как игрок прочитал сообщение. В будущем здесь же появится
+   * вариант «остаться на месте за кристаллы».
    */
   private resolveCampaignEvent(node: CampaignNode) {
     if (!this.campaign) return
-    const rng = mulberry32((this.campaignSeed + node.id * 7919) | 0 || 1)
-    const options = this.campaignVisited.filter((v) => v !== node.id)
-    const to = options.length ? options[Math.floor(rng() * options.length)] : this.campaignPlayerId
-    this.campaignPlayerId = to
-    if (!this.campaignVisited.includes(to)) this.campaignVisited.push(to)
-    this.campaignVisible = visibleFrom(this.campaign, to)
-    const target = nodeById(this.campaign, to)
-    const template = EVENT_TEXTS[Math.floor(rng() * EVENT_TEXTS.length)]
+    const options = this.campaignVisited.filter((v) => {
+      if (v === node.id) return false
+      const visited = nodeById(this.campaign!, v)
+      return !!visited && !visited.isEvent
+    })
+    const to = options.length ? options[Math.floor(Math.random() * options.length)] : -1
+    this.campaignEventTarget = to
+    const target = to >= 0 ? nodeById(this.campaign, to) : undefined
+    const template = EVENT_TEXTS[Math.floor(Math.random() * EVENT_TEXTS.length)]
     this.campaignEvent = template.replace("{place}", target ? target.name : "НЕИЗВЕСТНОЕ МЕСТО")
     this.onBossNode = false
     this.activeSpec = null
@@ -1390,10 +1400,29 @@ export class Game {
     this.pushHud()
   }
 
-  /** Закрытие экрана события («плыть дальше» — телепорт уже произошёл). */
+  /**
+   * Закрытие экрана события («плыть дальше»): фишка перемещается на узел из
+   * сообщения, и там сразу стартует бой — с вновь случайным шансом минибоссов
+   * (не по раскладу карты). Повторные события-телепорты на этом ходу исключены:
+   * узлы-события не бывают целью, бой стартует напрямую.
+   */
   dismissCampaignEvent() {
+    const target = this.campaignEventTarget
     this.campaignEvent = null
-    this.pushHud()
+    this.campaignEventTarget = -1
+    if (this.phase !== "map" || !this.campaign || target < 0) {
+      this.pushHud()
+      return
+    }
+    const node = nodeById(this.campaign, target)
+    if (!node || node.isEvent) {
+      this.pushHud()
+      return
+    }
+    this.campaignPlayerId = target
+    if (!this.campaignVisited.includes(target)) this.campaignVisited.push(target)
+    this.campaignVisible = visibleFrom(this.campaign, target)
+    this.startMapBattle(node, true)
   }
 
   /** Space/Enter на экране карты: входим в узел, если выбор однозначен. */
@@ -1406,8 +1435,10 @@ export class Game {
   /**
    * Запуск боя на узле карты. Обычный узел — авторская раскладка кампании по
    * кругу, узел босса — финальная арена, масштабирующаяся по ярусу.
+   * @param rerollMinibosses true — минибоссы разыгрываются заново случайным
+   *   шансом (узел после события-телепорта), а не берутся из расклада карты.
    */
-  private startMapBattle(node: CampaignNode) {
+  private startMapBattle(node: CampaignNode, rerollMinibosses = false) {
     if (!this.campaign) return
     this.level = node.tier + 1
     this.levelLostBall = false
@@ -1428,11 +1459,14 @@ export class Game {
     this.onBossNode = false
     this.activeSpec = this.nodeSpecFor(node)
     this.buildFromSpec(this.activeSpec)
-    // Минибоссы берутся из детерминированного расклада по карте забега
-    // (campaignMinibosses): одна карта — одни и те же существа, минимум один
-    // минибосс за забег гарантирован, в узле может быть и пара. HP существ
-    // растёт по мере приближения к финальному боссу.
-    for (const kind of this.campaignMinibossMap.get(node.id) ?? []) {
+    // Минибоссы: обычный детерминированный расклад по карте забега (одна карта
+    // — одни и те же существа, минимум один минибосс за забег гарантирован,
+    // в узле может быть и пара) — либо свежий случайный ролл, если узел взят
+    // событием-телепортом. HP существ растёт по мере приближения к боссу.
+    const kinds = rerollMinibosses
+      ? rollMiniboss(Math.floor(Math.random() * 0x7fffffff) | 0 || 1, node.id)
+      : (this.campaignMinibossMap.get(node.id) ?? [])
+    for (const kind of kinds) {
       this.addMiniboss(kind, minibossHpFor(kind, node.tier, this.campaign.tiers))
     }
     this.launchNodeBattle(node.name)
@@ -1498,6 +1532,7 @@ export class Game {
     this.campaign = null
     this.campaignMinibossMap = new Map()
     this.campaignEvent = null
+    this.campaignEventTarget = -1
     this.campaignPlayerId = -1
     this.campaignVisited = []
     this.campaignVisible = []
