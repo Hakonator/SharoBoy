@@ -160,4 +160,16 @@ describe("generateCampaignMap", () => {
     // за 60 карт события обязаны встретиться
     expect(totalEvents).toBeGreaterThan(0)
   })
+
+  it("дети держатся возле родителей: рёбра — короткие диагонали вверх/вниз", () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const map = generateCampaignMap(seed)
+      for (const e of map.edges) {
+        const a = nodeById(map, e.from)!
+        const b = nodeById(map, e.to)!
+        // ребро не тянет через всю высоту карты — вертикальный разлёт ограничен
+        expect(Math.abs(a.y - b.y), `сид ${seed}: ребро ${e.from}>${e.to}`).toBeLessThanOrEqual(0.5)
+      }
+    }
+  })
 })

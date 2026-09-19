@@ -121,7 +121,6 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
   let id = 0
   for (let t = 0; t < tiers; t++) {
     const row: number[] = []
-    const ys = tierYs(rng, widths[t])
     for (let i = 0; i < widths[t]; i++) {
       const isBoss = t === tiers - 1
       const isEvent = !isBoss && t > 0 && rng() < EVENT_NODE_CHANCE
@@ -129,7 +128,7 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
         id,
         tier: t,
         x: 0.04 + (t / Math.max(1, tiers - 1)) * 0.92,
-        y: ys[i],
+        y: 0.5, // точная вертикаль считается после связывания ярусов
         isBoss,
         isEvent,
         name: isBoss
@@ -145,6 +144,7 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
   }
 
   const edges = linkTiers(rng, perTier)
+  assignYs(rng, perTier, edges, nodes)
 
   return {
     seed,
@@ -164,15 +164,77 @@ function pickWidth(rng: () => number, prev: number): number {
   return clamp(w, 2, MAX_TIER_WIDTH)
 }
 
-/** Вертикальная раскладка узлов яруса: равномерно по слотам + лёгкий джиттер. */
-function tierYs(rng: () => number, w: number): number[] {
-  const ys: number[] = []
-  for (let i = 0; i < w; i++) {
-    const slot = w === 1 ? 0.5 : 0.08 + (i / (w - 1)) * 0.84
-    const jitter = (rng() - 0.5) * Math.min(0.14, 0.4 / w)
-    ys.push(clamp(slot + jitter, 0.06, 0.94))
+/** Минимальный вертикальный зазор между узлами одного яруса (доля высоты). */
+const MIN_NODE_GAP = 0.13
+/** Диагональный разброс детей относительно родителя (±половина). */
+const CHILD_SPREAD = 0.18
+
+/**
+ * Вертикальная раскладка: узлы держатся рядом со своими родителями, а не
+ * разбросаны по всей высоте колонки. Рёбра получаются короткими диагоналями
+ * вверх и вниз («спираль» вдоль пути), а не горизонтальными линиями через всю
+ * карту. После раскладки узлы яруса разводятся на MIN_NODE_GAP, чтобы не
+ * слипались на экране.
+ */
+function assignYs(
+  rng: () => number,
+  perTier: number[][],
+  edges: CampaignEdge[],
+  nodes: CampaignNode[]
+) {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const parentsOf = new Map<number, number[]>()
+  for (const e of edges) {
+    const list = parentsOf.get(e.to) ?? []
+    list.push(e.from)
+    parentsOf.set(e.to, list)
   }
-  return ys
+  for (let t = 0; t < perTier.length; t++) {
+    if (t === 0) {
+      byId.get(perTier[0][0])!.y = 0.5
+      continue
+    }
+    // цель: середина родителей + лёгкий диагональный дрейф вверх/вниз
+    const targets = new Map<number, number>()
+    for (const id of perTier[t]) {
+      const parents = parentsOf.get(id) ?? []
+      const base = parents.length
+        ? parents.reduce((s, p) => s + byId.get(p)!.y, 0) / parents.length
+        : 0.5
+      targets.set(id, base + (rng() - 0.5) * CHILD_SPREAD)
+    }
+    // разведение: узлы сортируются по цели, зажимаются в допустимое окно и
+    // расталкиваются на MIN_NODE_GAP — по возможности оставаясь у своей цели
+    const order = [...perTier[t]].sort((a, b) => targets.get(a)! - targets.get(b)!)
+    const n = order.length
+    const ys = order.map((id) => targets.get(id)!)
+    for (let i = 0; i < n; i++) {
+      ys[i] = clamp(ys[i], 0.06 + i * MIN_NODE_GAP, 0.94 - (n - 1 - i) * MIN_NODE_GAP)
+    }
+    // проекции на ограничения зазоров (вперёд-назад до сходимости):
+    //forward: вниз, backward: вверх — узлы не уезжают далеко от целей
+    for (let iter = 0; iter < 50; iter++) {
+      let moved = false
+      for (let i = 1; i < n; i++) {
+        const v = Math.max(ys[i], ys[i - 1] + MIN_NODE_GAP)
+        if (v !== ys[i]) {
+          ys[i] = v
+          moved = true
+        }
+      }
+      for (let i = n - 2; i >= 0; i--) {
+        const v = Math.min(ys[i], ys[i + 1] - MIN_NODE_GAP)
+        if (v !== ys[i]) {
+          ys[i] = v
+          moved = true
+        }
+      }
+      if (!moved) break
+    }
+    order.forEach((id, i) => {
+      byId.get(id)!.y = clamp(ys[i], 0.04, 0.96)
+    })
+  }
 }
 
 /**

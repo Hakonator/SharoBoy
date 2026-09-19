@@ -11,13 +11,12 @@ import { fixedVariant, pickBossVariant, type BossVariant } from "./bossVariants"
 import {
   buildFish,
   buildJelly,
-  campaignMinibosses,
   carveLevelBlocks,
   minibossHpFor,
   minibossName,
   MINIBOSS_HP,
   MINIBOSS_LIFE_CHANCE,
-  rollMiniboss,
+  rollMinibossLive,
   type MinibossKind,
 } from "./minibosses"
 import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
@@ -193,8 +192,11 @@ export class Game {
 
   /** Карта забега кампании и позиция игрока на ней (для экрана карты). */
   private campaign: CampaignMap | null = null
-  /** Детерминированный расклад минибоссов по узлам текущего забега. */
-  private campaignMinibossMap: Map<number, MinibossKind[]> = new Map()
+  /** Появлявшиеся минибоссы по узлам текущего забега (для маркеров карты) —
+   *  заполняется в момент старта каждого боя. */
+  private campaignMbSeen: Record<number, MinibossKind[]> = {}
+  /** Сколько боёв подряд прошло без минибосса (растит шанс появления). */
+  private minibossPity = 0
   /** Активное событие на карте (текст для оверлея; null — события нет). */
   private campaignEvent: string | null = null
   /** Узел назначения события-телепорта (бой стартует после подтверждения). */
@@ -1315,7 +1317,8 @@ export class Game {
   private startCampaignMap() {
     this.campaignSeed = (daySeed() * 31 + this.runSeq++) | 0
     this.campaign = generateCampaignMap(this.campaignSeed)
-    this.campaignMinibossMap = campaignMinibosses(this.campaignSeed, this.campaign.nodes)
+    this.campaignMbSeen = {}
+    this.minibossPity = 0
     this.campaignEvent = null
     this.campaignEventTarget = -1
     this.campaignPlayerId = this.campaign.startId
@@ -1422,7 +1425,7 @@ export class Game {
     this.campaignPlayerId = target
     if (!this.campaignVisited.includes(target)) this.campaignVisited.push(target)
     this.campaignVisible = visibleFrom(this.campaign, target)
-    this.startMapBattle(node, true)
+    this.startMapBattle(node)
   }
 
   /** Space/Enter на экране карты: входим в узел, если выбор однозначен. */
@@ -1434,11 +1437,10 @@ export class Game {
 
   /**
    * Запуск боя на узле карты. Обычный узел — авторская раскладка кампании по
-   * кругу, узел босса — финальная арена, масштабирующаяся по ярусу.
-   * @param rerollMinibosses true — минибоссы разыгрываются заново случайным
-   *   шансом (узел после события-телепорта), а не берутся из расклада карты.
+   * кругу, узел босса — финальная арена, масштабирующаяся по ярусу. Минибоссы
+   * разыгрываются полностью случайно при старте каждого боя с pity-системой.
    */
-  private startMapBattle(node: CampaignNode, rerollMinibosses = false) {
+  private startMapBattle(node: CampaignNode) {
     if (!this.campaign) return
     this.level = node.tier + 1
     this.levelLostBall = false
@@ -1459,14 +1461,13 @@ export class Game {
     this.onBossNode = false
     this.activeSpec = this.nodeSpecFor(node)
     this.buildFromSpec(this.activeSpec)
-    // Минибоссы: обычный детерминированный расклад по карте забега (одна карта
-    // — одни и те же существа, минимум один минибосс за забег гарантирован,
-    // в узле может быть и пара) — либо свежий случайный ролл, если узел взят
-    // событием-телепортом. HP существ растёт по мере приближения к боссу.
-    const kinds = rerollMinibosses
-      ? rollMiniboss(Math.floor(Math.random() * 0x7fffffff) | 0 || 1, node.id)
-      : (this.campaignMinibossMap.get(node.id) ?? [])
-    for (const kind of kinds) {
+    // Минибоссы: полностью случайный ролл в момент старта боя с pity-системой —
+    // пока существо не появлялось, шанс растёт, после появления — снова базовый.
+    // Появлявшиеся существа запоминаются для маркеров на карте забега.
+    const rolled = rollMinibossLive(this.minibossPity)
+    this.minibossPity = rolled.pity
+    if (rolled.kinds.length) this.campaignMbSeen[node.id] = rolled.kinds
+    for (const kind of rolled.kinds) {
       this.addMiniboss(kind, minibossHpFor(kind, node.tier, this.campaign.tiers))
     }
     this.launchNodeBattle(node.name)
@@ -1502,7 +1503,7 @@ export class Game {
       playerId: this.campaignPlayerId,
       visited: [...this.campaignVisited],
       visible: [...this.campaignVisible],
-      minibosses: Object.fromEntries(this.campaignMinibossMap),
+      minibosses: { ...this.campaignMbSeen },
     }
   }
 
@@ -1530,7 +1531,8 @@ export class Game {
     this.saveTop()
     this.phase = "menu"
     this.campaign = null
-    this.campaignMinibossMap = new Map()
+    this.campaignMbSeen = {}
+    this.minibossPity = 0
     this.campaignEvent = null
     this.campaignEventTarget = -1
     this.campaignPlayerId = -1

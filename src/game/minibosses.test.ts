@@ -3,17 +3,19 @@ import { describe, expect, it } from "vitest"
 import {
   buildFish,
   buildJelly,
-  campaignMinibosses,
   carveLevelBlocks,
+  minibossChance,
   minibossHpFor,
   MINIBOSS_HP,
   MINIBOSS_HP_GROWTH,
   MINIBOSS_LIFE_CHANCE,
   MINIBOSS_NODE_CHANCE,
+  MINIBOSS_PITY_STEP,
   minibossName,
-  rollMiniboss,
+  rollMinibossLive,
 } from "./minibosses"
-import { generateCampaignMap, MAP_TIERS } from "./campaignMap"
+import { mulberry32 } from "./utils"
+import { MAP_TIERS } from "./campaignMap"
 import type { Block } from "./types"
 
 const W = 960
@@ -72,40 +74,64 @@ describe("minibosses", () => {
     expect(MINIBOSS_LIFE_CHANCE).toBe(0.8)
   })
 
-  it("rollMiniboss детерминирован: тот же сид и узел — тот же результат", () => {
-    for (let nodeId = 0; nodeId < 30; nodeId++) {
-      expect(rollMiniboss(4242, nodeId)).toEqual(rollMiniboss(4242, nodeId))
-    }
+  it("шанс появления растёт без минибосса и ограничен единицей", () => {
+    expect(minibossChance(0)).toBe(MINIBOSS_NODE_CHANCE)
+    expect(minibossChance(3)).toBeCloseTo(MINIBOSS_NODE_CHANCE + 3 * MINIBOSS_PITY_STEP)
+    expect(minibossChance(10)).toBe(MINIBOSS_NODE_CHANCE + 10 * MINIBOSS_PITY_STEP)
+    expect(minibossChance(100)).toBe(1)
+    expect(minibossChance(-5)).toBe(MINIBOSS_NODE_CHANCE) // мусор на входе не ломает
   })
 
-  it("минибоссы выпадают примерно в MINIBOSS_NODE_CHANCE доле узлов, оба вида", () => {
+  it("rollMinibossLive: без появления жалость растёт, с появлением — сброс", () => {
+    // rand() = 0.999 — всегда выше шанса: существо не появляется
+    const miss = rollMinibossLive(2, () => 0.999)
+    expect(miss.kinds).toEqual([])
+    expect(miss.pity).toBe(3)
+    // rand() = 0 — появление гарантировано, жалость обнуляется
+    const hit = rollMinibossLive(5, () => 0)
+    expect(hit.kinds.length).toBeGreaterThanOrEqual(1)
+    expect(hit.pity).toBe(0)
+  })
+
+  it("rollMinibossLive: базовый шанс появления ≈ MINIBOSS_NODE_CHANCE", () => {
+    const rng = mulberry32(4242)
     let hits = 0
-    let duets = 0
-    const kinds = new Set<string>()
     const N = 4000
-    for (let seed = 1; seed <= N; seed++) {
-      const kindsInNode = rollMiniboss(seed, seed % 17)
-      if (kindsInNode.length) {
-        hits++
-        kinds.add(kindsInNode[0])
-        if (kindsInNode.length === 2) duets++
-      }
+    for (let i = 0; i < N; i++) {
+      if (rollMinibossLive(0, rng).kinds.length) hits++
     }
     expect(hits / N).toBeGreaterThan(MINIBOSS_NODE_CHANCE - 0.05)
     expect(hits / N).toBeLessThan(MINIBOSS_NODE_CHANCE + 0.05)
+  })
+
+  it("rollMinibossLive: оба вида существ, дуэты бывают и реже одиночных", () => {
+    const rng = mulberry32(777)
+    const kinds = new Set<string>()
+    let duets = 0
+    let hits = 0
+    for (let i = 0; i < 4000; i++) {
+      const roll = rollMinibossLive(0, rng)
+      if (!roll.kinds.length) continue
+      hits++
+      kinds.add(roll.kinds[0])
+      if (roll.kinds.length === 2) duets++
+    }
     expect(kinds).toEqual(new Set(["fish", "jelly"]))
-    // дуэты существуют и заметно реже одиночных существ
     expect(duets).toBeGreaterThan(0)
     expect(duets / hits).toBeLessThan(0.5)
   })
 
   it("в дуэте всегда рыба и медуза вместе", () => {
-    for (let seed = 1; seed <= 2000; seed++) {
-      const kinds = rollMiniboss(seed, seed)
-      if (kinds.length === 2) {
-        expect(new Set(kinds)).toEqual(new Set(["fish", "jelly"]))
-      }
-    }
+    // последовательность: появление → рыба → дуэт сработал
+    const seq = [0, 0, 0]
+    let i = 0
+    const duet = rollMinibossLive(0, () => seq[i++])
+    expect(new Set(duet.kinds)).toEqual(new Set(["fish", "jelly"]))
+    // появление → медуза → дуэта нет
+    const seq2 = [0, 0.9, 0.9]
+    i = 0
+    const single = rollMinibossLive(0, () => seq2[i++])
+    expect(single.kinds).toEqual(["jelly"])
   })
 
   it("HP минибосса растёт по мере приближения к финальному боссу", () => {
@@ -121,27 +147,6 @@ describe("minibosses", () => {
           minibossHpFor(kind, t - 1, MAP_TIERS)
         )
       }
-    }
-  })
-
-  it("campaignMinibosses: расклад детерминирован и минимум один минибосс в забеге", () => {
-    for (let seed = 1; seed <= 200; seed++) {
-      const map = generateCampaignMap(seed)
-      const a = campaignMinibosses(seed, map.nodes)
-      const b = campaignMinibosses(seed, map.nodes)
-      expect(a).toEqual(b)
-      let creatures = 0
-      for (const [id, kinds] of a) {
-        const node = map.nodes.find((n) => n.id === id)!
-        expect(node.isBoss).toBe(false)
-        expect(node.isEvent).toBe(false)
-        expect(node.tier).toBeGreaterThan(0)
-        expect(kinds.length).toBeGreaterThanOrEqual(1)
-        expect(kinds.length).toBeLessThanOrEqual(2)
-        for (const kind of kinds) expect(["fish", "jelly"]).toContain(kind)
-        creatures += kinds.length
-      }
-      expect(creatures, `сид ${seed}: забег без минибоссов`).toBeGreaterThanOrEqual(1)
     }
   })
 

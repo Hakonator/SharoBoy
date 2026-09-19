@@ -4,15 +4,15 @@
  * неразрушаемы — урон идёт в пул HP каждого существа (MINIBOSS_HP, растёт по
  * мере приближения к финальному боссу), над существом рисуется полоска
  * здоровья; при обнулении пула существо взрывается целиком. Появляются в
- * обычных боевых узлах кампании с фиксированным шансом (иногда парой) —
- * детерминированно по сиду карты, одна и та же карта всегда даёт минибоссов
- * в одних и тех же узлах. За уничтожение полагается жизнь с шансом
- * MINIBOSS_LIFE_CHANCE — других источников жизней в кампании нет.
+ * обычных боевых узлах кампании полностью случайно (иногда парой) с
+ * pity-системой: пока существо не встретилось, шанс растёт, после появления —
+ * снова базовый. За уничтожение полагается жизнь с шансом MINIBOSS_LIFE_CHANCE
+ * — других источников жизней в кампании нет.
  *
  * Чистые функции без обращений к движку — модуль тестируется автономно.
  */
 import type { Block } from "./types"
-import { clamp, mulberry32, rand } from "./utils"
+import { clamp, rand } from "./utils"
 
 export type MinibossKind = "fish" | "jelly"
 
@@ -34,45 +34,37 @@ export function minibossName(kind: MinibossKind): string {
   return NAMES[kind]
 }
 
+/** Шаг роста шанса за каждый бой подряд без минибосса (pity-система). */
+export const MINIBOSS_PITY_STEP = 0.08
+
 /**
- * Детерминированный розыгрыш минибоссов для узла кампании: обычно одно
- * существо, с шансом MINIBOSS_DUET_CHANCE — пара (рыба + медуза).
- * @param seed сид карты кампании
- * @param nodeId идентификатор узла
- * @returns список видов существ в узле (пустой — минибоссов нет)
+ * Текущий шанс появления минибосса: базовый MINIBOSS_NODE_CHANCE плюс
+ * MINIBOSS_PITY_STEP за каждый бой подряд без появления, но не больше 1.
  */
-export function rollMiniboss(seed: number, nodeId: number): MinibossKind[] {
-  const rng = mulberry32((seed + nodeId * 104729) | 0 || 1)
-  if (rng() >= MINIBOSS_NODE_CHANCE) return []
-  const kind: MinibossKind = rng() < 0.5 ? "fish" : "jelly"
-  if (rng() < MINIBOSS_DUET_CHANCE) return [kind, kind === "fish" ? "jelly" : "fish"]
-  return [kind]
+export function minibossChance(pity: number): number {
+  return Math.min(1, MINIBOSS_NODE_CHANCE + Math.max(0, pity) * MINIBOSS_PITY_STEP)
 }
 
 /**
- * Расклад минибоссов по всем узлам карты забега. Детерминирован сидом карты,
- * с гарантией хотя бы одного существа за забег: при 20% на узел карта может
- * остаться без единого минибосса, а с ними не работает единственный источник
- * жизней кампании. Стартовый узел (tier 0), босс и узлы-события исключены —
- * боёв в них не бывает.
+ * Полностью случайный ролл минибоссов для боевого узла (вызывается прямо в
+ * момент старта боя). Пока существо не появляется, шанс растёт на
+ * MINIBOSS_PITY_STEP за бой; когда появилось — возвращается к базовому.
+ * Обычно одно существо, с шансом MINIBOSS_DUET_CHANCE — пара (рыба + медуза).
+ * @param pity сколько боёв подряд прошло без минибосса
+ * @param rand источник случайности (по умолчанию Math.random; для тестов
+ *   можно передать детерминированный ГПСЧ)
+ * @returns виды существ в узле и новое значение жалости
  */
-export function campaignMinibosses(
-  seed: number,
-  nodes: ReadonlyArray<{ id: number; tier: number; isBoss: boolean; isEvent: boolean }>
-): Map<number, MinibossKind[]> {
-  const out = new Map<number, MinibossKind[]>()
-  for (const n of nodes) {
-    if (n.isBoss || n.isEvent || n.tier === 0) continue
-    const kinds = rollMiniboss(seed, n.id)
-    if (kinds.length) out.set(n.id, kinds)
+export function rollMinibossLive(
+  pity: number,
+  rand: () => number = Math.random
+): { kinds: MinibossKind[]; pity: number } {
+  if (rand() >= minibossChance(pity)) return { kinds: [], pity: Math.max(0, pity) + 1 }
+  const kind: MinibossKind = rand() < 0.5 ? "fish" : "jelly"
+  if (rand() < MINIBOSS_DUET_CHANCE) {
+    return { kinds: [kind, kind === "fish" ? "jelly" : "fish"], pity: 0 }
   }
-  if (out.size === 0) {
-    const fallback = nodes
-      .filter((n) => !n.isBoss && !n.isEvent && n.tier > 0)
-      .sort((a, b) => a.tier - b.tier || a.id - b.id)[0]
-    if (fallback) out.set(fallback.id, [seed % 2 ? "fish" : "jelly"])
-  }
-  return out
+  return { kinds: [kind], pity: 0 }
 }
 
 /** Общий запас HP существа: блоки минибосса не разрушаются поодиночке. */
