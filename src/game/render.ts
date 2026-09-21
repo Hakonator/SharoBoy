@@ -1370,3 +1370,19 @@ export function drawPopups(ctx: Ctx, popups: Popup[]) {
   }
   ctx.globalAlpha = 1
 }
+
+/**
+ * Мини-счётчик FPS: мелкий текст в левом нижнем углу поверх всего кадра.
+ * Рисуется вне общей трансформации сцены (после ctx.restore), поэтому затемнение
+ * и виньетка его не трогают. Размер шрифта передаётся в мировых единицах —
+ * вызывающий компенсирует масштаб мира, чтобы текст был мелким на экране.
+ */
+export function drawFps(ctx: Ctx, w: number, h: number, fps: number, fontPx: number) {
+  ctx.save()
+  ctx.font = `700 ${fontPx}px "Russo One", sans-serif`
+  ctx.textAlign = "left"
+  ctx.textBaseline = "alphabetic"
+  ctx.fillStyle = "rgba(159, 214, 234, 0.8)"
+  ctx.fillText(`${fps} FPS`, 8, h - 8)
+  ctx.restore()
+}

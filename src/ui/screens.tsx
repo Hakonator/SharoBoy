@@ -648,6 +648,8 @@ export function MenuScreen({
   onMusic,
   onMusicVolume,
   onSfxVolume,
+  showFps,
+  onToggleFps,
 }: {
   hud: HudData
   stats: PlayerStats
@@ -686,6 +688,10 @@ export function MenuScreen({
   onMusicVolume: (v: number) => void
   /** Ползунок громкости эффектов (0..1). */
   onSfxVolume: (v: number) => void
+  /** Показывается ли счётчик FPS на канвасе. */
+  showFps: boolean
+  /** Переключить отображение счётчика FPS. */
+  onToggleFps: () => void
 }) {
   /** Есть улучшение, которое игрок уже может купить, — индикатор на секции. */
   const canBuyAny = UPGRADE_DEFS.some((u) => {
@@ -696,6 +702,24 @@ export function MenuScreen({
   return (
     <div className="absolute inset-0 z-40 overflow-y-auto">
       <FloatingBalls />
+      {/* Переключатель счётчика FPS — в левом углу меню (значение рисуется на канвасе) */}
+      <button
+        type="button"
+        onClick={onToggleFps}
+        aria-pressed={showFps}
+        aria-label="Счётчик FPS"
+        className={`pointer-events-auto absolute left-3 top-3 z-10 flex h-9 items-center gap-2 rounded-full border px-3 font-display text-[11px] tracking-wider transition sm:left-5 sm:top-5 ${
+          showFps
+            ? "border-cyan-neon/60 bg-cyan-neon/10 text-cyan-neon"
+            : "border-line/50 bg-deep/50 text-dim hover:text-foam"
+        }`}
+      >
+        <span
+          aria-hidden
+          className={`h-1.5 w-1.5 rounded-full ${showFps ? "bg-cyan-neon" : "bg-line"}`}
+        />
+        FPS
+      </button>
       {/* Кнопки музыки и звука с ползунками громкости — в углу меню */}
       <div className="absolute right-3 top-3 z-10 flex items-center gap-2 sm:right-5 sm:top-5 sm:gap-3">
         <div className="flex items-center gap-1.5">

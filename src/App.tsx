@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
-import { Game, type HudData } from "./game/game"
+import { Game, FPS_LS_KEY, type HudData } from "./game/game"
 import { LEADERBOARD_ENABLED } from "./config"
 import { ACHIEVEMENTS, loadUnlocked, type AchievementDef } from "./game/achievements"
 import {
@@ -74,6 +74,15 @@ export default function App() {
   const [bootError, setBootError] = useState<string | null>(null)
   const [debug, setDebug] = useState<boolean>(false)
 
+  /** Счётчик FPS: начальное значение — сохранённая настройка движка. */
+  const [showFps, setShowFps] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(FPS_LS_KEY) === "1"
+    } catch {
+      return false
+    }
+  })
+
   const [globalTop, setGlobalTop] = useState<GlobalScore[]>([])
   const [globalTopEndless, setGlobalTopEndless] = useState<GlobalScore[]>([])
   const [period, setPeriod] = useState<LeadPeriod>("all")
@@ -118,6 +127,12 @@ export default function App() {
       gameRef.current?.toggleDebug()
       return next
     })
+  }, [])
+
+  const handleToggleFps = useCallback(() => {
+    const g = gameRef.current
+    if (!g) return
+    setShowFps(g.toggleFps())
   }, [])
 
   const [debugBoss, setDebugBoss] = useState<string>("")
@@ -420,6 +435,8 @@ export default function App() {
           onMusic={() => g()?.toggleMusic()}
           onMusicVolume={(v) => g()?.setMusicVolume(v)}
           onSfxVolume={(v) => g()?.setSfxVolume(v)}
+          showFps={showFps}
+          onToggleFps={handleToggleFps}
         />
       )}
 

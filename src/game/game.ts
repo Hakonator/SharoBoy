@@ -37,6 +37,7 @@ import {
   drawBalls,
   drawBlocks,
   drawBoss,
+  drawFps,
   drawLaserBeams,
   drawMinibossBar,
   drawMinibosses,
@@ -69,6 +70,9 @@ import { UPGRADE_DEFS, UPGRADES_ENABLED } from "./upgrades"
 
 export { UPGRADES_ENABLED, UPGRADE_DEFS } from "./upgrades"
 export type { Block, HudData, Phase, PowerType, ScoreEntry } from "./types"
+
+/** Ключ localStorage для настройки «показывать счётчик FPS». */
+export const FPS_LS_KEY = "sharoboy-fps"
 
 /* ==================================================================== */
 
@@ -131,6 +135,13 @@ export class Game {
   debugBallDamage = 1
   /** Активные эффекты отладки (для тестирования механик). */
   debugEffects = new Set<string>()
+
+  /** Счётчик FPS в углу канваса: вкл/выкл, состояние сохраняется в localStorage. */
+  showFps = lsGet(FPS_LS_KEY) === "1"
+  /** Текущий FPS (усреднение за окно ~0.5 с) — значение для счётчика. */
+  private fps = 0
+  private fpsFrames = 0
+  private fpsElapsed = 0
 
   private paddle: PaddleState = { x: 480, y: 600, w: 150, baseW: 150, h: 18, vx: 0, squash: 0 }
   /** Импульсный поворот ракетки (однократный резкий доворот + возврат). */
@@ -692,6 +703,13 @@ export class Game {
     this.pushHud()
   }
 
+  /** Переключение счётчика FPS; возвращает новое состояние (для синхронизации UI). */
+  toggleFps(): boolean {
+    this.showFps = !this.showFps
+    lsSet(FPS_LS_KEY, this.showFps ? "1" : "0")
+    return this.showFps
+  }
+
   /** Переключение эффекта отладки (вкл/выкл). */
   toggleDebugEffect(id: string) {
     const turnOn = !this.debugEffects.has(id)
@@ -1188,7 +1206,17 @@ export class Game {
 
   private loop = (t: number) => {
     if (this.destroyed) return
-    const dtRaw = clamp((t - this.last) / 1000, 0, 0.033)
+    // Нескомпенсированная дельта нужна счётчику FPS: dtRaw зажат в 0.033 с,
+    // и при реальном fps < 30 он бы занижал интервалы (fps казался выше).
+    const rawDt = Math.max(0, (t - this.last) / 1000)
+    const dtRaw = clamp(rawDt, 0, 0.033)
+    this.fpsFrames++
+    this.fpsElapsed += rawDt
+    if (this.fpsElapsed >= 0.5) {
+      this.fps = Math.round(this.fpsFrames / this.fpsElapsed)
+      this.fpsFrames = 0
+      this.fpsElapsed = 0
+    }
     this.last = t
     if (this.hitStop > 0) this.hitStop = Math.max(0, this.hitStop - dtRaw)
     const dt = this.hitStop > 0 ? dtRaw * 0.18 : dtRaw
@@ -2328,5 +2356,11 @@ export class Game {
     vg.addColorStop(1, "rgba(2,10,16,0.55)")
     ctx.fillStyle = vg
     ctx.fillRect(0, 0, w, h)
+
+    // Счётчик FPS: мелкий текст в левом нижнем углу, размер в экранных
+    // пикселях не зависит от масштаба мира (~11 css px, минимум 9).
+    if (this.showFps) {
+      drawFps(ctx, w, h, this.fps, Math.max(9, Math.round(11 / this.scale)))
+    }
   }
 }
