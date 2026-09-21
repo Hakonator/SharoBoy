@@ -2,5 +2,26 @@
   "deno.enable": true,
   "deno.lint": true,
   "deno.unstable": true,
-  "deno.config": "./deno.json"
+  "deno.config": "./deno.json",
+  "tailwindCSS.emmetCompletions": true,
+  "tailwindCSS.classAttributes": ["class", "className", "tw"],
+  "tailwindCSS.experimental.classRegex": [
+    ["className\\s*=\\s*[\"']([^\"']*)[\"']", "[\"']([^\"']*)[\"']"],
+    ["class\\s*=\\s*[\"']([^\"']*)[\"']", "[\"']([^\"']*)[\"']"],
+    ["clsx\\(([^)]*)\\)", "[\"']([^\"']*)[\"']"],
+    ["cn\\(([^)]*)\\)", "[\"']([^\"']*)[\"']"]
+  ],
+  "tailwindCSS.files.exclude": ["**/.git/**", "**/node_modules/**", "**/dist/**", "**/coverage/**"],
+  "tailwindCSS.validate": true,
+  "eslint.useFlatConfig": true,
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+  "eslint.workingDirectories": [{ "mode": "auto" }],
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.suggest.autoImports": true,
+  "typescript.updateImportsOnFileMove.enabled": "always"
 }

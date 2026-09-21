@@ -1,0 +1,47 @@
+# Project: SharoBoy
+- Тип: браузерная игра (без игровых движков)
+- Рендер: Canvas 2D (`src/game/render.ts`)
+- Аудио: Web Audio API, чиптюн-секвенсор (`src/game/audio.ts`)
+- UI: React 18 (`src/ui/screens.tsx`, `src/ui/icons.tsx`)
+- Вся игровая логика: чистый TypeScript в `src/game/*`
+
+# Stack
+- TypeScript ^5.7 (strict, `tsc --noEmit`)
+- Vite ^6.3 + @vitejs/plugin-react
+- Tailwind CSS 4 (CSS-first конфиг через `@theme` в `src/index.css`, плагин `@tailwindcss/vite`)
+- Vitest ^4.1 (тесты `*.test.ts` рядом с исходниками)
+- ESLint 9 (flat config `eslint.config.mjs`)
+- Prettier 3
+- ESM (`"type": "module"`)
+- Git: ветка `beta`
+
+# Code Style
+1. Строгая типизация: `unknown` вместо `any`, никаких `// @ts-ignore`.
+2. ESM-импорты: всегда `import/export`, никаких `require`.
+3. React-компоненты: функциональные, в `src/ui/`.
+4. Игровая логика: чистый TypeScript в `src/game/`, без React-зависимостей.
+5. Стили: только через Tailwind-классы. Не пиши кастомный CSS вне `src/index.css`.
+6. Canvas: все операции рисования только в `src/game/render.ts`.
+7. Аудио: работа с Web Audio API только в `src/game/audio.ts`.
+
+# Testing
+1. Тесты пишутся в `*.test.ts` рядом с исходным файлом.
+2. Перед завершением задачи запускай `npm run test`.
+3. Используй `describe` / `it` / `expect` из `vitest`.
+
+# Pre-commit
+1. Перед коммитом всегда: `npm run lint` → `npm run typecheck` → `npm run test`.
+2. husky + lint-staged уже настроены — не ломай их.
+3. Коммиты только на английском, Conventional Commits.
+4. Целевая ветка: `beta`.
+
+# File Size & Module Rules
+1. Максимальный размер файла: 300 строк.
+2. Исключение: `src/game/render.ts` и `src/game/audio.ts` могут быть до 500 строк из-за специфики Canvas и Web Audio.
+3. Если файл превышает лимит — разбей на модули по единой ответственности.
+4. Не создавай файлы-«свалки» (utils, helpers) более 300 строк.
+
+# Terminal
+1. Используй Git Bash.
+2. Не используй `chcp`.
+3. При ошибках с кириллицей в `ls` используй `ls --show-control-chars`.

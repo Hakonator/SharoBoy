@@ -1,0 +1,23 @@
+node_modules/
+dist/
+.git/
+coverage/
+*.log
+*.min.js
+package-lock.json
+
+# Vite
+.vite/
+vite.config.ts.timestamp-*
+
+# Tailwind (генерируемые артефакты)
+src/index.css.bak
+
+# Иконки (генерируемые скриптом)
+scripts/make-icons.mjs.cache
+
+# husky
+.husky/_/
+
+# Тестовые снапшоты (если есть)
+__snapshots__/
