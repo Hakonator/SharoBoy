@@ -44,6 +44,7 @@ export interface PowersWorld {
   rocketUntil: number
   fireUntil: number
   frostUntil: number
+  sparkUntil: number
   magnetUntil: number
   laserArmed: boolean
   laserArmedUntil: number

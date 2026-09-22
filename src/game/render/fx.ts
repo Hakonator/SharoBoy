@@ -1,5 +1,5 @@
-import { Particle, Popup, Ring } from "../types"
-import { clamp } from "../utils"
+import { Lightning, Particle, Popup, Ring } from "../types"
+import { clamp, rand } from "../utils"
 
 import { type Ctx } from "./shapes"
 
@@ -42,6 +42,42 @@ export function drawParticles(ctx: Ctx, particles: Particle[]) {
     ctx.beginPath()
     ctx.arc(p.x, p.y, p.size * a + 0.5, 0, Math.PI * 2)
     ctx.fill()
+  }
+  ctx.globalAlpha = 1
+}
+
+/**
+ * Молнии цепи искр: ломаная с джиттером в два прохода — широкое свечение
+ * и тонкий яркий ствол. Форма ломаной обновляется каждый кадр — разряд
+ * «дрожит», как настоящая молния.
+ */
+export function drawLightnings(ctx: Ctx, bolts: Lightning[]) {
+  for (const b of bolts) {
+    const a = clamp(1 - b.t, 0, 1)
+    if (a <= 0) continue
+    const trace = () => {
+      ctx.beginPath()
+      ctx.moveTo(b.x1, b.y1)
+      const segs = 5
+      for (let i = 1; i < segs; i++) {
+        const k = i / segs
+        const jit = rand(-6, 6) * Math.sin(k * Math.PI)
+        ctx.lineTo(
+          b.x1 + (b.x2 - b.x1) * k + jit,
+          b.y1 + (b.y2 - b.y1) * k + rand(-6, 6) * Math.sin(k * Math.PI)
+        )
+      }
+      ctx.lineTo(b.x2, b.y2)
+    }
+    ctx.globalAlpha = a
+    ctx.strokeStyle = "rgba(255,233,92,0.5)"
+    ctx.lineWidth = 5
+    trace()
+    ctx.stroke()
+    ctx.strokeStyle = "#fffde7"
+    ctx.lineWidth = 1.8
+    trace()
+    ctx.stroke()
   }
   ctx.globalAlpha = 1
 }

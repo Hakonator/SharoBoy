@@ -5,7 +5,15 @@
  */
 import type { Effects } from "./effects"
 import type { SFX } from "./audio"
-import type { Ball, Block, BossState, PaddleState, PaddleShapeKind, PowerUp } from "./types"
+import type {
+  Ball,
+  Block,
+  BossState,
+  PaddleState,
+  PaddleShapeKind,
+  PowerUp,
+  SparkHit,
+} from "./types"
 import { clamp, rand } from "./utils"
 import { convexBump, surfaceAt } from "./physics/shapes"
 import {
@@ -19,9 +27,17 @@ import {
   updateBombs as moveBombs,
 } from "./physics/destruction"
 import { ballSpeedMult } from "./physics/speed"
+import { spawnBallTrailFx } from "./physics/ballFx"
 
 export { FIREBALL_DAMAGE_MULT } from "./physics/destruction"
 export { FROST_FREEZE_RADIUS, freezeCluster } from "./physics/frost"
+export {
+  SPARK_CHAIN_DELAY,
+  SPARK_CHAIN_MAX,
+  SPARK_CHAIN_RADIUS,
+  queueSparkChain,
+  sparkChainTargets,
+} from "./physics/spark"
 export {
   CLEAR_RAMP_MAX,
   FAST_SPEED_MULT,
@@ -51,6 +67,9 @@ export interface PhysicsWorld {
   blocks: Block[]
   powers: PowerUp[]
   boomQueue: { x: number; y: number; at: number }[]
+  /** Очередь звеньев цепи искр электрошара: заполняется при ударе,
+   *  разбирается игровым циклом (каждое звено бьёт по расписанию). */
+  readonly sparkQueue: SparkHit[]
   shield: number
   combo: number
   shake: number
@@ -60,6 +79,7 @@ export interface PhysicsWorld {
   sfx: SFX
   fireActive(): boolean
   frostActive(): boolean
+  sparkActive(): boolean
   slowActive(): boolean
   fastActive(): boolean
   magnetActive(): boolean
@@ -209,20 +229,8 @@ export class Physics {
 
     ball.squash = Math.max(0, ball.squash - dt * 6)
 
-    // искры огненного ядра
-    if (g.fireActive() && Math.random() < 0.75) {
-      g.fx.particles.push({
-        x: ball.x + rand(-5, 5),
-        y: ball.y + rand(-5, 5),
-        vx: rand(-30, 30),
-        vy: rand(-120, -40),
-        life: rand(0.2, 0.45),
-        maxLife: 0.45,
-        size: rand(2, 4),
-        color: Math.random() < 0.5 ? "#ff8a3d" : "#ffc94d",
-        grav: -120,
-      })
-    }
+    // искры элементальных шаров (огонь/электро)
+    spawnBallTrailFx(g, ball)
 
     // режимы скорости + нарастание по мере зачистки уровня
     const mult = ballSpeedMult({

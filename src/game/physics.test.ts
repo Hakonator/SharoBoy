@@ -71,6 +71,8 @@ describe("Physics — огненное ядро", () => {
       sfx: { wall() {}, burn() {}, brick() {} },
       fireActive: () => fire,
       frostActive: () => false,
+      sparkActive: () => false,
+      sparkQueue: [],
       slowActive: () => false,
       fastActive: () => false,
       magnetActive: () => false,

@@ -44,12 +44,20 @@ export function applyPower(g: PowersWorld, type: PowerType) {
     case "fire":
       g.fireUntil = g.time + 8
       g.frostUntil = 0
+      g.sparkUntil = 0
       popup("ОГНЕННОЕ ЯДРО!")
       break
     case "frost":
       g.frostUntil = g.time + 8
       g.fireUntil = 0
+      g.sparkUntil = 0
       popup("МОРОЗНЫЙ МЯЧ!")
+      break
+    case "spark":
+      g.sparkUntil = g.time + 8
+      g.fireUntil = 0
+      g.frostUntil = 0
+      popup("ЭЛЕКТРОШАР!")
       break
     case "magnet":
       g.magnetUntil = g.time + 7

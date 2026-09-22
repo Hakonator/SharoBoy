@@ -8,6 +8,7 @@ import {
   drawLaserBeams,
   drawMinibossBar,
   drawMinibosses,
+  drawLightnings,
   drawMouthBubbles,
   drawPaddle,
   drawParticles,
@@ -42,6 +43,7 @@ export function draw(g: Game) {
   drawMinibossBar(ctx, g.minibosses, g.blocks)
   drawBoss(ctx, g.bossSys.boss, g.balls, g.blocks)
   drawRings(ctx, g.fx.rings)
+  drawLightnings(ctx, g.fx.lightnings)
   drawPowers(ctx, g.powers)
   drawLaserBeams(ctx, {
     time: g.time,
@@ -59,6 +61,7 @@ export function draw(g: Game) {
     hidden: g.phase === "menu",
     fire: g.time < g.fireUntil,
     frost: g.time < g.frostUntil,
+    spark: g.time < g.sparkUntil,
     slow: g.time < g.slowUntil,
     fast: g.time < g.fastUntil,
   })

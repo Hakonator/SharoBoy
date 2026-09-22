@@ -155,6 +155,12 @@ export function makePowersHost(g: Game): PowersWorld {
     set frostUntil(v) {
       g.frostUntil = v
     },
+    get sparkUntil() {
+      return g.sparkUntil
+    },
+    set sparkUntil(v) {
+      g.sparkUntil = v
+    },
     get magnetUntil() {
       return g.magnetUntil
     },

@@ -44,6 +44,7 @@ export function drawProjectiles(ctx: Ctx, projectiles: Projectile[], time: numbe
 export interface BallView extends RenderView {
   fire: boolean
   frost: boolean
+  spark: boolean
   slow: boolean
   fast: boolean
 }
@@ -54,11 +55,13 @@ export function drawBalls(ctx: Ctx, balls: Ball[], v: BallView) {
     ? { trail: "rgba(255,138,61,", mid: "#ffe9a8", core: "#ff5347", glow: "#ff8a3d" }
     : v.frost
       ? { trail: "rgba(124,214,255,", mid: "#dff4ff", core: "#5db8e8", glow: "#8fd9ff" }
-      : v.slow
-        ? { trail: "rgba(93,255,176,", mid: "#d2ffee", core: "#2fd98a", glow: "#5dffb0" }
-        : v.fast
-          ? { trail: "rgba(255,106,92,", mid: "#ffd9d4", core: "#ff5347", glow: "#ff6a5c" }
-          : { trail: "rgba(120,240,255,", mid: "#c9f6ff", core: "#38bcd8", glow: "#7cf5ff" }
+      : v.spark
+        ? { trail: "rgba(255,233,92,", mid: "#fff9c4", core: "#f5c518", glow: "#ffe95c" }
+        : v.slow
+          ? { trail: "rgba(93,255,176,", mid: "#d2ffee", core: "#2fd98a", glow: "#5dffb0" }
+          : v.fast
+            ? { trail: "rgba(255,106,92,", mid: "#ffd9d4", core: "#ff5347", glow: "#ff6a5c" }
+            : { trail: "rgba(120,240,255,", mid: "#c9f6ff", core: "#38bcd8", glow: "#7cf5ff" }
   for (const b of balls) {
     for (let i = 0; i < b.trail.length; i++) {
       const t = b.trail[i]
@@ -84,6 +87,22 @@ export function drawBalls(ctx: Ctx, balls: Ball[], v: BallView) {
       ctx.lineDashOffset = 0
     }
     const sq = b.squash * 0.28
+    // электрошар искрится: короткие случайные разряды от края шара
+    if (v.spark) {
+      for (let i = 0; i < 2; i++) {
+        const a0 = Math.random() * Math.PI * 2
+        const len = b.r * (1.2 + Math.random() * 1.3)
+        ctx.beginPath()
+        ctx.moveTo(b.x + Math.cos(a0) * b.r, b.y + Math.sin(a0) * b.r)
+        const mx = b.x + Math.cos(a0 + 0.35) * (b.r + len * 0.5)
+        const my = b.y + Math.sin(a0 + 0.35) * (b.r + len * 0.5)
+        ctx.lineTo(mx + (Math.random() - 0.5) * 8, my + (Math.random() - 0.5) * 8)
+        ctx.lineTo(b.x + Math.cos(a0 + 0.5) * (b.r + len), b.y + Math.sin(a0 + 0.5) * (b.r + len))
+        ctx.strokeStyle = i === 0 ? "rgba(255,249,196,0.9)" : "rgba(255,233,92,0.6)"
+        ctx.lineWidth = 1.4
+        ctx.stroke()
+      }
+    }
     ctx.save()
     ctx.translate(b.x, b.y)
     ctx.scale(1 + sq, 1 - sq)

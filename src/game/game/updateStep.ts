@@ -1,11 +1,21 @@
 import type { Game } from "../game"
 import { clamp } from "../utils"
+import type { SparkHit } from "../types"
 
 import { pushHud, syncEffectsHud } from "./hudSync"
 import { applyFishWake, updateMouthBubbles } from "./minibossFx"
 import { updatePaddleRotation } from "./paddleControl"
 import { draw } from "./drawScene"
 import { loseLife, onLevelCleared } from "./runFlow"
+
+/** Очередное звено цепи искр: молния-визуал, электрический треск и обычный урон. */
+function strikeSpark(g: Game, q: SparkHit) {
+  g.fx.lightnings.push({ x1: q.from.x, y1: q.from.y, x2: q.block.x, y2: q.block.y, t: 0 })
+  if (q.block.dead) return
+  g.sfx.zap()
+  g.fx.burst(q.block.x, q.block.y, "#ffe95c", 6, 160)
+  g.physics.damageBlock(q.block, g.debugBallDamage)
+}
 
 /** Игровой цикл: дельта времени, hit-stop, счётчик FPS, шаг update/draw. */
 export function gameLoop(g: Game, t: number) {
@@ -119,6 +129,14 @@ export function update(g: Game, dt: number) {
     if (due.length) {
       g.boomQueue = g.boomQueue.filter((q) => g.time < q.at)
       for (const q of due) g.weaponsSys.explode(q.x, q.y)
+    }
+  }
+  // цепь искр электрошара: звено — молния, треск и обычный урон блоку
+  if (g.sparkQueue.length) {
+    const due = g.sparkQueue.filter((q) => g.time >= q.at)
+    if (due.length) {
+      g.sparkQueue = g.sparkQueue.filter((q) => g.time < q.at)
+      for (const q of due) strikeSpark(g, q)
     }
   }
 

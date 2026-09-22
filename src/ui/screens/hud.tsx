@@ -168,11 +168,13 @@ export function HudOverlay({
           hud.shrinkOn ||
           hud.magnetOn ||
           hud.fireOn ||
-          hud.frostOn) && (
+          hud.frostOn ||
+          hud.sparkOn) && (
           <div className="pointer-events-none absolute bottom-3 left-3 z-20 flex max-w-[46vw] flex-wrap gap-1.5 sm:bottom-4 sm:left-4">
             {hud.wideOn && <EffectChip label="ШИРЕ" good />}
             {hud.fireOn && <EffectChip label="ОГНЬ" good />}
             {hud.frostOn && <EffectChip label="МОРОЗ" good />}
+            {hud.sparkOn && <EffectChip label="ЭЛЕКТРО" good />}
             {hud.magnetOn && <EffectChip label="МАГНИТ" good />}
             {hud.slowOn && <EffectChip label="МЕДЛЕННЕЕ" good />}
             {hud.fastOn && <EffectChip label="БЫСТРЕЕ" good={false} />}

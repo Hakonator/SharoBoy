@@ -5,6 +5,7 @@ import type { PhysicsWorld } from "../physics"
 import { convexBump, surfaceAt } from "./shapes"
 import { FIREBALL_DAMAGE_MULT, damageBlock } from "./destruction"
 import { freezeCluster } from "./frost"
+import { queueSparkChain, sparkChainTargets } from "./spark"
 
 /** Отскок от ракетки: угол зависит от точки попадания и её скорости; магнит — прилипание. */
 export function collidePaddle(g: PhysicsWorld, ball: Ball) {
@@ -213,6 +214,12 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
       ball.vy -= 2 * dot * wny
     }
     damageBlock(g, b, g.debugBallDamage * (fire ? FIREBALL_DAMAGE_MULT : 1))
+    // электрошар: обычный урон уже нанесён, искры цепочкой перескакивают
+    // по соседним блокам (звенья бьют по расписанию из очереди); сам блок
+    // удара исключён — свой урон он уже получил
+    if (g.sparkActive()) {
+      queueSparkChain(g.sparkQueue, sparkChainTargets(g.blocks, b, { exclude: b }), b, g.time)
+    }
     return
   }
 }

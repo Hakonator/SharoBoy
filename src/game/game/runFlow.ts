@@ -44,6 +44,8 @@ export function resetRun(g: Game) {
   g.rocketUntil = 0
   g.fireUntil = 0
   g.frostUntil = 0
+  g.sparkUntil = 0
+  g.sparkQueue = []
   g.magnetUntil = 0
   g.shield = 0
   g.weaponCd = 0
@@ -172,6 +174,8 @@ export function loseLife(g: Game) {
   g.rocketUntil = 0
   g.fireUntil = 0
   g.frostUntil = 0
+  g.sparkUntil = 0
+  g.sparkQueue = []
   g.magnetUntil = 0
   g.weaponCd = 0
   g.powers = []
@@ -209,6 +213,8 @@ export function clearAllEffects(g: Game) {
   g.rocketUntil = 0
   g.fireUntil = 0
   g.frostUntil = 0
+  g.sparkUntil = 0
+  g.sparkQueue = []
   g.magnetUntil = 0
   g.weaponCd = 0
   g.shield = 0

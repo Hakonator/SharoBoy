@@ -26,6 +26,7 @@ export function buildPowerTable(o: PowerTableOpts): [PowerType, number][] {
     ["rocket", o.fewBlocks ? 64 : 8],
     ["fire", 8],
     ["frost", 8],
+    ["spark", 8],
     ["fast", 14],
     ["shrink", 10],
   ]

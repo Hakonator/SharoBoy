@@ -392,6 +392,11 @@ export class SFX {
     }
     this.blip(520, 0.1, "square", 0.08, 180, 0.02)
   }
+  zap() {
+    // электрический разряд: резкий писк вниз + треск
+    this.blip(1600, 0.05, "sawtooth", 0.12, 320)
+    this.noise(0.07, 0.12)
+  }
   bossDie() {
     ;[520, 392, 311, 233, 155].forEach((f, i) =>
       this.blip(f, 0.2, "sawtooth", 0.2, undefined, i * 0.09)

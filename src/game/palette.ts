@@ -20,6 +20,7 @@ export const POWER_META: Record<
   rocket: { label: "РКТ", good: true, color: "#4dff9e", edge: "#d2ffee" },
   fire: { label: "ОГНЬ", good: true, color: "#4dff9e", edge: "#d2ffee" },
   frost: { label: "МОРОЗ", good: true, color: "#7cd6ff", edge: "#e0f7ff" },
+  spark: { label: "ИСКРА", good: true, color: "#ffe14d", edge: "#fff9c4" },
   fast: { label: "СК↑", good: false, color: "#ff5347", edge: "#ffd0cb" },
   shrink: { label: "УЗК", good: false, color: "#ff5347", edge: "#ffd0cb" },
 }

@@ -13,7 +13,7 @@ import { Effects } from "./effects"
 import { lsGet } from "./utils"
 import type { MinibossCreature } from "./types"
 import type { Ball, Block, Bubble, HudData, MouthBubble, PaddleShapeKind } from "./types"
-import type { PaddleState, Phase, PowerUp, Projectile, ScoreEntry } from "./types"
+import type { PaddleState, Phase, PowerUp, Projectile, ScoreEntry, SparkHit } from "./types"
 import type { CampaignMap } from "./campaignMap"
 import type { LevelSpec } from "./levels"
 import type { MinibossKind } from "./minibosses"
@@ -138,6 +138,7 @@ export class Game {
   rocketUntil = 0
   fireUntil = 0
   frostUntil = 0
+  sparkUntil = 0
   magnetUntil = 0
   weaponCd = 0
   shield = 0
@@ -146,6 +147,8 @@ export class Game {
   readonly powersSys: PowersSystem
   readonly weaponsSys: WeaponsSystem
   boomQueue: { x: number; y: number; at: number }[] = []
+  /** Очередь звеньев цепи искр электрошара (обрабатывается в updateStep). */
+  sparkQueue: SparkHit[] = []
   spawnTimer = 18
   skyDropTimer = 22
   shiftTimer = 14

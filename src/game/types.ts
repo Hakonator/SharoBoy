@@ -47,6 +47,7 @@ export interface HudData {
   rocketOn: boolean
   fireOn: boolean
   frostOn: boolean
+  sparkOn: boolean
   magnetOn: boolean
   coins: number
   upgrades: Record<string, number>
@@ -186,6 +187,7 @@ export type PowerType =
   | "rocket"
   | "fire"
   | "frost"
+  | "spark"
   | "fast"
   | "shrink"
 
@@ -244,6 +246,22 @@ export interface Ring {
   maxR: number
   color: string
   t: number
+}
+
+/** Молния цепи искр: отрезок от предыдущего звена к следующему, t — жизнь 0..1. */
+export interface Lightning {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  t: number
+}
+
+/** Звено цепи искр электрошара: блок-цель, точка предыдущего звена и время удара. */
+export interface SparkHit {
+  block: Block
+  from: { x: number; y: number }
+  at: number
 }
 
 export interface Popup {

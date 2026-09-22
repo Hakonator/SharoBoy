@@ -1,18 +1,19 @@
-import type { Particle, Popup, Ring } from "./types"
+import type { Lightning, Particle, Popup, Ring } from "./types"
 import { rand } from "./utils"
 
 /** Ёмкость пула частиц — защита от лавины эффектов на слабых машинах. */
 const MAX_PARTICLES = 420
 
 /**
- * Контейнер визуальных эффектов: искры-частицы, расходящиеся кольца
- * и всплывающие надписи. Только данные и их физика — без Canvas
- * и без знания об остальной игре.
+ * Контейнер визуальных эффектов: искры-частицы, расходящиеся кольца,
+ * молнии цепей искр и всплывающие надписи. Только данные и их физика —
+ * без Canvas и без знания об остальной игре.
  */
 export class Effects {
   particles: Particle[] = []
   rings: Ring[] = []
   popups: Popup[] = []
+  lightnings: Lightning[] = []
 
   /** Взрыв-фейерверк: count частиц из точки со скоростями 0.3–1 × speed. */
   burst(x: number, y: number, color: string, count: number, speed: number) {
@@ -90,6 +91,8 @@ export class Effects {
       p.y -= dt * 46
     }
     this.popups = this.popups.filter((p) => p.t < 1)
+    for (const l of this.lightnings) l.t += dt * 6
+    this.lightnings = this.lightnings.filter((l) => l.t < 1)
   }
 
   /** Полная очистка (между партиями/уровнями). */
@@ -97,5 +100,6 @@ export class Effects {
     this.particles = []
     this.rings = []
     this.popups = []
+    this.lightnings = []
   }
 }

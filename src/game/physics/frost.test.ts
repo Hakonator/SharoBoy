@@ -110,6 +110,8 @@ function makeWorld(blocks: Block[], frost: boolean) {
     sfx,
     fireActive: () => false,
     frostActive: () => frost,
+    sparkActive: () => false,
+    sparkQueue: [],
     slowActive: () => false,
     fastActive: () => false,
     magnetActive: () => false,

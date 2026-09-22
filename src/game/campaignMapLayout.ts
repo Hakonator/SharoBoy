@@ -136,38 +136,48 @@ function assignYs(
       const base = parents.length
         ? parents.reduce((s, p) => s + byId.get(p)!.y, 0) / parents.length
         : 0.5
-      targets.set(id, base + (rng() - 0.5) * CHILD_SPREAD)
+      let target = base + (rng() - 0.5) * CHILD_SPREAD
+      // инвариант коротких рёбер: |y(ребёнка) − y(родителя)| ≤ 0.5 для каждого
+      // родителя — цель держим в пересечении их «окон»; пустое пересечение
+      // (родители на противоположных концах колонки) — центр между ними
+      if (parents.length > 0) {
+        const lo = Math.max(...parents.map((p) => byId.get(p)!.y)) - 0.45
+        const hi = Math.min(...parents.map((p) => byId.get(p)!.y)) + 0.45
+        target = lo > hi ? (lo + hi) / 2 : clamp(target, lo, hi)
+      }
+      targets.set(id, target)
     }
-    // разведение: узлы сортируются по цели, зажимаются в допустимое окно и
-    // расталкиваются на MIN_NODE_GAP — по возможности оставаясь у своей цели
+    // разведение: узлы сортируются по цели и разводятся на MIN_NODE_GAP с
+    // минимальным суммарным отклонением от целей — изотоническая регрессия
+    // (PAVA) в координатах z_i = target_i − i·gap, где требование зазора
+    // превращается в обычную неубываемость. Жадные проекции «вперёд-назад»
+    // здесь не годятся: при близких целях они каскадом уносят колонку к краю.
     const order = [...perTier[t]].sort((a, b) => targets.get(a)! - targets.get(b)!)
     const n = order.length
-    const ys = order.map((id) => targets.get(id)!)
+    const blocks: { count: number; sum: number }[] = []
     for (let i = 0; i < n; i++) {
-      ys[i] = clamp(ys[i], 0.06 + i * MIN_NODE_GAP, 0.94 - (n - 1 - i) * MIN_NODE_GAP)
-    }
-    // проекции на ограничения зазоров (вперёд-назад до сходимости):
-    //forward: вниз, backward: вверх — узлы не уезжают далеко от целей
-    for (let iter = 0; iter < 50; iter++) {
-      let moved = false
-      for (let i = 1; i < n; i++) {
-        const v = Math.max(ys[i], ys[i - 1] + MIN_NODE_GAP)
-        if (v !== ys[i]) {
-          ys[i] = v
-          moved = true
-        }
+      blocks.push({ count: 1, sum: targets.get(order[i])! - i * MIN_NODE_GAP })
+      while (blocks.length > 1) {
+        const last = blocks[blocks.length - 1]
+        const prev = blocks[blocks.length - 2]
+        if (prev.sum / prev.count <= last.sum / last.count) break
+        prev.count += last.count
+        prev.sum += last.sum
+        blocks.pop()
       }
-      for (let i = n - 2; i >= 0; i--) {
-        const v = Math.min(ys[i], ys[i + 1] - MIN_NODE_GAP)
-        if (v !== ys[i]) {
-          ys[i] = v
-          moved = true
-        }
-      }
-      if (!moved) break
     }
+    const zs: number[] = []
+    for (const b of blocks) {
+      for (let i = 0; i < b.count; i++) zs.push(b.sum / b.count)
+    }
+    // зажим z в окно колонки монотонен — зазоры и порядок сохраняются
+    const zHi = 0.94 - (n - 1) * MIN_NODE_GAP
     order.forEach((id, i) => {
-      byId.get(id)!.y = clamp(ys[i], 0.04, 0.96)
+      byId.get(id)!.y = clamp(
+        zs[i] + i * MIN_NODE_GAP,
+        0.06 + i * MIN_NODE_GAP,
+        zHi + i * MIN_NODE_GAP
+      )
     })
   }
 }
@@ -190,11 +200,25 @@ function linkTiers(rng: () => number, perTier: number[][]): CampaignEdge[] {
     }
     const chosen = new Map<number, number[]>()
 
-    /* 1) Гарантия входящих рёбер: каждый узел следующего яруса получает родителя
-       среди тех, кто ещё не выбрал свою норму ветвления. */
+    /* 1) Гарантия входящих рёбер: каждый узел следующего яруса получает
+       родителя. Ребёнок идёт к наименее нагруженному родителю (ничья —
+       случайно): сбалансированность списков гарантирует, что на шаге добора
+       свободные кандидаты не исчерпаются и каждый узел наберёт свою норму
+       ветвления (раньше случайная раздача иногда собирала всех детей у одного
+       родителя, оставляя соседям ноль исходящих рёбер). */
     for (const c of shuffle(rng, nxt)) {
-      const open = cur.filter((p) => (chosen.get(p)?.length ?? 0) < (target.get(p) ?? 1))
-      const pool = open.length > 0 ? open : cur
+      let minLen = Infinity
+      const pool: number[] = []
+      for (const p of cur) {
+        const len = chosen.get(p)?.length ?? 0
+        if (len < minLen) {
+          minLen = len
+          pool.length = 0
+          pool.push(p)
+        } else if (len === minLen) {
+          pool.push(p)
+        }
+      }
       const p = pool[Math.floor(rng() * pool.length)]
       const list = chosen.get(p) ?? []
       list.push(c)
