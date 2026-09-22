@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { SFX } from "./audio"
+import { MAP_BASS, MAP_LEAD } from "./audio/tracks/map"
 
 /** Минимальный window с localStorage — проверяем сохранение ползунков.
  *  (В тестовом окружении node нет браузерных глобалов и Audio.) */
@@ -104,14 +105,12 @@ describe("SFX: раздельные ползунки громкости музы
   it("тема карты — медленная, разреженная и в пределах MIDI", () => {
     const sfx = SFX as unknown as {
       stepFor: (t: "menu" | "game" | "map") => number
-      MAP_LEAD: number[]
-      MAP_BASS: number[]
     }
     // темп карты — самый медленный из трёх
     expect(sfx.stepFor("map")).toBeGreaterThan(sfx.stepFor("menu"))
     expect(sfx.stepFor("menu")).toBeGreaterThan(sfx.stepFor("game"))
-    const lead = sfx.MAP_LEAD
-    const bass = sfx.MAP_BASS
+    const lead = MAP_LEAD
+    const bass = MAP_BASS
     expect(lead.length).toBe(bass.length)
     // все значения — валидный MIDI (0 = пауза)
     for (const n of [...lead, ...bass]) {

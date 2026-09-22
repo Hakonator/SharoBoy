@@ -1,238 +1,193 @@
+/**
+ * Ядро движка: класс Game — владелец состояния и игровой цикл.
+ * Подсистемы вынесены в модули папки game/ и работают с состоянием
+ * через свободные функции (g: Game, ...); класс оставляет публичный API.
+ */
 import { SFX } from "./audio"
-import { BossSystem, type BossHost } from "./boss"
-import { Physics, type PhysicsWorld } from "./physics"
-import { PowersSystem, type PowersWorld } from "./powers"
-import { WeaponsSystem, type WeaponsWorld } from "./weapons"
+import { BossSystem } from "./boss"
+import { Physics } from "./physics"
+import { PowersSystem } from "./powers"
+import { WeaponsSystem } from "./weapons"
 import { InputController } from "./input"
-import { evaluateAch } from "./achievements"
 import { Effects } from "./effects"
-import { buildBossArena, densityFactor, gridBlocks, layoutBlocks } from "./levelBuilder"
-import { fixedVariant, pickBossVariant, type BossVariant } from "./bossVariants"
+import { lsGet } from "./utils"
+import type { MinibossCreature } from "./types"
+import type { Ball, Block, Bubble, HudData, MouthBubble, PaddleShapeKind } from "./types"
+import type { PaddleState, Phase, PowerUp, Projectile, ScoreEntry } from "./types"
+import type { CampaignMap } from "./campaignMap"
+import type { LevelSpec } from "./levels"
+import type { MinibossKind } from "./minibosses"
+import { makeBossHost, makePowersHost } from "./game/hosts"
+import { makePhysicsHost, makeWeaponsHost } from "./game/hostsWorld"
+import { paddleShape } from "./game/paddleControl"
+import { loadProgress, buyUpgrade } from "./game/progress"
 import {
-  buildFish,
-  buildJelly,
-  carveLevelBlocks,
-  minibossHpFor,
-  minibossName,
-  MINIBOSS_HP,
-  MINIBOSS_LIFE_CHANCE,
-  rollMinibossLive,
-  type MinibossKind,
-} from "./minibosses"
-import { LEVELS, type LevelSpec, type PatternSpec } from "./levels"
+  loadScoreEntries,
+  createInput,
+  attach,
+  destroy,
+  setNick,
+  resizeHandler,
+} from "./game/lifecycle"
+import { startGame, startEndless, toMenu, togglePause } from "./game/modes"
 import {
-  EVENT_MAX_BACK_TIERS,
-  EVENT_TEXTS,
-  generateCampaignMap,
-  isAdjacent,
-  nodeById,
-  outgoingIds,
-  visibleFrom,
-  type CampaignMap,
-  type CampaignMapView,
-  type CampaignNode,
-} from "./campaignMap"
+  startLevelBattle,
+  enterMapNode,
+  dismissCampaignEvent,
+  enterNextNodeOnAction,
+} from "./game/campaignFlow"
 import {
-  drawBackground,
-  drawBalls,
-  drawBlocks,
-  drawBoss,
-  drawFps,
-  drawLaserBeams,
-  drawMinibossBar,
-  drawMinibosses,
-  drawPaddle,
-  drawParticles,
-  drawPowers,
-  drawProjectiles,
-  drawPopups,
-  drawRings,
-  drawShieldLine,
-  drawMouthBubbles,
-  fishFacing,
-} from "./render"
-import type {
-  Ball,
-  Block,
-  BossState,
-  Bubble,
-  MouthBubble,
-  PaddleShapeKind,
-  PaddleState,
-  Phase,
-  PowerUp,
-  Projectile,
-} from "./types"
-import type { HudData, ScoreEntry } from "./types"
-import { clamp, daySeed, lsGet, lsSet, mulberry32, rand } from "./utils"
-import { HUD_TOP_CSS, computeScale } from "./viewport"
-import { UPGRADE_DEFS, UPGRADES_ENABLED } from "./upgrades"
+  toggleDebug,
+  toggleFps,
+  toggleDebugEffect,
+  isDebugEffectActive,
+  spawnDebugBoss,
+  spawnDebugMiniboss,
+  debugDamageUp,
+  debugSkipLevel,
+} from "./game/debug"
+import { setMusicVolume, setSfxVolume, toggleMute, toggleMusic } from "./game/audioControls"
+import { launch } from "./game/runFlow"
+import { FPS_LS_KEY } from "./game/debug"
+import { update, gameLoop } from "./game/updateStep"
+import { draw } from "./game/drawScene"
 
 export { UPGRADES_ENABLED, UPGRADE_DEFS } from "./upgrades"
 export type { Block, HudData, Phase, PowerType, ScoreEntry } from "./types"
-
-/** Ключ localStorage для настройки «показывать счётчик FPS». */
-export const FPS_LS_KEY = "sharoboy-fps"
-
-/* ==================================================================== */
+export { FPS_LS_KEY } from "./game/debug"
 
 export class Game {
-  private canvas: HTMLCanvasElement
-  private ctx: CanvasRenderingContext2D
-  private onHud: (h: HudData) => void
-
-  private raf = 0
-  private last = 0
-  private destroyed = false
-  private time = 0
-
+  canvas: HTMLCanvasElement
+  ctx: CanvasRenderingContext2D
+  onHud: (h: HudData) => void
+  raf = 0
+  last = 0
+  destroyed = false
+  time = 0
   /** Размер мира в «эталонных» единицах: окно 1920×1080 соответствует масштабу 1. */
-  private w = 960
-  private h = 640
-  private dpr = 1
+  w = 960
+  h = 640
+  dpr = 1
   /** Мировые единицы → CSS-пиксели: весь мир масштабируется одним коэффициентом. */
-  private scale = 1
-
-  private phase: Phase = "menu"
-  private score = 0
-  private best = 0
-  private lives = 3
-  private level = 1
-  private combo = 0
-  private newRecord = false
+  scale = 1
+  phase: Phase = "menu"
+  score = 0
+  best = 0
+  lives = 3
+  level = 1
+  combo = 0
+  newRecord = false
   /** статистика текущей партии — для достижений */
-  private runBossKills = 0
-  private runLivesLost = 0
+  runBossKills = 0
+  runLivesLost = 0
   /** очередь открытых достижений до следующей отправки HUD */
-  private achQueue: string[] = []
-
-  private mode: "campaign" | "endless" = "campaign"
-  private wave = 0
-  private waveSpec: { name: string; speed: number } | null = null
-
+  achQueue: string[] = []
+  mode: "campaign" | "endless" = "campaign"
+  wave = 0
+  waveSpec: { name: string; speed: number } | null = null
   /** Режим отладки: позволяет тестировать новые механики и контент. */
   debug = false
   /** Принудительный тип босса для отладки (null = стандартное поведение). */
   debugBossType: "octopus" | "kraken" | null = null
   /** Живые существа-минибоссы уровня (их может быть несколько): у каждого свой
    *  пул HP, номер группы (mbGroup блоков) и центр для дропа жизни. */
-  private minibosses: {
-    kind: MinibossKind
-    group: number
-    hp: number
-    maxHp: number
-    dropX: number
-    dropY: number
-  }[] = []
-  private mbGroupSeq = 0
+  minibosses: MinibossCreature[] = []
+  mbGroupSeq = 0
   /** Пузырьки воздуха изо рта рыбы-минибосса. */
-  private mouthBubbles: MouthBubble[] = []
-  private mouthBubbleTimer = 0
-  private mouthX = 0
-  private mouthY = 0
-  private fishMouth = false
+  mouthBubbles: MouthBubble[] = []
+  mouthBubbleTimer = 0
+  mouthX = 0
+  mouthY = 0
+  fishMouth = false
   /** Множитель урона шара (скрытая отладка: клавиша "-" на цифровой клавиатуре). */
   debugBallDamage = 1
   /** Активные эффекты отладки (для тестирования механик). */
   debugEffects = new Set<string>()
-
   /** Счётчик FPS в углу канваса: вкл/выкл, состояние сохраняется в localStorage. */
   showFps = lsGet(FPS_LS_KEY) === "1"
   /** Текущий FPS (усреднение за окно ~0.5 с) — значение для счётчика. */
-  private fps = 0
-  private fpsFrames = 0
-  private fpsElapsed = 0
-
-  private paddle: PaddleState = { x: 480, y: 600, w: 150, baseW: 150, h: 18, vx: 0, squash: 0 }
+  fps = 0
+  fpsFrames = 0
+  fpsElapsed = 0
+  paddle: PaddleState = { x: 480, y: 600, w: 150, baseW: 150, h: 18, vx: 0, squash: 0 }
   /** Импульсный поворот ракетки (однократный резкий доворот + возврат). */
-  private paddleImpulse: { dir: number; t: number } | null = null
+  paddleImpulse: { dir: number; t: number } | null = null
   /** Предыдущее состояние кнопок мыши для детекта краёв нажатия. */
-  private prevLeftDown = false
-  private prevRightDown = false
+  prevLeftDown = false
+  prevRightDown = false
   /** Режим тача: ракетка поднята выше, чтобы управляющий палец её не закрывал. */
-  private touchMode =
-    typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches
+  touchMode = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches
   /** Множитель ширины ракетки от прокачки (апгрейд «paddle»). */
-  private paddleWidthMult = 1
-  private balls: Ball[] = []
-  private blocks: Block[] = []
-  private powers: PowerUp[] = []
-  private projectiles: Projectile[] = []
-  private fx = new Effects()
-  private bubbles: Bubble[] = []
-
-  private input: InputController
-  private shake = 0
-
-  private wideUntil = 0
-  private slowUntil = 0
-  private fastUntil = 0
-  private shrinkUntil = 0
-  private laserUntil = 0
-  private laserArmed = false
-  private laserArmedUntil = 0
-  private laserWasOn = false
-  private rocketUntil = 0
-  private fireUntil = 0
-  private magnetUntil = 0
-  private weaponCd = 0
-  private shield = 0
-
-  private readonly bossSys: BossSystem
-  private readonly physics: Physics
-  private readonly powersSys: PowersSystem
-  private readonly weaponsSys: WeaponsSystem
-  private boomQueue: { x: number; y: number; at: number }[] = []
-
-  private spawnTimer = 18
-  private skyDropTimer = 22
-  private shiftTimer = 14
-  private fieldShift: null | { t: number; dur: number; dx: number; dy: number } = null
-  private blocksInitial = 1
-
-  private coins = 0
-  private upgrades: Record<string, number> = {}
-
-  private banner: string | null = null
-  private bannerTimer = 0
-  private transition = 0
-  private hitStop = 0
-  private flash = 0
-  private countdown = 0
-  private levelLostBall = false
-  private effectsKey = ""
-
+  paddleWidthMult = 1
+  balls: Ball[] = []
+  blocks: Block[] = []
+  powers: PowerUp[] = []
+  projectiles: Projectile[] = []
+  fx = new Effects()
+  bubbles: Bubble[] = []
+  input: InputController
+  shake = 0
+  wideUntil = 0
+  slowUntil = 0
+  fastUntil = 0
+  shrinkUntil = 0
+  laserUntil = 0
+  laserArmed = false
+  laserArmedUntil = 0
+  laserWasOn = false
+  rocketUntil = 0
+  fireUntil = 0
+  magnetUntil = 0
+  weaponCd = 0
+  shield = 0
+  readonly bossSys: BossSystem
+  readonly physics: Physics
+  readonly powersSys: PowersSystem
+  readonly weaponsSys: WeaponsSystem
+  boomQueue: { x: number; y: number; at: number }[] = []
+  spawnTimer = 18
+  skyDropTimer = 22
+  shiftTimer = 14
+  fieldShift: null | { t: number; dur: number; dx: number; dy: number } = null
+  blocksInitial = 1
+  coins = 0
+  upgrades: Record<string, number> = {}
+  banner: string | null = null
+  bannerTimer = 0
+  transition = 0
+  hitStop = 0
+  flash = 0
+  countdown = 0
+  levelLostBall = false
+  effectsKey = ""
   /** Карта забега кампании и позиция игрока на ней (для экрана карты). */
-  private campaign: CampaignMap | null = null
+  campaign: CampaignMap | null = null
   /** Появлявшиеся минибоссы по узлам текущего забега (для маркеров карты) —
    *  заполняется в момент старта каждого боя. */
-  private campaignMbSeen: Record<number, MinibossKind[]> = {}
+  campaignMbSeen: Record<number, MinibossKind[]> = {}
   /** Сколько боёв подряд прошло без минибосса (растит шанс появления). */
-  private minibossPity = 0
+  minibossPity = 0
   /** Активное событие на карте (текст для оверлея; null — события нет). */
-  private campaignEvent: string | null = null
+  campaignEvent: string | null = null
   /** Узел назначения события-телепорта (бой стартует после подтверждения). */
-  private campaignEventTarget = -1
+  campaignEventTarget = -1
   /** Узлы-события, которые уже сработали (повторный вход — обычный бой). */
-  private campaignSpentEvents: number[] = []
-  private campaignPlayerId = -1
-  private campaignVisited: number[] = []
-  private campaignVisible: number[] = []
+  campaignSpentEvents: number[] = []
+  campaignPlayerId = -1
+  campaignVisited: number[] = []
+  campaignVisible: number[] = []
   /** Раскладка текущего боя (null вне карты и на узле финального босса). */
-  private activeSpec: LevelSpec | null = null
+  activeSpec: LevelSpec | null = null
   /** Идёт ли сейчас бой с финальным боссом (а не с обычным узлом). */
-  private onBossNode = false
+  onBossNode = false
   /** Номер забега: меняет сид карты, чтобы каждый старт был новым. */
-  private runSeq = 0
+  runSeq = 0
   /** Сид текущей карты кампании (для детерминированного выбора босса). */
-  private campaignSeed = 0
-
-  private top: ScoreEntry[] = []
-  private topEndless: ScoreEntry[] = []
-
+  campaignSeed = 0
+  top: ScoreEntry[] = []
+  topEndless: ScoreEntry[] = []
   sfx = new SFX()
-
-  private nick = ""
+  nick = ""
 
   constructor(canvas: HTMLCanvasElement, onHud: (h: HudData) => void, nick?: string) {
     this.canvas = canvas
@@ -241,2126 +196,104 @@ export class Game {
     this.ctx = ctx
     this.onHud = onHud
     if (nick) this.nick = nick
-    this.input = new InputController(canvas, {
-      paddleX: () => this.paddle.x,
-      paddleY: () => this.paddle.y,
-      paddleWidth: () => this.paddle.w,
-      worldWidth: () => this.w,
-      worldHeight: () => this.h,
-      sfxEnsure: () => this.sfx.ensure(),
-      isPlaying: () => this.phase === "playing",
-      primaryAction: () => {
-        if (this.phase === "menu" || this.phase === "over" || this.phase === "won") this.startGame()
-        else if (this.phase === "playing") this.launch()
-        else if (this.phase === "map") this.enterNextNodeOnAction()
-      },
-      launchIfPlaying: () => {
-        if (this.phase === "playing") this.launch()
-      },
-      onTouchInput: () => this.enableTouchMode(),
-      togglePause: () => this.togglePause(),
-      toggleMute: () => this.toggleMute(),
-      toggleMusic: () => this.toggleMusic(),
-      debugDamageUp: () => this.debugDamageUp(),
-      debugSkipLevel: () => this.debugSkipLevel(),
-      onBlur: () => {
-        if (this.phase === "playing") this.togglePause()
-      },
-      // Первый Esc при pointer lock браузер перехватывает (keydown не
-      // доставляется) — потеря захвата без нашего запроса = нажатие Esc.
-      // onBlur уже мог поставить паузу (alt-tab): фаз-гард не даёт
-      // случайно «снять» её повторным вызовом.
-      onLockLostUnexpectedly: () => {
-        if (this.phase === "playing") this.togglePause()
-      },
-    })
-    this.bossSys = new BossSystem(this.makeBossHost())
-    this.powersSys = new PowersSystem(this.makePowersHost())
-    this.physics = new Physics(this.makePhysicsHost())
-    this.weaponsSys = new WeaponsSystem(this.makeWeaponsHost())
+    this.input = createInput(this, canvas)
+    this.bossSys = new BossSystem(makeBossHost(this))
+    this.powersSys = new PowersSystem(makePowersHost(this))
+    this.physics = new Physics(makePhysicsHost(this))
+    this.weaponsSys = new WeaponsSystem(makeWeaponsHost(this))
     this.best = Number(lsGet("sharoboy-best") || 0) || 0
-    this.top = this.loadScoreEntries("sharoboy-top")
-    this.topEndless = this.loadScoreEntries("sharoboy-top-endless")
-    this.loadProgress()
+    this.top = loadScoreEntries(this, "sharoboy-top")
+    this.topEndless = loadScoreEntries(this, "sharoboy-top-endless")
+    loadProgress(this)
   }
 
-  /* ---------- хосты систем ---------- */
-
-  /** Хост для BossSystem: геттеры реактивных полей и колбэки последствий. */
-  private makeBossHost(): BossHost {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias -- геттерам хоста нужно живое замыкание на Game
-    const g = this
-    return {
-      get w() {
-        return g.w
-      },
-      get h() {
-        return g.h
-      },
-      get time() {
-        return g.time
-      },
-      get shake() {
-        return g.shake
-      },
-      set shake(v) {
-        g.shake = v
-      },
-      get hitStop() {
-        return g.hitStop
-      },
-      set hitStop(v) {
-        g.hitStop = v
-      },
-      get flash() {
-        return g.flash
-      },
-      set flash(v) {
-        g.flash = v
-      },
-      get blocks() {
-        return g.blocks
-      },
-      set blocks(v) {
-        g.blocks = v
-      },
-      get powers() {
-        return g.powers
-      },
-      get boomQueue() {
-        return g.boomQueue
-      },
-      paddle: g.paddle,
-      fx: g.fx,
-      sfx: g.sfx,
-      addRawScore: (n) => g.addRawScore(n),
-      onBossKilled: () => g.onBossKilled(),
-      pushHud: () => g.pushHud(),
-    }
-  }
-
-  /** Хост для PowersSystem: таймеры спавна, поля эффектов и последствия. */
-  private makePowersHost(): PowersWorld {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias -- геттерам хоста нужно живое замыкание на Game
-    const g = this
-    return {
-      get mode() {
-        return g.mode
-      },
-      get w() {
-        return g.w
-      },
-      get h() {
-        return g.h
-      },
-      get time() {
-        return g.time
-      },
-      paddle: g.paddle,
-      get balls() {
-        return g.balls
-      },
-      get blocks() {
-        return g.blocks
-      },
-      get boss() {
-        return g.bossSys.boss
-      },
-      get blocksInitial() {
-        return g.blocksInitial
-      },
-      get powers() {
-        return g.powers
-      },
-      set powers(v) {
-        g.powers = v
-      },
-      get fieldShift() {
-        return g.fieldShift
-      },
-      set fieldShift(v) {
-        g.fieldShift = v
-      },
-      get spawnTimer() {
-        return g.spawnTimer
-      },
-      set spawnTimer(v) {
-        g.spawnTimer = v
-      },
-      get skyDropTimer() {
-        return g.skyDropTimer
-      },
-      set skyDropTimer(v) {
-        g.skyDropTimer = v
-      },
-      get shiftTimer() {
-        return g.shiftTimer
-      },
-      set shiftTimer(v) {
-        g.shiftTimer = v
-      },
-      get wideUntil() {
-        return g.wideUntil
-      },
-      set wideUntil(v) {
-        g.wideUntil = v
-      },
-      get slowUntil() {
-        return g.slowUntil
-      },
-      set slowUntil(v) {
-        g.slowUntil = v
-      },
-      get fastUntil() {
-        return g.fastUntil
-      },
-      set fastUntil(v) {
-        g.fastUntil = v
-      },
-      get shrinkUntil() {
-        return g.shrinkUntil
-      },
-      set shrinkUntil(v) {
-        g.shrinkUntil = v
-      },
-      get rocketUntil() {
-        return g.rocketUntil
-      },
-      set rocketUntil(v) {
-        g.rocketUntil = v
-      },
-      get fireUntil() {
-        return g.fireUntil
-      },
-      set fireUntil(v) {
-        g.fireUntil = v
-      },
-      get magnetUntil() {
-        return g.magnetUntil
-      },
-      set magnetUntil(v) {
-        g.magnetUntil = v
-      },
-      get laserArmed() {
-        return g.laserArmed
-      },
-      set laserArmed(v) {
-        g.laserArmed = v
-      },
-      get laserArmedUntil() {
-        return g.laserArmedUntil
-      },
-      set laserArmedUntil(v) {
-        g.laserArmedUntil = v
-      },
-      paddleShape: () => g.paddleShapeKind(),
-      get shield() {
-        return g.shield
-      },
-      set shield(v) {
-        g.shield = v
-      },
-      get lives() {
-        return g.lives
-      },
-      set lives(v) {
-        g.lives = v
-      },
-      get shake() {
-        return g.shake
-      },
-      set shake(v) {
-        g.shake = v
-      },
-      fx: g.fx,
-      sfx: g.sfx,
-      addCoins: (n) => g.addCoins(n),
-      pushHud: () => g.pushHud(),
-    }
-  }
-
-  /** Хост для Physics: кинематика ракетки/шара, предикаты эффектов, колбэки. */
-  private makePhysicsHost(): PhysicsWorld {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias -- геттерам хоста нужно живое замыкание на Game
-    const g = this
-    return {
-      get w() {
-        return g.w
-      },
-      get h() {
-        return g.h
-      },
-      get time() {
-        return g.time
-      },
-      get debugBallDamage() {
-        return g.debugBallDamage
-      },
-      paddle: g.paddle,
-      get blocksInitial() {
-        return g.blocksInitial
-      },
-      get boss() {
-        return g.bossSys.boss
-      },
-      input: g.input,
-      get balls() {
-        return g.balls
-      },
-      get blocks() {
-        return g.blocks
-      },
-      set blocks(v) {
-        g.blocks = v
-      },
-      get powers() {
-        return g.powers
-      },
-      get boomQueue() {
-        return g.boomQueue
-      },
-      get shield() {
-        return g.shield
-      },
-      set shield(v) {
-        g.shield = v
-      },
-      get combo() {
-        return g.combo
-      },
-      set combo(v) {
-        g.combo = v
-      },
-      get shake() {
-        return g.shake
-      },
-      set shake(v) {
-        g.shake = v
-      },
-      get hitStop() {
-        return g.hitStop
-      },
-      set hitStop(v) {
-        g.hitStop = v
-      },
-      get flash() {
-        return g.flash
-      },
-      set flash(v) {
-        g.flash = v
-      },
-      fx: g.fx,
-      sfx: g.sfx,
-      fireActive: () => g.time < g.fireUntil,
-      slowActive: () => g.time < g.slowUntil,
-      fastActive: () => g.time < g.fastUntil,
-      magnetActive: () => g.time < g.magnetUntil,
-      paddleRotatable: () => g.isDebugEffectActive("paddleRotation"),
-      wideActive: () => g.time < g.wideUntil,
-      shrinkActive: () => g.time < g.shrinkUntil,
-      paddleShape: () => g.paddleShapeKind(),
-      addScore: (n, x, y, color, size) => g.addScore(n, x, y, color, size),
-      dropPower: (x, y) => g.powersSys.dropPower(x, y),
-      damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
-      damageMiniboss: (dmg, block) => g.damageMiniboss(dmg, block),
-      onBombHitPaddle: () => g.onBombHitPaddle(),
-      pushHud: () => g.pushHud(),
-    }
-  }
-
-  /** Хост для WeaponsSystem: снаряды, поля лазера и урон делегируется системам. */
-  private makeWeaponsHost(): WeaponsWorld {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias -- геттерам хоста нужно живое замыкание на Game
-    const g = this
-    return {
-      get time() {
-        return g.time
-      },
-      paddle: g.paddle,
-      get blocks() {
-        return g.blocks
-      },
-      get boss() {
-        return g.bossSys.boss
-      },
-      get projectiles() {
-        return g.projectiles
-      },
-      set projectiles(v) {
-        g.projectiles = v
-      },
-      get rocketUntil() {
-        return g.rocketUntil
-      },
-      set rocketUntil(v) {
-        g.rocketUntil = v
-      },
-      get weaponCd() {
-        return g.weaponCd
-      },
-      set weaponCd(v) {
-        g.weaponCd = v
-      },
-      get laserArmed() {
-        return g.laserArmed
-      },
-      set laserArmed(v) {
-        g.laserArmed = v
-      },
-      get laserArmedUntil() {
-        return g.laserArmedUntil
-      },
-      set laserArmedUntil(v) {
-        g.laserArmedUntil = v
-      },
-      get laserUntil() {
-        return g.laserUntil
-      },
-      set laserUntil(v) {
-        g.laserUntil = v
-      },
-      get laserWasOn() {
-        return g.laserWasOn
-      },
-      set laserWasOn(v) {
-        g.laserWasOn = v
-      },
-      // Пилоны оружия (лазер, ракеты) стоят на поверхности формы ракетки
-      paddleShape: () => g.paddleShapeKind(),
-      get shake() {
-        return g.shake
-      },
-      set shake(v) {
-        g.shake = v
-      },
-      get flash() {
-        return g.flash
-      },
-      set flash(v) {
-        g.flash = v
-      },
-      fx: g.fx,
-      sfx: g.sfx,
-      damageBlock: (b, dmg) => g.physics.damageBlock(b, dmg),
-      damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
-    }
-  }
-
-  /* ---------- сохранение валюты/прокачки ---------- */
-
-  private loadProgress() {
-    try {
-      this.coins = Math.max(0, Number(lsGet("sharoboy-coins") || 0) || 0)
-      const up = JSON.parse(lsGet("sharoboy-upgrades") || "{}") as unknown
-      this.upgrades = up && typeof up === "object" ? (up as Record<string, number>) : {}
-    } catch {
-      this.coins = 0
-      this.upgrades = {}
-    }
-  }
-
-  private saveProgress() {
-    lsSet("sharoboy-coins", String(this.coins))
-    lsSet("sharoboy-upgrades", JSON.stringify(this.upgrades))
-  }
-
-  private addCoins(n: number) {
-    const mult = 1 + (this.upgrades.coin ?? 0)
-    this.coins += n * mult
-    this.saveProgress()
-    this.pushHud()
-  }
-
-  /** Покупка постоянного улучшения — вызывается будущим UI прокачки. */
-  buyUpgrade(id: string): boolean {
-    if (!UPGRADES_ENABLED) return false
-    const def = UPGRADE_DEFS.find((d) => d.id === id)
-    if (!def) return false
-    const lvl = this.upgrades[id] ?? 0
-    if (lvl >= def.max) return false
-    const price = def.cost(lvl)
-    if (this.coins < price) return false
-    this.coins -= price
-    this.upgrades[id] = lvl + 1
-    this.saveProgress()
-    this.applyUpgrades()
-    this.pushHud()
-    return true
-  }
-
-  private applyUpgrades() {
-    const paddleLvl = this.upgrades.paddle ?? 0
-    this.paddleWidthMult = 1 + 0.12 * paddleLvl
-    this.paddle.baseW = clamp(this.w * 0.18, 110, 200) * this.paddleWidthMult
-  }
-
-  /* ---------- отладка ---------- */
-
-  /** Переключение режима отладки. */
-  toggleDebug() {
-    this.debug = !this.debug
-    if (!this.debug) this.debugEffects.clear()
-    this.pushHud()
-  }
-
-  /** Переключение счётчика FPS; возвращает новое состояние (для синхронизации UI). */
-  toggleFps(): boolean {
-    this.showFps = !this.showFps
-    lsSet(FPS_LS_KEY, this.showFps ? "1" : "0")
-    return this.showFps
-  }
-
-  /** Переключение эффекта отладки (вкл/выкл). */
-  toggleDebugEffect(id: string) {
-    const turnOn = !this.debugEffects.has(id)
-    // Режимы формы/поворота ракетки взаимоисключающие: физика отскока и
-    // управление реализуют один и тот же ресурс (форма/угол ракетки).
-    const paddleModes = ["paddleRotation", "paddleImpulse", "paddleConvex", "paddleConcave"]
-    if (turnOn) {
-      for (const m of paddleModes) if (m !== id) this.debugEffects.delete(m)
-    }
-    if (this.debugEffects.has(id)) this.debugEffects.delete(id)
-    else this.debugEffects.add(id)
-    // Сброс поворота при смене режима, чтобы не оставался наклон
-    if (paddleModes.includes(id)) {
-      this.paddle.rot = 0
-      this.paddleImpulse = null
-      this.prevLeftDown = false
-      this.prevRightDown = false
-    }
-    this.pushHud()
-  }
-
-  /** Активен ли эффект отладки. */
-  isDebugEffectActive(id: string) {
-    return this.debugEffects.has(id)
-  }
-
-  /** Текущая форма верхней поверхности ракетки (из эффектов отладки).
-   *  Единый источник для физики, ловли бонусов, оружия и рендера. */
+  /** Текущая форма верхней поверхности ракетки — см. game/paddleControl.ts. */
   paddleShapeKind(): PaddleShapeKind {
-    if (this.isDebugEffectActive("paddleConvex")) return "convex"
-    if (this.isDebugEffectActive("paddleConcave")) return "concave"
-    return "flat"
+    return paddleShape(this)
   }
-
-  /** Обновление поворота ракетки (режим отладки: ЛКМ/ПКМ = ±30°). */
-  private updatePaddleRotation(dt: number) {
-    const p = this.paddle
-    const ROT_MAX = (30 * Math.PI) / 180 // 30 градусов
-    const ROT_SPEED = 12 // скорость поворота
-    const inp = this.input
-    const active = this.isDebugEffectActive("paddleRotation")
-    const impulseActive = this.isDebugEffectActive("paddleImpulse")
-    // Блокируем поворот при старте мяча (мяч прилип к ракетке)
-    const ballStuck = this.balls.some((b) => b.stuck)
-
-    if (impulseActive) {
-      // --- Импульсный режим: однократный резкий доворот и автоматический возврат ---
-      const edgeLeft = inp.leftButton && !this.prevLeftDown
-      const edgeRight = inp.rightButton && !this.prevRightDown
-      this.prevLeftDown = inp.leftButton
-      this.prevRightDown = inp.rightButton
-      if (!ballStuck && this.paddleImpulse === null) {
-        if (edgeLeft && !edgeRight) {
-          this.paddleImpulse = { dir: 1, t: 0 }
-        } else if (edgeRight && !edgeLeft) {
-          this.paddleImpulse = { dir: -1, t: 0 }
-        }
-      }
-      if (this.paddleImpulse) {
-        this.paddleImpulse.t += dt
-        const t = this.paddleImpulse.t
-        const total = 0.35 // полный цикл: доворот + удержание + возврат
-        const rise = 0.08 // резкий доворот
-        const hold = 0.14 // удержание угла
-        let k: number
-        if (t < rise) {
-          k = t / rise // 0 → 1
-        } else if (t < rise + hold) {
-          k = 1 // держим максимум
-        } else {
-          const f = (t - rise - hold) / (total - rise - hold) // 0 → 1
-          k = 1 - f * f * (3 - 2 * f) // smoothstep-возврат
-        }
-        p.rot = this.paddleImpulse.dir * ROT_MAX * k
-        if (t >= total) {
-          p.rot = 0
-          this.paddleImpulse = null
-        }
-      }
-      return
-    }
-
-    if (!active) {
-      // Эффект выключен — плавно возвращаем в 0
-      if (p.rot) {
-        p.rot *= Math.exp(-dt * 6)
-        if (Math.abs(p.rot) < 0.01) p.rot = 0
-      }
-      return
-    }
-    if (ballStuck) return
-    let target = 0
-    if (inp.leftButton && !inp.rightButton) target = ROT_MAX
-    else if (inp.rightButton && !inp.leftButton) target = -ROT_MAX
-    // Плавно подходим к целевому углу
-    p.rot = (p.rot ?? 0) + (target - (p.rot ?? 0)) * Math.min(1, dt * ROT_SPEED)
+  loop = (t: number) => gameLoop(this, t)
+  /** Реакция на изменение размера окна (см. game/lifecycle.ts). */
+  handleResize = () => resizeHandler(this)
+  update(dt: number) {
+    update(this, dt)
   }
-
-  /** Принудительно спавнит щупальцевого босса (осьминог/кракен) для тестирования. */
-  spawnDebugBoss(kind: "octopus" | "kraken") {
-    this.debugBossType = kind
-    // Арена отладки живёт по правилам бесконечного режима: mode по умолчанию
-    // «campaign», и после убийства босса onLevelCleared ушёл бы на экран карты,
-    // которого в отладке нет (campaign = null) — поле зависало пустым.
-    this.mode = "endless"
-    this.onBossNode = false
-    this.blocks = []
-    this.balls = []
-    this.powers = []
-    this.projectiles = []
-    this.bossSys.clear()
-    this.resetMiniboss()
-    // Канонические параметры вида (как в кампании на 3-м ярусе боссов).
-    const variant = fixedVariant(kind)
-    const boss = this.buildOctopusBoss(variant.hp, variant)
-    this.bossSys.spawn(boss)
-    this.blocksInitial = Math.max(1, this.blocks.length)
-    this.setBanner(`ФИНАЛЬНЫЙ БОСС: ${variant.name}`)
-    if (this.phase === "menu") {
-      this.phase = "playing"
-      this.serveBall()
-    }
-    this.pushHud()
+  draw() {
+    draw(this)
   }
-
-  /** Отладочный спавн минибосса: обычная волна 1 + существо для тестирования. */
-  spawnDebugMiniboss(kind: MinibossKind) {
-    this.debugBossType = null
-    this.mode = "endless"
-    this.onBossNode = false
-    this.balls = []
-    this.powers = []
-    this.projectiles = []
-    this.bossSys.clear()
-    this.boomQueue = []
-    this.resetMiniboss()
-    this.buildWave(1)
-    this.addMiniboss(kind)
-    if (this.phase === "menu") this.phase = "playing"
-    this.serveBall()
-    this.setBanner(`МИНИ-БОСС: ${minibossName(kind)}`)
-    this.pushHud()
-  }
-
-  /* ---------- мини-боссы кампании ---------- */
-
-  resetMiniboss() {
-    this.minibosses = []
-    this.mbGroupSeq = 0
-    this.mouthBubbles = []
-    this.fishMouth = false
-  }
-
-  /** Добавляет существо-минибосса к текущему уровню (освободив ему место). */
-  private addMiniboss(kind: MinibossKind, hp = MINIBOSS_HP[kind]) {
-    const top = this.blockTop()
-    const group = ++this.mbGroupSeq
-    const creature =
-      kind === "fish"
-        ? buildFish(this.w, this.h, top, group)
-        : buildJelly(this.w, this.h, top, group)
-    // Существу нужен целостный силуэт: убираем обычные блоки, с которыми оно налегает.
-    this.blocks = [...carveLevelBlocks(this.blocks, creature), ...creature]
-    this.blocksInitial = Math.max(1, this.blocks.length)
-    const dropX = creature.reduce((s, b) => s + b.x, 0) / creature.length
-    const dropY = creature.reduce((s, b) => s + b.y, 0) / creature.length
-    this.minibosses.push({ kind, group, hp, maxHp: hp, dropX, dropY })
-    // У рыбы запоминаем точку рта (нос) — оттуда пойдут пузырьки воздуха.
-    if (kind === "fish") {
-      const bodyParts = creature.filter((b) => b.mbPart === "body")
-      const maxX = Math.max(...bodyParts.map((b) => b.x + b.rx))
-      const midY =
-        (Math.min(...bodyParts.map((b) => b.y)) + Math.max(...bodyParts.map((b) => b.y))) / 2
-      this.mouthX = maxX - 2
-      this.mouthY = midY + 5
-      this.fishMouth = true
-      this.mouthBubbleTimer = rand(0.5, 1.2)
-    }
-    this.fx.popups.push({
-      x: dropX,
-      y: dropY - 70,
-      text: `МИНИ-БОСС: ${minibossName(kind)}`,
-      color: "#ffc94d",
-      t: 0,
-      size: 22,
-    })
-    this.sfx.power()
-    this.pushHud()
-  }
-
-  /**
-   * Урон в пул HP конкретного существа (блоки минибосса неразрушаемы —
-   * вызывается из Physics.damageBlock с блоком, принявшим удар). Тело
-   * вспыхивает, при обнулении пула существо взрывается цепочкой и
-   * разыгрывается жизнь (MINIBOSS_LIFE_CHANCE).
-   */
-  damageMiniboss(dmg: number, block: Block) {
-    const creature = this.minibosses.find((c) => c.group === (block.mbGroup ?? 0))
-    if (!creature || creature.hp <= 0) return
-    creature.hp -= dmg
-    this.addRawScore(5)
-    for (const b of this.blocks) {
-      if (b.isMiniboss && (b.mbGroup ?? 0) === creature.group) b.flash = 1
-    }
-    if (creature.hp <= 0) this.killMiniboss(creature)
-    this.pushHud()
-  }
-
-  /** Пузырьки изо рта рыбы: периодический выдох + подъём с покачиванием. */
-  private updateMouthBubbles(dt: number) {
-    const fish = this.minibosses.find((c) => c.kind === "fish")
-    if (this.fishMouth && fish && fish.hp > 0 && this.phase === "playing") {
-      // рот следует за силуэтом: пузырьки выходят с носа той стороны, куда
-      // рыба сейчас повёрнута (плавный разворот — fishFacing из render.ts)
-      const bodyParts = this.blocks.filter(
-        (b) => b.isMiniboss && b.mbPart === "body" && (b.mbGroup ?? 0) === fish.group
-      )
-      let facing = 1
-      if (bodyParts.length) {
-        facing = fishFacing(bodyParts, this.time)
-        const minX = Math.min(...bodyParts.map((b) => b.x - b.rx))
-        const maxX = Math.max(...bodyParts.map((b) => b.x + b.rx))
-        const midY =
-          (Math.min(...bodyParts.map((b) => b.y)) + Math.max(...bodyParts.map((b) => b.y))) / 2
-        this.mouthX = facing >= 0 ? maxX - 12 : minX + 12
-        this.mouthY = midY + 9
-      }
-      // выдох только когда рот открыт — та же фаза sin(t·0.85), что в отрисовке
-      const open = Math.max(0, Math.sin(this.time * 0.85))
-      if (open > 0.35) {
-        this.mouthBubbleTimer -= dt
-        if (this.mouthBubbleTimer <= 0) {
-          this.mouthBubbleTimer = rand(1.1, 2.4)
-          const n = 1 + Math.floor(rand(0, 3))
-          for (let i = 0; i < n; i++) {
-            this.mouthBubbles.push({
-              x: this.mouthX + rand(-2, 2),
-              y: this.mouthY + rand(-2, 2),
-              vx: rand(6, 18) * (facing >= 0 ? 1 : -1),
-              vy: -rand(34, 62),
-              r: rand(2, 4.5),
-              t: 0,
-              life: rand(1.3, 2.4),
-              ph: rand(0, Math.PI * 2),
-            })
-          }
-        }
-      } else {
-        // пока рот закрыт, таймер держим почти заряженным — выдох начинается
-        // сразу после открытия рта
-        this.mouthBubbleTimer = Math.min(this.mouthBubbleTimer, 0.15)
-      }
-    }
-    for (const b of this.mouthBubbles) {
-      b.t += dt
-      b.x += (b.vx + Math.sin(b.t * 4 + b.ph) * 14) * dt
-      b.y += b.vy * dt
-      b.vy -= 8 * dt // подъём ускоряется, как у настоящего пузырька
-      b.r += 1.6 * dt
-    }
-    this.mouthBubbles = this.mouthBubbles.filter((b) => b.t < b.life)
-  }
-
-  /** Кильватер рыбы: шары рядом с проплывающей рыбой слегка сносит по её ходу. */
-  private applyFishWake(dt: number) {
-    const fish = this.minibosses.find((c) => c.kind === "fish")
-    if (!this.fishMouth || !fish || fish.hp <= 0 || this.phase !== "playing") return
-    const bodyParts = this.blocks.filter(
-      (b) => b.isMiniboss && b.mbPart === "body" && (b.mbGroup ?? 0) === fish.group
-    )
-    if (!bodyParts.length) return
-    const minX = Math.min(...bodyParts.map((b) => b.x - b.rx))
-    const maxX = Math.max(...bodyParts.map((b) => b.x + b.rx))
-    const minY = Math.min(...bodyParts.map((b) => b.y - b.ry))
-    const maxY = Math.max(...bodyParts.map((b) => b.y + b.ry))
-    const fx = (minX + maxX) / 2
-    const fy = (minY + maxY) / 2
-    const f = bodyParts[0].swayFreq
-    const amp = bodyParts[0].swayAmp
-    const fishVx = Math.cos(this.time * f) * amp * f // скорость рыбы, px/с
-    const R = 180
-    for (const ball of this.balls) {
-      if (ball.stuck) continue
-      const dx = ball.x - fx
-      const dy = ball.y - fy
-      // эллипс влияния: тянется шире по горизонтали — за хвостом и перед носом
-      const d = Math.hypot(dx, dy * 1.4)
-      if (d < R) {
-        const k = (1 - d / R) * 0.55
-        ball.x += fishVx * dt * k
-      }
-    }
-  }
-
-  /** Смерть минибосса: цепочка взрывов по его силуэту и шанс дропа жизни. */
-  private killMiniboss(creature: {
-    kind: MinibossKind
-    group: number
-    hp: number
-    maxHp: number
-    dropX: number
-    dropY: number
-  }) {
-    const doomed = this.blocks.filter((b) => b.isMiniboss && (b.mbGroup ?? 0) === creature.group)
-    let i = 0
-    for (const b of doomed) {
-      this.boomQueue.push({ x: b.x, y: b.y, at: this.time + 0.06 + i * 0.05 })
-      b.dead = true
-      i++
-    }
-    this.blocks = this.blocks.filter((b) => !b.dead)
-    this.minibosses = this.minibosses.filter((c) => c.group !== creature.group)
-    // рыба погибла — пузырьки изо рта и кильватер больше не нужны
-    if (creature.kind === "fish") {
-      this.mouthBubbles = []
-      this.fishMouth = false
-    }
-    this.addRawScore(800)
-    this.fx.popups.push({
-      x: creature.dropX,
-      y: creature.dropY,
-      text: "+800",
-      color: "#ffc94d",
-      t: 0,
-      size: 26,
-    })
-    this.flash = 1
-    this.hitStop = Math.max(this.hitStop, 0.3)
-    this.shake = Math.min(this.shake + 10, 14)
-    this.sfx.bossDie()
-    if (Math.random() < MINIBOSS_LIFE_CHANCE) {
-      this.powers.push({
-        x: creature.dropX,
-        y: creature.dropY,
-        vy: 150,
-        type: "life",
-        t: 0,
-      })
-      this.fx.rings.push({
-        x: creature.dropX,
-        y: creature.dropY,
-        r: 8,
-        maxR: 120,
-        color: "rgba(93,255,176,0.85)",
-        t: 0,
-      })
-      this.fx.popups.push({
-        x: creature.dropX,
-        y: creature.dropY - 40,
-        text: "ЖИЗНЬ!",
-        color: "#5dffb0",
-        t: 0,
-        size: 22,
-      })
-      this.sfx.power()
-    }
-    this.pushHud()
-  }
-
-  /**
-   * Босс-осьминог: тело + щупальца, которые нужно уничтожить первыми.
-   * opts позволяет вариантам (осьминог/кракен) менять число щупалец,
-   * частоту бомб и порог агрессии.
-   */
-  private buildOctopusBoss(
-    hp = 50,
-    opts?: { tentacles?: number; bombEvery?: number; angryAt?: number }
-  ): BossState {
-    const octoHp = hp
-    // Создаём щупальца вокруг тела босса — каждый из нескольких сегментов-шариков,
-    // уменьшающихся к концу, как провода. Сегменты начинаются от кольца здоровья
-    // босса и извиваются по длине, как змея.
-    const tentacleCount = opts?.tentacles ?? 6
-    const SEG_COUNT = 4
-    const SEG_RADII = [25, 20, 15, 10] // от базы к кончику (+5px)
-    const SEG_SPACING = 24 // расстояние между центрами сегментов
-    const TENTACLE_LENGTH = SEG_COUNT * SEG_SPACING // ~96px
-    const HEALTH_RING_R = 14 // радиус кольца здоровья (r + 14)
-    const WAVE_AMP = 22 // синхронизировано с boss.ts (анимация волн)
-    const WAVE_SPEED = 1.3
-    for (let i = 0; i < tentacleCount; i++) {
-      // Направление от центра босса к точке прикрепления щупальца.
-      const ang = (i / tentacleCount) * Math.PI * 2
-      // Точка на кольце здоровья босса (внешняя окружность r+14)
-      const bodyX = this.w / 2
-      const bodyY = this.h * 0.28
-      const dirX = Math.cos(ang)
-      const dirY = Math.sin(ang) * 0.5
-      const baseR = 40 + HEALTH_RING_R // r босса + радиус кольца здоровья
-      const baseX = bodyX + dirX * baseR
-      const baseY = bodyY + dirY * baseR
-      for (let seg = 0; seg < SEG_COUNT; seg++) {
-        // Прогресс по длине щупальца (0.25 = первый сегмент, 1 = кончик).
-        const segT = (seg + 1) / SEG_COUNT
-        const along = segT * TENTACLE_LENGTH
-        // Волновое отклонение при спавне (используем t=0 для начальной фазы).
-        const phase = seg * 0.9
-        const wave = Math.sin(0 * WAVE_SPEED + phase) * WAVE_AMP * segT
-        const perpX = -dirY
-        const perpY = dirX
-        const bx = baseX + dirX * along + perpX * wave
-        const by = baseY + dirY * along + perpY * wave
-        this.blocks.push({
-          x: bx,
-          y: by,
-          rx: SEG_RADII[seg],
-          ry: SEG_RADII[seg],
-          rot: 0,
-          circle: true,
-          hp: seg === SEG_COUNT - 1 ? 2 : 4,
-          maxHp: seg === SEG_COUNT - 1 ? 2 : 4,
-          tier: 2,
-          flash: 0,
-          seed: Math.random() * 1000 + seg * 100,
-          dead: false,
-          x0: bx,
-          swayAmp: 0,
-          swayFreq: 0,
-          swayPh: 0,
-          bomb: false,
-          splits: false,
-          minionOrbit: {
-            ang,
-            rad: 90,
-            dir: 1,
-            speed: 0.8,
-          },
-          isTentacle: true,
-          tentacleId: i,
-          tentacleSeg: seg,
-          tentacleOrbit: {
-            ang,
-            rad: 90,
-            dir: 1,
-            speed: 0.8,
-            seg: seg,
-          },
-        } as Block & { isTentacle: true; tentacleId: number; tentacleSeg: number })
-      }
-    }
-    return {
-      x: this.w / 2,
-      y: this.h * 0.28,
-      baseY: this.h * 0.28,
-      r: 52,
-      hp: octoHp,
-      maxHp: octoHp,
-      t: 0,
-      flash: 0,
-      dropTimer: 4,
-      isOctopus: true,
-      totalTentacles: tentacleCount,
-      bombEvery: opts?.bombEvery,
-      angryAt: opts?.angryAt,
-    } as BossState & { isOctopus: true }
-  }
-
-  /* ---------- жизненный цикл ---------- */
 
   attach() {
-    this.handleResize()
-    window.addEventListener("resize", this.handleResize)
-    this.input.attach()
-    for (let i = 0; i < 26; i++) {
-      this.bubbles.push({
-        x: Math.random() * this.w,
-        y: Math.random() * this.h,
-        r: rand(2, 7),
-        vy: rand(14, 46),
-        ph: rand(0, Math.PI * 2),
-      })
-    }
-    this.last = performance.now()
-    this.raf = requestAnimationFrame(this.loop)
-    // Музыка стартует сразу при запуске игры; если браузер требует жест,
-    // SFX сам повторит запуск при первом клике/тапе/клавише.
-    this.sfx.autostart()
-    this.pushHud()
+    attach(this)
   }
-
-  setNick(nick: string) {
-    this.nick = nick
-  }
-
   destroy() {
-    this.destroyed = true
-    cancelAnimationFrame(this.raf)
-    window.removeEventListener("resize", this.handleResize)
-    this.input.destroy()
-    // Движок уничтожен (например, пересоздание в dev-режиме) — музыка не должна
-    // остаться играть «вторым» экземпляром.
-    this.sfx.stopMusic()
+    destroy(this)
   }
-
-  private loop = (t: number) => {
-    if (this.destroyed) return
-    // Нескомпенсированная дельта нужна счётчику FPS: dtRaw зажат в 0.033 с,
-    // и при реальном fps < 30 он бы занижал интервалы (fps казался выше).
-    const rawDt = Math.max(0, (t - this.last) / 1000)
-    const dtRaw = clamp(rawDt, 0, 0.033)
-    this.fpsFrames++
-    this.fpsElapsed += rawDt
-    if (this.fpsElapsed >= 0.5) {
-      this.fps = Math.round(this.fpsFrames / this.fpsElapsed)
-      this.fpsFrames = 0
-      this.fpsElapsed = 0
-    }
-    this.last = t
-    if (this.hitStop > 0) this.hitStop = Math.max(0, this.hitStop - dtRaw)
-    const dt = this.hitStop > 0 ? dtRaw * 0.18 : dtRaw
-    this.time += dt
-    this.flash = Math.max(0, this.flash - dtRaw * 2.6)
-    try {
-      this.update(dt)
-      this.draw()
-    } catch (err) {
-      console.error("[ШАРОБОЙ] ошибка в игровом цикле:", err)
-    }
-    this.raf = requestAnimationFrame(this.loop)
+  setNick(nick: string) {
+    setNick(this, nick)
   }
-
-  private handleResize = () => {
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const cssW = window.innerWidth
-    const cssH = window.innerHeight
-    const ow = this.w
-    const oh = this.h
-    /* Единый масштаб мира (viewport.ts): логика считает в «эталонных» единицах
-       (окно 1920×1080 = масштаб 1), а канвас рисует весь мир одним трансформом.
-       Поэтому размеры/скорости сущностей одинаковы на телефоне, FHD и 4K. */
-    this.scale = computeScale(cssW, cssH)
-    this.w = cssW / this.scale
-    this.h = cssH / this.scale
-    this.canvas.width = Math.floor(cssW * this.dpr)
-    this.canvas.height = Math.floor(cssH * this.dpr)
-    this.ctx.setTransform(this.dpr * this.scale, 0, 0, this.dpr * this.scale, 0, 0)
-    // Экранный размер канваса задаём явно: canvas — replaced-элемент, без явных
-    // CSS-размеров он берёт размер атрибутов (w*dpr × h*dpr) и при
-    // devicePixelRatio != 1 (масштаб ОС 125%/150%, Retina) вылезает за экран.
-    this.canvas.style.width = `${cssW}px`
-    this.canvas.style.height = `${cssH}px`
-    this.paddle.baseW = clamp(this.w * 0.18, 110, 200) * this.paddleWidthMult
-    this.paddle.y = this.h - this.paddleBottomOffset()
-    this.paddle.x = clamp(this.paddle.x, this.paddle.w / 2 + 4, this.w - this.paddle.w / 2 - 4)
-    if (ow && oh && this.blocks.length && (ow !== this.w || oh !== this.h)) {
-      const sx = this.w / ow
-      const sy = this.h / oh
-      for (const b of this.blocks) {
-        b.x = clamp(b.x * sx, b.rx + 6, this.w - b.rx - 6)
-        b.x0 = clamp(b.x0 * sx, b.rx + 6, this.w - b.rx - 6)
-        b.y = clamp(b.y * sy, b.ry + 6, this.h * 0.75)
-      }
-    }
-  }
-
-  /** Отступ ракетки от нижнего края: на таче выше — палец не закрывает ракетку.
-   *  Задаётся в CSS-пикселях (размер пальца физический и от масштаба мира не
-   *  зависит), поэтому в мировые единицы переводим делением. */
-  private paddleBottomOffset(): number {
-    // Поднято на 10px против прежних 34/100: низ чаши-ленты не задевает щит.
-    return (this.touchMode ? 110 : 44) / this.scale
-  }
-
-  /** Верх зоны блоков в мировых единицах: 14% высоты мира, но не выше нижней
-   *  границы HUD-плашек — на масштабах < 1 (телефоны) плашки занимают больше
-   *  «мира», и блоки опускаются ниже, чтобы плашки их не перекрывали. */
-  private blockTop(): number {
-    return Math.min(Math.max(this.h * 0.14, HUD_TOP_CSS / this.scale), this.h * 0.35)
-  }
-
-  /** Загрузка рекордов из localStorage с миграцией со старого формата (number[]). */
-  private loadScoreEntries(key: string): ScoreEntry[] {
-    try {
-      const parsed = JSON.parse(lsGet(key) || "[]") as unknown
-      if (!Array.isArray(parsed)) return []
-      return parsed
-        .map((item: unknown): ScoreEntry | null => {
-          if (typeof item === "number") {
-            return { score: item, nick: "" }
-          }
-          if (typeof item === "object" && item !== null && "score" in item) {
-            const entry = item as { score: unknown; nick?: unknown }
-            return {
-              score: typeof entry.score === "number" ? entry.score : 0,
-              nick: typeof entry.nick === "string" ? entry.nick : "",
-            }
-          }
-          return null
-        })
-        .filter((e): e is ScoreEntry => e !== null)
-    } catch {
-      return []
-    }
-  }
-
-  /** Первый тач-ввод (в т.ч. на гибридных устройствах) — поднимаем ракетку. */
-  private enableTouchMode() {
-    if (this.touchMode) return
-    this.touchMode = true
-    this.paddle.y = this.h - this.paddleBottomOffset()
-  }
-
-  /* ---------- управление игрой ---------- */
-
-  /** Старт забега: генерирует карту кампании и открывает экран карты (фог войны). */
   startGame() {
-    this.sfx.ensure()
-    this.sfx.ui()
-    this.mode = "campaign"
-    this.wave = 0
-    this.waveSpec = null
-    this.resetRun()
-    this.startCampaignMap()
+    startGame(this)
   }
-
-  /** Прямой запуск боя уровня без карты — тесты движка и отладка раскладок. */
   startLevelBattle(n: number) {
-    this.sfx.ensure()
-    this.sfx.ui()
-    this.mode = "campaign"
-    this.wave = 0
-    this.waveSpec = null
-    this.resetRun()
-    this.applyUpgrades()
-    this.level = n
-    this.buildLevel(n)
-    this.levelLostBall = false
-    this.onBossNode = "boss" in LEVELS[n - 1]
-    this.activeSpec = this.onBossNode ? null : LEVELS[n - 1]
-    this.launchNodeBattle(LEVELS[n - 1].name)
+    startLevelBattle(this, n)
   }
-
-  /* ---------- карта кампании (рогалик слева-направо) ---------- */
-
-  /** Генерирует карту забега и ставит игрока на стартовый узел (экран карты). */
-  private startCampaignMap() {
-    this.campaignSeed = (daySeed() * 31 + this.runSeq++) | 0
-    this.campaign = generateCampaignMap(this.campaignSeed)
-    this.campaignMbSeen = {}
-    this.minibossPity = 0
-    this.campaignEvent = null
-    this.campaignEventTarget = -1
-    this.campaignSpentEvents = []
-    this.campaignPlayerId = this.campaign.startId
-    this.campaignVisited = [this.campaign.startId]
-    this.campaignVisible = visibleFrom(this.campaign, this.campaignPlayerId)
-    this.onBossNode = false
-    this.activeSpec = null
-    this.phase = "map"
-    this.enterMapView()
-    this.sfx.ui()
-    this.applyTrack()
-    this.pushHud()
-  }
-
-  /** Возврат на экран карты из боя или со старта забега: поле очищено. */
-  private enterMapView() {
-    this.phase = "map"
-    this.input.releaseLock()
-    this.input.clearKeys()
-    this.balls = []
-    this.blocks = []
-    this.powers = []
-    this.projectiles = []
-    this.bossSys.clear()
-    this.boomQueue = []
-    this.fieldShift = null
-    this.banner = null
-    this.bannerTimer = 0
-    this.transition = 0
-    this.countdown = 0
-    this.fx.clear()
-    this.onBossNode = false
-    this.activeSpec = null
-    this.applyTrack()
-    this.pushHud()
-  }
-
-  /** Клик по узлу карты: переход разрешён только в узел, соседний с текущим. */
-  enterMapNode(id: number) {
-    if (this.phase !== "map" || !this.campaign) return
-    if (!isAdjacent(this.campaign, this.campaignPlayerId, id)) return
-    const node = nodeById(this.campaign, id)
-    if (!node) return
-    this.sfx.ensure()
-    this.sfx.ui()
-    this.campaignPlayerId = id
-    if (!this.campaignVisited.includes(id)) this.campaignVisited.push(id)
-    if (node.isEvent) {
-      if (this.campaignSpentEvents.includes(id)) {
-        // стихия уже сработала однажды: повторный вход — обычный бой в этой
-        // зоне (иначе узел-«бутылочное горлышко» телепортировал бы вечно)
-        this.campaignVisible = visibleFrom(this.campaign, id)
-        this.startMapBattle(node)
-        return
-      }
-      this.campaignSpentEvents.push(id)
-      this.resolveCampaignEvent(node)
-      return
-    }
-    this.campaignVisible = visibleFrom(this.campaign, id)
-    this.startMapBattle(node)
-  }
-
-  /**
-   * Узел-событие: боя нет — подводная стихия (водоворот, течение, гейзер)
-   * уносит игрока в один из уже пройденных узлов, но не дальше чем на
-   * EVENT_MAX_BACK_TIERS зон назад. Расклад события (узел назначения и текст)
-   * рандомизируется прямо в момент срабатывания — живым ГПСЧ, а не
-   * детерминированным раскладом карты. Целями не могут быть узлы-события:
-   * цепочка телепортов на одном ходу исключена. Само перемещение фишки и старт
-   * боя на узле назначения происходят в dismissCampaignEvent, после того как
-   * игрок прочитал сообщение. Событие срабатывает один за забег: повторный
-   * вход в узел-событие — обычный бой (см. enterMapNode). В будущем здесь же
-   * появится вариант «остаться на месте за кристаллы».
-   */
-  private resolveCampaignEvent(node: CampaignNode) {
-    if (!this.campaign) return
-    const options = this.campaignVisited.filter((v) => {
-      if (v === node.id) return false
-      const visited = nodeById(this.campaign!, v)
-      // не-событийные узлы не дальше EVENT_MAX_BACK_TIERS зон назад
-      return !!visited && !visited.isEvent && visited.tier >= node.tier - EVENT_MAX_BACK_TIERS
-    })
-    if (!options.length) {
-      // редкий случай: окно из 3 зон съедено цепочкой событий — стихия стихла,
-      // игрок остаётся на месте и идёт дальше с этого узла
-      this.campaignVisible = visibleFrom(this.campaign, node.id)
-      this.phase = "map"
-      this.applyTrack()
-      this.pushHud()
-      return
-    }
-    const to = options[Math.floor(Math.random() * options.length)]
-    this.campaignEventTarget = to
-    const target = to >= 0 ? nodeById(this.campaign, to) : undefined
-    const template = EVENT_TEXTS[Math.floor(Math.random() * EVENT_TEXTS.length)]
-    this.campaignEvent = template.replace("{place}", target ? target.name : "НЕИЗВЕСТНОЕ МЕСТО")
-    this.onBossNode = false
-    this.activeSpec = null
-    this.phase = "map"
-    this.applyTrack()
-    this.sfx.power()
-    this.pushHud()
-  }
-
-  /**
-   * Закрытие экрана события («плыть дальше»): фишка перемещается на узел из
-   * сообщения, и там сразу стартует бой — с вновь случайным шансом минибоссов
-   * (не по раскладу карты). Повторные события-телепорты на этом ходу исключены:
-   * узлы-события не бывают целью, бой стартует напрямую.
-   */
-  dismissCampaignEvent() {
-    const target = this.campaignEventTarget
-    this.campaignEvent = null
-    this.campaignEventTarget = -1
-    if (this.phase !== "map" || !this.campaign || target < 0) {
-      this.pushHud()
-      return
-    }
-    const node = nodeById(this.campaign, target)
-    if (!node || node.isEvent) {
-      this.pushHud()
-      return
-    }
-    this.campaignPlayerId = target
-    if (!this.campaignVisited.includes(target)) this.campaignVisited.push(target)
-    this.campaignVisible = visibleFrom(this.campaign, target)
-    this.startMapBattle(node)
-  }
-
-  /** Space/Enter на экране карты: входим в узел, если выбор однозначен. */
-  private enterNextNodeOnAction() {
-    if (!this.campaign) return
-    const next = outgoingIds(this.campaign, this.campaignPlayerId)
-    if (next.length === 1) this.enterMapNode(next[0])
-  }
-
-  /**
-   * Запуск боя на узле карты. Обычный узел — авторская раскладка кампании по
-   * кругу, узел босса — финальная арена, масштабирующаяся по ярусу. Минибоссы
-   * разыгрываются полностью случайно при старте каждого боя с pity-системой.
-   */
-  private startMapBattle(node: CampaignNode) {
-    if (!this.campaign) return
-    this.level = node.tier + 1
-    this.levelLostBall = false
-    this.campaignEvent = null
-    if (node.isBoss) {
-      this.activeSpec = null
-      this.onBossNode = true
-      // Вариативность: тип финального босса детерминирован сидом карты и ярусом.
-      const variant = pickBossVariant(this.campaignSeed + node.id * 7919, node.tier)
-      if (variant.tentacles > 0) {
-        this.buildOctopusBossLevel(variant)
-      } else {
-        this.buildBossLevel(variant.hp, variant.minions, 4)
-      }
-      this.launchNodeBattle(`ФИНАЛЬНЫЙ БОСС: ${variant.name}`)
-      return
-    }
-    this.onBossNode = false
-    this.activeSpec = this.nodeSpecFor(node)
-    this.buildFromSpec(this.activeSpec)
-    // Минибоссы: полностью случайный ролл в момент старта боя с pity-системой —
-    // пока существо не появлялось, шанс растёт, после появления — снова базовый.
-    // Появлявшиеся существа запоминаются для маркеров на карте забега.
-    const rolled = rollMinibossLive(this.minibossPity)
-    this.minibossPity = rolled.pity
-    if (rolled.kinds.length) this.campaignMbSeen[node.id] = rolled.kinds
-    for (const kind of rolled.kinds) {
-      this.addMiniboss(kind, minibossHpFor(kind, node.tier, this.campaign.tiers))
-    }
-    this.launchNodeBattle(node.name)
-  }
-
-  /** Раскладка обычного узла: авторские уровни по кругу (босс исключён). */
-  private nodeSpecFor(node: CampaignNode): LevelSpec {
-    return LEVELS[node.tier % (LEVELS.length - 1)]
-  }
-
-  /** Общий вход в бой: подача шара, трек, баннер и бонусы прокачки. */
-  private launchNodeBattle(label: string) {
-    this.magnetUntil = this.time + 4 * (this.upgrades.magnet ?? 0)
-    this.laserArmed = (this.upgrades.laser ?? 0) > 0
-    this.serveBall()
-    this.phase = "playing"
-    this.applyTrack()
-    this.setBanner(label)
-    this.pushHud()
-  }
-
-  /** Снимок карты для HUD (только пока активен экран карты). */
-  private currentMapView(): CampaignMapView | null {
-    if (!this.campaign || this.phase !== "map") return null
-    const map = this.campaign
-    return {
-      seed: map.seed,
-      tiers: map.tiers,
-      nodes: map.nodes,
-      edges: map.edges,
-      startId: map.startId,
-      bossId: map.bossId,
-      playerId: this.campaignPlayerId,
-      visited: [...this.campaignVisited],
-      visible: [...this.campaignVisible],
-      minibosses: { ...this.campaignMbSeen },
-    }
-  }
-
   startEndless() {
-    this.sfx.ensure()
-    this.sfx.ui()
-    this.mode = "endless"
-    this.wave = 1
-    this.waveSpec = { name: "ВОЛНА 1", speed: 400 }
-    this.resetRun()
-    this.buildWave(1)
-    this.applyUpgrades()
-    this.magnetUntil = this.time + 4 * (this.upgrades.magnet ?? 0)
-    this.laserArmed = (this.upgrades.laser ?? 0) > 0
-    this.serveBall()
-    this.phase = "playing"
-    this.applyTrack()
-    this.setBanner("БЕСКОНЕЧНЫЙ РЕЖИМ — ВОЛНА 1")
-    this.pushHud()
+    startEndless(this)
   }
-
   toMenu() {
-    this.sfx.ui()
-    this.input.releaseLock()
-    this.saveTop()
-    this.phase = "menu"
-    this.campaign = null
-    this.campaignMbSeen = {}
-    this.minibossPity = 0
-    this.campaignEvent = null
-    this.campaignEventTarget = -1
-    this.campaignSpentEvents = []
-    this.campaignPlayerId = -1
-    this.campaignVisited = []
-    this.campaignVisible = []
-    this.activeSpec = null
-    this.onBossNode = false
-    this.applyTrack()
-    this.balls = []
-    this.blocks = []
-    this.powers = []
-    this.projectiles = []
-    this.bossSys.clear()
-    this.boomQueue = []
-    this.banner = null
-    this.fx.clear()
-    this.shake = 0
-    this.flash = 0
-    this.hitStop = 0
-    this.pushHud()
+    toMenu(this)
   }
-
   togglePause() {
-    if (this.phase === "playing") {
-      this.phase = "paused"
-      this.input.keys.space = false
-      this.input.releaseLock()
-      this.sfx.ui()
-    } else if (this.phase === "paused") {
-      this.phase = "playing"
-      this.countdown = 3
-      this.sfx.ui()
-    }
-    this.pushHud()
+    togglePause(this)
   }
-
   toggleMute() {
-    this.sfx.ensure() // клик по кнопке — жест, легально создаёт AudioContext
-    this.sfx.muted = !this.sfx.muted
-    if (!this.sfx.muted) this.sfx.ui()
-    this.pushHud()
+    toggleMute(this)
   }
-
-  /** Переключить фоновую музыку (отдельно от эффектов). */
   toggleMusic() {
-    this.sfx.ensure() // клик по кнопке — жест, легально создаёт AudioContext
-    this.sfx.setMusicMuted(!this.sfx.musicMuted)
-    this.pushHud()
+    toggleMusic(this)
   }
-
-  /**
-   * Скрытая отладочная клавиша («-» на цифровой клавиатуре): увеличивает
-   * урон шара на +1 за нажатие. Работает в любом режиме (для тестирования).
-   */
+  toggleFps(): boolean {
+    return toggleFps(this)
+  }
+  toggleDebug() {
+    toggleDebug(this)
+  }
+  toggleDebugEffect(id: string) {
+    toggleDebugEffect(this, id)
+  }
+  isDebugEffectActive(id: string): boolean {
+    return isDebugEffectActive(this, id)
+  }
+  enterMapNode(id: number) {
+    enterMapNode(this, id)
+  }
+  dismissCampaignEvent() {
+    dismissCampaignEvent(this)
+  }
+  enterNextNodeOnAction() {
+    enterNextNodeOnAction(this)
+  }
+  buyUpgrade(id: string): boolean {
+    return buyUpgrade(this, id)
+  }
   debugDamageUp() {
-    this.debugBallDamage += 1
-    this.sfx.ensure()
-    this.sfx.ui()
-    console.log(`[ШАРОБОЙ][debug] урон шара: ${this.debugBallDamage}`)
-    this.pushHud()
+    debugDamageUp(this)
   }
-
-  /**
-   * Скрытая отладочная клавиша («+» на цифровой клавиатуре): мгновенная
-   * зачистка текущего уровня — блоки, минибоссы и босс убираются без взрывов
-   * и без розыгрыша жизни, после чего обычный цикл сам переведёт кампанию
-   * на карту (или бесконечный режим на следующую волну). ВРЕМЕННАЯ помощь
-   * для быстрого прохождения уровней при отладке.
-   */
   debugSkipLevel() {
-    this.sfx.ensure()
-    if (this.phase !== "playing") return
-    this.minibosses = []
-    this.mouthBubbles = []
-    this.fishMouth = false
-    this.blocks = []
-    this.bossSys.clear()
-    this.boomQueue = []
-    // зачистка ждёт упавшую жизнь — для мгновенного перехода убираем её
-    this.powers = this.powers.filter((p) => p.type !== "life")
-    console.log("[ШАРОБОЙ][debug] уровень зачищен клавишей «+»")
-    this.pushHud()
+    debugSkipLevel(this)
   }
-
-  /** Ползунок громкости музыки (0..1). */
+  spawnDebugBoss(kind: "octopus" | "kraken") {
+    spawnDebugBoss(this, kind)
+  }
+  spawnDebugMiniboss(kind: MinibossKind) {
+    spawnDebugMiniboss(this, kind)
+  }
   setMusicVolume(v: number) {
-    this.sfx.ensure()
-    this.sfx.setMusicVolume(v)
-    this.pushHud()
+    setMusicVolume(this, v)
   }
-
-  /** Ползунок громкости эффектов (0..1). */
   setSfxVolume(v: number) {
-    this.sfx.ensure()
-    this.sfx.setSfxVolume(v)
-    this.pushHud()
+    setSfxVolume(this, v)
   }
-
-  /** Трек по фазе: в меню/финале — душевный медленный, в партии — боевой,
-   *  на карте кампании — своя медленная загадочная мелодия (тихий синт-трек
-   *  вместо MP3: игрок проводит на карте секунды, частые кроссфейды файлов
-   *  «бой → карта → бой» раздражали). */
-  private applyTrack() {
-    this.sfx.ensure() // музыка обязана звучать с первого момента уровня
-    this.sfx.setTrack(
-      this.phase === "playing" || this.phase === "paused"
-        ? "game"
-        : this.phase === "map"
-          ? "map"
-          : "menu"
-    )
-  }
-
-  /** Полный сброс состояния партии перед стартом кампании/бесконечного режима. */
-  private resetRun() {
-    this.bossSys.clear()
-    this.boomQueue = []
-    this.campaign = null
-    this.campaignPlayerId = -1
-    this.campaignVisited = []
-    this.campaignVisible = []
-    this.activeSpec = null
-    this.onBossNode = false
-    this.score = 0
-    this.lives = 3 + (this.upgrades.life ?? 0)
-    this.combo = 0
-    this.level = 1
-    this.newRecord = false
-    this.runBossKills = 0
-    this.runLivesLost = 0
-    this.debugBallDamage = 1
-    this.fx.clear()
-    this.powers = []
-    this.projectiles = []
-    /* Ракетка начинает партию по центру: шар клеится на неё в serveBall,
-       и они появляются вместе, а не в разных концах поля. */
-    this.paddle.x = this.w / 2
-    this.paddle.vx = 0
-    this.paddle.rot = 0
-    this.paddleImpulse = null
-    this.prevLeftDown = false
-    this.prevRightDown = false
-    this.wideUntil = 0
-    this.slowUntil = 0
-    this.fastUntil = 0
-    this.shrinkUntil = 0
-    this.laserUntil = 0
-    this.laserArmed = false
-    this.rocketUntil = 0
-    this.fireUntil = 0
-    this.magnetUntil = 0
-    this.shield = 0
-    this.weaponCd = 0
-    this.effectsKey = ""
-    this.transition = 0
-  }
-
-  private launch() {
-    let launched = false
-    for (const b of this.balls) {
-      if (b.stuck) {
-        b.stuck = false
-        const ang = -Math.PI / 2 + rand(-0.3, 0.3)
-        b.vx = Math.cos(ang) * b.speed
-        b.vy = Math.sin(ang) * b.speed
-        launched = true
-      }
-    }
-    if (launched) {
-      this.sfx.launch()
-      this.pushHud()
-    }
-  }
-
-  /* ---------- построение уровней ---------- */
-
-  private buildLevel(n: number) {
-    this.buildFromSpec(LEVELS[n - 1])
-  }
-
-  private buildFromSpec(spec: LevelSpec) {
-    this.levelLostBall = false
-    this.bossSys.clear()
-    this.boomQueue = []
-    this.fieldShift = null
-    this.resetMiniboss()
-    const top = this.blockTop()
-    if ("boss" in spec) {
-      const { boss, blocks } = buildBossArena(
-        spec.boss.hp,
-        spec.boss.minions,
-        spec.boss.bombs,
-        this.w,
-        this.h,
-        top
-      )
-      this.bossSys.spawn(boss)
-      this.blocks = blocks
-    } else if ("layout" in spec) {
-      this.blocks = layoutBlocks(spec, this.w, this.h, densityFactor(this.w, this.h), top)
-    } else {
-      this.blocks = gridBlocks(spec, this.w, this.h, densityFactor(this.w, this.h), top)
-    }
-    this.blocksInitial = Math.max(1, this.blocks.length)
-  }
-
-  private buildWave(n: number) {
-    this.waveSpec = { name: `ВОЛНА ${n}`, speed: clamp(380 + n * 22, 380, 650) }
-    if (n % 5 === 0) {
-      this.buildBossLevel(38 + n * 4, Math.min(5, 3 + Math.floor(n / 10)), 4)
-      return
-    }
-    const rng = mulberry32(daySeed() * 31 + n * 7919)
-    const rows = clamp(5 + Math.floor(n / 3), 5, 8)
-    const spec: PatternSpec = {
-      name: this.waveSpec.name,
-      speed: this.waveSpec.speed,
-      rows,
-      counts: Array.from({ length: rows }, (_, r) =>
-        clamp(6 + ((r + n) % 3) + Math.floor(n / 4), 6, 10)
-      ),
-      shape: () => {
-        const t = rng()
-        return (t < 0.5 ? "circle" : t < 0.78 ? "eh" : "ev") as "circle" | "eh" | "ev"
-      },
-      hp: (r) =>
-        (r < rows * 0.4 ? (rng() < 0.4 ? 3 : 2) : r < rows * 0.75 ? (rng() < 0.45 ? 2 : 1) : 1) as
-          1 | 2 | 3,
-    }
-    this.buildFromSpec(spec)
-  }
-
-  private buildBossLevel(hp: number, minions: number, bombs: number) {
-    this.resetMiniboss()
-    const { boss, blocks } = buildBossArena(hp, minions, bombs, this.w, this.h, this.blockTop())
-    this.bossSys.spawn(boss)
-    this.blocks = blocks
-    this.blocksInitial = Math.max(1, blocks.length)
-  }
-
-  /** Финальный босс кампании — осьминог/кракен: тело + щупальца, параметры из варианта. */
-  private buildOctopusBossLevel(variant: BossVariant) {
-    this.bossSys.clear()
-    this.boomQueue = []
-    this.fieldShift = null
-    this.resetMiniboss()
-    this.blocks = []
-    const boss = this.buildOctopusBoss(variant.hp, variant)
-    this.bossSys.spawn(boss)
-    this.blocksInitial = Math.max(1, this.blocks.length)
-  }
-
-  /** Скорость шара: в узле карты — по раскладке, иначе безопасный фолбэк. */
-  private levelSpeed() {
-    if (this.mode === "endless") return this.waveSpec?.speed ?? 400
-    if (this.activeSpec) return this.activeSpec.speed
-    return LEVELS[clamp(this.level - 1, 0, LEVELS.length - 1)].speed
-  }
-
-  private levelDisplayName() {
-    if (this.mode === "endless") return this.waveSpec?.name ?? "ВОЛНА"
-    if (this.onBossNode) return "БОСС"
-    if (this.activeSpec) return this.activeSpec.name
-    return LEVELS[clamp(this.level - 1, 0, LEVELS.length - 1)].name
-  }
-
-  private serveBall() {
-    // базовая скорость повышена на 50%
-    const base = clamp(
-      Math.min(
-        this.h * 0.62,
-        (this.levelSpeed() + (this.mode === "endless" ? this.wave * 18 : this.level * 45)) * 1.5
-      ),
-      540,
-      1140
-    )
-    /* Единый масштаб мира (viewport.ts): скорость одна на всех экранах —
-       поле в мировых единицах имеет сопоставимые пропорции. */
-    const speed = base
-    /* Старт: шар на поверхности ракетки (купол выше грани, чаша — ниже). */
-    const bump = Physics.surfaceAt(this.paddle.w / 2, 0, this.paddleShapeKind(), this.paddle.h)
-    const ball: Ball = {
-      x: this.paddle.x,
-      y: this.paddle.y - this.paddle.h / 2 - bump - 9 - 2,
-      vx: 0,
-      vy: 0,
-      r: 9,
-      speed: speed,
-      stuck: true,
-      stuckOffset: 0,
-      trail: [],
-      squash: 0,
-      sinceHit: 0,
-    }
-    this.balls = [ball]
-    this.spawnTimer = rand(16, 22)
-    this.skyDropTimer = rand(18, 27)
-    this.shiftTimer = rand(12, 18)
-    this.fieldShift = null
-    this.pushHud()
-  }
-
-  /* ---------- обновление ---------- */
-
-  private update(dt: number) {
-    this.shake = Math.max(0, this.shake - dt * 26)
-
-    this.fx.step(dt)
-
-    for (const b of this.bubbles) {
-      b.y -= b.vy * dt
-      b.x += Math.sin(this.time * 0.8 + b.ph) * 12 * dt
-      if (b.y < -20) {
-        b.y = this.h + 20
-        b.x = Math.random() * this.w
-      }
-    }
-
-    if (this.countdown > 0 && this.phase === "playing") {
-      const prev = Math.ceil(this.countdown)
-      this.countdown = Math.max(0, this.countdown - dt)
-      if (this.countdown > 0 && Math.ceil(this.countdown) !== prev) this.sfx.ui()
-    }
-
-    if (this.bannerTimer > 0 && this.phase === "playing") {
-      this.bannerTimer -= dt
-      if (this.bannerTimer <= 0) {
-        this.banner = null
-        this.pushHud()
-      }
-    }
-
-    if (this.transition > 0 && this.phase === "playing") {
-      this.transition -= dt
-      if (this.transition <= 0) this.pushHud()
-    }
-
-    // живые ряды
-    for (const b of this.blocks) {
-      if (b.swayAmp > 0) {
-        b.x = clamp(
-          b.x0 + Math.sin(this.time * b.swayFreq + b.swayPh) * b.swayAmp,
-          b.rx + 4,
-          this.w - b.rx - 4
-        )
-      }
-      // вертикальный дрейф медузы: вся медуза целиком (одна фаза bobPh)
-      if (b.bobAmp && b.bobFreq) {
-        b.y = clamp(
-          (b.y0 ?? b.y) + Math.sin(this.time * b.bobFreq + (b.bobPh ?? 0)) * b.bobAmp,
-          b.ry + 4,
-          this.h * 0.75
-        )
-      }
-    }
-
-    // плавный дрейф поля
-    if (this.fieldShift) {
-      const fs = this.fieldShift
-      fs.t += dt
-      const k = clamp(fs.t / fs.dur, 0, 1)
-      const e = k * k * (3 - 2 * k)
-      for (const b of this.blocks) {
-        if (b.minionOrbit) continue
-        b.x0 = clamp(b.x0 + fs.dx * e * dt, b.rx + 4, this.w - b.rx - 4)
-        b.y = clamp(b.y + fs.dy * e * dt, b.ry + 4, this.h * 0.8)
-      }
-      if (k >= 1) this.fieldShift = null
-    }
-
-    if (this.phase !== "playing") return
-
-    this.syncEffectsHud()
-    this.physics.updatePaddle(dt)
-    this.updatePaddleRotation(dt)
-    /* Прилипший шар следует за ракеткой даже пока мир заморожен баннером/отсчётом:
-       иначе на старте партии шар оставался на точке спавна, а ракетка уезжала к курсору. */
-    for (const ball of this.balls) this.physics.stickToPaddle(ball)
-    this.powersSys.updatePowers(dt)
-    this.powersSys.periodicSpawn(dt)
-    this.powersSys.periodicPowerDrop(dt)
-    this.powersSys.tryFieldShift(dt)
-    this.bossSys.step(dt)
-    if (this.boomQueue.length) {
-      const due = this.boomQueue.filter((q) => this.time >= q.at)
-      if (due.length) {
-        this.boomQueue = this.boomQueue.filter((q) => this.time < q.at)
-        for (const q of due) this.weaponsSys.explode(q.x, q.y)
-      }
-    }
-
-    const frozen = this.transition > 0 || this.bannerTimer > 1.1 || this.countdown > 0
-    if (!frozen) {
-      const fire = this.input.keys.space || this.input.consumeTapFire()
-      this.weaponsSys.updateLaser(fire)
-      this.weaponsSys.tryFire(dt, fire)
-      this.weaponsSys.updateProjectiles(dt)
-      for (const ball of this.balls) this.physics.updateBall(ball, dt)
-      this.physics.updateBombs(dt)
-      this.balls = this.balls.filter((b) => !b.lost)
-      if (this.balls.length === 0) this.loseLife()
-    }
-
-    for (const b of this.blocks) b.flash = Math.max(0, b.flash - dt * 5)
-
-    this.updateMouthBubbles(dt)
-    this.applyFishWake(dt)
-
-    if (
-      this.blocks.length === 0 &&
-      !this.bossSys.boss &&
-      this.transition <= 0 &&
-      this.phase === "playing" &&
-      // Зачистка ждёт упавшую за минибосса жизнь: её нужно успеть поймать.
-      !this.powers.some((p) => p.type === "life")
-    ) {
-      this.onLevelCleared()
-    }
-  }
-
-  private addScore(n: number, x: number, y: number, color: string, size: number) {
-    this.score += Math.round(n)
-    if (this.score > this.best) {
-      this.best = this.score
-      this.newRecord = true
-      lsSet("sharoboy-best", String(this.best))
-    }
-    this.fx.popups.push({ x, y, text: `+${Math.round(n)}`, color, t: 0, size })
-  }
-
-  /* ---------- хост для BossSystem ---------- */
-
-  /** Начисление очков без попапа и проверки рекорда (как было в damageBoss/killBoss). */
-  private addRawScore(n: number) {
-    this.score += n
-  }
-
-  /** Смерть босса засчитана в статистику партии (для достижений). */
-  private onBossKilled() {
-    this.runBossKills++
-  }
-
-  /* ---------- переходы ---------- */
-
-  private onLevelCleared() {
-    if (!this.levelLostBall) {
-      this.score += 500
-      if (this.score > this.best) {
-        this.best = this.score
-        this.newRecord = true
-        lsSet("sharoboy-best", String(this.best))
-      }
-      this.fx.popups.push({
-        x: this.w / 2,
-        y: this.h * 0.42,
-        text: "ЧИСТО! +500",
-        color: "#5dffb0",
-        t: 0,
-        size: 26,
-      })
-      this.sfx.power()
-    }
-    this.flash = 1
-    this.hitStop = Math.max(this.hitStop, 0.35)
-    if (this.mode === "endless") {
-      this.score += 200 + this.wave * 50
-      this.lives = Math.min(this.lives + 1, 5)
-      this.sfx.levelClear()
-      this.wave++
-      this.buildWave(this.wave)
-      this.applyTrack() // новый случайный трек на новую волну
-      this.clearAllEffects()
-      this.balls = []
-      this.serveBall()
-      this.setBanner(this.wave % 5 === 0 ? `ВОЛНА ${this.wave} — БОСС!` : `ВОЛНА ${this.wave}`)
-      this.pushHud()
-      return
-    }
-    if (this.mode === "campaign") {
-      if (this.onBossNode) {
-        // Финальный босс карты повержен — забег пройден.
-        this.onBossNode = false
-        this.phase = "won"
-        this.input.releaseLock()
-        this.applyTrack()
-        this.sfx.win()
-        this.saveTop()
-        this.pushHud()
-        return
-      }
-      // Обычный узел зачищен — возвращаемся на карту за следующим шагом.
-      this.sfx.levelClear()
-      this.enterMapView()
-      return
-    }
-    this.sfx.levelClear()
-    this.level++
-    this.buildLevel(this.level)
-    this.applyTrack() // новый случайный трек на новый уровень
-    this.clearAllEffects()
-    this.balls = []
-    this.serveBall()
-    this.setBanner(`УРОВЕНЬ ${this.level} — ${LEVELS[this.level - 1].name}`)
-    this.pushHud()
-  }
-
-  private loseLife() {
-    this.lives--
-    this.runLivesLost++
-    this.levelLostBall = true
-    this.combo = 0
-    this.shake = 10
-    this.sfx.loseLife()
-    this.wideUntil = 0
-    this.slowUntil = 0
-    this.fastUntil = 0
-    this.shrinkUntil = 0
-    this.laserUntil = 0
-    this.laserArmed = false
-    this.rocketUntil = 0
-    this.fireUntil = 0
-    this.magnetUntil = 0
-    this.weaponCd = 0
-    this.powers = []
-    this.projectiles = []
-    this.paddle.rot = 0 // Сброс поворота при потере мяча
-    this.paddleImpulse = null
-    this.prevLeftDown = false
-    this.prevRightDown = false
-    if (this.lives <= 0) {
-      this.phase = "over"
-      this.input.releaseLock()
-      this.applyTrack()
-      this.sfx.gameOver()
-      this.saveTop()
-      this.pushHud()
-      return
-    }
-    this.serveBall()
-    this.pushHud()
-  }
-
-  /** Попадание бомбы осьминога по ракетке — отнимает жизнь. */
-  onBombHitPaddle() {
-    if (this.phase !== "playing") return
-    this.loseLife()
-  }
-
-  /** Полный сброс временных эффектов между уровнями/волнами. */
-  private clearAllEffects() {
-    this.slowUntil = 0
-    this.fastUntil = 0
-    this.shrinkUntil = 0
-    this.laserUntil = 0
-    this.laserArmed = false
-    this.rocketUntil = 0
-    this.fireUntil = 0
-    this.magnetUntil = 0
-    this.weaponCd = 0
-    this.shield = 0
-    this.laserWasOn = false
-    this.powers = []
-    this.projectiles = []
-    this.combo = 0
-    this.paddle.rot = 0
-    this.paddleImpulse = null
-    this.prevLeftDown = false
-    this.prevRightDown = false
-    this.effectsKey = ""
-    this.pushHud()
-  }
-
-  private saveTop() {
-    if (this.score <= 0) return
-    const entry: ScoreEntry = { score: this.score, nick: this.nick }
-    /* записи, сделанные до появления ника, считаем рекордами текущего игрока */
-    const withNick = (list: ScoreEntry[]): ScoreEntry[] =>
-      this.nick ? list.map((e) => (e.nick ? e : { ...e, nick: this.nick })) : list
-    if (this.mode === "endless") {
-      this.topEndless = withNick([...this.topEndless, entry])
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 5)
-      lsSet("sharoboy-top-endless", JSON.stringify(this.topEndless))
-    } else {
-      this.top = withNick([...this.top, entry])
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 5)
-      lsSet("sharoboy-top", JSON.stringify(this.top))
-    }
-  }
-
-  private syncEffectsHud() {
-    const t = this.time
-    const key = [
-      t < this.wideUntil ? 1 : 0,
-      t < this.slowUntil ? 1 : 0,
-      t < this.fastUntil ? 1 : 0,
-      t < this.shrinkUntil ? 1 : 0,
-      t < this.laserUntil ? 1 : 0,
-      this.laserArmed ? 1 : 0,
-      t < this.rocketUntil ? 1 : 0,
-      t < this.fireUntil ? 1 : 0,
-      t < this.magnetUntil ? 1 : 0,
-    ].join("")
-    if (key !== this.effectsKey) {
-      this.effectsKey = key
-      this.pushHud()
-    }
-  }
-
-  private pushHud() {
-    const fresh = evaluateAch({
-      score: this.score,
-      combo: this.combo,
-      wave: this.wave,
-      won: this.phase === "won",
-      bossKills: this.runBossKills,
-      livesLost: this.runLivesLost,
-      coins: this.coins,
-      upgradeLevels: Object.values(this.upgrades).reduce((a, b) => a + b, 0),
-      upgradesMaxed: UPGRADE_DEFS.every((d) => (this.upgrades[d.id] ?? 0) >= d.max),
-    })
-    if (fresh.length) {
-      this.achQueue.push(...fresh.map((a) => a.id))
-      this.sfx.achievement()
-    }
-    this.onHud({
-      phase: this.phase,
-      score: this.score,
-      best: this.best,
-      lives: this.lives,
-      level: this.mode === "endless" ? this.wave : this.level,
-      levelCount: this.mode === "endless" ? -1 : (this.campaign?.tiers ?? LEVELS.length),
-      levelName: this.levelDisplayName(),
-      mode: this.mode,
-      wave: this.wave,
-      combo: this.combo,
-      blocksLeft: this.blocks.length,
-      muted: this.sfx.muted,
-      musicMuted: this.sfx.musicMuted,
-      musicVolume: this.sfx.musicVolume,
-      sfxVolume: this.sfx.sfxVolume,
-      banner: this.banner,
-      stuck: this.balls.some((b) => b.stuck),
-      newRecord: this.newRecord,
-      shield: this.shield,
-      wideOn: this.time < this.wideUntil,
-      slowOn: this.time < this.slowUntil,
-      fastOn: this.time < this.fastUntil,
-      shrinkOn: this.time < this.shrinkUntil,
-      laserOn: this.time < this.laserUntil || this.laserArmed,
-      laserArmed: this.laserArmed,
-      rocketOn: this.time < this.rocketUntil,
-      fireOn: this.time < this.fireUntil,
-      magnetOn: this.time < this.magnetUntil,
-      coins: this.coins,
-      upgrades: { ...this.upgrades },
-      top: this.top,
-      topEndless: this.topEndless,
-      map: this.currentMapView(),
-      campaignEvent: this.campaignEvent,
-      newAchievements: this.achQueue.splice(0),
-    })
-  }
-
-  private setBanner(text: string) {
-    this.banner = text
-    this.bannerTimer = 2.2
-    this.transition = 0.5
-  }
-
-  /* ---------- отрисовка ---------- */
-
-  private draw() {
-    const { ctx, w, h } = this
-    ctx.clearRect(0, 0, w, h)
-
-    /* Страховка от «мигания»: если какой-то кадр упал посреди отрисовки
-       (ошибка гасится в loop), глобальное состояние контекста могло остаться
-       грязным — начинаем каждый кадр с заведомо полной альфой, иначе после
-       сбоя шар/ракетка рисовались бы призрачными до ближайшего сброса. */
-    ctx.globalAlpha = 1
-
-    ctx.save()
-    if (this.shake > 0) {
-      ctx.translate(rand(-this.shake, this.shake), rand(-this.shake, this.shake))
-    }
-
-    drawBackground(ctx, w, h, this.combo, this.bubbles)
-    drawShieldLine(ctx, w, h, this.time, this.shield, this.phase === "menu")
-    drawBlocks(ctx, this.blocks, this.time)
-    drawMinibosses(ctx, this.blocks, this.time)
-    drawMouthBubbles(ctx, this.mouthBubbles)
-    drawMinibossBar(ctx, this.minibosses, this.blocks)
-    drawBoss(ctx, this.bossSys.boss, this.balls, this.blocks)
-    drawRings(ctx, this.fx.rings)
-    drawPowers(ctx, this.powers)
-    drawLaserBeams(ctx, {
-      time: this.time,
-      hidden: this.phase === "menu",
-      laserUntil: this.laserUntil,
-      paddle: this.paddle,
-      blocks: this.blocks,
-      boss: this.bossSys.boss,
-      // Пилоны лазера стоят на поверхности формы ракетки (согласовано с weapons)
-      shape: this.paddleShapeKind(),
-    })
-    drawProjectiles(ctx, this.projectiles, this.time)
-    drawBalls(ctx, this.balls, {
-      time: this.time,
-      hidden: this.phase === "menu",
-      fire: this.time < this.fireUntil,
-      slow: this.time < this.slowUntil,
-      fast: this.time < this.fastUntil,
-    })
-    if (this.phase !== "menu" && this.phase !== "map") {
-      drawPaddle(ctx, {
-        p: this.paddle,
-        time: this.time,
-        wideUntil: this.wideUntil,
-        shrinkUntil: this.shrinkUntil,
-        laserUntil: this.laserUntil,
-        laserArmed: this.laserArmed,
-        rocketUntil: this.rocketUntil,
-        magnetUntil: this.magnetUntil,
-        shape: this.paddleShapeKind(),
-      })
-    }
-    drawParticles(ctx, this.fx.particles)
-    drawPopups(ctx, this.fx.popups)
-
-    ctx.restore()
-
-    if (this.flash > 0) {
-      ctx.fillStyle = `rgba(234,247,255,${this.flash * 0.3})`
-      ctx.fillRect(0, 0, w, h)
-    }
-
-    if (this.countdown > 0 && this.phase === "playing") {
-      ctx.fillStyle = "rgba(4,16,26,0.45)"
-      ctx.fillRect(0, 0, w, h)
-      const n = Math.ceil(this.countdown)
-      const frac = this.countdown - Math.floor(this.countdown)
-      ctx.save()
-      ctx.translate(w / 2, h * 0.44)
-      ctx.scale(0.8 + frac * 0.5, 0.8 + frac * 0.5)
-      ctx.font = '120px "Russo One", sans-serif'
-      ctx.textAlign = "center"
-      ctx.textBaseline = "middle"
-      ctx.shadowColor = "#35e0ff"
-      ctx.shadowBlur = 34
-      ctx.fillStyle = "#eaf7ff"
-      ctx.fillText(String(n), 0, 0)
-      ctx.restore()
-    }
-
-    // виньетка
-    const vg = ctx.createRadialGradient(
-      w / 2,
-      h / 2,
-      Math.min(w, h) * 0.42,
-      w / 2,
-      h / 2,
-      Math.max(w, h) * 0.75
-    )
-    vg.addColorStop(0, "rgba(0,0,0,0)")
-    vg.addColorStop(1, "rgba(2,10,16,0.55)")
-    ctx.fillStyle = vg
-    ctx.fillRect(0, 0, w, h)
-
-    // Счётчик FPS: мелкий текст в левом нижнем углу, размер в экранных
-    // пикселях не зависит от масштаба мира (~11 css px, минимум 9).
-    if (this.showFps) {
-      drawFps(ctx, w, h, this.fps, Math.max(9, Math.round(11 / this.scale)))
-    }
+  launch() {
+    launch(this)
   }
 }

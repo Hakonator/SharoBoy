@@ -5,12 +5,21 @@
  */
 import type { Effects } from "./effects"
 import type { SFX } from "./audio"
-import { TIER } from "./palette"
 import type { Ball, Block, BossState, PaddleState, PaddleShapeKind, PowerUp } from "./types"
 import { clamp, rand } from "./utils"
+import { convexBump, surfaceAt } from "./physics/shapes"
+import {
+  collideBlocks as blockBounce,
+  collideBoss as bossBounce,
+  collidePaddle as paddleBounce,
+} from "./physics/collide"
+import {
+  damageBlock as applyBlockDamage,
+  spawnScatter as scatterBlocks,
+  updateBombs as moveBombs,
+} from "./physics/destruction"
 
-/** Урон огненного ядра: множитель от обычного урона шара. */
-export const FIREBALL_DAMAGE_MULT = 3
+export { FIREBALL_DAMAGE_MULT } from "./physics/destruction"
 
 /** Узкий срез ввода, нужный ракетке (структурно совместим с InputController). */
 export interface PaddleInput {
@@ -66,8 +75,15 @@ export interface PhysicsWorld {
 export class Physics {
   constructor(private readonly g: PhysicsWorld) {}
 
-  private comboMult() {
-    return 1 + Math.min(this.g.combo, 20) * 0.1
+  /** Высота купола выпуклой ракетки — единая для физики и рендера.
+   *  Чаша использует ту же глубину (инверсия купола). */
+  static convexBump(halfW: number): number {
+    return convexBump(halfW)
+  }
+
+  /** Высота поверхности ракетки над плоской гранью — см. physics/shapes.ts. */
+  static surfaceAt(halfW: number, relX: number, kind: PaddleShapeKind, hh = 0): number {
+    return surfaceAt(halfW, relX, kind, hh)
   }
 
   /** Кинематика ракетки: целевая ширина (эффекты), клавиши/указатель, границы поля. */
@@ -105,7 +121,7 @@ export class Physics {
     const p = g.paddle
     ball.x = p.x + ball.stuckOffset
     const rel = clamp(ball.stuckOffset / (p.w / 2), -1, 1)
-    ball.y = p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, g.paddleShape(), p.h) - ball.r - 2
+    ball.y = p.y - p.h / 2 - surfaceAt(p.w / 2, rel, g.paddleShape(), p.h) - ball.r - 2
   }
 
   /** Интеграция движения шара с подшагами: стены, щит, потери, столкновения. */
@@ -172,9 +188,9 @@ export class Physics {
         return
       }
 
-      this.collidePaddle(ball)
-      this.collideBlocks(ball)
-      this.collideBoss(ball)
+      paddleBounce(this.g, ball)
+      blockBounce(this.g, ball)
+      bossBounce(this.g, ball)
     }
 
     ball.trail.push({ x: ball.x, y: ball.y })
@@ -224,406 +240,18 @@ export class Physics {
     }
   }
 
-  /** Отскок от ракетки: угол зависит от точки попадания и её скорости; магнит — прилипание. */
-  private collidePaddle(ball: Ball) {
-    const g = this.g
-    const p = g.paddle
-    const rot = p.rot ?? 0
-    // Трансформируем координаты шара в локальную систему ракетки (с учётом поворота)
-    const dx = ball.x - p.x
-    const dy = ball.y - p.y
-    const cs = Math.cos(-rot)
-    const sn = Math.sin(-rot)
-    const lx = dx * cs - dy * sn
-    const ly = dx * sn + dy * cs
-    // Форма (купол/чаша) выходит за плоскую грань — расширяем зону проверки
-    const shape = g.paddleShape()
-    const bump = shape === "flat" ? 0 : Physics.convexBump(p.w / 2)
-    const halfW = p.w / 2 + ball.r
-    const halfH = p.h / 2 + ball.r + bump
-    // Проверяем коллизию в локальных координатах
-    if (Math.abs(lx) > halfW || Math.abs(ly) > halfH) return
-    // Cooldown после предыдущего отскока: шар не должен повторно задевать
-    // ракетку на следующих субшагах (особенно при её вращении по удержанию).
-    if (ball.sinceHit < 0.05) return
-    // Шар должен двигаться вниз (в локальных координатах)
-    const lvy = ball.vx * sn + ball.vy * cs
-    if (lvy <= 0) return
-    const rel = clamp(lx / (p.w / 2), -1, 1)
-    // магнит: шар прилипает вместо отскока
-    if (g.magnetActive() && !ball.stuck) {
-      ball.stuck = true
-      ball.stuckOffset = clamp(lx, -p.w / 2 + ball.r, p.w / 2 - ball.r)
-      ball.vx = 0
-      ball.vy = 0
-      ball.squash = 1
-      ball.sinceHit = 0
-      g.sfx.paddle(Math.abs(rel))
-      g.fx.burst(ball.x, p.y + ly - ball.r, "#4dff9e", 8, 140)
-      return
-    }
-    // Купол (∪/∩): мяч отражается по нормали поверхности формы в точке
-    // попадания. Купол «convex» разводит мяч к краям, чаша «concave»
-    // сводит к центру — всё через единую формулу Physics.surfaceAt.
-    if (shape !== "flat") {
-      // Точная проверка: если шар ещё над поверхностью в этой точке —
-      // контакта нет (грубая AABB-зона шире фактической поверхности).
-      const ySurf = p.y - p.h / 2 - Physics.surfaceAt(p.w / 2, rel, shape, p.h)
-      if (ball.y + ball.r < ySurf) return
-      this.collidePaddleShape(ball, rel, shape)
-      return
-    }
-    // Поворотный эффект (ЛКМ/ПКМ) меняет наклон ракетки — отскок зеркальный
-    // по нормали ракетки, без арканоидного «искажения» (угол и так задаётся
-    // наклоном). Арканоидная механика — только на не-повёрнутой ракетке.
-    const nx = Math.sin(rot)
-    const ny = -Math.cos(rot)
-    if (this.g.paddleRotatable()) {
-      const dot = ball.vx * nx + ball.vy * ny
-      const rvx = ball.vx - 2 * dot * nx
-      let rvy = ball.vy - 2 * dot * ny
-      // Страховка: отскок не должен отправлять мяч вниз
-      if (rvy > 0) rvy = -rvy
-      ball.vx = rvx
-      ball.vy = rvy
-    } else {
-      // Классический арканоидный отскок (как в изначальной версии): угол зависит
-      // от точки попадания (rel·1.05 рад ≈ ±60°) и от скорости движения ракетки —
-      // «искажение» траектории в зависимости от места отскока.
-      const ang = -Math.PI / 2 + rot + rel * 1.05 + clamp(p.vx * 0.0004, -0.3, 0.3)
-      const sp = Math.hypot(ball.vx, ball.vy) || ball.speed
-      ball.vx = Math.cos(ang) * sp
-      ball.vy = Math.sin(ang) * sp
-      // Страховка: отскок не должен отправлять мяч вниз (при сильном наклоне)
-      if (ball.vy > 0) {
-        const s2 = Math.hypot(ball.vx, ball.vy) || 1
-        ball.vy = -ball.vy
-        const vxs = Math.sqrt(Math.max(s2 * s2 - ball.vy * ball.vy, 0))
-        ball.vx = Math.sign(ball.vx || 1) * vxs
-      }
-    }
-    // Корректируем позицию шара: выталкиваем вдоль нормали ракетки
-    const pen = halfH + ball.r - Math.abs(ly) // глубина проникновения
-    if (pen > 0) {
-      ball.x = ball.x + nx * pen
-      ball.y = ball.y + ny * pen
-    }
-    ball.squash = 1
-    ball.sinceHit = 0
-    p.squash = 1
-    g.combo = 0
-    g.sfx.paddle(Math.abs(rel))
-    g.fx.burst(ball.x, ball.y - ball.r, "#7cf5ff", 6, 130)
-    g.pushHud()
-  }
-
-  /** Высота купола выпуклой ракетки — единая для физики и рендера.
-   *  Чаша использует ту же глубину (инверсия купола). */
-  static convexBump(halfW: number): number {
-    return Math.min(halfW * 0.4, 42)
-  }
-
-  /** Поверхность ракетки в точке relX ∈ [-1,1] относительно плоской грани.
-   *  Результат — ВЫСОТА НАД ГРАНЬЮ (≥0): потребители делают y = yTop − surfaceAt.
-   *  Формы — инверсии друг друга, обе ленты постоянной толщины с общей глубиной
-   *  convexBump: «convex» — купол (+bump·(1−rel²), центр выше), «concave» — чаша
-   *  (+bump·rel², края выше, центр на грани), «flat» — 0. ЕДИНАЯ формула
-   *  для физики, ловли бонусов, оружия и рендера — форма и коллизии не могут
-   *  разойтись. Новые формы (скины) добавляются здесь, потребители
-   *  подхватывают их автоматически. */
-  static surfaceAt(halfW: number, relX: number, kind: PaddleShapeKind, _hh = 0): number {
-    if (kind === "flat") return 0
-    if (kind === "concave") return Physics.convexBump(halfW) * relX * relX
-    // convex: центр выше краёв на bump, края на грани (высота над гранью ≥ 0).
-    return Physics.convexBump(halfW) * (1 - relX * relX)
-  }
-
-  /** Отскок от изогнутой поверхности ракетки (купол или чаша). Поверхность —
-   *  парабола y(rel) = yTop - sign·bump·(1-rel²), sign = +1 купол / -1 чаша.
-   *  Нормаль из наклона: dy/dx = -sign·2·bump·rel / halfW. Купол разводит мяч
-   *  от центра к краям, чаша сводит к центру — единая формула surfaceAt. */
-  private collidePaddleShape(ball: Ball, rel: number, kind: PaddleShapeKind) {
-    const g = this.g
-    const p = g.paddle
-    const halfW = p.w / 2
-    // Обе формы — ленты постоянной толщины с одинаковой глубиной (convexBump).
-    const bump = Physics.convexBump(halfW)
-    const sign = kind === "concave" ? -1 : 1
-    // Наклон поверхности: f'(x) = sign·2·bump·rel / halfW (нормаль вверх).
-    // Для convex (sign=+1) rel>0 → наклон вниз к краю, нормаль наружу вправо-
-    // вверх; для concave — зеркально (к центру).
-    const slope = (sign * 2 * bump * rel) / halfW
-    const len = Math.hypot(slope, 1)
-    const nx = slope / len
-    const ny = -1 / len
-    // Отражение: v' = v - 2(v·n)n
-    const dot = ball.vx * nx + ball.vy * ny
-    const rvx = ball.vx - 2 * dot * nx
-    let rvy = ball.vy - 2 * dot * ny
-    // Страховка: поверхность всегда отбрасывает мяч вверх
-    if (rvy > 0) rvy = -rvy
-    ball.vx = rvx
-    ball.vy = rvy
-    // Скорость не должна упасть ниже нормы (плоский удар в вершину формы)
-    const sp = Math.hypot(ball.vx, ball.vy)
-    const minSpeed = ball.speed * 0.8
-    if (sp < minSpeed) {
-      const scale = minSpeed / (sp || 1)
-      ball.vx *= scale
-      ball.vy *= scale
-    }
-    // Выталкивание на поверхность формы в точке попадания
-    const ySurf = p.y - p.h / 2 - Physics.surfaceAt(halfW, rel, kind, p.h)
-    if (ball.y > ySurf - ball.r) ball.y = ySurf - ball.r
-    ball.squash = 1
-    ball.sinceHit = 0
-    p.squash = 1
-    g.combo = 0
-    g.sfx.paddle(Math.abs(rel))
-    g.fx.burst(ball.x, ball.y - ball.r, "#7cf5ff", 6, 130)
-    g.pushHud()
-  }
-
-  /** Столкновения с блоками: локальные координаты повёрнутого эллипса, отражение по нормали. */
-  private collideBlocks(ball: Ball) {
-    const g = this.g
-    const fire = g.fireActive()
-    for (const b of g.blocks) {
-      if (b.dead) continue
-      const ex = b.rx + ball.r
-      const ey = b.ry + ball.r
-      const dx = ball.x - b.x
-      const dy = ball.y - b.y
-      const cs = Math.cos(b.rot)
-      const sn = Math.sin(b.rot)
-      const lx = dx * cs + dy * sn
-      const ly = -dx * sn + dy * cs
-      const q = (lx * lx) / (ex * ex) + (ly * ly) / (ey * ey)
-      if (q > 1) continue
-
-      let nx = lx / (ex * ex)
-      let ny = ly / (ey * ey)
-      const nl = Math.hypot(nx, ny) || 1
-      nx /= nl
-      ny /= nl
-      const wnx = nx * cs - ny * sn
-      const wny = nx * sn + ny * cs
-      const sc = 1 / Math.sqrt(Math.max(q, 1e-6))
-      const plx = lx * sc
-      const ply = ly * sc
-      ball.x = b.x + plx * cs - ply * sn + wnx * 0.8
-      ball.y = b.y + plx * sn + ply * cs + wny * 0.8
-      ball.sinceHit = 0
-      if (fire && !b.isMiniboss) {
-        // обычные блоки огонь прожигает насквозь (без отскока)
-        g.sfx.burn()
-        this.damageBlock(b, g.debugBallDamage * FIREBALL_DAMAGE_MULT)
-        continue
-      }
-      // блоки минибоссов (и любые — у обычного шара) отскакивают: «прожигание»
-      // насквозь превращало минибосса в машинку урона; огонь бьёт ×3 от обычного
-      const dot = ball.vx * wnx + ball.vy * wny
-      if (dot < 0) {
-        ball.vx -= 2 * dot * wnx
-        ball.vy -= 2 * dot * wny
-      }
-      this.damageBlock(b, g.debugBallDamage * (fire ? FIREBALL_DAMAGE_MULT : 1))
-      return
-    }
-  }
-
-  /** Столкновение с боссом: круговое отражение + урон (огненное ядро бьёт сильнее). */
-  private collideBoss(ball: Ball) {
-    const g = this.g
-    const bo = g.boss
-    if (!bo || ball.stuck) return
-    const dx = ball.x - bo.x
-    const dy = ball.y - bo.y
-    const dist = Math.hypot(dx, dy)
-    const min = bo.r + ball.r
-    if (dist >= min) return
-    const nx = dx / (dist || 1)
-    const ny = dy / (dist || 1)
-    ball.x = bo.x + nx * (min + 1)
-    ball.y = bo.y + ny * (min + 1)
-    const dot = ball.vx * nx + ball.vy * ny
-    if (dot < 0) {
-      ball.vx -= 2 * dot * nx
-      ball.vy -= 2 * dot * ny
-    }
-    ball.squash = 1
-    ball.sinceHit = 0
-    g.damageBoss(g.debugBallDamage * (g.fireActive() ? FIREBALL_DAMAGE_MULT : 1), false)
-  }
-
   /** Урон блоку; при разрушении — очки, эффекты, дроп бонуса, «матрёшка». */
   damageBlock(b: Block, dmg = 1) {
-    const g = this.g
-    // Блоки минибосса неразрушаемы: урон идёт в пул HP его существа.
-    if (b.isMiniboss) {
-      b.flash = 1
-      g.damageMiniboss(dmg, b)
-      return
-    }
-    b.hp -= dmg
-    b.flash = 1
-    if (b.hp > 0) {
-      g.sfx.brick(b.tier)
-      g.fx.burst(b.x, b.y, TIER[b.tier].base, 5, 130)
-      g.combo++
-      g.addScore(10 * this.comboMult(), b.x, b.y, "#9fd6ea", 12)
-      if (b.tier === 3) g.hitStop = Math.max(g.hitStop, 0.03)
-      g.pushHud()
-      return
-    }
-    b.dead = true
-    // Если уничтожен сегмент щупальца, то уничтожаем все сегменты,
-    // которые дальше от туловища (с большим номером tentacleSeg).
-    if (b.isTentacle) {
-      const tentacleId = (b as any).tentacleId
-      const seg = (b as any).tentacleSeg!
-      for (const other of g.blocks) {
-        if (
-          other.isTentacle &&
-          (other as any).tentacleId === tentacleId &&
-          (other as any).tentacleSeg! > seg
-        ) {
-          other.dead = true
-        }
-      }
-    }
-    g.blocks = g.blocks.filter((x) => !x.dead)
-    if (b.bomb && !b.boomQueued) {
-      b.boomQueued = true
-      g.boomQueue.push({ x: b.x, y: b.y, at: g.time + 0.09 })
-    }
-    if (b.splits) this.spawnScatter(b)
-    g.combo++
-    const mult = this.comboMult()
-    g.addScore((30 + b.tier * 20) * mult, b.x, b.y, TIER[b.tier].base, 14 + b.tier * 2)
-    g.sfx.destroy(b.tier)
-    g.fx.burst(b.x, b.y, TIER[b.tier].base, 10 + b.tier * 4, 190 + b.tier * 40)
-    g.fx.rings.push({
-      x: b.x,
-      y: b.y,
-      r: 6,
-      maxR: 40 + b.tier * 18,
-      color: "rgba(234,247,255,0.7)",
-      t: 0,
-    })
-    g.shake = Math.min(g.shake + b.tier, 9)
-    if (b.tier === 3) g.hitStop = Math.max(g.hitStop, 0.05)
-
-    // вехи серии
-    if (g.combo === 5 || g.combo === 10 || g.combo === 15) {
-      const word = g.combo === 5 ? "ГОРЯЧО!" : g.combo === 10 ? "НЕУДЕРЖИМО!" : "БЕЗУМИЕ!"
-      g.fx.popups.push({
-        x: g.w / 2,
-        y: g.h * 0.3,
-        text: `${word} ×${g.combo}`,
-        color: "#ffc94d",
-        t: 0,
-        size: 30,
-      })
-      g.fx.rings.push({
-        x: g.w / 2,
-        y: g.h * 0.3,
-        r: 10,
-        maxR: 150,
-        color: "rgba(255,201,77,0.6)",
-        t: 0,
-      })
-      g.sfx.levelClear()
-    }
-
-    // дроп из блока
-    g.dropPower(b.x, b.y)
-
-    // монеты
-    if (Math.random() < 0.05) {
-      g.powers.push({ x: b.x, y: b.y, vy: 150, type: "coin", t: 0 })
-    }
-    g.pushHud()
+    applyBlockDamage(this.g, b, dmg)
   }
 
   /** «Матрёшка»: вокруг разбитого блока рассыпаются 3–10 крупных шаров. */
   spawnScatter(b: Block) {
-    const g = this.g
-    if (g.blocks.length > 150) return
-    const n = 3 + Math.floor(rand(0, 8))
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + rand(-0.4, 0.4)
-      const d = Math.max(b.rx, b.ry) * rand(1.7, 2.4)
-      const r = rand(17, 23)
-      const cx = clamp(b.x + Math.cos(a) * d, r + 6, g.w - r - 6)
-      const cy = clamp(b.y + Math.sin(a) * d, r + 6, g.h * 0.72)
-      g.blocks.push({
-        x: cx,
-        y: cy,
-        rx: r,
-        ry: r,
-        rot: 0,
-        circle: true,
-        hp: 1,
-        maxHp: 1,
-        tier: 1,
-        flash: 1,
-        seed: rand(0, Math.PI * 2),
-        dead: false,
-        x0: cx,
-        swayAmp: 0,
-        swayFreq: 0,
-        swayPh: 0,
-        bomb: false,
-        splits: false,
-      })
-    }
-    g.fx.popups.push({ x: b.x, y: b.y, text: "РАССЫПЬ!", color: "#5dffb0", t: 0, size: 16 })
-    g.fx.rings.push({ x: b.x, y: b.y, r: 8, maxR: 90, color: "rgba(93,255,176,0.7)", t: 0 })
-    g.fx.burst(b.x, b.y, "#5dffb0", 10, 200)
+    scatterBlocks(this.g, b)
   }
 
   /** Обновление бомб осьминога: движение и столкновение с ракеткой. */
   updateBombs(dt: number) {
-    const g = this.g
-    const p = g.paddle
-    for (const b of g.blocks) {
-      if (!b.bomb || b.hitsPaddle === undefined) continue
-      // Движение бомбы
-      b.x += (b.bombVx ?? 0) * dt
-      b.y += (b.bombVy ?? 0) * dt
-      // Отскок от боковых стен
-      if (b.x - b.rx < 0) {
-        b.x = b.rx
-        b.bombVx = Math.abs(b.bombVx ?? 0)
-      }
-      if (b.x + b.rx > g.w) {
-        b.x = g.w - b.rx
-        b.bombVx = -Math.abs(b.bombVx ?? 0)
-      }
-      // Потеря за нижней границей
-      if (b.y > g.h + b.ry * 2) {
-        b.dead = true
-        continue
-      }
-      // Столкновение с ракеткой
-      const top = p.y - p.h / 2
-      if (
-        b.y + b.ry >= top &&
-        b.y - b.ry <= p.y + p.h / 2 &&
-        b.x >= p.x - p.w / 2 - b.rx &&
-        b.x <= p.x + p.w / 2 + b.rx
-      ) {
-        b.dead = true
-        // Бомба отнимает жизнь
-        g.onBombHitPaddle()
-        g.shake = Math.min(g.shake + 8, 14)
-        g.flash = 0.6
-        g.sfx.explosion()
-        g.fx.burst(b.x, b.y, "#ff6a5c", 20, 300)
-        g.fx.burst(b.x, b.y, "#ffc94d", 12, 200)
-      }
-    }
-    g.blocks = g.blocks.filter((x) => !x.dead)
+    moveBombs(this.g, dt)
   }
 }

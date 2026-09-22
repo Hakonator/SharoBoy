@@ -112,6 +112,16 @@ export interface Block {
 }
 
 /** Пузырёк воздуха, выпускаемый рыбой-минибоссом изо рта. */
+/** Существо-минибосс в текущем уровне: HP-пул и центр для дропа жизни. */
+export interface MinibossCreature {
+  kind: "fish" | "jelly"
+  group: number
+  hp: number
+  maxHp: number
+  dropX: number
+  dropY: number
+}
+
 export interface MouthBubble {
   x: number
   y: number
