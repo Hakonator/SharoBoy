@@ -3,9 +3,19 @@
 > Файл-состояние для продолжения работы в следующих сессиях.
 > Обновляй после каждого завершённого шага.
 
-> **СТАТУС: РЕФАКТОРИНГ ЗАВЕРШЁН.** Монолит `game.ts` (2841 строки) разобран на
-> системы, UI-монолит `App.tsx` (932 строки) — на `ui/screens.tsx` + `ui/icons.tsx`.
+> **СТАТУС: РЕФАКТОРИНГ ЗАВЕРШЁН (обе волны).** Монолит `game.ts` (2841 строки)
+> разобран на системы, UI-монолит `App.tsx` (932 строки) — на `ui/screens.tsx` +
+> `ui/icons.tsx`. Вторая волна (2026-09) довела все файлы `src/` до лимита
+> `.clinerules` (≤300, ≤500 для render/audio): `game.ts` 2366 → **299** строк,
+> логика вынесена в 16 модулей `src/game/game/*` (свободные функции
+> `(g: Game, ...)` по хост-паттерну), UI-хуки — в `src/ui/*`. Актуальное
+> состояние и следующий шаг — в `memory-bank/activeContext.md`.
 > Дальнейшая работа — баги и фичи поверх этой базы.
+>
+> **Роль документа:** исторический журнал рефакторинга (волна 1 — по коммитам,
+> волна 2 — краткой сводкой в конце). Оперативное «состояние сессий» ведётся в
+> `memory-bank/activeContext.md`, поэтому разделы ниже описывают состояние
+> **на конец волны 1** (помечено по тексту).
 
 ## Цель
 
@@ -36,9 +46,12 @@
 | `c670354` | UI: иконки и мелкие компоненты → `ui/icons.tsx` (`IconBall`, `IconPlay`, `Key`, `EffectChip`, `ControlsPanel`, `FloatingBalls` и др.)                                                                                             |
 | `e968ba4` | UI: экраны и оверлеи → `ui/screens.tsx` (`BootErrorScreen`, `AchToasts`, `HudOverlay`, `MenuScreen`, `PauseScreen`, `GameOverScreen`, `WinScreen`, `TopSubmit`); `App.tsx` — только оркестрация состояния                         |
 
-Текущий размер: **game.ts 1253 строки** (изначально 2841), **App.tsx 274 строки**
-(изначально 932), `ui/screens.tsx` 821, `ui/icons.tsx` 182.
+Размер после волны 1: **game.ts 1253 строки** (изначально 2841), **App.tsx 274
+строки** (изначально 932), `ui/screens.tsx` 821, `ui/icons.tsx` 182.
 Тесты 45/45, lint/typecheck/build чистые.
+
+> После волны 2 (2026-09): `game.ts` — **299 строк**, все модули ≤300
+> (кроме `audio.ts` 414 ≤500 — разрешено правилами), тесты 132/132.
 
 ## Паттерн «система + хост» (так выносим подсистемы)
 
@@ -66,7 +79,13 @@ npm run build
 husky pre-commit сам гоняет `eslint --fix` + `prettier --write` на staged
 (шумный вывод lint-staged — норма, не ошибка).
 
-## Финальная структура: что осознанно осталось в game.ts
+## Финальная структура волны 1: что осознанно оставалось в game.ts
+
+> ⚠️ Устарело: во второй волне (2026-09) всё перечисленное ниже вынесено из
+> `game.ts` в модули `src/game/game/*` (`runFlow.ts`, `progress.ts`, `hudSync.ts`,
+> `drawScene.ts`, `modes.ts`, `lifecycle.ts` и др.); `game.ts` — только состояние,
+> конструктор, игровой цикл и делегаты публичного API (299 строк). Раздел сохранён
+> как запись обоснований волны 1.
 
 1. **Жизненный цикл партии** (`startGame`, `startEndless`, `toMenu`, `launch`,
    `serveBall`, `onLevelCleared`, `loseLife`, `clearAllEffects`, `saveTop`) —
@@ -88,3 +107,37 @@ husky pre-commit сам гоняет `eslint --fix` + `prettier --write` на st
   двойные кавычки, 100 колонок).
 - Рабочая ветка `beta`; `main` — стабильная (деплой GH Pages: main → корень,
   beta → `/beta/`).
+
+---
+
+## Волна 2 (2026-09): доведение до лимита 300 строк
+
+Цель — соблюсти `.clinerules` (≤300 строк, ≤500 для `render/`/`audio.ts`).
+Стадии:
+
+- **A** `render.ts` (1388) → `src/game/render/`: shapes, background, blocks,
+  fish+fishParts, jelly, minibosses, boss, powers, projectiles, paddle, fx + фасад.
+- **B** `screens.tsx` (1409) → `src/ui/screens/`: типы, boot, top, hud, map,
+  shared, menu, menuTop, menuPanels, menuPanels2, overlays + фасад.
+- **C** `audio.ts` (1028) → `src/game/audio/`: `tracks/{map,menu,game,gameTheme}`,
+  новый класс `FileMusicPlayer` (развязан с `SFX` через колбэки `getVolume`,
+  `shouldPlay`); `audio.ts` хранит `SFX` (414 строк — исключение правил).
+- **D** `physics.ts` (629) → `src/game/physics/`: shapes, collide, destruction;
+  `Physics` — оркестратор с static-обёртками (публичный API сохранён).
+- **E** `App.tsx` (470 → 219) → хуки `src/ui/`: useAchToasts, usePlayerStats,
+  useLeaderboard, useDebugControls.
+- **F** мелкие: `powers/apply.ts`, `inputHost.ts`, `campaignMapLayout.ts`,
+  `levelPatterns.ts`, тестовые хелперы `campaignFlow.helpers.ts`,
+  `frameInvariant.helpers.ts`.
+- **Финал** `game.ts` (2366 → **299**): тела методов — свободные функции
+  `(g: Game, ...)` в `src/game/game/*` (hosts, hostsWorld, updateStep, drawScene,
+  runFlow, campaignFlow, levelBuild, minibossRuntime, minibossFx, lifecycle,
+  modes, audioControls, paddleControl, debug, hudSync, progress); класс сохраняет
+  поля, конструктор, `loop` и 25 однострочных делегатов публичного API; тип
+  `MinibossCreature` — в `types.ts`.
+
+Инцидент: промежуточные PowerShell-правки перекодировали кириллицу
+(cp1251 → mojibake) в `game.ts`/`drawScene.ts` — восстановлено обратным
+преобразованием; **урок: UTF-8 файлы править только node/редактором, не PowerShell**.
+
+Итог волны 2: typecheck ✓, lint 0 ошибок ✓, 132/132 теста ✓, build ✓.

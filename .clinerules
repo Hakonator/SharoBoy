@@ -1,8 +1,8 @@
 # Project: SharoBoy
 - Тип: браузерная игра (без игровых движков)
-- Рендер: Canvas 2D (`src/game/render.ts`)
-- Аудио: Web Audio API, чиптюн-секвенсор (`src/game/audio.ts`)
-- UI: React 18 (`src/ui/screens.tsx`, `src/ui/icons.tsx`)
+- Рендер: Canvas 2D (`src/game/render/` + фасад `src/game/render.ts`)
+- Аудио: Web Audio API, чиптюн-секвенсор (`src/game/audio/`, класс `SFX` в `src/game/audio.ts`)
+- UI: React 18 (`src/ui/screens/`, `src/ui/icons.tsx`, хуки `src/ui/use*.ts`)
 - Вся игровая логика: чистый TypeScript в `src/game/*`
 
 # Stack
@@ -37,9 +37,22 @@
 
 # File Size & Module Rules
 1. Максимальный размер файла: 300 строк.
-2. Исключение: `src/game/render.ts` и `src/game/audio.ts` могут быть до 500 строк из-за специфики Canvas и Web Audio.
+2. Исключение: `src/game/render/` (фасад и модули) и `src/game/audio.ts` могут быть до 500 строк из-за специфики Canvas и Web Audio.
 3. Если файл превышает лимит — разбей на модули по единой ответственности.
 4. Не создавай файлы-«свалки» (utils, helpers) более 300 строк.
+
+# Memory Bank
+1. В начале задачи прочитай `memory-bank/activeContext.md` — там текущее состояние
+   и следующий шаг; при работе с архитектурой — также `systemPatterns.md`.
+2. По завершении каждой задачи (не дожидаясь просьбы) обнови
+   `memory-bank/activeContext.md`: что сделано, блокеры, следующий шаг, дата.
+3. После крупных изменений обновляй и остальные файлы: новая подсистема или
+   паттерн → `systemPatterns.md`, новые инструменты/команды → `techContext.md`,
+   завершённая веха → `progress.md`.
+4. Долговечная документация для людей — в `docs/` (DEVELOPMENT, ROADMAP,
+   REFACTORING — история); memory-bank хранит только снапшот состояния, не дублируй её.
+5. Правь UTF-8 файлы только node-скриптом или редактором; PowerShell
+   (Get-Content/Set-Content) портит кириллицу.
 
 # Terminal
 1. Используй Git Bash.
