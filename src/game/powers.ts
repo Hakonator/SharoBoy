@@ -16,6 +16,8 @@ import type {
   PowerUp,
 } from "./types"
 import { clamp, fitTilt, rand } from "./utils"
+import { isBallSpedUp } from "./physics/speed"
+import { buildPowerTable } from "./powers/table"
 import { applyPower as applyPowerEffect } from "./powers/apply"
 
 /** Хост-интерфейс: состояние движка, которым управляет система бонусов. */
@@ -166,26 +168,22 @@ export class PowersSystem {
 
   private pickPowerType(): PowerType {
     const g = this.g
-    const fewBlocks = g.blocks.length <= Math.max(5, g.blocksInitial * 0.3)
-    let table: [PowerType, number][] = [
-      ["wide", 12],
-      ["multi", 12],
-      ["life", 6],
-      ["slow", 10],
-      ["shield", 10],
-      ["laser", fewBlocks ? 72 : 9],
-      ["rocket", fewBlocks ? 64 : 8],
-      ["fire", 8],
-      ["fast", 14],
-      ["shrink", 10],
-    ]
-    // В кампании жизни выпадают только с минибоссов — из общих дропов исключены.
-    if (g.mode === "campaign") table = table.filter(([t]) => t !== "life")
-    const filtered = g.boss ? table.filter(([t]) => t !== "laser" && t !== "rocket") : table
+    const table = buildPowerTable({
+      boss: g.boss !== null,
+      campaign: g.mode === "campaign",
+      fewBlocks: g.blocks.length <= Math.max(5, g.blocksInitial * 0.3),
+      // «Замедление» выпадает только когда шар разогнан ≥1.5× номинала
+      // (эффект ускорения + перманентный разгон зачистки).
+      spedUp: isBallSpedUp({
+        slow: g.time < g.slowUntil,
+        fast: g.time < g.fastUntil,
+        cleared: 1 - g.blocks.length / g.blocksInitial,
+      }),
+    })
     let sum = 0
-    for (const [, w] of filtered) sum += w
+    for (const [, w] of table) sum += w
     let roll = Math.random() * sum
-    for (const [t, w] of filtered) {
+    for (const [t, w] of table) {
       roll -= w
       if (roll <= 0) return t
     }
@@ -194,7 +192,7 @@ export class PowersSystem {
 
   dropPower(x: number, y: number) {
     const g = this.g
-    if (Math.random() < 0.24) {
+    if (Math.random() < 0.12) {
       const type = this.pickPowerType()
       const skip =
         (type === "multi" && g.balls.length >= 4) ||

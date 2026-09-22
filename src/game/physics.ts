@@ -18,8 +18,17 @@ import {
   spawnScatter as scatterBlocks,
   updateBombs as moveBombs,
 } from "./physics/destruction"
+import { ballSpeedMult } from "./physics/speed"
 
 export { FIREBALL_DAMAGE_MULT } from "./physics/destruction"
+export {
+  CLEAR_RAMP_MAX,
+  FAST_SPEED_MULT,
+  SLOW_SPEED_MULT,
+  SPEEDUP_RATIO,
+  ballSpeedMult,
+  isBallSpedUp,
+} from "./physics/speed"
 
 /** Узкий срез ввода, нужный ракетке (структурно совместим с InputController). */
 export interface PaddleInput {
@@ -214,9 +223,11 @@ export class Physics {
     }
 
     // режимы скорости + нарастание по мере зачистки уровня
-    const cleared = 1 - g.blocks.length / g.blocksInitial
-    const ramp = 1 + clamp(cleared, 0, 1) * 0.24
-    const mult = (g.slowActive() ? 0.72 : g.fastActive() ? 1.32 : 1) * ramp
+    const mult = ballSpeedMult({
+      slow: g.slowActive(),
+      fast: g.fastActive(),
+      cleared: 1 - g.blocks.length / g.blocksInitial,
+    })
     const cur = Math.hypot(ball.vx, ball.vy) || 1
     const target = ball.speed * mult
     if (Math.abs(cur - target) > 1) {
