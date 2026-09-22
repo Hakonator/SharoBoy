@@ -2,27 +2,25 @@
 
 > Обновлять в конце каждой сессии.
 
-## Где мы сейчас (2026-09-22)
+## Где мы сейчас (2026-09-22, вечер)
 
-Завершён полный рефакторинг под лимит 300 строк (`.clinerules`):
+Рефакторинг полностью завершён и **закоммичен/запушен** в `origin/beta`:
 
-- Волна 1 (стадии A–F): `render/`, `ui/screens/`, `audio/`, `physics/`, хуки UI,
-  `powers/apply.ts`, `inputHost.ts`, `campaignMapLayout.ts`, `levelPatterns.ts`,
-  тестовые хелперы. Подробнее — `docs/REFACTORING.md`.
-- Волна 2 (финальная фаза): `game.ts` 2366 → **299** строк, логика — в 16 модулей
-  `src/game/game/*` (свободные функции `(g: Game, ...)`), хосты — `hosts.ts` +
-  `hostsWorld.ts`, тип `MinibossCreature` — в `types.ts`.
-- Восстановлена кодировка (инцидент PowerShell/cp1251), U+FFFD в `src` — 0.
-- Валидация: typecheck ✓, lint 0 ошибок ✓, 132/132 теста ✓, build ✓.
+- `1425ee3` `refactor: split oversized modules to comply with 300-line rule` —
+  вся волна 2 (71 файл `src`: `render/`, `audio/`, `physics/`, 16 модулей `game/`,
+  `ui/screens/`, хуки, тестовые хелперы).
+- `79ebe29` `docs: initialize memory bank and sync rules with module layout` —
+  memory-bank инициализирована, `.clinerules` дополнен секцией Memory Bank,
+  `docs/REFACTORING.md` отражает обе волны.
 
-## Незакрытые шаги
+Валидация на момент коммита: typecheck ✓, lint 0 ошибок ✓, 132/132 теста ✓,
+build ✓. Рабочее дерево чистое. Push в `beta` запускает деплой CI (deploy.yml).
 
-1. **Закоммитить** 29 изменённых файлов (ветка `beta`, Conventional Commits, EN),
-   прогон pre-commit: lint → typecheck → test.
-2. Обновить статусный блок `docs/REFACTORING.md` (дописать волну 2) — частично
-   сделано при инициализации memory-bank.
+## Блокеры
 
-## Следующие задачи
+Нет.
 
-Баги и фичи поверх текущей базы — направления в `docs/ROADMAP.md` (лор, боссы,
-прогрессия и т.д.).
+## Следующие шаги
+
+- Проверить зелёный прогон CI после пуша (GitHub Actions → deploy).
+- Баги/фичи поверх базы — направления в `docs/ROADMAP.md`.
