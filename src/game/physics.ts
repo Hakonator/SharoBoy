@@ -21,6 +21,7 @@ import {
 import { ballSpeedMult } from "./physics/speed"
 
 export { FIREBALL_DAMAGE_MULT } from "./physics/destruction"
+export { FROST_FREEZE_RADIUS, freezeCluster } from "./physics/frost"
 export {
   CLEAR_RAMP_MAX,
   FAST_SPEED_MULT,
@@ -58,6 +59,7 @@ export interface PhysicsWorld {
   fx: Effects
   sfx: SFX
   fireActive(): boolean
+  frostActive(): boolean
   slowActive(): boolean
   fastActive(): boolean
   magnetActive(): boolean

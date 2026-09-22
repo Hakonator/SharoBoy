@@ -34,6 +34,45 @@ export class Effects {
     }
   }
 
+  /** Раскалывание льда: веер осколков-треугольников + мелкая ледяная пыль. */
+  iceShatter(x: number, y: number) {
+    if (this.particles.length > MAX_PARTICLES) return
+    const colors = ["#eaf9ff", "#bfeaff", "#8fd4ff"]
+    for (let i = 0; i < 14; i++) {
+      const a = rand(0, Math.PI * 2)
+      const v = rand(90, 300)
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * v,
+        vy: Math.sin(a) * v - 60,
+        life: rand(0.5, 0.9),
+        maxLife: 0.9,
+        size: rand(3, 7),
+        color: colors[i % colors.length],
+        grav: 420,
+        shape: "shard",
+        rot: rand(0, Math.PI * 2),
+        vr: rand(-9, 9),
+      })
+    }
+    for (let i = 0; i < 10; i++) {
+      const a = rand(0, Math.PI * 2)
+      const v = rand(40, 160)
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * v,
+        vy: Math.sin(a) * v,
+        life: rand(0.3, 0.6),
+        maxLife: 0.6,
+        size: rand(1.5, 3),
+        color: "#ffffff",
+        grav: 260,
+      })
+    }
+  }
+
   /** Шаг физики: полёт частиц с гравитацией, расширение колец, всплытие попапов. */
   step(dt: number) {
     for (const p of this.particles) {
@@ -41,6 +80,7 @@ export class Effects {
       p.x += p.vx * dt
       p.y += p.vy * dt
       p.vy += p.grav * dt
+      if (p.vr) p.rot = (p.rot ?? 0) + p.vr * dt
     }
     this.particles = this.particles.filter((p) => p.life > 0)
     for (const r of this.rings) r.t += dt * 2.4

@@ -379,6 +379,19 @@ export class SFX {
     this.blip(980, 0.09, "sawtooth", 0.13, 240)
     this.noise(0.06, 0.06)
   }
+  freeze() {
+    // заморозка: стеклянный перелив вниз
+    this.blip(1720, 0.09, "triangle", 0.16, 1180)
+    this.blip(2300, 0.07, "sine", 0.1, 1560, 0.03)
+  }
+  iceShatter() {
+    // раскалывание льда: хрустящий шум + россыпь высоких «звонов»
+    this.noise(0.16, 0.2)
+    for (let i = 0; i < 5; i++) {
+      this.blip(1400 + i * 260, 0.06, "triangle", 0.09, undefined, i * 0.025)
+    }
+    this.blip(520, 0.1, "square", 0.08, 180, 0.02)
+  }
   bossDie() {
     ;[520, 392, 311, 233, 155].forEach((f, i) =>
       this.blip(f, 0.2, "sawtooth", 0.2, undefined, i * 0.09)

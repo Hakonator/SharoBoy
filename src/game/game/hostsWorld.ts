@@ -77,6 +77,7 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     fx: g.fx,
     sfx: g.sfx,
     fireActive: () => g.time < g.fireUntil,
+    frostActive: () => g.time < g.frostUntil,
     slowActive: () => g.time < g.slowUntil,
     fastActive: () => g.time < g.fastUntil,
     magnetActive: () => g.time < g.magnetUntil,

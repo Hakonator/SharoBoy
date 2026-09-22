@@ -43,6 +43,7 @@ export function drawProjectiles(ctx: Ctx, projectiles: Projectile[], time: numbe
 /** Снимок данных для отрисовки шаров. */
 export interface BallView extends RenderView {
   fire: boolean
+  frost: boolean
   slow: boolean
   fast: boolean
 }
@@ -51,11 +52,13 @@ export function drawBalls(ctx: Ctx, balls: Ball[], v: BallView) {
   if (v.hidden) return
   const mode = v.fire
     ? { trail: "rgba(255,138,61,", mid: "#ffe9a8", core: "#ff5347", glow: "#ff8a3d" }
-    : v.slow
-      ? { trail: "rgba(93,255,176,", mid: "#d2ffee", core: "#2fd98a", glow: "#5dffb0" }
-      : v.fast
-        ? { trail: "rgba(255,106,92,", mid: "#ffd9d4", core: "#ff5347", glow: "#ff6a5c" }
-        : { trail: "rgba(120,240,255,", mid: "#c9f6ff", core: "#38bcd8", glow: "#7cf5ff" }
+    : v.frost
+      ? { trail: "rgba(124,214,255,", mid: "#dff4ff", core: "#5db8e8", glow: "#8fd9ff" }
+      : v.slow
+        ? { trail: "rgba(93,255,176,", mid: "#d2ffee", core: "#2fd98a", glow: "#5dffb0" }
+        : v.fast
+          ? { trail: "rgba(255,106,92,", mid: "#ffd9d4", core: "#ff5347", glow: "#ff6a5c" }
+          : { trail: "rgba(120,240,255,", mid: "#c9f6ff", core: "#38bcd8", glow: "#7cf5ff" }
   for (const b of balls) {
     for (let i = 0; i < b.trail.length; i++) {
       const t = b.trail[i]

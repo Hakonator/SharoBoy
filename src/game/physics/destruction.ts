@@ -55,8 +55,14 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1) {
   g.combo++
   const mult = comboMult(g)
   g.addScore((30 + b.tier * 20) * mult, b.x, b.y, TIER[b.tier].base, 14 + b.tier * 2)
-  g.sfx.destroy(b.tier)
-  g.fx.burst(b.x, b.y, TIER[b.tier].base, 10 + b.tier * 4, 190 + b.tier * 40)
+  if (b.frozen) {
+    // замороженный блок колется с одного удара: веер ледяных осколков
+    g.sfx.iceShatter()
+    g.fx.iceShatter(b.x, b.y)
+  } else {
+    g.sfx.destroy(b.tier)
+    g.fx.burst(b.x, b.y, TIER[b.tier].base, 10 + b.tier * 4, 190 + b.tier * 40)
+  }
   g.fx.rings.push({
     x: b.x,
     y: b.y,

@@ -46,6 +46,7 @@ const INITIAL_HUD: HudData = {
   laserArmed: false,
   rocketOn: false,
   fireOn: false,
+  frostOn: false,
   magnetOn: false,
   coins: 0,
   upgrades: {},

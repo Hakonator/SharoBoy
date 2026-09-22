@@ -137,6 +137,7 @@ export class Game {
   laserWasOn = false
   rocketUntil = 0
   fireUntil = 0
+  frostUntil = 0
   magnetUntil = 0
   weaponCd = 0
   shield = 0

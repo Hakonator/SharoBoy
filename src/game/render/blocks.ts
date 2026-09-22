@@ -1,5 +1,6 @@
 import { TIER } from "../palette"
 import { Block } from "../types"
+import { mulberry32 } from "../utils"
 
 import { type Ctx } from "./shapes"
 
@@ -34,6 +35,70 @@ function drawBomb(ctx: Ctx, b: Block, x: number, y: number, time: number) {
   ctx.restore()
 }
 
+/**
+ * Замороженный блок: полупрозрачный водяной лёд с бликами. Трещины —
+ * процедурные, у каждого блока свои (детерминированно из seed), поэтому
+ * силуэт повреждений не повторяется.
+ */
+function drawFrozenBlock(ctx: Ctx, b: Block, x: number, y: number, time: number) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(b.rot)
+  ctx.scale(b.rx, b.ry)
+  // ледяное тело: холодный градиент от светлой корки к глубине
+  const g = ctx.createRadialGradient(-0.35, -0.4, 0.05, 0, 0, 1.15)
+  g.addColorStop(0, "#f2fcff")
+  g.addColorStop(0.55, "#a8e2ff")
+  g.addColorStop(1, "#3f88b5")
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(0, 0, 1, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.lineWidth = 2.5 / Math.max(b.rx, b.ry)
+  ctx.strokeStyle = "rgba(9,42,64,0.55)"
+  ctx.stroke()
+  // трещины: 2–3 ломаные, форма зависит только от seed (не мерцают)
+  const rng = mulberry32((b.seed * 7919) | 0)
+  const n = 2 + Math.floor(rng() * 2)
+  ctx.lineWidth = 1.4 / Math.max(b.rx, b.ry)
+  ctx.strokeStyle = "rgba(9,42,64,0.45)"
+  for (let i = 0; i < n; i++) {
+    let a = rng() * Math.PI * 2
+    ctx.beginPath()
+    ctx.moveTo(Math.cos(a) * 0.12, Math.sin(a) * 0.12)
+    const segs = 2 + Math.floor(rng() * 2)
+    for (let s = 0; s < segs; s++) {
+      a += (rng() - 0.5) * 1.5
+      const r = 0.3 + rng() * 0.55
+      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r)
+    }
+    ctx.stroke()
+  }
+  // блики «водяного льда»: мягкая широкая полоса, яркий штрих и искра;
+  // слегка дышат по времени
+  const shim = 0.85 + Math.sin(time * 2.2 + b.seed) * 0.15
+  ctx.rotate(-0.7)
+  ctx.fillStyle = `rgba(255,255,255,${0.24 * shim})`
+  ctx.beginPath()
+  ctx.ellipse(-0.22, -0.34, 0.52, 0.14, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = `rgba(255,255,255,${0.5 * shim})`
+  ctx.beginPath()
+  ctx.ellipse(-0.28, -0.42, 0.3, 0.055, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = `rgba(255,255,255,${0.75 * shim})`
+  ctx.beginPath()
+  ctx.arc(0.34, -0.4, 0.07, 0, Math.PI * 2)
+  ctx.fill()
+  if (b.flash > 0) {
+    ctx.fillStyle = `rgba(255,255,255,${b.flash * 0.8})`
+    ctx.beginPath()
+    ctx.arc(0, 0, 1, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.restore()
+}
+
 export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
   for (const b of blocks) {
     if (b.dead) continue
@@ -45,6 +110,10 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
     }
     const x = b.x + Math.sin(time * 0.9 + b.seed) * 1.4
     const y = b.y + Math.cos(time * 0.8 + b.seed) * 1.4
+    if (b.frozen) {
+      drawFrozenBlock(ctx, b, x, y, time)
+      continue
+    }
     const tier = TIER[b.tier]
     ctx.save()
     ctx.translate(x, y)

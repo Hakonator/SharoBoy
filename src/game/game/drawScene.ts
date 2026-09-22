@@ -58,6 +58,7 @@ export function draw(g: Game) {
     time: g.time,
     hidden: g.phase === "menu",
     fire: g.time < g.fireUntil,
+    frost: g.time < g.frostUntil,
     slow: g.time < g.slowUntil,
     fast: g.time < g.fastUntil,
   })

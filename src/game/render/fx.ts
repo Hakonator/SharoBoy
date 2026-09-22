@@ -24,6 +24,21 @@ export function drawParticles(ctx: Ctx, particles: Particle[]) {
     const a = clamp(p.life / p.maxLife, 0, 1)
     ctx.globalAlpha = a
     ctx.fillStyle = p.color
+    if (p.shape === "shard") {
+      // осколок: неровный треугольник с собственным вращением (лёд)
+      const s = p.size * (0.55 + 0.45 * a)
+      ctx.save()
+      ctx.translate(p.x, p.y)
+      ctx.rotate(p.rot ?? 0)
+      ctx.beginPath()
+      ctx.moveTo(0, -s)
+      ctx.lineTo(s * 0.6, s * 0.7)
+      ctx.lineTo(-s * 0.5, s * 0.55)
+      ctx.closePath()
+      ctx.fill()
+      ctx.restore()
+      continue
+    }
     ctx.beginPath()
     ctx.arc(p.x, p.y, p.size * a + 0.5, 0, Math.PI * 2)
     ctx.fill()

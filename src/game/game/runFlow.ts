@@ -43,6 +43,7 @@ export function resetRun(g: Game) {
   g.laserArmed = false
   g.rocketUntil = 0
   g.fireUntil = 0
+  g.frostUntil = 0
   g.magnetUntil = 0
   g.shield = 0
   g.weaponCd = 0
@@ -170,6 +171,7 @@ export function loseLife(g: Game) {
   g.laserArmed = false
   g.rocketUntil = 0
   g.fireUntil = 0
+  g.frostUntil = 0
   g.magnetUntil = 0
   g.weaponCd = 0
   g.powers = []
@@ -206,6 +208,7 @@ export function clearAllEffects(g: Game) {
   g.laserArmed = false
   g.rocketUntil = 0
   g.fireUntil = 0
+  g.frostUntil = 0
   g.magnetUntil = 0
   g.weaponCd = 0
   g.shield = 0

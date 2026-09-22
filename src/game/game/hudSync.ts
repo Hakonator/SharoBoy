@@ -38,6 +38,7 @@ export function syncEffectsHud(g: Game) {
     g.laserArmed ? 1 : 0,
     t < g.rocketUntil ? 1 : 0,
     t < g.fireUntil ? 1 : 0,
+    t < g.frostUntil ? 1 : 0,
     t < g.magnetUntil ? 1 : 0,
   ].join("")
   if (key !== g.effectsKey) {
@@ -90,6 +91,7 @@ export function pushHud(g: Game) {
     laserArmed: g.laserArmed,
     rocketOn: g.time < g.rocketUntil,
     fireOn: g.time < g.fireUntil,
+    frostOn: g.time < g.frostUntil,
     magnetOn: g.time < g.magnetUntil,
     coins: g.coins,
     upgrades: { ...g.upgrades },

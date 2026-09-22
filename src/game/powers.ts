@@ -43,6 +43,7 @@ export interface PowersWorld {
   shrinkUntil: number
   rocketUntil: number
   fireUntil: number
+  frostUntil: number
   magnetUntil: number
   laserArmed: boolean
   laserArmedUntil: number

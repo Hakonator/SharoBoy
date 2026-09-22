@@ -70,6 +70,7 @@ describe("Physics — огненное ядро", () => {
       fx: { burst() {}, particles: [], rings: [], popups: [] },
       sfx: { wall() {}, burn() {}, brick() {} },
       fireActive: () => fire,
+      frostActive: () => false,
       slowActive: () => false,
       fastActive: () => false,
       magnetActive: () => false,

@@ -46,6 +46,7 @@ export interface HudData {
   laserArmed: boolean
   rocketOn: boolean
   fireOn: boolean
+  frostOn: boolean
   magnetOn: boolean
   coins: number
   upgrades: Record<string, number>
@@ -88,6 +89,8 @@ export interface Block {
   bomb: boolean
   boomQueued?: boolean
   splits: boolean
+  /** Заморожен морозным мячом: колется с одного удара, рисуется льдом. */
+  frozen?: boolean
   minionOrbit?: { ang: number; rad: number; dir: number; speed: number }
   /** Щупальце босса-осьминога: нужно уничтожить прежде чем наносить урон телу. */
   isTentacle?: boolean
@@ -182,6 +185,7 @@ export type PowerType =
   | "laser"
   | "rocket"
   | "fire"
+  | "frost"
   | "fast"
   | "shrink"
 
@@ -226,6 +230,11 @@ export interface Particle {
   size: number
   color: string
   grav: number
+  /** Форма частицы: точка (по умолчанию) или осколок (треугольник, для льда). */
+  shape?: "dot" | "shard"
+  /** Угол и скорость вращения осколка. */
+  rot?: number
+  vr?: number
 }
 
 export interface Ring {

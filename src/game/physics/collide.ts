@@ -4,6 +4,7 @@ import type { PhysicsWorld } from "../physics"
 
 import { convexBump, surfaceAt } from "./shapes"
 import { FIREBALL_DAMAGE_MULT, damageBlock } from "./destruction"
+import { freezeCluster } from "./frost"
 
 /** Отскок от ракетки: угол зависит от точки попадания и её скорости; магнит — прилипание. */
 export function collidePaddle(g: PhysicsWorld, ball: Ball) {
@@ -174,11 +175,35 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
     ball.x = b.x + plx * cs - ply * sn + wnx * 0.8
     ball.y = b.y + plx * sn + ply * cs + wny * 0.8
     ball.sinceHit = 0
-    if (fire && !b.isMiniboss) {
+    if (fire && !b.isMiniboss && !(g.frostActive() && !b.frozen)) {
       // обычные блоки огонь прожигает насквозь (без отскока)
       g.sfx.burn()
       damageBlock(g, b, g.debugBallDamage * FIREBALL_DAMAGE_MULT)
       continue
+    }
+    // морозный мяч: живой блок и соседи замораживаются вместо урона,
+    // мяч просто отскакивает — раскол произойдёт от следующего удара
+    if (g.frostActive() && !b.frozen && !b.isMiniboss && !b.bomb) {
+      const frozen = freezeCluster(g.blocks, b)
+      if (frozen.length > 0) {
+        g.sfx.freeze()
+        g.fx.burst(b.x, b.y, "#bfeaff", 10, 140)
+        g.fx.rings.push({
+          x: b.x,
+          y: b.y,
+          r: 8,
+          maxR: 86,
+          color: "rgba(124,214,255,0.8)",
+          t: 0,
+        })
+      }
+      const fdot = ball.vx * wnx + ball.vy * wny
+      if (fdot < 0) {
+        ball.vx -= 2 * fdot * wnx
+        ball.vy -= 2 * fdot * wny
+      }
+      ball.squash = 1
+      return
     }
     // блоки минибоссов (и любые — у обычного шара) отскакивают: «прожигание»
     // насквозь превращало минибосса в машинку урона; огонь бьёт ×3 от обычного
