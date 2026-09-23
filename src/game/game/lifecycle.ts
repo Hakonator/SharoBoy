@@ -51,6 +51,8 @@ export function resizeHandler(g: Game) {
   g.dpr = Math.min(window.devicePixelRatio || 1, 2)
   const cssW = window.innerWidth
   const cssH = window.innerHeight
+  g.cssW = cssW
+  g.cssH = cssH
   const ow = g.w
   const oh = g.h
   /* Единый масштаб мира (viewport.ts): логика считает в «эталонных» единицах

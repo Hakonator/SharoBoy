@@ -1,6 +1,6 @@
 import type { PaddleShapeKind } from "../types"
 import type { Game } from "../game"
-import { HUD_TOP_CSS } from "../viewport"
+import { hudTopCss } from "../viewport"
 
 import { isDebugEffectActive } from "./debug"
 
@@ -84,8 +84,9 @@ export function paddleBottomOffset(g: Game): number {
 }
 
 /** Верх зоны блоков в мировых единицах: 14% высоты мира, но не выше нижней
- *  границы HUD-плашек — на масштабах < 1 (телефоны) плашки занимают больше
- *  «мира», и блоки опускаются ниже, чтобы плашки их не перекрывали. */
+ *  границы HUD-плашек (неигровая зона, viewport.hudTopCss) — на масштабах < 1
+ *  (телефоны) плашки занимают больше «мира», и блоки опускаются ниже, чтобы
+ *  плашки их не перекрывали; в портрете HUD двухрядный — зона ещё выше. */
 export function blockTop(g: Game): number {
-  return Math.min(Math.max(g.h * 0.14, HUD_TOP_CSS / g.scale), g.h * 0.35)
+  return Math.min(Math.max(g.h * 0.14, hudTopCss(g.cssW, g.cssH) / g.scale), g.h * 0.35)
 }

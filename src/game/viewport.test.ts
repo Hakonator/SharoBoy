@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest"
 
-import { MAX_SCALE, MIN_SCALE, computeScale } from "./viewport"
+import {
+  HUD_TOP_CSS,
+  HUD_TOP_PORTRAIT_CSS,
+  MAX_SCALE,
+  MIN_SCALE,
+  computeScale,
+  hudTopCss,
+  isPortrait,
+} from "./viewport"
 
 describe("computeScale — единый масштаб мира", () => {
   it("эталонное окно 1920×1080 даёт масштаб 1", () => {
@@ -20,5 +28,22 @@ describe("computeScale — единый масштаб мира", () => {
   it("масштаб ограничен снизу и сверху", () => {
     expect(computeScale(100, 100)).toBe(MIN_SCALE)
     expect(computeScale(20000, 20000)).toBe(MAX_SCALE)
+  })
+})
+
+describe("isPortrait / hudTopCss — неигровая HUD-зона", () => {
+  it("портрет — высота больше ширины, ландшафт — наоборот", () => {
+    expect(isPortrait(390, 844)).toBe(true)
+    expect(isPortrait(844, 390)).toBe(false)
+  })
+
+  it("квадратное окно считается ландшафтом", () => {
+    expect(isPortrait(800, 800)).toBe(false)
+  })
+
+  it("в портрете HUD-зона выше: HUD двухрядный", () => {
+    expect(hudTopCss(390, 844)).toBe(HUD_TOP_PORTRAIT_CSS)
+    expect(hudTopCss(844, 390)).toBe(HUD_TOP_CSS)
+    expect(hudTopCss(390, 844)).toBeGreaterThan(hudTopCss(844, 390))
   })
 })

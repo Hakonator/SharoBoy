@@ -23,6 +23,22 @@ export const MAX_SCALE = 3
  *  плашки занимают больше «мира», и блоки опускаются ниже (Game.blockTop). */
 export const HUD_TOP_CSS = 96
 
+/** Высота верхней HUD-зоны при вертикальной ориентации: HUD свёрнут в два
+ *  ряда (счёт/цели + жизни/кнопки, ниже — рекорд/серия/монеты/щит), худший
+ *  случай — перенос чипа целей на вторую строку первого ряда. */
+export const HUD_TOP_PORTRAIT_CSS = 156
+
+/** Вертикальная ориентация окна: высота больше ширины (мобильный портрет). */
+export function isPortrait(cssW: number, cssH: number): boolean {
+  return cssH > cssW
+}
+
+/** Высота верхней неигровой HUD-зоны в CSS-пикселях для текущего окна:
+ *  в портрете плашки занимают два ряда — резервируем больше места. */
+export function hudTopCss(cssW: number, cssH: number): number {
+  return isPortrait(cssW, cssH) ? HUD_TOP_PORTRAIT_CSS : HUD_TOP_CSS
+}
+
 /** Единый масштаб мира: диагональ окна относительно эталонной диагонали. */
 export function computeScale(cssW: number, cssH: number): number {
   return clamp(Math.hypot(cssW, cssH) / REF_DIAG, MIN_SCALE, MAX_SCALE)

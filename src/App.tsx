@@ -16,6 +16,7 @@ import { useAchToasts } from "./ui/useAchToasts"
 import { useDebugControls } from "./ui/useDebugControls"
 import { useLeaderboard } from "./ui/useLeaderboard"
 import { usePlayerStats } from "./ui/usePlayerStats"
+import { usePortrait } from "./ui/usePortrait"
 
 const INITIAL_HUD: HudData = {
   phase: "menu",
@@ -88,6 +89,8 @@ export default function App() {
   const { stats } = usePlayerStats(hud)
   const debug = useDebugControls(gameRef)
   const leaderboard = useLeaderboard(hud, nick, handleNickChange)
+  /** Вертикальный экран: HUD живёт в зарезервированной неигровой зоне сверху. */
+  const portrait = usePortrait()
 
   /* Инициализация движка: без этого gameRef.current остаётся null,
      и кнопки меню (Кампания / Бесконечный) не запускают игру. */
@@ -142,6 +145,7 @@ export default function App() {
       <HudOverlay
         hud={hud}
         inGame={inGame}
+        portrait={portrait}
         onPause={() => g()?.togglePause()}
         onMute={() => g()?.toggleMute()}
         onMusic={() => g()?.toggleMusic()}

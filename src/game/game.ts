@@ -70,6 +70,10 @@ export class Game {
   dpr = 1
   /** Мировые единицы → CSS-пиксели: весь мир масштабируется одним коэффициентом. */
   scale = 1
+  /** CSS-размер окна (заполняется в resizeHandler): ориентация окна нужна
+   *  для расчёта неигровой HUD-зоны (viewport.hudTopCss → Game.blockTop). */
+  cssW = 1920
+  cssH = 1080
   phase: Phase = "menu"
   score = 0
   best = 0
