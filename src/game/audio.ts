@@ -397,6 +397,22 @@ export class SFX {
     this.blip(1600, 0.05, "sawtooth", 0.12, 320)
     this.noise(0.07, 0.12)
   }
+  spring() {
+    // пружинный блок: «бо-инг» вверх
+    this.blip(200, 0.14, "square", 0.18, 700)
+    this.blip(400, 0.1, "triangle", 0.1, 950, 0.05)
+  }
+  thud() {
+    // ватный блок: глухой мягкий шлепок
+    this.blip(110, 0.18, "sine", 0.3, 60)
+    this.noise(0.09, 0.07)
+  }
+  warp() {
+    // телепорт: «воронка» — свип вниз и обратно
+    this.blip(980, 0.16, "sine", 0.13, 160)
+    this.blip(160, 0.2, "triangle", 0.11, 880, 0.08)
+    this.noise(0.12, 0.05)
+  }
   bossDie() {
     ;[520, 392, 311, 233, 155].forEach((f, i) =>
       this.blip(f, 0.2, "sawtooth", 0.2, undefined, i * 0.09)

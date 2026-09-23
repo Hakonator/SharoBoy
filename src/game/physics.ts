@@ -27,6 +27,7 @@ import {
   updateBombs as moveBombs,
 } from "./physics/destruction"
 import { ballSpeedMult } from "./physics/speed"
+import { applyBallTimers, specialSpeedMult } from "./physics/special"
 import { spawnBallTrailFx } from "./physics/ballFx"
 
 export { FIREBALL_DAMAGE_MULT } from "./physics/destruction"
@@ -164,6 +165,8 @@ export class Physics {
     }
 
     ball.sinceHit += dt
+    // таймеры спецблоков (пружина/вата) тикают вниз
+    applyBallTimers(ball, dt)
 
     const speed = Math.hypot(ball.vx, ball.vy) || 1
     const steps = Math.max(1, Math.ceil((speed * dt) / (ball.r * 0.8)))
@@ -239,7 +242,7 @@ export class Physics {
       cleared: 1 - g.blocks.length / g.blocksInitial,
     })
     const cur = Math.hypot(ball.vx, ball.vy) || 1
-    const target = ball.speed * mult
+    const target = ball.speed * mult * specialSpeedMult(ball)
     if (Math.abs(cur - target) > 1) {
       ball.vx = (ball.vx / cur) * target
       ball.vy = (ball.vy / cur) * target

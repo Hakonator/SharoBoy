@@ -6,6 +6,7 @@ import { convexBump, surfaceAt } from "./shapes"
 import { FIREBALL_DAMAGE_MULT, damageBlock } from "./destruction"
 import { freezeCluster } from "./frost"
 import { queueSparkChain, sparkChainTargets } from "./spark"
+import { onBallHitSpecial } from "./special"
 
 /** Отскок от ракетки: угол зависит от точки попадания и её скорости; магнит — прилипание. */
 export function collidePaddle(g: PhysicsWorld, ball: Ball) {
@@ -176,6 +177,9 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
     ball.x = b.x + plx * cs - ply * sn + wnx * 0.8
     ball.y = b.y + plx * sn + ply * cs + wny * 0.8
     ball.sinceHit = 0
+    // специальный блок (§6): пружина/вата/вращение/телепорт. Телепорт
+    // поглощает контакт целиком (без отражения и урона от шара).
+    if (onBallHitSpecial(g, b, ball, lx, ex)) return
     if (fire && !b.isMiniboss && !(g.frostActive() && !b.frozen)) {
       // обычные блоки огонь прожигает насквозь (без отскока)
       g.sfx.burn()

@@ -4,6 +4,7 @@ import type { SparkHit } from "../types"
 
 import { pushHud, syncEffectsHud } from "./hudSync"
 import { applyFishWake, updateMouthBubbles } from "./minibossFx"
+import { stepBlock } from "./blockMotion"
 import { updatePaddleRotation } from "./paddleControl"
 import { draw } from "./drawScene"
 import { loseLife, onLevelCleared } from "./runFlow"
@@ -80,24 +81,9 @@ export function update(g: Game, dt: number) {
     if (g.transition <= 0) pushHud(g)
   }
 
-  // живые ряды
-  for (const b of g.blocks) {
-    if (b.swayAmp > 0) {
-      b.x = clamp(
-        b.x0 + Math.sin(g.time * b.swayFreq + b.swayPh) * b.swayAmp,
-        b.rx + 4,
-        g.w - b.rx - 4
-      )
-    }
-    // вертикальный дрейф медузы: вся медуза целиком (одна фаза bobPh)
-    if (b.bobAmp && b.bobFreq) {
-      b.y = clamp(
-        (b.y0 ?? b.y) + Math.sin(g.time * b.bobFreq + (b.bobPh ?? 0)) * b.bobAmp,
-        b.ry + 4,
-        g.h * 0.75
-      )
-    }
-  }
+  // живые ряды: маршрутизатор траекторий (покачивание, дрейф §6, пульсация,
+  // вращение, кулдаун порталов)
+  for (const b of g.blocks) stepBlock(g, b, dt)
 
   // плавный дрейф поля
   if (g.fieldShift) {

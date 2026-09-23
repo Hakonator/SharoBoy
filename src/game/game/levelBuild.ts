@@ -11,6 +11,8 @@ import type { LevelSpec, PatternSpec } from "../levels"
 import { pushHud } from "./hudSync"
 import { resetMiniboss } from "./minibossRuntime"
 import { blockTop } from "./paddleControl"
+import { decorateBlocks } from "./blockSpawn"
+
 export function buildLevel(g: Game, n: number) {
   buildFromSpec(g, LEVELS[n - 1])
 }
@@ -38,7 +40,16 @@ export function buildFromSpec(g: Game, spec: LevelSpec) {
   } else {
     g.blocks = gridBlocks(spec, g.w, g.h, densityFactor(g.w, g.h), top)
   }
+  // спецблоки §6: только для обычных уровней (не боссовых арен)
+  if (!("boss" in spec)) decorateLevel(g)
   g.blocksInitial = Math.max(1, g.blocks.length)
+}
+
+/** Детерминированная расстановка спецблоков: кампания — по уровню, бесконечный — по волне. */
+function decorateLevel(g: Game) {
+  const lvl = g.mode === "endless" ? g.wave : g.level
+  const seed = g.mode === "endless" ? daySeed() * 31 + lvl * 7919 : lvl * 1013 + 17
+  decorateBlocks(g.blocks, lvl, mulberry32(seed))
 }
 
 export function buildWave(g: Game, n: number) {

@@ -5,6 +5,7 @@
  */
 
 import type { CampaignMapView } from "./campaignMap"
+import type { BlockSpecial } from "./blockKinds"
 
 export type Phase = "menu" | "playing" | "paused" | "over" | "won" | "map"
 
@@ -90,6 +91,8 @@ export interface Block {
   bomb: boolean
   boomQueued?: boolean
   splits: boolean
+  /** Особый тип блока (§6): пульсация/пружина/вата/вращение/дрейф/телепорт. */
+  sp?: BlockSpecial
   /** Заморожен морозным мячом: колется с одного удара, рисуется льдом. */
   frozen?: boolean
   minionOrbit?: { ang: number; rad: number; dir: number; speed: number }
@@ -173,6 +176,10 @@ export interface Ball {
   sinceHit: number
   /** шар вылетел за нижнюю границу и должен быть убран в этом же кадре */
   lost?: boolean
+  /** Таймер разгона пружинного блока, сек (0/undefined — не активен). */
+  springT?: number
+  /** Таймер замедления ватного блока, сек (0/undefined — не активен). */
+  cottonT?: number
 }
 
 export type PowerType =

@@ -2,6 +2,7 @@ import { TIER } from "../palette"
 import { Block } from "../types"
 import { mulberry32 } from "../utils"
 
+import { drawSpecialBody, drawSpecialMarks } from "./blockKinds"
 import { gradient } from "./gradCache"
 import { type Ctx } from "./shapes"
 
@@ -119,6 +120,12 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
       drawFrozenBlock(ctx, b, x, y, time)
       continue
     }
+    // Спецблоки §6: пружина/вата/портал рисуются целиком кастомно;
+    // пульсация/дрейф/вращение — стандартное тело + метки поверх.
+    if (b.sp?.portalId || b.sp?.spring || b.sp?.cotton) {
+      drawSpecialBody(ctx, b, x, y, time)
+      continue
+    }
     const tier = TIER[b.tier]
     ctx.save()
     ctx.translate(x, y)
@@ -147,6 +154,9 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
       ctx.fill()
     }
     ctx.restore()
+
+    // метки спецблоков поверх тела: кольцо пульсации, штрихи маршрута, стрелки
+    if (b.sp) drawSpecialMarks(ctx, b, x, y, time)
 
     // трещины
     const dmg = b.maxHp - b.hp
