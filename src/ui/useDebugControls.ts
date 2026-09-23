@@ -1,27 +1,16 @@
 import { useCallback, useState } from "react"
 import type { RefObject } from "react"
 
-import { FPS_LS_KEY, type Game } from "../game/game"
-
-/** Отладочные контролы доступны только в DEV-сборке. */
-const DEV = import.meta.env.DEV
+import type { Game } from "../game/game"
 
 /**
- * Отладочные контролы меню: режим отладки, выбор босса/минибосса,
- * активируемые эффекты и счётчик FPS (значение рисуется на канвасе).
+ * Отладочные контролы меню: режим отладки, выбор босса/минибосса
+ * и активируемые эффекты. FPS/хитбоксы/замедление/бессмертие —
+ * горячими клавишами F1–F4, только в DEV-сборке (см. src/game/input.ts).
  */
 export function useDebugControls(gameRef: RefObject<Game | null>) {
   const [debug, setDebug] = useState<boolean>(false)
   const [debugBoss, setDebugBoss] = useState<string>("")
-  /** Счётчик FPS: начальное значение — сохранённая настройка движка (только DEV). */
-  const [showFps, setShowFps] = useState<boolean>(() => {
-    if (!DEV) return false
-    try {
-      return localStorage.getItem(FPS_LS_KEY) === "1"
-    } catch {
-      return false
-    }
-  })
 
   const handleToggleDebug = useCallback(() => {
     setDebug((prev) => {
@@ -29,12 +18,6 @@ export function useDebugControls(gameRef: RefObject<Game | null>) {
       gameRef.current?.toggleDebug()
       return next
     })
-  }, [gameRef])
-
-  const handleToggleFps = useCallback(() => {
-    const g = gameRef.current
-    if (!g || !DEV) return
-    setShowFps(g.toggleFps())
   }, [gameRef])
 
   const handleSelectDebugBoss = useCallback((boss: string) => {
@@ -71,10 +54,8 @@ export function useDebugControls(gameRef: RefObject<Game | null>) {
 
   return {
     debug,
-    showFps,
     debugBoss,
     handleToggleDebug,
-    handleToggleFps,
     handleSelectDebugBoss,
     handleToggleDebugEffect,
     handleIsDebugEffectActive,

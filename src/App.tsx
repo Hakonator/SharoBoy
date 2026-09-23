@@ -190,8 +190,6 @@ export default function App() {
           onMusic={() => g()?.toggleMusic()}
           onMusicVolume={(v) => g()?.setMusicVolume(v)}
           onSfxVolume={(v) => g()?.setSfxVolume(v)}
-          showFps={debug.showFps}
-          onToggleFps={debug.handleToggleFps}
         />
       )}
 

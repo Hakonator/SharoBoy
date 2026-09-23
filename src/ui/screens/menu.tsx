@@ -39,8 +39,6 @@ export function MenuScreen({
   onMusic,
   onMusicVolume,
   onSfxVolume,
-  showFps,
-  onToggleFps,
 }: {
   hud: HudData
   stats: PlayerStats
@@ -79,10 +77,6 @@ export function MenuScreen({
   onMusicVolume: (v: number) => void
   /** Ползунок громкости эффектов (0..1). */
   onSfxVolume: (v: number) => void
-  /** Показывается ли счётчик FPS на канвасе. */
-  showFps: boolean
-  /** Переключить отображение счётчика FPS. */
-  onToggleFps: () => void
 }) {
   /** Есть улучшение, которое игрок уже может купить, — индикатор на секции. */
 
@@ -91,8 +85,6 @@ export function MenuScreen({
       <FloatingBalls />
       <MenuCornerControls
         hud={hud}
-        showFps={showFps}
-        onToggleFps={onToggleFps}
         onMute={onMute}
         onMusic={onMusic}
         onMusicVolume={onMusicVolume}

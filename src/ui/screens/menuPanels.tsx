@@ -4,19 +4,15 @@ import type { HudData } from "../../game/types"
 
 import { MenuSection } from "./shared"
 
-/** Угловые контролы меню: счётчик FPS, музыка и звук с ползунками. */
+/** Угловые контролы меню: музыка и звук с ползунками. */
 export function MenuCornerControls({
   hud,
-  showFps,
-  onToggleFps,
   onMute,
   onMusic,
   onMusicVolume,
   onSfxVolume,
 }: {
   hud: HudData
-  showFps: boolean
-  onToggleFps: () => void
   onMute: () => void
   onMusic: () => void
   onMusicVolume: (v: number) => void
@@ -24,24 +20,6 @@ export function MenuCornerControls({
 }) {
   return (
     <>
-      {/* Переключатель счётчика FPS — в левом углу меню (значение рисуется на канвасе) */}
-      <button
-        type="button"
-        onClick={onToggleFps}
-        aria-pressed={showFps}
-        aria-label="Счётчик FPS"
-        className={`pointer-events-auto absolute left-3 top-3 z-10 flex h-9 items-center gap-2 rounded-full border px-3 font-display text-[11px] tracking-wider transition sm:left-5 sm:top-5 ${
-          showFps
-            ? "border-cyan-neon/60 bg-cyan-neon/10 text-cyan-neon"
-            : "border-line/50 bg-deep/50 text-dim hover:text-foam"
-        }`}
-      >
-        <span
-          aria-hidden
-          className={`h-1.5 w-1.5 rounded-full ${showFps ? "bg-cyan-neon" : "bg-line"}`}
-        />
-        FPS
-      </button>
       {/* Кнопки музыки и звука с ползунками громкости — в углу меню */}
       <div className="absolute right-3 top-3 z-10 flex items-center gap-2 sm:right-5 sm:top-5 sm:gap-3">
         <div className="flex items-center gap-1.5">

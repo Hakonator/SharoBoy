@@ -19,11 +19,16 @@
 - F2: `render/debug.ts` — `drawHitboxes` (эллипсы блоков с rot, круги шаров/
   боссов/бонусов/снарядов, прямоугольник ракетки с поворотом) + `drawDebugFlags`
   («DEV: SLOW ×0.25 · GOD» над FPS). Вызовы в `drawScene.ts`.
-- `useDebugControls`: FPS-кнопка меню — только в DEV.
-- Тесты: `game/debug.test.ts` (4 теста через `makeEnv`): toggle-флаги,
-  бессмертие не списывает жизнь, контрольное списание, slowMotion ×0.25 в
-  игровом цикле. **20 файлов, 172 теста — зелёные**; typecheck/lint/build —
-  чисто.
+- Старая FPS-кнопка в углу меню **удалена** (вместе с дубль-стейтом
+  `showFps` в `useDebugControls` и цепочкой props showFps/onToggleFps) —
+  F1 единственный способ включить счётчик; состояние по-прежнему в localStorage.
+- Сквозной тест keydown-цепочки: `debug.test.ts` перехватывает
+  `window.addEventListener` фейкового окна, подключает `createInput` и дёргает
+  F1–F4 (проверено: input → InputHost → debug-toggle → флаги).
+- Тесты: `game/debug.test.ts` (5 тестов через `makeEnv`): F1–F4 по цепочке,
+  toggle-флаги, бессмертие не списывает жизнь, контрольное списание,
+  slowMotion ×0.25 в игровом цикле. **20 файлов, 173 теста — зелёные**;
+  typecheck/lint/build — чисто.
 
 **Мобильный HUD: неигровая зона при вертикальном экране** (сделано, 7ec527f):
 

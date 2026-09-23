@@ -1,11 +1,66 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { makeEnv } from "../frameInvariant.helpers"
+import type { Game } from "../game"
 
+import { createInput } from "./lifecycle"
 import { loseLife } from "./runFlow"
+
+/** Форма события keydown, которое получает обработчик контроллера ввода. */
+type KeyEvent = { code: string; preventDefault: () => void }
+
+/**
+ * Перехватывает window.addEventListener фейкового окна (makeEnv) и
+ * регистрирует контроллер ввода напрямую: так эмулируем нажатия клавиш
+ * браузера и проверяем всю цепочку keydown → InputHost → Game.
+ */
+function captureKeydown(game: Game): (code: string) => void {
+  let keydown: ((e: KeyEvent) => void) | null = null
+  const win = window as unknown as {
+    addEventListener: (type: string, fn: (e: KeyEvent) => void) => void
+  }
+  win.addEventListener = (type, fn) => {
+    if (type === "keydown") keydown = fn
+  }
+  createInput(game, game.canvas).attach()
+  return (code) => {
+    if (!keydown) throw new Error("keydown-обработчик не зарегистрирован")
+    keydown({ code, preventDefault: () => {} })
+  }
+}
 
 afterEach(() => {
   vi.restoreAllMocks()
+})
+
+describe("DEV-отладка: горячие клавиши F1–F4", () => {
+  it("нажатия F1–F4 переключают флаги через контроллер ввода", () => {
+    const { game, restoreRandom } = makeEnv()
+    try {
+      const press = captureKeydown(game)
+      expect(game.showFps).toBe(false)
+      press("F1")
+      expect(game.showFps).toBe(true)
+      press("F1")
+      expect(game.showFps).toBe(false)
+
+      press("F2")
+      expect(game.showHitboxes).toBe(true)
+
+      press("F3")
+      expect(game.slowMotion).toBe(true)
+
+      press("F4")
+      expect(game.invincible).toBe(true)
+
+      // Повторное нажатие выключает режим.
+      press("F3")
+      expect(game.slowMotion).toBe(false)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
 })
 
 describe("DEV-отладка (F2–F4)", () => {
