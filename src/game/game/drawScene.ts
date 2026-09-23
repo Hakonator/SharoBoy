@@ -1,3 +1,4 @@
+import { DEBUG_TOOLS } from "../../config"
 import type { Game } from "../game"
 import {
   drawBackground,
@@ -137,11 +138,11 @@ export function draw(g: Game) {
 
   // Счётчик FPS: мелкий текст в левом нижнем углу, размер в экранных
   // пикселях не зависит от масштаба мира (~11 css px, минимум 9).
-  // DEV-функции: FPS — F1, хитбоксы — F2, замедление — F3, бессмертие — F4.
+  // Отладка: FPS — F1, хитбоксы — F2, замедление — F3, бессмертие — F4.
   if (g.showFps) {
     drawFps(ctx, w, h, g.fps, Math.max(9, Math.round(11 / g.scale)))
   }
-  if (import.meta.env.DEV) {
+  if (DEBUG_TOOLS) {
     drawDebugFlags(ctx, w, h, g.slowMotion, g.invincible, Math.max(9, Math.round(11 / g.scale)))
   }
 }

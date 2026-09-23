@@ -3,6 +3,8 @@
  * Подсистемы вынесены в модули папки game/ и работают с состоянием
  * через свободные функции (g: Game, ...); класс оставляет публичный API.
  */
+import { DEBUG_TOOLS } from "../config"
+
 import { SFX } from "./audio"
 import { BossSystem } from "./boss"
 import { Physics } from "./physics"
@@ -110,8 +112,9 @@ export class Game {
   debugBallDamage = 1
   /** Активные эффекты отладки (для тестирования механик). */
   debugEffects = new Set<string>()
-  /** Счётчик FPS (F1, только DEV-сборка): состояние сохраняется в localStorage. */
-  showFps = import.meta.env.DEV && lsGet(FPS_LS_KEY) === "1"
+  /** Счётчик FPS (F1; отключается в сборке через VITE_DEBUG_TOOLS=0):
+      состояние сохраняется в localStorage. */
+  showFps = DEBUG_TOOLS && lsGet(FPS_LS_KEY) === "1"
   /** DEV (F2): рисовать хитбоксы сущностей. */
   showHitboxes = false
   /** DEV (F3): замедление времени ×0.25 для отладки. */

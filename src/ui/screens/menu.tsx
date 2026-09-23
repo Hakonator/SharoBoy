@@ -2,6 +2,7 @@ import { type ReactNode } from "react"
 
 import { ACHIEVEMENTS } from "../../game/achievements"
 import { MAX_NICK } from "../../game/profanity"
+import { DEBUG_TOOLS } from "../../config"
 import { ControlsPanel, FloatingBalls } from "../icons"
 import type { GlobalScore, LeadPeriod, ScreenFilter } from "../../game/leaderboard"
 import type { HudData } from "../../game/types"
@@ -171,16 +172,19 @@ export function MenuScreen({
             )}
             <MenuRecords hud={hud} />
             <MenuUpgrades hud={hud} onBuyUpgrade={onBuyUpgrade} />
-            {/* Секция отладки — для тестирования новых механик */}
-            <MenuDebug
-              debug={debug}
-              onToggleDebug={onToggleDebug}
-              debugBoss={debugBoss}
-              onSelectDebugBoss={onSelectDebugBoss}
-              isDebugEffectActive={isDebugEffectActive}
-              onToggleDebugEffect={onToggleDebugEffect}
-              onDebugStartGame={onDebugStartGame}
-            />
+            {/* Секция отладки — только когда отладочные инструменты включены
+                (по умолчанию включены; отключается VITE_DEBUG_TOOLS=0) */}
+            {DEBUG_TOOLS && (
+              <MenuDebug
+                debug={debug}
+                onToggleDebug={onToggleDebug}
+                debugBoss={debugBoss}
+                onSelectDebugBoss={onSelectDebugBoss}
+                isDebugEffectActive={isDebugEffectActive}
+                onToggleDebugEffect={onToggleDebugEffect}
+                onDebugStartGame={onDebugStartGame}
+              />
+            )}
             <MenuSection
               title="🏅 Достижения"
               badge={`${Object.keys(unlocked).length}/${ACHIEVEMENTS.length}`}

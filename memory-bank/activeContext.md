@@ -9,10 +9,11 @@
 - `input.ts`: F1 — FPS, F2 — хитбоксы, F3 — замедление, F4 — бессмертие
   (preventDefault); «+»/«-» на цифровой клавиатуре (зачистка/урон) тоже
   переведены на DEV-гейт — флаг `DEBUG_DAMAGE_KEY` удалён из `inputHost.ts`.
-- Гейт — `import.meta.env.DEV` внутри toggle-функций (`game/debug.ts`):
-  в prod-сборке клавиши не работают и FPS не восстанавливается из localStorage.
+- Гейт — `DEBUG_TOOLS` (`src/config.ts`, `import.meta.env.VITE_DEBUG_TOOLS`
+  !== "0"): включён во всех сборках, включая деплой beta; в стабильной версии
+  (`main`) урезается передачей `VITE_DEBUG_TOOLS=0` в шаге build workflow.
 - Новые поля `Game`: `showHitboxes`, `slowMotion`, `invincible`; `showFps`
-  инициализируется только в DEV.
+  инициализируется только при включённой отладке.
 - F3: `gameLoop` умножает dt на ×0.25 (FPS и hit-stop не искажаются).
 - F4: `loseLife` при бессмертии не списывает жизнь — подаёт новый шар
   (попадание бомбы игнорируется).

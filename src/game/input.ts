@@ -4,6 +4,8 @@
  * через узкий интерфейс InputHost. Состояние ввода (клавиши, позиция
  * указателя, захват мыши) хост читает напрямую.
  */
+import { DEBUG_TOOLS } from "../config"
+
 import { clamp } from "./utils"
 import type { InputHost, InputKeys } from "./inputHost"
 export type { InputHost, InputKeys } from "./inputHost"
@@ -143,8 +145,8 @@ export class InputController {
     if (c === "KeyP" || c === "Escape") this.host.togglePause()
     if (c === "KeyM") this.host.toggleMute()
     if (c === "KeyN") this.host.toggleMusic()
-    if (import.meta.env.DEV) {
-      /* Отладочные клавиши работают только в DEV-сборке:
+    if (DEBUG_TOOLS) {
+      /* Отладочные клавиши (отключаются в сборке через VITE_DEBUG_TOOLS=0):
          F1 — FPS, F2 — хитбоксы, F3 — замедление, F4 — бессмертие,
          «+»/«-» на цифровой клавиатуре — зачистка/урон. */
       if (c === "F1") {

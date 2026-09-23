@@ -20,3 +20,14 @@ export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? ""
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ""
 
 export const LEADERBOARD_ENABLED = SUPABASE_URL.trim() !== "" && SUPABASE_ANON_KEY.trim() !== ""
+
+/**
+ * Отладочные инструменты (F1–F4: FPS/хитбоксы/замедление/бессмертие,
+ * «+»/«-» на цифровой клавиатуре, отладочная панель в меню).
+ *
+ * По умолчанию включены во ВСЕХ сборках, включая деплой на GitHub Pages.
+ * Чтобы урезать отладку в стабильной версии (деплой из `main`), задайте
+ * в сборке переменную окружения `VITE_DEBUG_TOOLS=0` (например, в env-блоке
+ * шага build в workflow) — код менять не нужно.
+ */
+export const DEBUG_TOOLS = import.meta.env.VITE_DEBUG_TOOLS !== "0"
