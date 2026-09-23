@@ -3,6 +3,9 @@ import type { RefObject } from "react"
 
 import { FPS_LS_KEY, type Game } from "../game/game"
 
+/** Отладочные контролы доступны только в DEV-сборке. */
+const DEV = import.meta.env.DEV
+
 /**
  * Отладочные контролы меню: режим отладки, выбор босса/минибосса,
  * активируемые эффекты и счётчик FPS (значение рисуется на канвасе).
@@ -10,8 +13,9 @@ import { FPS_LS_KEY, type Game } from "../game/game"
 export function useDebugControls(gameRef: RefObject<Game | null>) {
   const [debug, setDebug] = useState<boolean>(false)
   const [debugBoss, setDebugBoss] = useState<string>("")
-  /** Счётчик FPS: начальное значение — сохранённая настройка движка. */
+  /** Счётчик FPS: начальное значение — сохранённая настройка движка (только DEV). */
   const [showFps, setShowFps] = useState<boolean>(() => {
+    if (!DEV) return false
     try {
       return localStorage.getItem(FPS_LS_KEY) === "1"
     } catch {
@@ -29,7 +33,7 @@ export function useDebugControls(gameRef: RefObject<Game | null>) {
 
   const handleToggleFps = useCallback(() => {
     const g = gameRef.current
-    if (!g) return
+    if (!g || !DEV) return
     setShowFps(g.toggleFps())
   }, [gameRef])
 

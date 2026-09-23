@@ -6,7 +6,14 @@ import type { ScoreEntry } from "../types"
 
 import { toggleMusic, toggleMute } from "./audioControls"
 import { enterNextNodeOnAction } from "./campaignFlow"
-import { debugDamageUp, debugSkipLevel } from "./debug"
+import {
+  debugDamageUp,
+  debugSkipLevel,
+  toggleFps,
+  toggleHitboxes,
+  toggleInvincible,
+  toggleSlowMotion,
+} from "./debug"
 import { pushHud } from "./hudSync"
 import { startGame, togglePause } from "./modes"
 import { paddleBottomOffset } from "./paddleControl"
@@ -135,6 +142,19 @@ export function createInput(g: Game, canvas: HTMLCanvasElement): InputController
     togglePause: () => togglePause(g),
     toggleMute: () => toggleMute(g),
     toggleMusic: () => toggleMusic(g),
+    // DEV-отладка (F1–F4): DEV-гейт внутри toggle-функций (game/debug.ts).
+    toggleFpsOverlay: () => {
+      toggleFps(g)
+    },
+    toggleHitboxes: () => {
+      toggleHitboxes(g)
+    },
+    toggleSlowMotion: () => {
+      toggleSlowMotion(g)
+    },
+    toggleInvincible: () => {
+      toggleInvincible(g)
+    },
     debugDamageUp: () => debugDamageUp(g),
     debugSkipLevel: () => debugSkipLevel(g),
     onBlur: () => {

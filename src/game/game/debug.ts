@@ -11,6 +11,9 @@ import { addMiniboss, resetMiniboss } from "./minibossRuntime"
 /** Ключ localStorage для настройки «показывать счётчик FPS». */
 export const FPS_LS_KEY = "sharoboy-fps"
 
+/** DEV-режим сборки (vite): отладочные функции доступны только в нём. */
+const DEV = import.meta.env.DEV
+
 /* ---------- отладка ---------- */
 
 /** Переключение режима отладки. */
@@ -20,11 +23,36 @@ export function toggleDebug(g: Game) {
   pushHud(g)
 }
 
-/** Переключение счётчика FPS; возвращает новое состояние (для синхронизации UI). */
+/** Переключение счётчика FPS (F1); возвращает новое состояние (для UI). Только DEV. */
 export function toggleFps(g: Game): boolean {
+  if (!DEV) return false
   g.showFps = !g.showFps
   lsSet(FPS_LS_KEY, g.showFps ? "1" : "0")
   return g.showFps
+}
+
+/** DEV (F2): переключение отрисовки хитбоксов сущностей. */
+export function toggleHitboxes(g: Game): boolean {
+  if (!DEV) return false
+  g.showHitboxes = !g.showHitboxes
+  console.log(`[ШАРОБОЙ][debug] хитбоксы: ${g.showHitboxes ? "вкл" : "выкл"}`)
+  return g.showHitboxes
+}
+
+/** DEV (F3): замедление игры ×0.25 — видно медленно летящий шар и эффекты. */
+export function toggleSlowMotion(g: Game): boolean {
+  if (!DEV) return false
+  g.slowMotion = !g.slowMotion
+  console.log(`[ШАРОБОЙ][debug] замедление: ${g.slowMotion ? "вкл (×0.25)" : "выкл"}`)
+  return g.slowMotion
+}
+
+/** DEV (F4): бессмертие — потеря шара/бомба не списывают жизни. */
+export function toggleInvincible(g: Game): boolean {
+  if (!DEV) return false
+  g.invincible = !g.invincible
+  console.log(`[ШАРОБОЙ][debug] бессмертие: ${g.invincible ? "вкл" : "выкл"}`)
+  return g.invincible
 }
 
 /** Переключение эффекта отладки (вкл/выкл). */

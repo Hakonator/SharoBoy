@@ -6,6 +6,7 @@
 export * from "./render/background"
 export * from "./render/blocks"
 export * from "./render/boss"
+export * from "./render/debug"
 export * from "./render/fish"
 export * from "./render/jelly"
 export * from "./render/minibosses"

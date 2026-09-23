@@ -159,6 +159,12 @@ export function onLevelCleared(g: Game) {
 }
 
 export function loseLife(g: Game) {
+  // DEV-бессмертие (F4): жизнь не списывается — при потере шара просто
+  // подаём новый, попадание бомбы игнорируется (шары остаются на месте).
+  if (g.invincible) {
+    if (g.balls.length === 0) serveBall(g)
+    return
+  }
   g.lives--
   g.runLivesLost++
   g.levelLostBall = true

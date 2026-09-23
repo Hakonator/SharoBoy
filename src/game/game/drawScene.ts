@@ -4,7 +4,9 @@ import {
   drawBalls,
   drawBlocks,
   drawBoss,
+  drawDebugFlags,
   drawFps,
+  drawHitboxes,
   drawLaserBeams,
   drawMinibossBar,
   drawMinibosses,
@@ -81,6 +83,19 @@ export function draw(g: Game) {
   drawParticles(ctx, g.fx.particles)
   drawPopups(ctx, g.fx.popups)
 
+  // DEV (F2): хитбоксы поверх сущностей, но под экранным текстом.
+  if (g.showHitboxes) {
+    drawHitboxes(ctx, {
+      blocks: g.blocks,
+      balls: g.balls,
+      paddle: g.paddle,
+      paddleRot: g.paddle.rot ?? 0,
+      boss: g.bossSys.boss,
+      powers: g.powers,
+      projectiles: g.projectiles,
+    })
+  }
+
   ctx.restore()
 
   if (g.flash > 0) {
@@ -122,7 +137,11 @@ export function draw(g: Game) {
 
   // Счётчик FPS: мелкий текст в левом нижнем углу, размер в экранных
   // пикселях не зависит от масштаба мира (~11 css px, минимум 9).
+  // DEV-функции: FPS — F1, хитбоксы — F2, замедление — F3, бессмертие — F4.
   if (g.showFps) {
     drawFps(ctx, w, h, g.fps, Math.max(9, Math.round(11 / g.scale)))
+  }
+  if (import.meta.env.DEV) {
+    drawDebugFlags(ctx, w, h, g.slowMotion, g.invincible, Math.max(9, Math.round(11 / g.scale)))
   }
 }

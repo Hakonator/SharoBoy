@@ -33,7 +33,9 @@ export function gameLoop(g: Game, t: number) {
   }
   g.last = t
   if (g.hitStop > 0) g.hitStop = Math.max(0, g.hitStop - dtRaw)
-  const dt = g.hitStop > 0 ? dtRaw * 0.18 : dtRaw
+  /* DEV (F3): slowMotion замедляет весь мир, но не счётчик FPS (он считает
+     по rawDt) и не hit-stop, который умножается первым. */
+  const dt = (g.hitStop > 0 ? dtRaw * 0.18 : dtRaw) * (g.slowMotion ? 0.25 : 1)
   g.time += dt
   g.flash = Math.max(0, g.flash - dtRaw * 2.6)
   try {

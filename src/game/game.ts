@@ -39,6 +39,9 @@ import {
 import {
   toggleDebug,
   toggleFps,
+  toggleHitboxes,
+  toggleSlowMotion,
+  toggleInvincible,
   toggleDebugEffect,
   isDebugEffectActive,
   spawnDebugBoss,
@@ -107,8 +110,14 @@ export class Game {
   debugBallDamage = 1
   /** Активные эффекты отладки (для тестирования механик). */
   debugEffects = new Set<string>()
-  /** Счётчик FPS в углу канваса: вкл/выкл, состояние сохраняется в localStorage. */
-  showFps = lsGet(FPS_LS_KEY) === "1"
+  /** Счётчик FPS (F1, только DEV-сборка): состояние сохраняется в localStorage. */
+  showFps = import.meta.env.DEV && lsGet(FPS_LS_KEY) === "1"
+  /** DEV (F2): рисовать хитбоксы сущностей. */
+  showHitboxes = false
+  /** DEV (F3): замедление времени ×0.25 для отладки. */
+  slowMotion = false
+  /** DEV (F4): бессмертие — жизни не тратятся. */
+  invincible = false
   /** Текущий FPS (усреднение за окно ~0.5 с) — значение для счётчика. */
   fps = 0
   fpsFrames = 0
@@ -261,6 +270,15 @@ export class Game {
   }
   toggleFps(): boolean {
     return toggleFps(this)
+  }
+  toggleHitboxes(): boolean {
+    return toggleHitboxes(this)
+  }
+  toggleSlowMotion(): boolean {
+    return toggleSlowMotion(this)
+  }
+  toggleInvincible(): boolean {
+    return toggleInvincible(this)
   }
   toggleDebug() {
     toggleDebug(this)

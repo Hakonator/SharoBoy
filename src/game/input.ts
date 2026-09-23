@@ -5,7 +5,7 @@
  * указателя, захват мыши) хост читает напрямую.
  */
 import { clamp } from "./utils"
-import { DEBUG_DAMAGE_KEY, type InputHost, type InputKeys } from "./inputHost"
+import type { InputHost, InputKeys } from "./inputHost"
 export type { InputHost, InputKeys } from "./inputHost"
 
 export class InputController {
@@ -143,10 +143,29 @@ export class InputController {
     if (c === "KeyP" || c === "Escape") this.host.togglePause()
     if (c === "KeyM") this.host.toggleMute()
     if (c === "KeyN") this.host.toggleMusic()
-    // Скрытая отладочная клавиша: "-" на цифровой клавиатуре — увеличить урон шара.
-    if (DEBUG_DAMAGE_KEY && c === "NumpadSubtract") this.host.debugDamageUp()
-    // Скрытая отладочная клавиша: "+" на цифровой клавиатуре — зачистить уровень.
-    if (DEBUG_DAMAGE_KEY && c === "NumpadAdd") this.host.debugSkipLevel()
+    if (import.meta.env.DEV) {
+      /* Отладочные клавиши работают только в DEV-сборке:
+         F1 — FPS, F2 — хитбоксы, F3 — замедление, F4 — бессмертие,
+         «+»/«-» на цифровой клавиатуре — зачистка/урон. */
+      if (c === "F1") {
+        e.preventDefault()
+        this.host.toggleFpsOverlay()
+      }
+      if (c === "F2") {
+        e.preventDefault()
+        this.host.toggleHitboxes()
+      }
+      if (c === "F3") {
+        e.preventDefault()
+        this.host.toggleSlowMotion()
+      }
+      if (c === "F4") {
+        e.preventDefault()
+        this.host.toggleInvincible()
+      }
+      if (c === "NumpadSubtract") this.host.debugDamageUp()
+      if (c === "NumpadAdd") this.host.debugSkipLevel()
+    }
   }
 
   private handleKeyUp = (e: KeyboardEvent) => {
