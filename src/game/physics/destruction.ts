@@ -1,6 +1,6 @@
 import { TIER } from "../palette"
 import type { Block } from "../types"
-import { clamp, rand } from "../utils"
+import { clamp, compactInPlace, rand } from "../utils"
 import type { PhysicsWorld } from "../physics"
 
 /** Урон огненного ядра: множитель от обычного урона шара. */
@@ -46,7 +46,7 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1) {
       }
     }
   }
-  g.blocks = g.blocks.filter((x) => !x.dead)
+  compactInPlace(g.blocks, (x) => !x.dead)
   if (b.bomb && !b.boomQueued) {
     b.boomQueued = true
     g.boomQueue.push({ x: b.x, y: b.y, at: g.time + 0.09 })
@@ -182,5 +182,5 @@ export function updateBombs(g: PhysicsWorld, dt: number) {
       g.fx.burst(b.x, b.y, "#ffc94d", 12, 200)
     }
   }
-  g.blocks = g.blocks.filter((x) => !x.dead)
+  compactInPlace(g.blocks, (x) => !x.dead)
 }

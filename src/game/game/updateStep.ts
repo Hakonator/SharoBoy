@@ -1,5 +1,5 @@
 import type { Game } from "../game"
-import { clamp } from "../utils"
+import { clamp, compactInPlace, drainQueue } from "../utils"
 import type { SparkHit } from "../types"
 
 import { pushHud, syncEffectsHud } from "./hudSync"
@@ -126,21 +126,12 @@ export function update(g: Game, dt: number) {
   g.powersSys.periodicPowerDrop(dt)
   g.powersSys.tryFieldShift(dt)
   g.bossSys.step(dt)
-  if (g.boomQueue.length) {
-    const due = g.boomQueue.filter((q) => g.time >= q.at)
-    if (due.length) {
-      g.boomQueue = g.boomQueue.filter((q) => g.time < q.at)
-      for (const q of due) g.weaponsSys.explode(q.x, q.y)
-    }
-  }
-  // цепь искр электрошара: звено — молния, треск и обычный урон блоку
-  if (g.sparkQueue.length) {
-    const due = g.sparkQueue.filter((q) => g.time >= q.at)
-    if (due.length) {
-      g.sparkQueue = g.sparkQueue.filter((q) => g.time < q.at)
-      for (const q of due) strikeSpark(g, q)
-    }
-  }
+  /* Очереди отложенных событий: zero-alloc drain in-place. Нулевые задачи
+     обрабатываются по расписанию; новые звенья, добавленные во время
+     обработки (цепные взрывы бомб/искр), уходят в конец и бьют на следующих
+     кадрах — раньше filter() аллоцировал два массива на кадр. */
+  drainQueue(g.boomQueue, g.time, (q) => g.weaponsSys.explode(q.x, q.y))
+  drainQueue(g.sparkQueue, g.time, (q) => strikeSpark(g, q))
 
   const frozen = g.transition > 0 || g.bannerTimer > 1.1 || g.countdown > 0
   if (!frozen) {
@@ -150,7 +141,7 @@ export function update(g: Game, dt: number) {
     g.weaponsSys.updateProjectiles(dt)
     for (const ball of g.balls) g.physics.updateBall(ball, dt)
     g.physics.updateBombs(dt)
-    g.balls = g.balls.filter((b) => !b.lost)
+    compactInPlace(g.balls, (b) => !b.lost)
     if (g.balls.length === 0) loseLife(g)
   }
 

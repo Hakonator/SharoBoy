@@ -1,5 +1,5 @@
 import type { Lightning, Particle, Popup, Ring } from "./types"
-import { rand } from "./utils"
+import { compactInPlace, rand } from "./utils"
 
 /** Ёмкость пула частиц — защита от лавины эффектов на слабых машинах. */
 const MAX_PARTICLES = 420
@@ -74,7 +74,8 @@ export class Effects {
     }
   }
 
-  /** Шаг физики: полёт частиц с гравитацией, расширение колец, всплытие попапов. */
+  /** Шаг физики: полёт частиц с гравитацией, расширение колец, всплытие попапов.
+   *  Мёртвые элементы убираются in-place — без аллокаций (GC-дружелюбно). */
   step(dt: number) {
     for (const p of this.particles) {
       p.life -= dt
@@ -83,16 +84,16 @@ export class Effects {
       p.vy += p.grav * dt
       if (p.vr) p.rot = (p.rot ?? 0) + p.vr * dt
     }
-    this.particles = this.particles.filter((p) => p.life > 0)
+    compactInPlace(this.particles, (p) => p.life > 0)
     for (const r of this.rings) r.t += dt * 2.4
-    this.rings = this.rings.filter((r) => r.t < 1)
+    compactInPlace(this.rings, (r) => r.t < 1)
     for (const p of this.popups) {
       p.t += dt
       p.y -= dt * 46
     }
-    this.popups = this.popups.filter((p) => p.t < 1)
+    compactInPlace(this.popups, (p) => p.t < 1)
     for (const l of this.lightnings) l.t += dt * 6
-    this.lightnings = this.lightnings.filter((l) => l.t < 1)
+    compactInPlace(this.lightnings, (l) => l.t < 1)
   }
 
   /** Полная очистка (между партиями/уровнями). */

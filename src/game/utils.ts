@@ -57,3 +57,40 @@ export function rotatedExtents(rx: number, ry: number, rot: number) {
   const s = Math.sin(rot)
   return { hw: Math.hypot(rx * c, ry * s), hh: Math.hypot(rx * s, ry * c) }
 }
+
+/**
+ * Удаляет элементы in-place без аллокации нового массива (против .filter()
+ * в игровом цикле: каждый кадр filter оставлял старый массив мусором GC).
+ * Порядок сохранённых элементов не меняется.
+ */
+export function compactInPlace<T>(arr: T[], keep: (item: T) => boolean): void {
+  let j = 0
+  for (let i = 0; i < arr.length; i++) {
+    const item = arr[i]
+    if (keep(item)) arr[j++] = item
+  }
+  arr.length = j
+}
+
+/**
+ * Разбирает очередь отложенных событий in-place: «созревшие» (at <= time)
+ * уходят в handle, остальные уплотняются к началу. Элементы, добавленные
+ * handle'ом во время обхода (цепные взрывы бомб, звенья искр), переносятся
+ * в конец и разбираются на следующих кадрах. Ноль аллокаций на кадр.
+ */
+export function drainQueue<T extends { at: number }>(
+  queue: T[],
+  time: number,
+  handle: (q: T) => void
+): void {
+  const n = queue.length
+  let j = 0
+  for (let i = 0; i < n; i++) {
+    const q = queue[i]
+    if (time >= q.at) handle(q)
+    else queue[j++] = q
+  }
+  const added = queue.length - n
+  for (let k = 0; k < added; k++) queue[j + k] = queue[n + k]
+  queue.length = j + added
+}

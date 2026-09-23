@@ -2,6 +2,7 @@ import { TIER } from "../palette"
 import { Block } from "../types"
 import { mulberry32 } from "../utils"
 
+import { gradient } from "./gradCache"
 import { type Ctx } from "./shapes"
 
 function drawBomb(ctx: Ctx, b: Block, x: number, y: number, time: number) {
@@ -46,10 +47,14 @@ function drawFrozenBlock(ctx: Ctx, b: Block, x: number, y: number, time: number)
   ctx.rotate(b.rot)
   ctx.scale(b.rx, b.ry)
   // ледяное тело: холодный градиент от светлой корки к глубине
-  const g = ctx.createRadialGradient(-0.35, -0.4, 0.05, 0, 0, 1.15)
-  g.addColorStop(0, "#f2fcff")
-  g.addColorStop(0.55, "#a8e2ff")
-  g.addColorStop(1, "#3f88b5")
+  // (единый кэшированный градиент — координаты в локальной системе блока)
+  const g = gradient(ctx, "frozen", (c) => {
+    const rg = c.createRadialGradient(-0.35, -0.4, 0.05, 0, 0, 1.15)
+    rg.addColorStop(0, "#f2fcff")
+    rg.addColorStop(0.55, "#a8e2ff")
+    rg.addColorStop(1, "#3f88b5")
+    return rg
+  })
   ctx.fillStyle = g
   ctx.beginPath()
   ctx.arc(0, 0, 1, 0, Math.PI * 2)
@@ -119,10 +124,15 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
     ctx.translate(x, y)
     ctx.rotate(b.rot)
     ctx.scale(b.rx, b.ry)
-    const g = ctx.createRadialGradient(-0.35, -0.4, 0.05, 0, 0, 1.15)
-    g.addColorStop(0, tier.light)
-    g.addColorStop(0.5, tier.base)
-    g.addColorStop(1, tier.dark)
+    /* Градиент один на tier и общий для всех блоков: рисуем в единичной
+       локальной системе, координаты градиента резолвятся при заливке. */
+    const g = gradient(ctx, `tier${b.tier}`, (c) => {
+      const rg = c.createRadialGradient(-0.35, -0.4, 0.05, 0, 0, 1.15)
+      rg.addColorStop(0, tier.light)
+      rg.addColorStop(0.5, tier.base)
+      rg.addColorStop(1, tier.dark)
+      return rg
+    })
     ctx.fillStyle = g
     ctx.beginPath()
     ctx.arc(0, 0, 1, 0, Math.PI * 2)

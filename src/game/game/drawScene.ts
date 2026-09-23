@@ -1,4 +1,5 @@
 import { DEBUG_TOOLS } from "../../config"
+import { gradient } from "../render/gradCache"
 import type { Game } from "../game"
 import {
   drawBackground,
@@ -122,18 +123,20 @@ export function draw(g: Game) {
     ctx.restore()
   }
 
-  // виньетка
-  const vg = ctx.createRadialGradient(
-    w / 2,
-    h / 2,
-    Math.min(w, h) * 0.42,
-    w / 2,
-    h / 2,
-    Math.max(w, h) * 0.75
-  )
-  vg.addColorStop(0, "rgba(0,0,0,0)")
-  vg.addColorStop(1, "rgba(2,10,16,0.55)")
-  ctx.fillStyle = vg
+  // виньетка: кэшированный градиент (зависит только от размеров экрана)
+  ctx.fillStyle = gradient(ctx, `vignette:${w}x${h}`, (c) => {
+    const vg = c.createRadialGradient(
+      w / 2,
+      h / 2,
+      Math.min(w, h) * 0.42,
+      w / 2,
+      h / 2,
+      Math.max(w, h) * 0.75
+    )
+    vg.addColorStop(0, "rgba(0,0,0,0)")
+    vg.addColorStop(1, "rgba(2,10,16,0.55)")
+    return vg
+  })
   ctx.fillRect(0, 0, w, h)
 
   // Счётчик FPS: мелкий текст в левом нижнем углу, размер в экранных
