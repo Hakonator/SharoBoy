@@ -153,6 +153,12 @@
   слипается), орбитальные/бомбовые блоки не трогаем (их каждый кадр считает
   босс); портрет → ландшафт и вне боя — без сдвига. Тест
   `rotateLayout.test.ts` (6 кейсов).
+- Supabase: письмо об отмене автогрантов Data API (с 30.10.2025) отработано —
+  боевая таблица не затронута (гранты сохраняются), но добавлена миграция
+  `20250101000007_grants_api_access.sql` (select → anon/authenticated, all →
+  service_role), чтобы не падали свежий проект / `supabase db reset` /
+  preview-ветки и будущая Edge-работа; правило «GRANT в той же миграции, что и
+  create table» записано в DEVELOPMENT.md, ROADMAP (§13 этап B) и techContext.
 - Механика: `isPortrait()`/`hudTopCss()` в viewport, `blockTop()` = `hudTopCss()/scale`
   (клампы `h*0.14..h*0.35`), `ui/usePortrait.ts`; портрет — два ряда чипов,
   ландшафт — однострочный.

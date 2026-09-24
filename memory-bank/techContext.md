@@ -5,6 +5,10 @@
   Prettier 3, ESM. Сборка статики — GitHub Pages (ветка `beta`).
 - Supabase: мировой топ (`sharoboy_scores`), Edge Function «scores», секреты
   `VITE_SUPABASE_URL/ANON_KEY`, `VITE_SCORE_SECRET` (см. `docs/DEVELOPMENT.md`).
+  Правило с 30.10.2025: новые таблицы в `public` НЕ получают Data API-доступ
+  автоматически — явные `grant` (anon/authenticated/service_role) обязательны
+  в той же миграции, что и `create table`
+  (`20250101000007_grants_api_access.sql`).
 - Команды: `npm run dev` (:3000), `build`, `test` (vitest), `typecheck`
   (tsc --noEmit), `lint` / `lint:check`.
 - Pre-commit: husky + lint-staged (не ломать); коммиты на английском, Conventional
