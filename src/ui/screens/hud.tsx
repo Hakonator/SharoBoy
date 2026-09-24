@@ -210,6 +210,9 @@ export function HudOverlay({
         </div>
       )}
 
+      {/* Телефон: лента эффектов — горизонтальная полоса по центру нижнего
+          края, целиком НИЖЕ ракетки (тач-отступ 110 CSS px оставляет снизу
+          свободную полосу ~100 px). Десктоп — как раньше, слева внизу. */}
       {inGame &&
         (hud.wideOn ||
           hud.slowOn ||
@@ -219,7 +222,7 @@ export function HudOverlay({
           hud.fireOn ||
           hud.frostOn ||
           hud.sparkOn) && (
-          <div className="pointer-events-none absolute bottom-3 left-3 z-20 flex max-w-[46vw] flex-wrap gap-1.5 sm:bottom-4 sm:left-4">
+          <div className="pointer-events-none absolute inset-x-1 bottom-2 z-20 flex flex-wrap justify-center gap-1 sm:inset-x-auto sm:bottom-4 sm:left-4 sm:max-w-[46vw] sm:gap-1.5">
             {hud.wideOn && <EffectChip label="ШИРЕ" good />}
             {hud.fireOn && <EffectChip label="ОГНЬ" good />}
             {hud.frostOn && <EffectChip label="МОРОЗ" good />}

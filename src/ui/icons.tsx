@@ -210,7 +210,7 @@ export function Key({ children, wide }: { children: ReactNode; wide?: boolean })
 export function EffectChip({ label, good }: { label: string; good: boolean }) {
   return (
     <span
-      className={`hud-chip px-2.5 py-1 font-display text-[10px] tracking-widest ${
+      className={`hud-chip px-1.5 py-0.5 font-display text-[10px] tracking-widest sm:px-2.5 sm:py-1 ${
         good ? "text-[#7dffb9]" : "text-[#ff9d94]"
       }`}
     >
