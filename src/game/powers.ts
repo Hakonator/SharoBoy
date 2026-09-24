@@ -24,6 +24,8 @@ import { applyPower as applyPowerEffect } from "./powers/apply"
 export interface PowersWorld {
   readonly w: number
   readonly h: number
+  /** Верхняя неигровая HUD-зона (мировые единицы): спавн/дрейф поля — ниже. */
+  readonly blockTop: number
   readonly time: number
   readonly paddle: PaddleState
   readonly balls: Ball[]
@@ -85,7 +87,9 @@ export class PowersSystem {
         ry = rand(20, 34)
       }
       const cx = rand(rx + 10, g.w - rx - 10)
-      const cy = rand(ry + 70, g.h * 0.5)
+      // неигровая HUD-зона сверху: новые блоки появляются только ниже неё
+      const lo = g.blockTop + ry + 6
+      const cy = rand(lo, Math.max(lo, g.h * 0.5))
       let overlaps = false
       for (const b of g.blocks) {
         if (Math.abs(b.x - cx) < b.rx + rx + 8 && Math.abs(b.y - cy) < b.ry + ry + 8) {
@@ -154,7 +158,7 @@ export class PowersSystem {
     }
     if (minX + dx < 6) dx = 6 - minX
     if (maxX + dx > g.w - 6) dx = g.w - 6 - maxX
-    if (minY + dy < 6) dy = 6 - minY
+    if (minY + dy < g.blockTop) dy = g.blockTop - minY
     if (maxY + dy > g.h * 0.8) dy = g.h * 0.8 - maxY
     g.fieldShift = { t: 0, dur: rand(0.6, 0.9), dx: dx * 2.2, dy: dy * 2.2 }
     g.fx.popups.push({

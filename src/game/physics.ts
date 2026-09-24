@@ -59,6 +59,8 @@ export interface PaddleInput {
 export interface PhysicsWorld {
   readonly w: number
   readonly h: number
+  /** Верхняя неигровая HUD-зона (мировые единицы): шар не заходит выше неё. */
+  readonly blockTop: number
   readonly time: number
   readonly paddle: PaddleState
   readonly blocksInitial: number
@@ -189,8 +191,8 @@ export class Physics {
         ball.squash = 1
         g.sfx.wall()
       }
-      if (ball.y - ball.r < 0) {
-        ball.y = ball.r
+      if (ball.y - ball.r < g.blockTop) {
+        ball.y = g.blockTop + ball.r
         ball.vy = Math.abs(ball.vy)
         ball.squash = 1
         g.sfx.wall()

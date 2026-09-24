@@ -4,6 +4,7 @@ import type { PowersWorld } from "../powers"
 
 import { addCoins } from "./progress"
 import { pushHud } from "./hudSync"
+import { blockTop } from "./paddleControl"
 import { addRawScore, onBossKilled } from "./runFlow"
 
 export function makeBossHost(g: Game): BossHost {
@@ -69,6 +70,9 @@ export function makePowersHost(g: Game): PowersWorld {
     },
     get time() {
       return g.time
+    },
+    get blockTop() {
+      return blockTop(g)
     },
     paddle: g.paddle,
     get balls() {

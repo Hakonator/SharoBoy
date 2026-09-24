@@ -9,9 +9,13 @@ import type { Block } from "../types"
 import { PULSE_AMPLITUDE } from "../blockKinds"
 import { clamp } from "../utils"
 
+import { blockTop } from "./paddleControl"
+
 /** Один шаг анимации/движения блока (каждый блок — каждый кадр). */
 export function stepBlock(g: Game, b: Block, dt: number) {
   const t = g.time
+  // нижняя граница по вертикали: блок не заходит в неигровую HUD-зону сверху
+  const yMin = blockTop(g) + b.ry
   // горизонтальное покачивание (сетка)
   if (b.swayAmp > 0) {
     b.x = clamp(b.x0 + Math.sin(t * b.swayFreq + b.swayPh) * b.swayAmp, b.rx + 4, g.w - b.rx - 4)
@@ -20,7 +24,7 @@ export function stepBlock(g: Game, b: Block, dt: number) {
   if (b.bobAmp && b.bobFreq) {
     b.y = clamp(
       (b.y0 ?? b.y) + Math.sin(t * b.bobFreq + (b.bobPh ?? 0)) * b.bobAmp,
-      b.ry + 4,
+      yMin,
       g.h * 0.75
     )
   }
@@ -40,10 +44,10 @@ export function stepBlock(g: Game, b: Block, dt: number) {
     if (d.kind === "h") {
       b.x = clamp(b.x0 + off, b.rx + 4, g.w - b.rx - 4)
     } else if (d.kind === "v") {
-      b.y = clamp(baseY + off, b.ry + 4, g.h * 0.75)
+      b.y = clamp(baseY + off, yMin, g.h * 0.75)
     } else {
       b.x = clamp(b.x0 + Math.cos(t * d.freq + d.ph) * d.amp, b.rx + 4, g.w - b.rx - 4)
-      b.y = clamp(baseY + Math.sin(t * d.freq + d.ph) * d.amp * 0.6, b.ry + 4, g.h * 0.75)
+      b.y = clamp(baseY + Math.sin(t * d.freq + d.ph) * d.amp * 0.6, yMin, g.h * 0.75)
     }
   }
   // пульсация размера: хитбокс (collideBlocks читает rx/ry) следует за визуалом

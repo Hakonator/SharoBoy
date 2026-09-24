@@ -165,3 +165,82 @@ describe("Physics — огненное ядро", () => {
     expect(ball.vy).toBeLessThan(0) // прошёл насквозь
   })
 })
+
+/** Верхняя неигровая HUD-зона: шар отражается от её нижней границы. */
+describe("Physics — верхняя неигровая HUD-зона", () => {
+  function makeTopWorld(blockTop: number) {
+    return {
+      w: 400,
+      h: 600,
+      blockTop,
+      time: 0,
+      paddle: { x: 200, y: 560, w: 90, h: 14 },
+      blocksInitial: 0,
+      boss: null,
+      input: { keys: { left: false, right: false }, pointerX: null, locked: false },
+      balls: [],
+      blocks: [],
+      powers: [],
+      boomQueue: [],
+      shield: 0,
+      combo: 0,
+      shake: 0,
+      hitStop: 0,
+      flash: 0,
+      fx: { burst() {}, particles: [], rings: [], popups: [] },
+      sfx: { wall() {} },
+      fireActive: () => false,
+      frostActive: () => false,
+      sparkActive: () => false,
+      sparkQueue: [],
+      slowActive: () => false,
+      fastActive: () => false,
+      magnetActive: () => false,
+      wideActive: () => false,
+      shrinkActive: () => false,
+      paddleShape: () => "flat" as const,
+      paddleRotatable: () => false,
+      addScore: () => {},
+      dropPower() {},
+      damageBoss() {},
+      damageMiniboss() {},
+      onBombHitPaddle() {},
+      pushHud() {},
+      debugBallDamage: 1,
+    } as unknown as PhysicsWorld
+  }
+
+  function makeTopBall(): Ball {
+    return {
+      x: 200,
+      y: 300,
+      vx: 0,
+      vy: -400,
+      r: 10,
+      speed: 400,
+      stuck: false,
+      stuckOffset: 0,
+      trail: [],
+      squash: 0,
+      sinceHit: 0,
+    }
+  }
+
+  it("шар отражается от границы зоны и не заходит выше неё", () => {
+    const world = makeTopWorld(150)
+    const physics = new Physics(world)
+    const ball = makeTopBall()
+    for (let i = 0; i < 40; i++) physics.updateBall(ball, 0.016)
+    expect(ball.y - ball.r).toBeGreaterThanOrEqual(150)
+    expect(ball.vy).toBeGreaterThan(0)
+  })
+
+  it("шар, оказавшийся выше границы (поворот экрана), выталкивается вниз", () => {
+    const world = makeTopWorld(150)
+    const physics = new Physics(world)
+    const ball = { ...makeTopBall(), y: 80, vy: -100 }
+    physics.updateBall(ball, 0.016)
+    expect(ball.y - ball.r).toBe(150)
+    expect(ball.vy).toBeGreaterThan(0)
+  })
+})

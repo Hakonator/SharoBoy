@@ -5,7 +5,7 @@ import type { SparkHit } from "../types"
 import { pushHud, syncEffectsHud } from "./hudSync"
 import { applyFishWake, updateMouthBubbles } from "./minibossFx"
 import { stepBlock } from "./blockMotion"
-import { updatePaddleRotation } from "./paddleControl"
+import { blockTop, updatePaddleRotation } from "./paddleControl"
 import { draw } from "./drawScene"
 import { loseLife, onLevelCleared } from "./runFlow"
 
@@ -94,7 +94,7 @@ export function update(g: Game, dt: number) {
     for (const b of g.blocks) {
       if (b.minionOrbit) continue
       b.x0 = clamp(b.x0 + fs.dx * e * dt, b.rx + 4, g.w - b.rx - 4)
-      b.y = clamp(b.y + fs.dy * e * dt, b.ry + 4, g.h * 0.8)
+      b.y = clamp(b.y + fs.dy * e * dt, blockTop(g) + b.ry, g.h * 0.8)
     }
     if (k >= 1) g.fieldShift = null
   }

@@ -33,10 +33,15 @@ export function HudOverlay({
   /** Ползунок громкости эффектов (0..1). */
   onSfxVolume: (v: number) => void
 }) {
+  /* Портрет: чипы и кнопки компактнее — зона HUD уже (HUD_TOP_PORTRAIT_CSS),
+   * и на планшетах в портрете чипы не растут до десктопных размеров. */
+  const pad = portrait ? "px-2 py-1" : "px-3 py-1.5 sm:px-3.5 sm:py-2"
+  const val = portrait ? "text-base" : "text-lg sm:text-2xl"
+  const iconBtn = portrait ? "h-8 w-8" : "h-9 w-9 sm:h-10 sm:w-10"
   const scoreChip = (
-    <div className="hud-chip px-3 py-1.5 sm:px-3.5 sm:py-2">
+    <div className={`hud-chip ${pad}`}>
       <div className="hud-label">Счёт</div>
-      <div className="font-display text-lg leading-none text-foam tabular-nums sm:text-2xl">
+      <div className={`font-display ${val} leading-none text-foam tabular-nums`}>
         {hud.score.toLocaleString("ru-RU")}
       </div>
     </div>
@@ -44,9 +49,9 @@ export function HudOverlay({
   /** Цели: компактный чип — в портрете всегда, в ландшафте только до md. */
   const goalsChip = (hidden: boolean) => (
     <div
-      className={`hud-chip flex flex-col justify-center px-3 py-1 font-display text-[11px] leading-tight text-cyan-neon ${
-        hidden ? "md:hidden" : ""
-      }`}
+      className={`hud-chip flex flex-col justify-center ${
+        portrait ? "px-2 py-0.5" : "px-3 py-1"
+      } font-display text-[11px] leading-tight text-cyan-neon ${hidden ? "md:hidden" : ""}`}
     >
       <span className="text-dim">
         {hud.mode === "endless" ? `ВОЛНА ${hud.wave}` : `УР. ${hud.level}/${hud.levelCount}`}
@@ -57,41 +62,36 @@ export function HudOverlay({
     </div>
   )
   const bestChip = (
-    <div className="hud-chip hidden px-3.5 py-2 sm:block">
+    <div className={`hud-chip hidden ${pad} sm:block`}>
       <div className="hud-label">Рекорд</div>
-      <div className="font-display text-xl leading-none text-gold tabular-nums sm:text-2xl">
+      <div className={`font-display ${val} leading-none text-gold tabular-nums`}>
         {hud.best.toLocaleString("ru-RU")}
       </div>
     </div>
   )
   const comboChip =
     hud.combo >= 2 ? (
-      <div key={`combo-${hud.combo}`} className="hud-chip anim-combo px-3 py-1.5 sm:px-3.5 sm:py-2">
+      <div key={`combo-${hud.combo}`} className={`hud-chip anim-combo ${pad}`}>
         <div className="hud-label">Серия</div>
-        <div className="font-display text-lg leading-none text-punch sm:text-2xl">×{hud.combo}</div>
+        <div className={`font-display ${val} leading-none text-punch`}>×{hud.combo}</div>
       </div>
     ) : null
   const coinsChip =
     hud.coins > 0 ? (
-      <div className="hud-chip px-3 py-1.5 sm:px-3.5 sm:py-2">
+      <div className={`hud-chip ${pad}`}>
         <div className="hud-label">Монеты</div>
-        <div className="font-display text-lg leading-none text-gold tabular-nums sm:text-2xl">
-          {hud.coins}
-        </div>
+        <div className={`font-display ${val} leading-none text-gold tabular-nums`}>{hud.coins}</div>
       </div>
     ) : null
   const shieldChip =
     hud.shield > 0 ? (
-      <div
-        key={`shield-${hud.shield}`}
-        className="hud-chip anim-combo px-3 py-1.5 sm:px-3.5 sm:py-2"
-      >
+      <div key={`shield-${hud.shield}`} className={`hud-chip anim-combo ${pad}`}>
         <div className="hud-label">Щит</div>
-        <div className="mt-1 flex gap-1">
+        <div className={portrait ? "flex gap-1" : "mt-1 flex gap-1"}>
           {Array.from({ length: hud.shield }).map((_, i) => (
             <span
               key={i}
-              className="h-3.5 w-3.5 rounded-full bg-[#4dff9e] shadow-[0_0_8px_rgba(77,255,158,0.8)]"
+              className={`${portrait ? "h-3 w-3" : "h-3.5 w-3.5"} rounded-full bg-[#4dff9e] shadow-[0_0_8px_rgba(77,255,158,0.8)]`}
             />
           ))}
         </div>
@@ -99,14 +99,14 @@ export function HudOverlay({
     ) : null
   const rightControls = (
     <div className="flex items-start gap-1.5 sm:gap-2">
-      <div className="hud-chip px-3 py-1.5 sm:px-3.5 sm:py-2">
+      <div className={`hud-chip ${pad}`}>
         <div className="hud-label hidden sm:block">Жизни</div>
-        <div className="flex gap-1 sm:mt-1">
+        <div className={portrait ? "flex gap-1" : "flex gap-1 sm:mt-1"}>
           {Array.from({ length: 5 }).map((_, i) => (
             <IconBall
               key={i}
               color="#35e0ff"
-              className={`h-3 w-3 sm:h-4 sm:w-4 ${
+              className={`${portrait ? "h-3 w-3" : "h-3 w-3 sm:h-4 sm:w-4"} ${
                 i < hud.lives ? "opacity-100" : "opacity-20 grayscale"
               }`}
             />
@@ -114,7 +114,7 @@ export function HudOverlay({
         </div>
       </div>
       <button
-        className="icon-btn pointer-events-auto flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
+        className={`icon-btn pointer-events-auto flex ${iconBtn} items-center justify-center`}
         onClick={onPause}
         aria-label="Пауза"
       >
@@ -122,7 +122,7 @@ export function HudOverlay({
       </button>
       <div className="flex items-center gap-1.5">
         <button
-          className="icon-btn pointer-events-auto flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
+          className={`icon-btn pointer-events-auto flex ${iconBtn} items-center justify-center`}
           onClick={onMusic}
           aria-label="Музыка"
         >
@@ -137,7 +137,7 @@ export function HudOverlay({
       </div>
       <div className="flex items-center gap-1.5">
         <button
-          className="icon-btn pointer-events-auto flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
+          className={`icon-btn pointer-events-auto flex ${iconBtn} items-center justify-center`}
           onClick={onMute}
           aria-label="Звук"
         >
@@ -156,25 +156,25 @@ export function HudOverlay({
     <>
       {inGame && (
         <div
-          className={`pointer-events-none absolute inset-x-0 top-0 z-20 p-2 sm:p-4 ${
+          className={`pointer-events-none absolute inset-x-0 top-0 ${
             portrait
-              ? "flex flex-col gap-1.5 sm:gap-2"
-              : "flex items-start justify-between gap-1.5 sm:gap-2"
+              ? "flex flex-col gap-1 p-2"
+              : "flex items-start justify-between gap-1.5 p-2 sm:gap-2 sm:p-4"
           }`}
         >
           {portrait ? (
             <>
               {/* Вертикальный экран: ряд 1 — счёт/цели и жизни/кнопки, ряд 2 —
                   рекорд/серия/монеты/щит. Высота зоны = HUD_TOP_PORTRAIT_CSS. */}
-              <div className="flex items-start justify-between gap-1.5 sm:gap-2">
-                <div className="flex flex-wrap items-start gap-1.5 sm:gap-2">
+              <div className="flex items-start justify-between gap-1">
+                <div className="flex flex-wrap items-start gap-1">
                   {scoreChip}
                   {goalsChip(false)}
                 </div>
                 {rightControls}
               </div>
               {(hud.best > 0 || comboChip || coinsChip || shieldChip) && (
-                <div className="flex flex-wrap items-start gap-1.5 sm:gap-2">
+                <div className="flex flex-wrap items-start gap-1">
                   {bestChip}
                   {comboChip}
                   {coinsChip}

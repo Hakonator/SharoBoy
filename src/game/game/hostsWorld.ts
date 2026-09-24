@@ -3,6 +3,7 @@ import type { PhysicsWorld } from "../physics"
 import type { WeaponsWorld } from "../weapons"
 
 import { isDebugEffectActive } from "./debug"
+import { blockTop } from "./paddleControl"
 import { damageMiniboss } from "./minibossRuntime"
 import { pushHud } from "./hudSync"
 import { addScore, onBombHitPaddle } from "./runFlow"
@@ -17,6 +18,9 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     get time() {
       return g.time
+    },
+    get blockTop() {
+      return blockTop(g)
     },
     get debugBallDamage() {
       return g.debugBallDamage
