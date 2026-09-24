@@ -21,8 +21,11 @@ import {
   drawProjectiles,
   drawRings,
   drawShieldLine,
+  drawTopZone,
 } from "../render"
 import { rand } from "../utils"
+
+import { blockTop } from "./paddleControl"
 
 export function draw(g: Game) {
   const { ctx, w, h } = g
@@ -84,6 +87,9 @@ export function draw(g: Game) {
   }
   drawParticles(ctx, g.fx.particles)
   drawPopups(ctx, g.fx.popups)
+
+  // неигровая HUD-зона: затемнение + пунктирная линия отскока (см. blockTop)
+  drawTopZone(ctx, w, blockTop(g))
 
   // DEV (F2): хитбоксы поверх сущностей, но под экранным текстом.
   if (g.showHitboxes) {

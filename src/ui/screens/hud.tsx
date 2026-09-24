@@ -235,19 +235,21 @@ export function HudOverlay({
         )}
 
       {hud.phase === "playing" && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[96px] z-20 flex flex-col items-center gap-2 sm:bottom-[102px]">
+        /* Телефон: подсказки в свободной полосе ниже ракетки (над лентой
+           эффектов); десктоп — как раньше, над ракеткой. */
+        <div className="pointer-events-none absolute inset-x-0 bottom-14 z-20 flex flex-col items-center gap-1.5 sm:bottom-[102px] sm:gap-2">
           {hud.laserArmed && (
-            <div className="anim-blink hud-chip px-4 py-2 font-display text-sm tracking-wider text-[#9df2ff]">
+            <div className="anim-blink hud-chip px-3 py-1.5 font-display text-xs tracking-wider text-[#9df2ff] sm:px-4 sm:py-2 sm:text-sm">
               ЛАЗЕР ГОТОВ — ПРОБЕЛ / ТАП
             </div>
           )}
           {hud.rocketOn && (
-            <div className="anim-blink hud-chip px-4 py-2 font-display text-sm tracking-wider text-mint">
+            <div className="anim-blink hud-chip px-3 py-1.5 font-display text-xs tracking-wider text-mint sm:px-4 sm:py-2 sm:text-sm">
               РАКЕТЫ — ПРОБЕЛ / ТАП
             </div>
           )}
           {hud.stuck && (
-            <div className="anim-blink hud-chip px-4 py-2 font-display text-sm tracking-wider text-cyan-neon">
+            <div className="anim-blink hud-chip px-3 py-1.5 font-display text-xs tracking-wider text-cyan-neon sm:px-4 sm:py-2 sm:text-sm">
               ТАП / КЛИК / ПРОБЕЛ — ЗАПУСК
             </div>
           )}
