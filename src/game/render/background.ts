@@ -42,10 +42,11 @@ export function drawBackground(ctx: Ctx, w: number, h: number, combo: number, bu
 /**
  * Затемнение неигровой HUD-зоны над верхней границей поля (Game.blockTop):
  * шары и блоки туда не заходят — зона читается как «стекло» над игрой, а
- * пунктирная линия показывает, от чего отскакивает шар.
+ * пунктирная линия показывает, от чего отскакивает шар. Показывается только
+ * во время прохождения уровня (hidden — вне игры: меню/карта/итоги).
  */
-export function drawTopZone(ctx: Ctx, w: number, top: number) {
-  if (top <= 0) return
+export function drawTopZone(ctx: Ctx, w: number, top: number, hidden: boolean) {
+  if (hidden || top <= 0) return
   ctx.fillStyle = gradient(ctx, `topzone:${w}x${Math.round(top)}`, (c) => {
     const g = c.createLinearGradient(0, 0, 0, top)
     g.addColorStop(0, "rgba(2,8,14,0.6)")
