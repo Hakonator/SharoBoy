@@ -55,7 +55,20 @@ export class BossSystem {
     const angryAt = bo.angryAt ?? (bo.isOctopus ? 0.5 : 0.4)
     const angry = bo.hp < bo.maxHp * angryAt
     const amp = clamp(this.g.w * 0.26, 120, 420)
-    bo.x = this.g.w / 2 + Math.sin(bo.t * (angry ? (bo.isOctopus ? 1.5 : 1.1) : 0.6)) * amp
+    /* Патруль по горизонтали: фаза накапливается интегрированием частоты, а сама
+       частота плавно стремится к целевой. Раньше позиция считалась как
+       sin(bo.t * freq) с частотой, зависящей от «злой» фазы, — при её смене
+       синус пересчитывался с новой частотой от того же времени, и босс
+       телепортировался. Теперь x непрерывен всегда. */
+    const targetFreq = angry ? (bo.isOctopus ? 1.5 : 1.1) : 0.6
+    if (bo.swayFreq === undefined || bo.swayPhase === undefined) {
+      // первый шаг: согласуем фазу со старой формулой sin(bo.t * 0.6)
+      bo.swayFreq = 0.6
+      bo.swayPhase = 0.6 * bo.t
+    }
+    bo.swayFreq += (targetFreq - bo.swayFreq) * Math.min(1, dt * 2.5)
+    bo.swayPhase += bo.swayFreq * dt
+    bo.x = this.g.w / 2 + Math.sin(bo.swayPhase) * amp
     bo.y = bo.baseY + Math.sin(bo.t * 1.7) * 22
     for (const b of this.g.blocks) {
       const m = b.minionOrbit
