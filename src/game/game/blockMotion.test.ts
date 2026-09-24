@@ -7,7 +7,8 @@ import type { Block } from "../types"
 import { stepBlock } from "./blockMotion"
 
 /** Минимальный фейковый Game: stepBlock читает time/w/h и blockTop —
- *  последний считается из cssW/cssH/scale: hudTopCss(1920,1080)=96 → 96. */
+ *  последний считается из cssW/cssH/scale; дефолт ландшафтный (1920×1080) →
+ *  blockTop = 0 (зона только в портрете). */
 function makeGame(time: number, over: Partial<Game> = {}): Game {
   return { time, w: 800, h: 600, cssW: 1920, cssH: 1080, scale: 1, ...over } as unknown as Game
 }
@@ -50,19 +51,29 @@ describe("stepBlock — базовые дрейфы", () => {
   })
 })
 
-describe("stepBlock — неигровая HUD-зона сверху", () => {
-  const yMin = 96 + 16 // blockTop(1920×1080, scale 1) = 96, ry = 16
+describe("stepBlock — неигровая HUD-зона сверху (только вертикальный экран)", () => {
+  // портретный Game: 390×844, scale 1 → hudTopCss = 140 → blockTop = 140,
+  // клампы h*0.14..h*0.35 (140..350) не бьют; лимит блока = blockTop + ry
+  function portraitGame(time: number, over: Partial<Game> = {}): Game {
+    return makeGame(time, { cssW: 390, cssH: 844, scale: 1, w: 800, h: 1000, ...over })
+  }
+
+  it("в ландшафте зоны нет: blockTop = 0, блоки не клампятся сверху", () => {
+    const b = makeBlock({ y: 40, y0: 40, bobAmp: 40, bobFreq: 1, bobPh: 0 })
+    stepBlock(makeGame(Math.PI / 2), b, 0.016) // сырой y = 80 > 0 + ry = 16
+    expect(b.y).toBe(80)
+  })
 
   it("вертикальный дрейф медузы не поднимает блок в HUD-зону", () => {
     const b = makeBlock({ y: 40, y0: 40, bobAmp: 40, bobFreq: 1, bobPh: 0 })
-    stepBlock(makeGame(Math.PI / 2), b, 0.016) // raw y = 80 < yMin
-    expect(b.y).toBe(yMin)
+    stepBlock(portraitGame(Math.PI / 2), b, 0.016) // сырой y = 80 < yMin
+    expect(b.y).toBe(140 + 16)
   })
 
   it("дрейф §6 по вертикали клампится границей HUD-зоны", () => {
     const b = makeBlock({ y: 40, y0: 40, sp: { drift: { kind: "v", amp: 60, freq: 1, ph: 0 } } })
-    stepBlock(makeGame(Math.PI / 2), b, 0.016) // raw y = 100 < yMin
-    expect(b.y).toBe(yMin)
+    stepBlock(portraitGame(Math.PI / 2), b, 0.016) // сырой y = 100 < yMin
+    expect(b.y).toBe(140 + 16)
   })
 
   it("дрейф §6 по окружности тоже уважает границу", () => {
@@ -72,18 +83,14 @@ describe("stepBlock — неигровая HUD-зона сверху", () => {
       x0: 200,
       sp: { drift: { kind: "circle", amp: 60, freq: 1, ph: 0 } },
     })
-    stepBlock(makeGame(Math.PI / 2), b, 0.016)
-    expect(b.y).toBe(yMin)
+    stepBlock(portraitGame(Math.PI / 2), b, 0.016)
+    expect(b.y).toBe(140 + 16)
   })
 
-  it("в портретном окне граница выше (двухрядный HUD)", () => {
-    // 390×844: hudTopCss = 140 CSS; scale 0.5 → 280 (кламп h*0.35 не бьёт при h=1000)
+  it("масштаб окна учитывается: 140 css px / scale", () => {
+    // scale 0.5 → 280 мировых (кламп h*0.35 = 350 не бьёт при h = 1000)
     const b = makeBlock({ y: 40, y0: 40, bobAmp: 40, bobFreq: 1, bobPh: 0 })
-    stepBlock(
-      makeGame(Math.PI / 2, { cssW: 390, cssH: 844, scale: 0.5, w: 800, h: 1000 }),
-      b,
-      0.016
-    )
+    stepBlock(portraitGame(Math.PI / 2, { scale: 0.5 }), b, 0.016)
     expect(b.y).toBe(140 / 0.5 + 16)
   })
 })
