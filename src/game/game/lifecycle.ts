@@ -17,6 +17,7 @@ import {
 import { pushHud } from "./hudSync"
 import { startGame, togglePause } from "./modes"
 import { paddleBottomOffset } from "./paddleControl"
+import { realignOnOrientationChange } from "./rotateLayout"
 import { launch } from "./runFlow"
 
 export function attach(g: Game) {
@@ -79,6 +80,7 @@ export function resizeHandler(g: Game) {
   g.paddle.baseW = clamp(g.w * 0.18, 110, 200) * g.paddleWidthMult
   g.paddle.y = g.h - paddleBottomOffset(g)
   g.paddle.x = clamp(g.paddle.x, g.paddle.w / 2 + 4, g.w - g.paddle.w / 2 - 4)
+  const wasPortrait = oh > ow
   if (ow && oh && g.blocks.length && (ow !== g.w || oh !== g.h)) {
     const sx = g.w / ow
     const sy = g.h / oh
@@ -88,6 +90,9 @@ export function resizeHandler(g: Game) {
       b.y = clamp(b.y * sy, b.ry + 6, g.h * 0.75)
     }
   }
+  // Смена ориентации посреди уровня: пропорционального масштабирования мало —
+  // в портрете опускаем блоки/босса ниже неигровой HUD-зоны (rotateLayout.ts).
+  realignOnOrientationChange(g, wasPortrait)
 }
 /** Загрузка рекордов из localStorage с миграцией со старого формата (number[]). */
 export function loadScoreEntries(g: Game, key: string): ScoreEntry[] {
