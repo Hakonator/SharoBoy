@@ -2,7 +2,7 @@ import { Ball, Block, BossState } from "../types"
 import { clamp } from "../utils"
 import { jellyTentacleBase } from "../bossJelly"
 
-import { drawJellyDomeHp, traceJellyDome } from "./bossJellyDome"
+import { drawJellyDamageFill, drawJellyDomeHp, traceJellyDome } from "./bossJellyDome"
 import { type Ctx } from "./shapes"
 
 /** Рендер летящей молнии медузы: зигзаг в направлении полёта + светящаяся голова. */
@@ -166,6 +166,7 @@ function drawJellyfishBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block
   traceJellyDome(ctx, bo)
   ctx.fill()
   ctx.shadowBlur = 0
+  if (angry) drawJellyDamageFill(ctx, bo)
   if (bo.flash > 0) {
     ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.7})`
     ctx.beginPath()

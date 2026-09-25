@@ -6,10 +6,12 @@ import type { BossState } from "../types"
 import { drawBoss } from "./boss"
 import {
   contourLength,
+  drawJellyDamageFill,
   drawJellyDomeHp,
   JELLY_DOME_RIM_Y,
   jellyDomeContour,
   jellyDamageColor,
+  jellyDamageFraction,
   jellyHpContourSlice,
   jellyDomeContourColor,
   traceJellyDome,
@@ -226,6 +228,29 @@ describe("полоска HP по контуру купола", () => {
 })
 
 describe("полоска HP в рендере босса", () => {
+  it("считает долю красной заливки по полученному урону", () => {
+    expect(jellyDamageFraction(boss({ hp: 100 }))).toBe(0)
+    expect(jellyDamageFraction(boss({ hp: 35 }))).toBeCloseTo(0.65)
+    expect(jellyDamageFraction(boss({ hp: 0 }))).toBe(1)
+  })
+
+  it("рисует заливку урона внутри купола только при полученном уроне", () => {
+    const paints: PaintEvent[] = []
+    const rec = makeRecordingCtx(paints)
+    drawJellyDamageFill(rec.ctx, boss({ hp: 40 }))
+    expect(paints.filter((p) => p.op === "fillRect")).toHaveLength(1)
+  })
+
+  it("включает заливку тела только в злой фазе", () => {
+    const calmPaints: PaintEvent[] = []
+    drawBoss(makeRecordingCtx(calmPaints).ctx, boss({ hp: 60 }), [], [])
+    expect(calmPaints.filter((p) => p.op === "fillRect")).toHaveLength(0)
+
+    const angryPaints: PaintEvent[] = []
+    drawBoss(makeRecordingCtx(angryPaints).ctx, boss({ hp: 40 }), [], [])
+    expect(angryPaints.filter((p) => p.op === "fillRect")).toHaveLength(1)
+  })
+
   it("рисуется под масштабом пульса — изгибается вместе с телом", () => {
     const paints: PaintEvent[] = []
     const rec = makeRecordingCtx(paints)

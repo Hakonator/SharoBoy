@@ -184,6 +184,34 @@ export function jellyDamageColor(): string {
   return "#ff5347"
 }
 
+/** Доля тела, которую нужно закрасить красным в злой фазе. */
+export function jellyDamageFraction(bo: BossState): number {
+  return clamp(bo.maxHp > 0 ? 1 - bo.hp / bo.maxHp : 1, 0, 1)
+}
+
+/**
+ * Красная заливка урона внутри купола. Она растёт сверху вниз и использует
+ * тот же путь, что и тело, поэтому цвет не выходит за бахрому и кромку.
+ */
+export function drawJellyDamageFill(ctx: Ctx, bo: BossState) {
+  const frac = jellyDamageFraction(bo)
+  if (frac <= 0) return
+  const top = -bo.r * 0.72
+  const bottom = bo.r * (JELLY_DOME_RIM_Y + LOBE_DIP + LOBE_WOBBLE)
+  const height = bottom - top
+  ctx.save()
+  ctx.beginPath()
+  traceJellyDome(ctx, bo)
+  ctx.clip()
+  const g = ctx.createLinearGradient(0, top, 0, bottom)
+  g.addColorStop(0, "rgba(255,190,190,0.82)")
+  g.addColorStop(0.55, "rgba(255,125,140,0.7)")
+  g.addColorStop(1, "rgba(255,83,71,0.62)")
+  ctx.fillStyle = g
+  ctx.fillRect(-bo.r * 1.1, top, bo.r * 2.2, height * frac)
+  ctx.restore()
+}
+
 /**
  * Тонкая полоска HP ровно по контуру купола: цветная окантовка по всему
  * периметру и красное заполнение по полученному урону. Вызывать внутри трансформа
@@ -203,7 +231,7 @@ export function drawJellyDomeHp(ctx: Ctx, bo: BossState) {
   ctx.lineWidth = 4
   ctx.stroke()
   // заполнение — симметричный от макушки обрезок контура по полученному урону
-  const frac = clamp(bo.maxHp > 0 ? 1 - bo.hp / bo.maxHp : 1, 0, 1)
+  const frac = jellyDamageFraction(bo)
   const slice = jellyHpContourSlice(contour, frac)
   if (slice.length >= 4) {
     ctx.beginPath()
