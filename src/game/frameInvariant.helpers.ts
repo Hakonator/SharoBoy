@@ -19,6 +19,9 @@ export interface PaintEvent {
   m: number[]
   /** дуги текущего пути (после beginPath) — для проверки тела шара */
   arcs: { x: number; y: number; r: number }[]
+  /** стиль и толщина обводки на момент stroke (полоски HP и т.п.) */
+  strokeStyle: string
+  lineWidth: number
 }
 
 export function makeRecordingCtx(log: PaintEvent[]) {
@@ -106,6 +109,8 @@ export function makeRecordingCtx(log: PaintEvent[]) {
       alpha: target.globalAlpha as number,
       m: [...stack[stack.length - 1]],
       arcs: [...arcs],
+      strokeStyle: target.strokeStyle as string,
+      lineWidth: target.lineWidth as number,
     })
   }
   target.fill = () => paint("fill")

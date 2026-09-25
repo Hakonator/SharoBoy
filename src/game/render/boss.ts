@@ -2,6 +2,7 @@ import { Ball, Block, BossState } from "../types"
 import { clamp } from "../utils"
 import { jellyTentacleBase } from "../bossJelly"
 
+import { drawJellyDomeHp, traceJellyDome } from "./bossJellyDome"
 import { type Ctx } from "./shapes"
 
 /** Рендер летящей молнии медузы: зигзаг в направлении полёта + светящаяся голова. */
@@ -160,22 +161,9 @@ function drawJellyfishBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block
   }
   ctx.fillStyle = g
   ctx.beginPath()
-  // купол: верхняя полуарка + волнистая нижняя кромка, накрывающая базы отростков
-  ctx.moveTo(-bo.r, bo.r * 0.28)
-  ctx.arc(0, bo.r * 0.28, bo.r, Math.PI, Math.PI * 2)
-  const rimY = bo.r * 0.28
-  const lobe = bo.r / 4
-  for (let i = 3; i >= 0; i--) {
-    const x1 = lobe * i
-    const x0 = lobe * (i + 1)
-    ctx.quadraticCurveTo(
-      (x0 + x1) / 2,
-      rimY + bo.r * (0.34 + Math.sin(bo.t * 5 + i) * 0.05),
-      x1,
-      rimY
-    )
-  }
-  ctx.closePath()
+  // купол: верхняя полуарка + волнистая бахрома через всю ширину — общая
+  // геометрия с полоской HP (см. bossJellyDome)
+  traceJellyDome(ctx, bo)
   ctx.fill()
   ctx.shadowBlur = 0
   if (bo.flash > 0) {
@@ -184,6 +172,9 @@ function drawJellyfishBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block
     ctx.arc(0, bo.r * 0.2, bo.r, Math.PI, Math.PI * 2)
     ctx.fill()
   }
+  // тонкая полоска HP ровно по контуру купола: внутри трансформа пульса —
+  // поэтому изгибается вместе с телом и повторяет волну бахромы
+  drawJellyDomeHp(ctx, bo)
   // глаза следят за шаром
   const target = balls.find((b) => !b.stuck)
   let ex = 0
