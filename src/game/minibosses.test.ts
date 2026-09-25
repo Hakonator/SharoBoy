@@ -7,8 +7,8 @@ import {
   minibossChance,
   minibossHpFor,
   MINIBOSS_DUET_SHIFT,
-  MINIBOSS_HP,
-  MINIBOSS_HP_GROWTH,
+  MINIBOSS_HP_FIRST,
+  MINIBOSS_HP_LAST,
   MINIBOSS_LIFE_CHANCE,
   MINIBOSS_NODE_CHANCE,
   MINIBOSS_PITY_STEP,
@@ -66,9 +66,9 @@ describe("minibosses", () => {
     expect(jelly.filter((b) => b.mbPart === "tentacle").length).toBe(20) // 5 × 4
   })
 
-  it("пул HP существа снижен и задан константой", () => {
-    expect(MINIBOSS_HP.fish).toBe(60)
-    expect(MINIBOSS_HP.jelly).toBe(50)
+  it("пул HP существа: 20 на старте кампании, 100 в конце", () => {
+    expect(MINIBOSS_HP_FIRST).toBe(20)
+    expect(MINIBOSS_HP_LAST).toBe(100)
   })
 
   it("шанс жизни за минибосса — 80%", () => {
@@ -135,20 +135,29 @@ describe("minibosses", () => {
     expect(single.kinds).toEqual(["jelly"])
   })
 
-  it("HP минибосса растёт по мере приближения к финальному боссу", () => {
-    for (const kind of ["fish", "jelly"] as const) {
-      // первый боевой ярус — базовый пул, последний боевой — максимум роста
-      expect(minibossHpFor(kind, 1, MAP_TIERS)).toBe(MINIBOSS_HP[kind])
-      expect(minibossHpFor(kind, MAP_TIERS - 2, MAP_TIERS)).toBe(
-        Math.round(MINIBOSS_HP[kind] * (1 + MINIBOSS_HP_GROWTH))
-      )
-      // монотонный неубывающий рост между ярусами
-      for (let t = 2; t < MAP_TIERS; t++) {
-        expect(minibossHpFor(kind, t, MAP_TIERS)).toBeGreaterThanOrEqual(
-          minibossHpFor(kind, t - 1, MAP_TIERS)
-        )
-      }
+  it("HP минибосса плавно растёт от 20 на первых ярусах до 100 в конце", () => {
+    // первый боевой ярус — стартовый пул, последний боевой — максимум
+    expect(minibossHpFor(1, MAP_TIERS)).toBe(MINIBOSS_HP_FIRST)
+    expect(minibossHpFor(MAP_TIERS - 2, MAP_TIERS)).toBe(MINIBOSS_HP_LAST)
+    // монотонный неубывающий рост между ярусами
+    for (let t = 2; t < MAP_TIERS; t++) {
+      expect(minibossHpFor(t, MAP_TIERS)).toBeGreaterThanOrEqual(minibossHpFor(t - 1, MAP_TIERS))
     }
+    // рост плавный: не больше 5 HP за ярус (шаг ≈ 3 при 28 боевых ярусах)
+    for (let t = 2; t <= MAP_TIERS - 2; t++) {
+      expect(minibossHpFor(t, MAP_TIERS) - minibossHpFor(t - 1, MAP_TIERS)).toBeLessThanOrEqual(5)
+    }
+    // значения кратны 5 — ровные деления HP-полоски
+    for (let t = 1; t <= MAP_TIERS; t++) expect(minibossHpFor(t, MAP_TIERS) % 5).toBe(0)
+    // середина кампании — примерно посередине диапазона
+    const mid = minibossHpFor(Math.ceil((MAP_TIERS - 2) / 2), MAP_TIERS)
+    expect(mid).toBeGreaterThanOrEqual(55)
+    expect(mid).toBeLessThanOrEqual(65)
+    // мусор на входе зажимается в границы диапазона
+    expect(minibossHpFor(-3, MAP_TIERS)).toBe(MINIBOSS_HP_FIRST)
+    expect(minibossHpFor(MAP_TIERS + 5, MAP_TIERS)).toBe(MINIBOSS_HP_LAST)
+    // вырожденная карта не делит на ноль
+    expect(minibossHpFor(1, 1)).toBe(MINIBOSS_HP_FIRST)
   })
 
   it("carveLevelBlocks убирает только blocks, налегающие на существо", () => {

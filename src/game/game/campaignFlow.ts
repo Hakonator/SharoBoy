@@ -217,7 +217,7 @@ export function startMapBattle(g: Game, node: CampaignNode) {
   g.minibossPity = rolled.pity
   if (rolled.kinds.length) g.campaignMbSeen[node.id] = rolled.kinds
   for (const kind of rolled.kinds) {
-    addMiniboss(g, kind, minibossHpFor(kind, node.tier, g.campaign.tiers))
+    addMiniboss(g, kind, minibossHpFor(node.tier, g.campaign.tiers))
   }
   launchNodeBattle(g, node.name)
 }

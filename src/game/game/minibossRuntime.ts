@@ -4,7 +4,7 @@ import {
   buildJelly,
   carveLevelBlocks,
   minibossName,
-  MINIBOSS_HP,
+  MINIBOSS_HP_FIRST,
   MINIBOSS_LIFE_CHANCE,
 } from "../minibosses"
 import { rand } from "../utils"
@@ -23,7 +23,7 @@ export function resetMiniboss(g: Game) {
 }
 
 /** Добавляет существо-минибосса к текущему уровню (освободив ему место). */
-export function addMiniboss(g: Game, kind: MinibossKind, hp = MINIBOSS_HP[kind]) {
+export function addMiniboss(g: Game, kind: MinibossKind, hp = MINIBOSS_HP_FIRST) {
   const top = blockTop(g)
   const group = ++g.mbGroupSeq
   // Дуэт: второе существо рождается со сдвигом вправо — иначе оба существа

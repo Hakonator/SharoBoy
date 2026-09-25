@@ -168,6 +168,12 @@
   рендер: группа без dome/body не рисуется вовсе. Тесты: 3 новых в
   `minibosses.test.ts` + интеграционный `minibossRuntime.test.ts` (2 кейса,
   28 файлов / 236 тестов — зелёные).
+- Шкала HP минибоссов переработана: вместо `MINIBOSS_HP` (рыба 60 / медуза 50)
+  с ростом ×(1+1.5) — линейный рост от `MINIBOSS_HP_FIRST = 20` на первом
+  боевом ярусе до `MINIBOSS_HP_LAST = 100` на последнем боевом ярусе (28 из 30),
+  округление до 5. Оба вида существ теперь в одном диапазоне. Вызов в
+  `campaignFlow.ts` упрощён (`minibossHpFor(tier, tiers)`), дефолт `addMiniboss`
+  — `MINIBOSS_HP_FIRST`.
 - Механика: `isPortrait()`/`hudTopCss()` в viewport, `blockTop()` = `hudTopCss()/scale`
   (клампы `h*0.14..h*0.35`), `ui/usePortrait.ts`; портрет — два ряда чипов,
   ландшафт — однострочный.

@@ -1,8 +1,8 @@
 /**
  * Мини-боссы кампании: стилизованные обитатели водной фауны (рыба, медуза),
  * собранные из перекрывающихся эллипсов в цельный силуэт. Блоки существа
- * неразрушаемы — урон идёт в пул HP каждого существа (MINIBOSS_HP, растёт по
- * мере приближения к финальному боссу), над существом рисуется полоска
+ * неразрушаемы — урон идёт в пул HP каждого существа (от MINIBOSS_HP_FIRST на
+ * первых ярусах до MINIBOSS_HP_LAST в конце кампании), над существом рисуется полоска
  * здоровья; при обнулении пула существо взрывается целиком. Появляются в
  * обычных боевых узлах кампании полностью случайно (иногда парой) с
  * pity-системой: пока существо не встретилось, шанс растёт, после появления —
@@ -22,8 +22,6 @@ export const MINIBOSS_NODE_CHANCE = 0.2
 export const MINIBOSS_DUET_CHANCE = 0.25
 /** Шанс дропа жизни за полностью уничтоженного минибосса. */
 export const MINIBOSS_LIFE_CHANCE = 0.8
-/** Прирост HP на предпоследнем ярусе относительно базового (60 → 150 у рыбы). */
-export const MINIBOSS_HP_GROWTH = 1.5
 /** Горизонтальный сдвиг центра ВТОРОГО существа дуэта (доля ширины поля). */
 export const MINIBOSS_DUET_SHIFT = 0.22
 
@@ -69,20 +67,21 @@ export function rollMinibossLive(
   return { kinds: [kind], pity: 0 }
 }
 
-/** Общий запас HP существа: блоки минибосса не разрушаются поодиночке. */
-export const MINIBOSS_HP: Record<MinibossKind, number> = {
-  fish: 60,
-  jelly: 50,
-}
+/** Стартовый пул HP существа на первом боевом ярусе кампании. */
+export const MINIBOSS_HP_FIRST = 20
+/** Пул HP существа на последнем боевом ярусе перед финальным боссом. */
+export const MINIBOSS_HP_LAST = 100
 
 /**
- * HP минибосса на ярусе: линейный рост от базового значения на первом боевом
- * ярусе (tier 1) до (1 + MINIBOSS_HP_GROWTH) базового на последнем боевом
- * ярусе перед финальным боссом — чем дальше по карте, тем жирнее существа.
+ * HP минибосса на ярусе: плавный линейный рост от MINIBOSS_HP_FIRST на первом
+ * боевом ярусе (tier 1) до MINIBOSS_HP_LAST на последнем боевом ярусе перед
+ * финальным боссом — чем дальше по карте, тем жирнее существа. Значение
+ * округляется до 5, чтобы деления HP-полоски оставались ровными.
  */
-export function minibossHpFor(kind: MinibossKind, tier: number, tiers: number): number {
+export function minibossHpFor(tier: number, tiers: number): number {
   const progress = clamp((tier - 1) / Math.max(1, tiers - 3), 0, 1)
-  return Math.round(MINIBOSS_HP[kind] * (1 + MINIBOSS_HP_GROWTH * progress))
+  const hp = MINIBOSS_HP_FIRST + (MINIBOSS_HP_LAST - MINIBOSS_HP_FIRST) * progress
+  return Math.round(hp / 5) * 5
 }
 
 /** Фабрика части существа: эллипс с наклоном, «плавание» через sway. */
