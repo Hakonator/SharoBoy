@@ -42,6 +42,7 @@ export function MenuDebug({
                   { id: "", label: "Нет" },
                   { id: "octopus", label: "🐙 Осьминог" },
                   { id: "kraken", label: "🦑 Кракен" },
+                  { id: "jellyfish", label: "🪼 Медуза (босс)" },
                   { id: "minibossFish", label: "🐟 Рыба (мини)" },
                   { id: "minibossJelly", label: "🪼 Медуза (мини)" },
                 ].map((b) => (

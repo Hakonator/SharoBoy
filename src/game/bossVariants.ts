@@ -7,7 +7,7 @@
  */
 import { clamp, mulberry32 } from "./utils"
 
-export type BossVariantKind = "king" | "octopus" | "kraken"
+export type BossVariantKind = "king" | "octopus" | "kraken" | "jellyfish"
 
 /** Параметры конкретного воплощения финального босса. */
 export interface BossVariant {
@@ -34,6 +34,7 @@ const KIND_DEFAULTS: Record<
   king: { name: "ЦАРЬ-ШАР", minions: 3, tentacles: 0, bombEvery: 0, angryAt: 0.4 },
   octopus: { name: "ОСЬМИНОГ", minions: 0, tentacles: 6, bombEvery: 4.5, angryAt: 0.5 },
   kraken: { name: "КРАКЕН", minions: 0, tentacles: 8, bombEvery: 3.2, angryAt: 0.55 },
+  jellyfish: { name: "ГРОЗОВАЯ МЕДУЗА", minions: 0, tentacles: 5, bombEvery: 0, angryAt: 0.5 },
 }
 
 /**
@@ -46,8 +47,9 @@ export function fixedVariant(kind: BossVariantKind, tier = 2): BossVariant {
   return {
     kind,
     name: d.name,
-    // Сила масштабируется ярусом: HP растёт, миньонов прибавляется.
-    hp: 40 + (tier + 1) * 6 + (kind === "kraken" ? 10 : 0),
+    // Сила масштабируется ярусом: HP растёт, миньонов прибавляется. Медуза —
+    // peer кракена по размеру и живучести.
+    hp: 40 + (tier + 1) * 6 + (kind === "kraken" || kind === "jellyfish" ? 10 : 0),
     minions: kind === "king" ? clamp(d.minions + Math.floor(tier / 2), 3, 6) : 0,
     tentacles: d.tentacles,
     bombEvery: d.bombEvery,
@@ -63,8 +65,14 @@ export function fixedVariant(kind: BossVariantKind, tier = 2): BossVariant {
 export function pickBossVariant(seed: number, tier: number): BossVariant {
   const rng = mulberry32(seed | 0 || 1)
   const roll = rng()
-  // «Кракен» открывается со 2-го яруса боссов, до этого — король или осьминог.
-  const pool: BossVariantKind[] = tier >= 1 ? ["king", "octopus", "kraken"] : ["king", "octopus"]
+  // «Кракен» открывается со 2-го яруса боссов, медуза — с 3-го (самая коварная),
+  // до этого — король или осьминог.
+  const pool: BossVariantKind[] =
+    tier >= 2
+      ? ["king", "octopus", "kraken", "jellyfish"]
+      : tier >= 1
+        ? ["king", "octopus", "kraken"]
+        : ["king", "octopus"]
   const kind = pool[Math.floor(roll * pool.length) % pool.length]
   return fixedVariant(kind, tier)
 }

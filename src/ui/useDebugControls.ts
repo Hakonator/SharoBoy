@@ -39,8 +39,11 @@ export function useDebugControls(gameRef: RefObject<Game | null>) {
   const handleDebugStartGame = useCallback(() => {
     const game = gameRef.current
     if (!game) return
-    game.debugBossType = debugBoss === "octopus" || debugBoss === "kraken" ? debugBoss : null
-    if (debugBoss === "octopus" || debugBoss === "kraken") {
+    game.debugBossType =
+      debugBoss === "octopus" || debugBoss === "kraken" || debugBoss === "jellyfish"
+        ? debugBoss
+        : null
+    if (debugBoss === "octopus" || debugBoss === "kraken" || debugBoss === "jellyfish") {
       game.spawnDebugBoss(debugBoss)
     } else if (debugBoss === "minibossFish") {
       game.spawnDebugMiniboss("fish")

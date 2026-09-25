@@ -6,6 +6,8 @@ import { LEVELS } from "../levels"
 import { clamp, rand, mulberry32, daySeed } from "../utils"
 import type { Ball, Block, BossState } from "../types"
 import type { BossVariant } from "../bossVariants"
+import { JELLY_SEG_RADII, JELLY_SEG_COUNT, JELLY_TENTACLES, JELLY_BOLT_EVERY } from "../bossJelly"
+import { updateJellyTentacles } from "../bossJelly"
 import type { LevelSpec, PatternSpec } from "../levels"
 
 import { pushHud } from "./hudSync"
@@ -94,6 +96,18 @@ export function buildOctopusBossLevel(g: Game, variant: BossVariant) {
   resetMiniboss(g)
   g.blocks = []
   const boss = buildOctopusBoss(g, variant.hp, variant)
+  g.bossSys.spawn(boss)
+  g.blocksInitial = Math.max(1, g.blocks.length)
+}
+
+/** Финальный босс кампании — грозовая медуза: пульсирующий купол + отростки. */
+export function buildJellyfishBossLevel(g: Game, variant: BossVariant) {
+  g.bossSys.clear()
+  g.boomQueue = []
+  g.fieldShift = null
+  resetMiniboss(g)
+  g.blocks = []
+  const boss = buildJellyfishBoss(g, variant.hp, variant)
   g.bossSys.spawn(boss)
   g.blocksInitial = Math.max(1, g.blocks.length)
 }
@@ -242,6 +256,72 @@ export function buildOctopusBoss(
     bombEvery: opts?.bombEvery,
     angryAt: opts?.angryAt,
   } as BossState & { isOctopus: true }
+}
+
+/**
+ * Босс-медуза: пульсирующий купол (r как у кракена) и веер нижних отростков
+ * длиной с туловище. Отростки — сегменты-блоки (уничтожаемые, тело уязвимо
+ * только после них); позиции сегментов каждый кадр считает bossJelly.
+ */
+export function buildJellyfishBoss(
+  g: Game,
+  hp = 50,
+  opts?: { tentacles?: number; angryAt?: number }
+): BossState {
+  const tentacleCount = opts?.tentacles ?? JELLY_TENTACLES
+  const bodyX = g.w / 2
+  const bodyY = g.h * 0.24
+  const bo: BossState = {
+    x: bodyX,
+    y: bodyY,
+    baseY: bodyY,
+    r: 52,
+    hp,
+    maxHp: hp,
+    t: 0,
+    flash: 0,
+    dropTimer: 4,
+    isJellyfish: true,
+    totalTentacles: tentacleCount,
+    pulsePhase: 0,
+    pulseScale: 1,
+    boltTimer: JELLY_BOLT_EVERY,
+    chargeTent: null,
+    chargeT: 0,
+    bombEvery: 0, // вместо бомб — молнии из отростков
+    angryAt: opts?.angryAt,
+  }
+  for (let i = 0; i < tentacleCount; i++) {
+    for (let seg = 0; seg < JELLY_SEG_COUNT; seg++) {
+      const isTip = seg === JELLY_SEG_COUNT - 1
+      g.blocks.push({
+        x: bodyX,
+        y: bodyY + 40 + seg * 34,
+        rx: JELLY_SEG_RADII[seg],
+        ry: JELLY_SEG_RADII[seg],
+        rot: 0,
+        circle: true,
+        hp: isTip ? 2 : 4,
+        maxHp: isTip ? 2 : 4,
+        tier: 2,
+        flash: 0,
+        seed: Math.random() * 1000 + seg * 100,
+        dead: false,
+        x0: bodyX,
+        swayAmp: 0,
+        swayFreq: 0,
+        swayPh: 0,
+        bomb: false,
+        splits: false,
+        isTentacle: true,
+        tentacleId: i,
+        tentacleSeg: seg,
+      } as Block & { isTentacle: true; tentacleId: number; tentacleSeg: number })
+    }
+  }
+  // стартовая раскладка отростков (дальше их ведёт stepJellyfish)
+  updateJellyTentacles(g, bo, g.blocks)
+  return bo
 }
 
 /* ---------- жизненный цикл ---------- */

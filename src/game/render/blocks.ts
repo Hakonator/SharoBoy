@@ -111,7 +111,8 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
     // Минибоссы рисуются специализированным рендером (drawMinibosses).
     if (b.isMiniboss) continue
     if (b.bomb) {
-      drawBomb(ctx, b, b.x, b.y, time)
+      // Молнию медузы рисует рендер босса (drawBolts) — здесь пропускаем.
+      if (!b.bolt) drawBomb(ctx, b, b.x, b.y, time)
       continue
     }
     const x = b.x + Math.sin(time * 0.9 + b.seed) * 1.4

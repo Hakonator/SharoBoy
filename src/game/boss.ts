@@ -7,6 +7,7 @@ import type { Effects } from "./effects"
 import type { SFX } from "./audio"
 import type { Block, BossState, PaddleState, PowerType, PowerUp } from "./types"
 import { clamp, rand } from "./utils"
+import { stepJellyfish } from "./bossJelly"
 
 /** Хост-интерфейс: то, что системе босса нужно от движка. */
 export interface BossHost {
@@ -51,8 +52,8 @@ export class BossSystem {
     bo.t += dt
     bo.flash = Math.max(0, bo.flash - dt * 4)
     // Порог агрессии: настраивается вариантом босса (angryAt), по умолчанию —
-    // осьминог «злится» при половине здоровья, остальные — при 40%.
-    const angryAt = bo.angryAt ?? (bo.isOctopus ? 0.5 : 0.4)
+    // осьминог и медуза «злятся» при половине здоровья, остальные — при 40%.
+    const angryAt = bo.angryAt ?? (bo.isOctopus || bo.isJellyfish ? 0.5 : 0.4)
     const angry = bo.hp < bo.maxHp * angryAt
     const amp = clamp(this.g.w * 0.26, 120, 420)
     /* Патруль по горизонтали: фаза накапливается интегрированием частоты, а сама
@@ -60,7 +61,15 @@ export class BossSystem {
        sin(bo.t * freq) с частотой, зависящей от «злой» фазы, — при её смене
        синус пересчитывался с новой частотой от того же времени, и босс
        телепортировался. Теперь x непрерывен всегда. */
-    const targetFreq = angry ? (bo.isOctopus ? 1.5 : 1.1) : 0.6
+    const targetFreq = angry
+      ? bo.isOctopus
+        ? 1.5
+        : bo.isJellyfish
+          ? 1
+          : 1.1
+      : bo.isJellyfish
+        ? 0.45
+        : 0.6
     if (bo.swayFreq === undefined || bo.swayPhase === undefined) {
       // первый шаг: согласуем фазу со старой формулой sin(bo.t * 0.6)
       bo.swayFreq = 0.6
@@ -69,7 +78,13 @@ export class BossSystem {
     bo.swayFreq += (targetFreq - bo.swayFreq) * Math.min(1, dt * 2.5)
     bo.swayPhase += bo.swayFreq * dt
     bo.x = this.g.w / 2 + Math.sin(bo.swayPhase) * amp
-    bo.y = bo.baseY + Math.sin(bo.t * 1.7) * 22
+    if (bo.isJellyfish) {
+      // Медуза ведёт себя как настоящая: пульс купола (сжатие — рывок вверх,
+      // расширение — погружение), отростки следуют за куполом, молнии.
+      stepJellyfish(this.g, bo, angry, dt)
+    } else {
+      bo.y = bo.baseY + Math.sin(bo.t * 1.7) * 22
+    }
     for (const b of this.g.blocks) {
       const m = b.minionOrbit
       if (!m) continue
@@ -170,10 +185,10 @@ export class BossSystem {
     if (fromWeapon && this.g.time < this.weaponHitCd) return
     this.weaponHitCd = this.g.time + 0.08
 
-    // Босс-осьминог: тело неуязвимо, пока живы хотя бы некоторые щупальца
-    // (в каждом щупальце несколько сегментов; если все сегменты щупальца
-    // уничтожены — щупальце считается мёртвым).
-    if (bo.isOctopus) {
+    // Боссы со щупальцами: тело неуязвимо, пока живы хотя бы некоторые
+    // щупальца/отростки (в каждом несколько сегментов; если все сегменты
+    // щупальца уничтожены — щупальце считается мёртвым).
+    if (bo.isOctopus || bo.isJellyfish) {
       const tentacles = this.g.blocks.filter((b) => b.isTentacle && !b.dead) as (Block & {
         tentacleId: number
       })[]
@@ -228,10 +243,10 @@ export class BossSystem {
       t: 0,
     })
     this.g.fx.popups.push({ x: bo.x, y: bo.y, text: "+1500", color: "#ffc94d", t: 0, size: 30 })
-    // миньоны и бомбы разлетаются цепочкой взрывов
+    // миньоны, бомбы и отростки щупалец/медузы разлетаются цепочкой взрывов
     let i = 0
     for (const b of [...this.g.blocks]) {
-      if (b.minionOrbit || b.bomb) {
+      if (b.minionOrbit || b.bomb || b.isTentacle) {
         this.g.boomQueue.push({ x: b.x, y: b.y, at: this.g.time + 0.12 + i * 0.1 })
         b.hp = 0
         b.dead = true

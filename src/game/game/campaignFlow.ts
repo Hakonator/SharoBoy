@@ -15,6 +15,7 @@ import {
   buildFromSpec,
   buildLevel,
   buildOctopusBossLevel,
+  buildJellyfishBossLevel,
   serveBall,
 } from "./levelBuild"
 import { addMiniboss } from "./minibossRuntime"
@@ -199,7 +200,9 @@ export function startMapBattle(g: Game, node: CampaignNode) {
     g.onBossNode = true
     // Вариативность: тип финального босса детерминирован сидом карты и ярусом.
     const variant = pickBossVariant(g.campaignSeed + node.id * 7919, node.tier)
-    if (variant.tentacles > 0) {
+    if (variant.kind === "jellyfish") {
+      buildJellyfishBossLevel(g, variant)
+    } else if (variant.tentacles > 0) {
       buildOctopusBossLevel(g, variant)
     } else {
       buildBossLevel(g, variant.hp, variant.minions, 4)

@@ -173,13 +173,20 @@ export function updateBombs(g: PhysicsWorld, dt: number) {
       b.x <= p.x + p.w / 2 + b.rx
     ) {
       b.dead = true
-      // Бомба отнимает жизнь
+      // Бомба/молния отнимает жизнь
       g.onBombHitPaddle()
       g.shake = Math.min(g.shake + 8, 14)
       g.flash = 0.6
-      g.sfx.explosion()
-      g.fx.burst(b.x, b.y, "#ff6a5c", 20, 300)
-      g.fx.burst(b.x, b.y, "#ffc94d", 12, 200)
+      if (b.bolt) {
+        // разряд: электрический треск и голубые искры
+        g.sfx.zap()
+        g.fx.burst(b.x, b.y, "#ffe95c", 16, 280)
+        g.fx.burst(b.x, b.y, "#7cf5ff", 10, 200)
+      } else {
+        g.sfx.explosion()
+        g.fx.burst(b.x, b.y, "#ff6a5c", 20, 300)
+        g.fx.burst(b.x, b.y, "#ffc94d", 12, 200)
+      }
     }
   }
   compactInPlace(g.blocks, (x) => !x.dead)

@@ -97,7 +97,7 @@ export class Game {
   /** Режим отладки: позволяет тестировать новые механики и контент. */
   debug = false
   /** Принудительный тип босса для отладки (null = стандартное поведение). */
-  debugBossType: "octopus" | "kraken" | null = null
+  debugBossType: "octopus" | "kraken" | "jellyfish" | null = null
   /** Живые существа-минибоссы уровня (их может быть несколько): у каждого свой
    *  пул HP, номер группы (mbGroup блоков) и центр для дропа жизни. */
   minibosses: MinibossCreature[] = []
@@ -310,7 +310,7 @@ export class Game {
   debugSkipLevel() {
     debugSkipLevel(this)
   }
-  spawnDebugBoss(kind: "octopus" | "kraken") {
+  spawnDebugBoss(kind: "octopus" | "kraken" | "jellyfish") {
     spawnDebugBoss(this, kind)
   }
   spawnDebugMiniboss(kind: MinibossKind) {

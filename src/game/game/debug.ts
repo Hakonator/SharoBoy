@@ -6,7 +6,7 @@ import { lsSet } from "../utils"
 import type { MinibossKind } from "../minibosses"
 
 import { pushHud, setBanner } from "./hudSync"
-import { buildOctopusBoss, buildWave, serveBall } from "./levelBuild"
+import { buildOctopusBoss, buildJellyfishBoss, buildWave, serveBall } from "./levelBuild"
 import { addMiniboss, resetMiniboss } from "./minibossRuntime"
 
 /** Ключ localStorage для настройки «показывать счётчик FPS». */
@@ -78,8 +78,8 @@ export function toggleDebugEffect(g: Game, id: string) {
 export function isDebugEffectActive(g: Game, id: string) {
   return g.debugEffects.has(id)
 }
-/** Принудительно спавнит щупальцевого босса (осьминог/кракен) для тестирования. */
-export function spawnDebugBoss(g: Game, kind: "octopus" | "kraken") {
+/** Принудительно спавнит щупальцевого босса (осьминог/кракен) или медузу. */
+export function spawnDebugBoss(g: Game, kind: "octopus" | "kraken" | "jellyfish") {
   g.debugBossType = kind
   // Арена отладки живёт по правилам бесконечного режима: mode по умолчанию
   // «campaign», и после убийства босса onLevelCleared ушёл бы на экран карты,
@@ -94,7 +94,10 @@ export function spawnDebugBoss(g: Game, kind: "octopus" | "kraken") {
   resetMiniboss(g)
   // Канонические параметры вида (как в кампании на 3-м ярусе боссов).
   const variant = fixedVariant(kind)
-  const boss = buildOctopusBoss(g, variant.hp, variant)
+  const boss =
+    kind === "jellyfish"
+      ? buildJellyfishBoss(g, variant.hp, variant)
+      : buildOctopusBoss(g, variant.hp, variant)
   g.bossSys.spawn(boss)
   g.blocksInitial = Math.max(1, g.blocks.length)
   setBanner(g, `ФИНАЛЬНЫЙ БОСС: ${variant.name}`)
