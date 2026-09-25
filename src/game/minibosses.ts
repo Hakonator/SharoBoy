@@ -24,6 +24,8 @@ export const MINIBOSS_DUET_CHANCE = 0.25
 export const MINIBOSS_LIFE_CHANCE = 0.8
 /** Прирост HP на предпоследнем ярусе относительно базового (60 → 150 у рыбы). */
 export const MINIBOSS_HP_GROWTH = 1.5
+/** Горизонтальный сдвиг центра ВТОРОГО существа дуэта (доля ширины поля). */
+export const MINIBOSS_DUET_SHIFT = 0.22
 
 const NAMES: Record<MinibossKind, string> = {
   fish: "РЫБА-ШАР",
@@ -133,13 +135,12 @@ function makePart(opts: {
  * спинной и грудной плавники, глаз. Плывёт носом вправо, патрулирует поле.
  * Тиры: тело — 2 (золото), плавники — 1 (зелень), глаз — 3 (акцент).
  */
-export function buildFish(w: number, h: number, top: number, group = 0): Block[] {
+export function buildFish(w: number, h: number, top: number, group = 0, cx = w / 2): Block[] {
   void h
-  const cx = w / 2
   const cy = top + 165
   // патрулирует всё поле: амплитуда — почти до стен (с запасом на нос и хвост),
   // частота низкая — неспешное движение
-  const S = { swayAmp: Math.max(26, cx - 110), swayFreq: 0.15 }
+  const S = { swayAmp: Math.max(26, w / 2 - 110), swayFreq: 0.15 }
   const p = (
     x: number,
     y: number,
@@ -171,15 +172,14 @@ export function buildFish(w: number, h: number, top: number, group = 0): Block[]
  * Медуза: пышный купол с бахромой по нижнему краю и пятью щупальцами-цепочками.
  * Тиры: купол — 3 (розовый), щупальца — 1 (зелень).
  */
-export function buildJelly(w: number, h: number, top: number, group = 0): Block[] {
-  const cx = w / 2
+export function buildJelly(w: number, h: number, top: number, group = 0, cx = w / 2): Block[] {
   const cy = top + 160
   // Медленный патруль влево-вправо (без разворота) + вертикальный дрейф со
   // случайной фазой и некратной частотой — траектория выглядит случайной,
   // но ограничена: щупальца не опускаются ниже ~65% высоты поля.
   const bobAmp = Math.max(10, Math.min(28, h * 0.65 - cy - 90))
   const S = {
-    swayAmp: Math.max(14, cx - 56),
+    swayAmp: Math.max(14, w / 2 - 56),
     swayFreq: 0.18,
     bobAmp,
     bobFreq: 0.1 + rand(0, 0.05),
@@ -230,9 +230,14 @@ function circlesOverlap(
 /**
  * Убирает из раскладки уровня блоки, на которые налегает существо, —
  * силуэт минибосса остаётся аккуратным и целостным, без наложений.
+ * Блоки ДРУГИХ существ (дуэт) не трогает: перекрытие двух существ во время
+ * патруля допустимо, а вырезание частей чужого силуэта ломало рендер —
+ * существо оставалось в g.minibosses с HP-полоской, но становилось невидимым.
  */
 export function carveLevelBlocks(level: Block[], creature: Block[]): Block[] {
   return level.filter(
-    (b) => !creature.some((c) => circlesOverlap(b.x, b.y, Math.max(b.rx, b.ry), c.x, c.y, c.rx, 6))
+    (b) =>
+      b.isMiniboss === true ||
+      !creature.some((c) => circlesOverlap(b.x, b.y, Math.max(b.rx, b.ry), c.x, c.y, c.rx, 6))
   )
 }

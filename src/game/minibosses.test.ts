@@ -6,6 +6,7 @@ import {
   carveLevelBlocks,
   minibossChance,
   minibossHpFor,
+  MINIBOSS_DUET_SHIFT,
   MINIBOSS_HP,
   MINIBOSS_HP_GROWTH,
   MINIBOSS_LIFE_CHANCE,
@@ -158,10 +159,56 @@ describe("minibosses", () => {
       y: creature[0].y,
       rx: 40,
       ry: 40,
+      isMiniboss: false,
+      mbGroup: undefined,
+      mbPart: undefined,
     }
-    const far: Block = { ...creature[0], x: 60, y: H - 120, rx: 15, ry: 15 }
+    const far: Block = {
+      ...creature[0],
+      x: 60,
+      y: H - 120,
+      rx: 15,
+      ry: 15,
+      isMiniboss: false,
+      mbGroup: undefined,
+      mbPart: undefined,
+    }
     const kept = carveLevelBlocks([inside, far], creature)
     expect(kept).toEqual([far])
+  })
+
+  it("carveLevelBlocks не трогает блоки другого существа (дуэт)", () => {
+    // Регресс «невидимой медузы»: даже если второе существо налегает на первое,
+    // вырезаются только ОБЫЧНЫЕ блоки уровня, чужой силуэт остаётся целым.
+    const fish = buildFish(W, H, TOP) // центр по умолчанию — та же точка, где родится медуза
+    const jelly = buildJelly(W, H, TOP)
+    expect(carveLevelBlocks(fish, jelly)).toEqual(fish)
+    expect(carveLevelBlocks(jelly, fish)).toEqual(jelly)
+  })
+
+  it("дуэт со сдвигом MINIBOSS_DUET_SHIFT не налегает на первое существо", () => {
+    const fish = buildFish(W, H, TOP)
+    const jelly = buildJelly(W, H, TOP, 0, W / 2 + W * MINIBOSS_DUET_SHIFT)
+    // ни один блок медузы не пересекается с блоками рыбы (с запасом carve-а)
+    const pad = 6
+    for (const c of jelly) {
+      for (const f of fish) {
+        const dx = c.x - f.x
+        const dy = c.y - f.y
+        const rr = Math.max(f.rx, f.ry) + c.rx + pad
+        expect(dx * dx + dy * dy).toBeGreaterThanOrEqual(rr * rr)
+      }
+    }
+  })
+
+  it("buildFish/buildJelly принимают кастомный центр (дуэт)", () => {
+    const fish = buildFish(W, H, TOP, 0, W / 2 + W * MINIBOSS_DUET_SHIFT)
+    const body = fish.filter((b) => b.mbPart === "body")
+    const cx = body.reduce((s, b) => s + b.x, 0) / body.length
+    expect(cx).toBeCloseTo(W / 2 + W * MINIBOSS_DUET_SHIFT)
+    const jelly = buildJelly(W, H, TOP, 0, W * 0.3)
+    const dome = jelly.filter((b) => b.mbPart === "dome")
+    expect(dome[0].x).toBeCloseTo(W * 0.3)
   })
 
   it("имена существ заданы", () => {

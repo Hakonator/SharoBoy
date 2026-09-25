@@ -10,6 +10,7 @@ import {
 import { rand } from "../utils"
 import type { Block } from "../types"
 import type { MinibossKind } from "../minibosses"
+import { MINIBOSS_DUET_SHIFT } from "../minibosses"
 
 import { pushHud } from "./hudSync"
 import { blockTop } from "./paddleControl"
@@ -25,8 +26,13 @@ export function resetMiniboss(g: Game) {
 export function addMiniboss(g: Game, kind: MinibossKind, hp = MINIBOSS_HP[kind]) {
   const top = blockTop(g)
   const group = ++g.mbGroupSeq
+  // Дуэт: второе существо рождается со сдвигом вправо — иначе оба существа
+  // строятся вокруг одного центра и налегают друг на друга с первого кадра.
+  const duetShift = g.minibosses.length > 0 ? g.w * MINIBOSS_DUET_SHIFT : 0
   const creature =
-    kind === "fish" ? buildFish(g.w, g.h, top, group) : buildJelly(g.w, g.h, top, group)
+    kind === "fish"
+      ? buildFish(g.w, g.h, top, group, g.w / 2 + duetShift)
+      : buildJelly(g.w, g.h, top, group, g.w / 2 + duetShift)
   // Существу нужен целостный силуэт: убираем обычные блоки, с которыми оно налегает.
   g.blocks = [...carveLevelBlocks(g.blocks, creature), ...creature]
   g.blocksInitial = Math.max(1, g.blocks.length)

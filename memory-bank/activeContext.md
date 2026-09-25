@@ -159,6 +159,15 @@
   service_role), чтобы не падали свежий проект / `supabase db reset` /
   preview-ветки и будущая Edge-работа; правило «GRANT в той же миграции, что и
   create table» записано в DEVELOPMENT.md, ROADMAP (§13 этап B) и techContext.
+- Баг «невидимая медуза с полоской HP» (дуэт с рыбой) исправлен: оба существа
+  строились вокруг `cx = w/2`, а второй `addMiniboss` вырезал `carveLevelBlocks`
+  чужие блоки → купол медузы удалялся, группа без `dome` проваливалась в
+  `drawFish` (пусто) → невидимка с HP-полоской. Фикс: `carveLevelBlocks` не
+  трогает `isMiniboss`-блоки; `buildFish/buildJelly` приняли параметр `cx`,
+  второе существо дуэта рождается со сдвигом `w*MINIBOSS_DUET_SHIFT` (0.22);
+  рендер: группа без dome/body не рисуется вовсе. Тесты: 3 новых в
+  `minibosses.test.ts` + интеграционный `minibossRuntime.test.ts` (2 кейса,
+  28 файлов / 236 тестов — зелёные).
 - Механика: `isPortrait()`/`hudTopCss()` в viewport, `blockTop()` = `hudTopCss()/scale`
   (клампы `h*0.14..h*0.35`), `ui/usePortrait.ts`; портрет — два ряда чипов,
   ландшафт — однострочный.

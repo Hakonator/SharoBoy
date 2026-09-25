@@ -23,7 +23,10 @@ export function drawMinibosses(ctx: Ctx, blocks: Block[], time: number) {
   }
   for (const group of groups.values()) {
     if (group.some((p) => p.mbPart === "dome")) drawJelly(ctx, group, time)
-    else drawFish(ctx, group, time)
+    else if (group.some((p) => p.mbPart === "body")) drawFish(ctx, group, time)
+    // Группа без ключевых частей (dome/body) не рисуется вовсе: иначе неполная
+    // медуза проваливалась в drawFish и существо становилось «невидимкой»
+    // с живой HP-полоской (баг дуэта рыба+медуза в одной точке).
   }
 }
 
