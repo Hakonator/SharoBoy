@@ -174,14 +174,19 @@ export function jellyHpContourSlice(contour: number[], frac: number): number[] {
   return out
 }
 
-/** Цвет заполнения полоски HP — как у кольца остальных боссов. */
-export function jellyHpColor(frac: number): string {
-  return frac > 0.55 ? "#5dffb0" : frac > 0.25 ? "#ffc94d" : "#ff5347"
+/** Цвет окантовки купола — темнее основного оттенка текущей фазы медузы. */
+export function jellyDomeContourColor(bo: BossState): string {
+  return bo.hp < bo.maxHp * 0.5 ? "#a63f5b" : "#7848a8"
+}
+
+/** Красный цвет участка окантовки, показывающего полученный урон. */
+export function jellyDamageColor(): string {
+  return "#ff5347"
 }
 
 /**
- * Тонкая полоска HP ровно по контуру купола: тёмная подложка по всему
- * периметру и цветное заполнение по остатку HP. Вызывать внутри трансформа
+ * Тонкая полоска HP ровно по контуру купола: цветная окантовка по всему
+ * периметру и красное заполнение по полученному урону. Вызывать внутри трансформа
  * купола — полоска изгибается вместе с телом (пульс) и плывёт с волной бахромы.
  */
 export function drawJellyDomeHp(ctx: Ctx, bo: BossState) {
@@ -194,17 +199,17 @@ export function drawJellyDomeHp(ctx: Ctx, bo: BossState) {
   ctx.moveTo(contour[0], contour[1])
   for (let i = 2; i < contour.length; i += 2) ctx.lineTo(contour[i], contour[i + 1])
   ctx.closePath()
-  ctx.strokeStyle = "rgba(4,18,26,0.72)"
+  ctx.strokeStyle = jellyDomeContourColor(bo)
   ctx.lineWidth = 4
   ctx.stroke()
-  // заполнение — симметричный от макушки обрезок контура по остатку HP
-  const frac = clamp(bo.maxHp > 0 ? bo.hp / bo.maxHp : 0, 0, 1)
+  // заполнение — симметричный от макушки обрезок контура по полученному урону
+  const frac = clamp(bo.maxHp > 0 ? 1 - bo.hp / bo.maxHp : 1, 0, 1)
   const slice = jellyHpContourSlice(contour, frac)
   if (slice.length >= 4) {
     ctx.beginPath()
     ctx.moveTo(slice[0], slice[1])
     for (let i = 2; i < slice.length; i += 2) ctx.lineTo(slice[i], slice[i + 1])
-    ctx.strokeStyle = jellyHpColor(frac)
+    ctx.strokeStyle = jellyDamageColor()
     ctx.lineWidth = 2.5
     ctx.stroke()
   }

@@ -9,8 +9,9 @@ import {
   drawJellyDomeHp,
   JELLY_DOME_RIM_Y,
   jellyDomeContour,
-  jellyHpColor,
+  jellyDamageColor,
   jellyHpContourSlice,
+  jellyDomeContourColor,
   traceJellyDome,
 } from "./bossJellyDome"
 import type { Ctx } from "./shapes"
@@ -219,10 +220,8 @@ describe("полоска HP по контуру купола", () => {
     }
   })
 
-  it("цвет меняется с остатком HP (зелёный → жёлтый → красный)", () => {
-    expect(jellyHpColor(1)).toBe("#5dffb0")
-    expect(jellyHpColor(0.4)).toBe("#ffc94d")
-    expect(jellyHpColor(0.1)).toBe("#ff5347")
+  it("использует красный цвет для обозначения урона", () => {
+    expect(jellyDamageColor()).toBe("#ff5347")
   })
 })
 
@@ -230,11 +229,11 @@ describe("полоска HP в рендере босса", () => {
   it("рисуется под масштабом пульса — изгибается вместе с телом", () => {
     const paints: PaintEvent[] = []
     const rec = makeRecordingCtx(paints)
-    const bo = boss({ hp: 40, maxHp: 100, pulseScale: 0.8 })
+    const bo = boss({ hp: 60, maxHp: 100, pulseScale: 0.8 })
     drawBoss(rec.ctx, bo, [], [])
-    const fill = paints.filter((p) => p.op === "stroke" && p.strokeStyle === jellyHpColor(0.4))
+    const fill = paints.filter((p) => p.op === "stroke" && p.strokeStyle === jellyDamageColor())
     const track = paints.filter(
-      (p) => p.op === "stroke" && p.strokeStyle.startsWith("rgba(4,18,26")
+      (p) => p.op === "stroke" && p.strokeStyle === jellyDomeContourColor(bo)
     )
     expect(fill).toHaveLength(1)
     expect(track).toHaveLength(1)
@@ -246,12 +245,13 @@ describe("полоска HP в рендере босса", () => {
     expect(track[0].lineWidth).toBeLessThanOrEqual(5)
   })
 
-  it("без HP остаётся только подложка контура", () => {
+  it("при полном уроне красным становится весь контур", () => {
     const paints: PaintEvent[] = []
     const rec = makeRecordingCtx(paints)
     drawJellyDomeHp(rec.ctx, boss({ hp: 0 }))
     const strokes = paints.filter((p) => p.op === "stroke")
-    expect(strokes).toHaveLength(1)
-    expect(strokes[0].strokeStyle).toBe("rgba(4,18,26,0.72)")
+    expect(strokes).toHaveLength(2)
+    expect(strokes[0].strokeStyle).toBe(jellyDomeContourColor(boss({ hp: 0 })))
+    expect(strokes[1].strokeStyle).toBe(jellyDamageColor())
   })
 })
