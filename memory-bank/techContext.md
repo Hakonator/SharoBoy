@@ -13,9 +13,24 @@
   (tsc --noEmit), `lint` / `lint:check`.
 - Pre-commit: husky + lint-staged (не ломать); коммиты на английском, Conventional
   Commits, целевая ветка `beta`.
-- Терминал: Git Bash; PowerShell-правки файлов НЕ использовать для UTF-8 файлов
-  (Get-Content/Set-Content портят кириллицу — инцидент 2026-09, чинить только node).
+- Терминал: Git Bash — явным вызовом `"C:\Program Files\Git\bin\bash.exe" -lc '...'`,
+  потому что оболочка по умолчанию PowerShell 5.1: `&&` нельзя (сепаратор `;`),
+  `$_:` в строках требует `${_}`. PowerShell-правки файлов НЕ использовать для
+  UTF-8 файлов (Get-Content/Set-Content портят кириллицу — инцидент 2026-09,
+  чинить только node/редактором).
+- Git: многострочные сообщения — `git commit -F <файл>`; `-m "..."` из
+  PowerShell в bash теряет кавычки и коммит получает `feat:` вместо полного
+  сообщения (инцидент 25.09.2026, чинилось `--amend -F`).
 - Тесты: `*.test.ts` рядом с исходниками; e2e-подобные: `campaignFlow.test.ts`,
   `frame.invariant.test.ts` (хелперы: `campaignFlow.helpers.ts`,
   `frameInvariant.helpers.ts` обращаются к internals `Game` — не переименовывать
   поля/методы `Game` без правки хелперов).
+- Известный флаки: `campaignMap.test.ts` «структурные инварианты» (~4–5 с) под
+  полной параллельной нагрузкой превышает дефолтный таймаут Vitest 5 с —
+  перезапуск сьюта, не бага; таймаут не поднимать без причины.
+- Тесты рендера: `makeRecordingCtx` (`frameInvariant.helpers.ts`) записывает
+  op/матрицу трансформа/alpha/strokeStyle/lineWidth — им проверяют, что полоски
+  рисуются внутри трансформа сущности при `globalAlpha === 1`.
+- Визуальная проверка Canvas-геометрии без браузера: отрисовать те же кривые
+  PowerShell GDI+ (`System.Drawing`) в PNG и посмотреть картинку — так проверяли
+  контур купола медузы (25.09.2026).
