@@ -275,7 +275,7 @@ export function buildJellyfishBoss(
     x: bodyX,
     y: bodyY,
     baseY: bodyY,
-    r: 52,
+    r: 68, // крупнее кракена — купол занимает заметную часть верхней трети поля
     hp,
     maxHp: hp,
     t: 0,

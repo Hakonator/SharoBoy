@@ -31,8 +31,8 @@ export const JELLY_TENTACLES = 5
 export const JELLY_SEG_COUNT = 4
 /** Расстояние между центрами сегментов: 4×34 ≈ диаметр купола. */
 export const JELLY_SEG_SPACING = 34
-/** Радиусы сегментов от базы к кончику. */
-export const JELLY_SEG_RADII = [15, 12, 9, 7]
+/** Радиусы сегментов от базы к кончику (база шире — плавное сопряжение с куполом). */
+export const JELLY_SEG_RADII = [17, 13, 10, 7]
 /** Амплитуда и скорость волны изгиба отростков. */
 export const JELLY_WAVE_AMP = 12
 export const JELLY_WAVE_SPEED = 1.8
@@ -79,6 +79,16 @@ function tentacleTheta(i: number, n: number): number {
   return (n <= 1 ? 0.5 : i / (n - 1) - 0.5) * 2.4
 }
 
+/** Точка крепления отростка к нижней кромке купола (логика и рендер). */
+export function jellyTentacleBase(bo: BossState, tentacleId: number): { x: number; y: number } {
+  const n = bo.totalTentacles ?? JELLY_TENTACLES
+  const theta = tentacleTheta(tentacleId, n)
+  return {
+    x: bo.x + Math.sin(theta) * bo.r * 0.62 * (bo.pulseScale ?? 1),
+    y: bo.y + Math.cos(theta) * bo.r * 0.55,
+  }
+}
+
 /**
  * Обновляет позиции сегментов отростков: база — на нижней кромке купола
  * (веером), свисают вниз с волной, длина и разлёт масштабируются пульсом —
@@ -88,7 +98,6 @@ export function updateJellyTentacles(g: Pick<BossHost, "w" | "h">, bo: BossState
   const n = bo.totalTentacles ?? JELLY_TENTACLES
   const s = bo.pulseScale ?? 1
   const stretch = 1 + (1 - s) * 0.45 // при сжатии отростки вытягиваются
-  const spread = 0.62 * s // горизонтальный разлёт базы следует за куполом
   for (const b of blocks) {
     if (!b.isTentacle || b.dead) continue
     const seg = b.tentacleSeg ?? 0
@@ -96,8 +105,7 @@ export function updateJellyTentacles(g: Pick<BossHost, "w" | "h">, bo: BossState
     const dirX = Math.sin(theta) * 0.35
     const dirY = 1
     const dirLen = Math.hypot(dirX, dirY)
-    const baseX = bo.x + Math.sin(theta) * bo.r * spread
-    const baseY = bo.y + Math.cos(theta) * bo.r * 0.5
+    const base = jellyTentacleBase(bo, b.tentacleId ?? 0)
     const segT = (seg + 1) / JELLY_SEG_COUNT
     const along = ((seg + 1) * JELLY_SEG_SPACING * stretch) / dirLen
     // волна изгиба, бежит от базы к кончику
@@ -105,22 +113,20 @@ export function updateJellyTentacles(g: Pick<BossHost, "w" | "h">, bo: BossState
       Math.sin(bo.t * JELLY_WAVE_SPEED + theta * 2.4 + seg * 1.05) * JELLY_WAVE_AMP * segT
     const perpX = dirY / dirLen
     const perpY = -dirX / dirLen
-    b.x = clamp(baseX + dirX * along + perpX * wave, b.rx + 4, g.w - b.rx - 4)
-    b.y = clamp(baseY + dirY * along + perpY * wave, b.ry + 4, g.h * 0.8)
+    b.x = clamp(base.x + dirX * along + perpX * wave, b.rx + 4, g.w - b.rx - 4)
+    b.y = clamp(base.y + dirY * along + perpY * wave, b.ry + 4, g.h * 0.8)
   }
 }
 
 function tipBlock(g: BossHost, tentacleId: number): Block | null {
+  // Кончик — СТАРШИЙ живой сегмент отростка: после уничтожения прежнего кончика
+  // его роль переходит следующему сегменту, и отросток продолжает стрелять.
+  let best: Block | null = null
   for (const b of g.blocks) {
-    if (
-      b.isTentacle &&
-      !b.dead &&
-      b.tentacleId === tentacleId &&
-      b.tentacleSeg === JELLY_SEG_COUNT - 1
-    )
-      return b
+    if (!b.isTentacle || b.dead || b.tentacleId !== tentacleId) continue
+    if (!best || (b.tentacleSeg ?? 0) > (best.tentacleSeg ?? 0)) best = b
   }
-  return null
+  return best
 }
 
 function aliveTentacleIds(g: BossHost): number[] {

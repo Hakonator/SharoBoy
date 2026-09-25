@@ -189,4 +189,29 @@ describe("stepJellyfish: молнии (интеграция через игро�
       game.destroy()
     }
   })
+
+  it("после уничтожения кончиков усечённые отростки продолжают стрелять", () => {
+    const { game, step, restoreRandom } = makeEnv()
+    try {
+      game.spawnDebugBoss("jellyfish")
+      const boss = game.bossSys.boss as BossState
+      // первый выстрел по расписанию (~10.1 с)
+      step(606)
+      expect(game.blocks.filter((b) => b.bolt).length).toBe(1)
+      // сносим все прежние кончики (seg 3) — остаются усечённые отростки
+      game.blocks = game.blocks.filter(
+        (b) => !(b.isTentacle && b.tentacleSeg === JELLY_SEG_COUNT - 1)
+      )
+      const aliveSegs = new Set(game.blocks.filter((b) => b.isTentacle).map((b) => b.tentacleSeg))
+      expect(aliveSegs.has(JELLY_SEG_COUNT - 1)).toBe(false)
+      // сокращаем ожидание и даём выстрелить: молния должна прилететь
+      // из нового кончика (seg 2), а не исчезнуть вместе с прежними
+      boss.boltTimer = 1.4
+      step(90)
+      expect(game.blocks.filter((b) => b.bolt).length).toBe(1)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
 })

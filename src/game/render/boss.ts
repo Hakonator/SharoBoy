@@ -1,6 +1,6 @@
 import { Ball, Block, BossState } from "../types"
 import { clamp } from "../utils"
-import { JELLY_SEG_COUNT } from "../bossJelly"
+import { jellyTentacleBase } from "../bossJelly"
 
 import { type Ctx } from "./shapes"
 
@@ -44,13 +44,12 @@ function drawBolt(ctx: Ctx, b: Block, time: number) {
 function drawChargeTip(ctx: Ctx, bo: BossState, blocks: Block[]) {
   if (bo.chargeTent === null || bo.chargeTent === undefined) return
   const charge = clamp(bo.chargeT ?? 0, 0, 1)
-  const tip = blocks.find(
-    (b) =>
-      b.isTentacle &&
-      !b.dead &&
-      b.tentacleId === bo.chargeTent &&
-      b.tentacleSeg === JELLY_SEG_COUNT - 1
-  )
+  // кончик — старший живой сегмент (после смерти прежнего кончика искрит следующий)
+  let tip: Block | undefined
+  for (const b of blocks) {
+    if (!b.isTentacle || b.dead || b.tentacleId !== bo.chargeTent) continue
+    if (!tip || (b.tentacleSeg ?? 0) > (tip.tentacleSeg ?? 0)) tip = b
+  }
   if (!tip) return
   const r = tip.rx * (1.1 + charge * 1.6)
   ctx.save()
@@ -95,8 +94,10 @@ function drawJellyTentacles(ctx: Ctx, bo: BossState, blocks: Block[]) {
       ctx.lineWidth = 9
       ctx.lineCap = "round"
       ctx.beginPath()
-      ctx.moveTo(segs[0].x, segs[0].y)
-      for (let k = 1; k < segs.length - 1; k++) {
+      // линия начинается прямо на кромке купола — плавное сопряжение
+      const base = jellyTentacleBase(bo, segs[0].tentacleId ?? 0)
+      ctx.moveTo(base.x, base.y)
+      for (let k = 0; k < segs.length - 1; k++) {
         const mx = (segs[k].x + segs[k + 1].x) / 2
         const my = (segs[k].y + segs[k + 1].y) / 2
         ctx.quadraticCurveTo(segs[k].x, segs[k].y, mx, my)
@@ -134,17 +135,6 @@ function drawJellyTentacles(ctx: Ctx, bo: BossState, blocks: Block[]) {
 function drawJellyfishBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block[]) {
   const angry = bo.hp < bo.maxHp * 0.5
   const s = clamp(bo.pulseScale ?? 1, 0.6, 1.1)
-  // кольцо здоровья (как у остальных боссов)
-  const frac = clamp(bo.hp / bo.maxHp, 0, 1)
-  ctx.lineWidth = 6
-  ctx.strokeStyle = "rgba(4,18,26,0.7)"
-  ctx.beginPath()
-  ctx.arc(bo.x, bo.y, bo.r + 14, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.strokeStyle = frac > 0.55 ? "#5dffb0" : frac > 0.25 ? "#ffc94d" : "#ff5347"
-  ctx.beginPath()
-  ctx.arc(bo.x, bo.y, bo.r + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
-  ctx.stroke()
   // отростки — позади купола
   drawJellyTentacles(ctx, bo, blocks)
   // летящие молнии
@@ -170,17 +160,17 @@ function drawJellyfishBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block
   }
   ctx.fillStyle = g
   ctx.beginPath()
-  // купол: верхняя полуарка + волнистая нижняя кромка (4 бахроминки)
-  ctx.moveTo(-bo.r, bo.r * 0.12)
-  ctx.arc(0, bo.r * 0.12, bo.r, Math.PI, Math.PI * 2)
-  const rimY = bo.r * 0.12
+  // купол: верхняя полуарка + волнистая нижняя кромка, накрывающая базы отростков
+  ctx.moveTo(-bo.r, bo.r * 0.28)
+  ctx.arc(0, bo.r * 0.28, bo.r, Math.PI, Math.PI * 2)
+  const rimY = bo.r * 0.28
   const lobe = bo.r / 4
   for (let i = 3; i >= 0; i--) {
     const x1 = lobe * i
     const x0 = lobe * (i + 1)
     ctx.quadraticCurveTo(
       (x0 + x1) / 2,
-      rimY + bo.r * (0.28 + Math.sin(bo.t * 5 + i) * 0.05),
+      rimY + bo.r * (0.34 + Math.sin(bo.t * 5 + i) * 0.05),
       x1,
       rimY
     )
@@ -191,7 +181,7 @@ function drawJellyfishBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block
   if (bo.flash > 0) {
     ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.7})`
     ctx.beginPath()
-    ctx.arc(0, bo.r * 0.12 - bo.r * 0.08, bo.r, Math.PI, Math.PI * 2)
+    ctx.arc(0, bo.r * 0.2, bo.r, Math.PI, Math.PI * 2)
     ctx.fill()
   }
   // глаза следят за шаром

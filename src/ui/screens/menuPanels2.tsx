@@ -1,6 +1,16 @@
+import type { ReactNode } from "react"
+
 import { ACHIEVEMENTS } from "../../game/achievements"
+import { IconJelly } from "../icons"
 
 import { MenuSection } from "./shared"
+
+/** Пункт выбора босса в отладке (icon — SVG вместо эмодзи, когда его нет в шрифте). */
+interface BossOption {
+  id: string
+  label: string
+  icon?: ReactNode
+}
 
 /** Секция отладки: выбор босса и активируемые эффекты. */
 export function MenuDebug({
@@ -38,14 +48,25 @@ export function MenuDebug({
             <div className="space-y-1.5">
               <p className="text-xs font-medium text-dim">Босс</p>
               <div className="flex flex-wrap gap-2">
-                {[
-                  { id: "", label: "Нет" },
-                  { id: "octopus", label: "🐙 Осьминог" },
-                  { id: "kraken", label: "🦑 Кракен" },
-                  { id: "jellyfish", label: "🪼 Медуза (босс)" },
-                  { id: "minibossFish", label: "🐟 Рыба (мини)" },
-                  { id: "minibossJelly", label: "🪼 Медуза (мини)" },
-                ].map((b) => (
+                {(
+                  [
+                    { id: "", label: "Нет" },
+                    { id: "octopus", label: "🐙 Осьминог" },
+                    { id: "kraken", label: "🦑 Кракен" },
+                    // эмодзи 🪼 есть не во всех шрифтах — используем SVG-иконку
+                    {
+                      id: "jellyfish",
+                      label: "Медуза (босс)",
+                      icon: <IconJelly className="h-3.5 w-3.5" />,
+                    },
+                    { id: "minibossFish", label: "🐟 Рыба (мини)" },
+                    {
+                      id: "minibossJelly",
+                      label: "Медуза (мини)",
+                      icon: <IconJelly className="h-3.5 w-3.5" />,
+                    },
+                  ] as BossOption[]
+                ).map((b) => (
                   <label
                     key={b.id}
                     className={`flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-xs transition ${
@@ -62,6 +83,7 @@ export function MenuDebug({
                       onChange={() => onSelectDebugBoss(b.id)}
                       className="sr-only"
                     />
+                    {b.icon}
                     {b.label}
                   </label>
                 ))}
