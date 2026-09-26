@@ -13,6 +13,8 @@ import { stepJellyfish } from "./bossJelly"
 export interface BossHost {
   readonly w: number
   readonly h: number
+  /** Верхняя граница доступной шару игровой зоны. */
+  readonly blockTop: number
   readonly time: number
   shake: number
   hitStop: number

@@ -15,6 +15,9 @@ export function makeBossHost(g: Game): BossHost {
     get h() {
       return g.h
     },
+    get blockTop() {
+      return blockTop(g)
+    },
     get time() {
       return g.time
     },

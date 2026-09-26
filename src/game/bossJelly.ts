@@ -43,6 +43,11 @@ const CONTRACT_PART = 0.28 // доля цикла, которую занимае
 
 const smoothstep = (k: number) => k * k * (3 - 2 * k)
 
+/** Минимальная координата центра купола, достижимая шаром над игровой зоной. */
+export function jellyBodyMinY(blockTop: number, radius: number): number {
+  return blockTop + radius
+}
+
 export interface JellyPulse {
   /** Масштаб купола в этот момент пульса (1 — расправлен). */
   scale: number
@@ -231,7 +236,11 @@ export function stepJellyfish(g: BossHost, bo: BossState, angry: boolean, dt: nu
   const pulse = jellyPulse(bo.pulsePhase, angry)
   bo.pulseScale = pulse.scale
   // сжатие толкает вверх, расширение опускает; не выходим из-за HUD и не ныряем
-  bo.y = clamp(bo.y + pulse.vy * dt, g.h * 0.12, bo.baseY + g.h * 0.05)
+  bo.y = clamp(
+    bo.y + pulse.vy * dt,
+    jellyBodyMinY(g.blockTop, bo.r),
+    Math.max(jellyBodyMinY(g.blockTop, bo.r), bo.baseY + g.h * 0.05)
+  )
   updateJellyTentacles(g, bo, g.blocks)
   stepJellyBolts(g, bo, angry, dt)
 }

@@ -8,6 +8,7 @@ import {
   JELLY_MIN_PULSE_SCALE,
   JELLY_SEG_COUNT,
   JELLY_TENTACLES,
+  jellyBodyMinY,
   jellyPulse,
   updateJellyTentacles,
 } from "./bossJelly"
@@ -68,6 +69,11 @@ function makeTentacles(): Block[] {
 }
 
 describe("jellyPulse: настоящий пульс медузы", () => {
+  it("оставляет купол достижимым над верхней границей поля", () => {
+    expect(jellyBodyMinY(350, 68)).toBe(418)
+    expect(jellyBodyMinY(0, 68)).toBe(68)
+  })
+
   it("купол сжимается и расправляется в пределах шкалы", () => {
     for (let i = 0; i < 100; i++) {
       const { scale } = jellyPulse(i / 100)
