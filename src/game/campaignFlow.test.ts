@@ -253,6 +253,28 @@ describe("сквозной цикл кампании по карте", () => {
     g.destroy()
   })
 
+  it("лазер из прокачки остаётся взведённым после стартовой паузы и стреляет по команде", () => {
+    const { g, step } = makeEnv()
+    const laserGame = g as typeof g & {
+      upgrades: Record<string, number>
+      laserArmed: boolean
+      laserUntil: number
+      time: number
+      weaponsSys: { updateLaser: (fire: boolean) => void }
+    }
+    laserGame.upgrades.laser = 1
+    g.startLevelBattle(1)
+    expect(laserGame.laserArmed).toBe(true)
+
+    step(180)
+    expect(laserGame.laserArmed).toBe(true)
+
+    laserGame.weaponsSys.updateLaser(true)
+    expect(laserGame.laserArmed).toBe(false)
+    expect(laserGame.laserUntil).toBeGreaterThan(laserGame.time)
+    g.destroy()
+  })
+
   it("toMenu очищает карту, а фазы вне карты несут map = null", () => {
     const { g, step, hudLog } = makeEnv()
     g.startGame()

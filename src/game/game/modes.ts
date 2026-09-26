@@ -29,6 +29,7 @@ export function startEndless(g: Game) {
   applyUpgrades(g)
   g.magnetUntil = g.time + 4 * (g.upgrades.magnet ?? 0)
   g.laserArmed = (g.upgrades.laser ?? 0) > 0
+  g.laserArmedUntil = g.laserArmed ? Number.POSITIVE_INFINITY : 0
   serveBall(g)
   g.phase = "playing"
   applyTrack(g)
