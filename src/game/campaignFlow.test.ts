@@ -119,12 +119,16 @@ describe("сквозной цикл кампании по карте", () => {
       if (target.isEvent) {
         if (hudLog[hudLog.length - 1].campaignEvent) {
           // первое срабатывание: экран с сообщением, фишка ещё на месте
+          const eventView = hudLog[hudLog.length - 1].map
+          expect(eventView?.eventTargetId).toBeTruthy()
+          expect(eventView?.nodes.some((n) => n.id === eventView.eventTargetId)).toBe(true)
           g.dismissCampaignEvent()
           // после подтверждения фишка перемещена на узел назначения и бой
           // уже стартовал; узлом назначения не может быть узел-событие —
           // цепочка телепортов на одном ходу исключена; и отбросить событие
           // может не дальше чем на EVENT_MAX_BACK_TIERS зон назад
           expect(g.phase).toBe("playing")
+          expect(hudLog[hudLog.length - 1].map).toBeNull()
           battleNode = map.nodes.find((n) => n.id === raw.campaignPlayerId)!
           expect(battleNode.isEvent).toBe(false)
           expect(battleNode.tier).toBeGreaterThanOrEqual(target.tier - EVENT_MAX_BACK_TIERS)

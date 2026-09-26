@@ -68,6 +68,8 @@ export interface CampaignMapView {
   visited: number[]
   /** Туман войны: узлы, доступные для выбора — ровно один шаг от игрока. */
   visible: number[]
+  /** Цель текущего события-телепорта, показывается поверх тумана войны. */
+  eventTargetId?: number
 }
 
 /**

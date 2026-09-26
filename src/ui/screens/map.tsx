@@ -23,8 +23,11 @@ export function MapScreen({
 
   const byId = new Map(view.nodes.map((n) => [n.id, n]))
   const revealed = new Set<number>([...view.visited, ...view.visible])
+  if (view.eventTargetId !== undefined) revealed.add(view.eventTargetId)
   const playerOut = new Set<number>(view.visible)
   const revealedEdges = view.edges.filter((e) => revealed.has(e.from) && revealed.has(e.to))
+  const eventTarget = view.eventTargetId === undefined ? undefined : byId.get(view.eventTargetId)
+  const player = byId.get(view.playerId)
   // маркеры существ — только на УЖЕ ПОСЕЩЁННЫХ узлах: до боя локация хранит
   // сюрприз. SVG-иконки в едином стиле вместо эмодзи (на части систем эмодзи
   // показывались квадратами). рыба/медуза — источник жизней, осьминог — босс
@@ -84,6 +87,19 @@ export function MapScreen({
             preserveAspectRatio="none"
             aria-hidden
           >
+            <defs>
+              <marker
+                id="campaign-event-arrow"
+                markerWidth="3"
+                markerHeight="3"
+                refX="2.6"
+                refY="1.5"
+                orient="auto"
+                markerUnits="userSpaceOnUse"
+              >
+                <path d="M0 0 L3 1.5 L0 3 Z" fill="#ffc94d" />
+              </marker>
+            </defs>
             {revealedEdges.map((e) => {
               const a = byId.get(e.from)
               const b = byId.get(e.to)
@@ -104,17 +120,34 @@ export function MapScreen({
                 />
               )
             })}
+            {eventTarget && player && eventTarget.id !== player.id && (
+              <line
+                x1={player.x * 100}
+                y1={player.y * 100}
+                x2={eventTarget.x * 100}
+                y2={eventTarget.y * 100}
+                stroke="#ffc94d"
+                strokeWidth="0.35"
+                strokeDasharray="2 1.4"
+                strokeLinecap="round"
+                markerEnd="url(#campaign-event-arrow)"
+                style={{ filter: "drop-shadow(0 0 1px rgba(255, 201, 77, 0.75))" }}
+              />
+            )}
           </svg>
 
           {view.nodes
             .filter((n) => revealed.has(n.id))
             .map((n) => {
               const isCurrent = n.id === view.playerId
+              const isEventTarget = n.id === view.eventTargetId
               const clickable = playerOut.has(n.id)
               const mbKinds = view.minibosses[n.id] ?? []
               const showMb = view.visited.includes(n.id) && mbKinds.length > 0
               const size = n.isBoss ? "h-12 w-12 sm:h-14 sm:w-14" : "h-7 w-7 sm:h-8 sm:w-8"
-              const tint = n.isBoss
+              const tint = isEventTarget
+                ? "border-2 border-gold bg-gold text-abyss shadow-[0_0_0_4px_rgba(255,201,77,0.25),0_0_24px_rgba(255,201,77,0.85)] animate-pulse"
+                : n.isBoss
                 ? "bg-coral shadow-[0_0_18px_rgba(255,106,92,0.85)]"
                 : isCurrent
                   ? "bg-cyan-neon shadow-[0_0_16px_rgba(53,224,255,0.9)]"
@@ -159,8 +192,8 @@ export function MapScreen({
                       БОСС
                     </span>
                   )}
-                  {clickable && (
-                    <span className="whitespace-nowrap font-display text-[10px] tracking-wider text-foam drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs">
+                  {(clickable || isEventTarget) && (
+                    <span className={`whitespace-nowrap font-display text-[10px] tracking-wider drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs ${isEventTarget ? "text-gold" : "text-foam"}`}>
                       {n.name}
                     </span>
                   )}
