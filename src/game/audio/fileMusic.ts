@@ -18,6 +18,24 @@ export const MUSIC_VOLUME = 0.4
 /** Длительность плавного перехода между треками (мс). */
 const MUSIC_FADE_MS = 900
 
+/** Fisher–Yates: перемешать набор и не повторить последний трек на стыке циклов. */
+export function shuffleMusicTracks(
+  tracks: readonly string[],
+  previous: string | null,
+  random: () => number = Math.random
+): string[] {
+  const shuffled = [...tracks]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  if (shuffled.length > 1 && shuffled[0] === previous) {
+    const swapIndex = 1 + Math.floor(random() * (shuffled.length - 1))
+    ;[shuffled[0], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[0]]
+  }
+  return shuffled
+}
+
 /** Создать аудиоэлемент для MP3-трека. Возвращает null, если окружение без
  *  медиа-элементов (тесты в node) — тогда музыка просто не играет. */
 function createAudio(src: string): HTMLAudioElement | null {
@@ -30,6 +48,8 @@ function createAudio(src: string): HTMLAudioElement | null {
 export class FileMusicPlayer {
   private audio: HTMLAudioElement | null = null
   private url: string | null = null
+  private lastPlayedUrl: string | null = null
+  private trackQueue: string[] = []
   /** Активные fade-переходы громкости: элемент → id интервала. */
   private fades = new Map<HTMLAudioElement, number>()
 
@@ -64,13 +84,14 @@ export class FileMusicPlayer {
 
   play() {
     if (!MUSIC_FILES.length) return
-    let pick = MUSIC_FILES[Math.floor(Math.random() * MUSIC_FILES.length)]
-    if (MUSIC_FILES.length > 1 && pick === this.url) {
-      pick = MUSIC_FILES[(MUSIC_FILES.indexOf(pick) + 1) % MUSIC_FILES.length]
+    if (!this.trackQueue.length) {
+      this.trackQueue = shuffleMusicTracks(MUSIC_FILES, this.lastPlayedUrl)
     }
+    const pick = this.trackQueue.pop()!
     const a = createAudio(pick)
     if (!a) return // окружение без медиа-элементов (тесты) — музыки нет
     this.url = pick
+    this.lastPlayedUrl = pick
     a.volume = 0
     a.addEventListener("ended", () => {
       // Трек кончился — следующий случайный из набора
