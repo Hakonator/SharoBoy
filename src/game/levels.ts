@@ -26,10 +26,15 @@ export interface PatternSpec extends BaseSpec {
   shape: (r: number, i: number) => "circle" | "eh" | "ev"
   hp: (r: number, i: number) => 1 | 2 | 3
 }
+export interface MotifSpec extends BaseSpec {
+  layout: LayoutItem[]
+  seed: number
+  motif: true
+}
 interface BossSpec extends BaseSpec {
   boss: { hp: number; minions: number; bombs: number }
 }
-export type LevelSpec = PatternSpec | LayoutSpec | BossSpec
+export type LevelSpec = PatternSpec | LayoutSpec | MotifSpec | BossSpec
 
 /** «СТРЕЛА» — плотная авторская раскладка первого уровня. */
 const ARROW_LAYOUT: LayoutItem[] = [

@@ -102,6 +102,29 @@ describe("SFX: раздельные ползунки громкости музы
     expect(internals.track).toBe("game")
   })
 
+  it("останавливает таймер секвенсора при переключении в файловый трек", () => {
+    stubStorage()
+    const clearTimeout = vi.fn()
+    vi.stubGlobal("window", {
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      clearTimeout,
+      localStorage: { getItem: () => null, setItem: () => {} },
+    })
+    const s = new SFX() as unknown as {
+      setTrack: (track: "game" | "map") => void
+      musicOn: boolean
+      musicTimer: number | null
+      fileMode: boolean
+    }
+    s.musicOn = true
+    s.musicTimer = 123
+    s.setTrack("game")
+    expect(s.fileMode).toBe(true)
+    expect(s.musicTimer).toBeNull()
+    expect(clearTimeout).toHaveBeenCalledWith(123)
+  })
+
   it("тема карты — медленная, разреженная и в пределах MIDI", () => {
     const sfx = SFX as unknown as {
       stepFor: (t: "menu" | "game" | "map") => number

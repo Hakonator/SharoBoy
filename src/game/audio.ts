@@ -145,12 +145,17 @@ export class SFX {
     // Файловая музыка работает и без WebAudio; секвенсору нужен контекст.
     if (!this.ctx && !this.fileMode) return // ensure ещё не был — дождётся жеста
     this.nextBeat = this.ctx ? this.ctx.currentTime + 0.05 : 0
-    if (!this.musicOn) return
+    this.stopMusicTimer()
+    if (!this.musicOn) {
+      this.filePlayer.stop()
+      return
+    }
     if (this.fileMode) {
+      this.stopMusicTimer()
       if (!this.musicMuted) this.playFileMusic()
     } else {
       this.filePlayer.stop()
-      this.scheduleMusic()
+      if (!this.musicMuted) this.scheduleMusic()
     }
   }
   /** Случайный MP3-трек с плавным кроссфейдом (делегирует файловому плееру). */
@@ -164,8 +169,14 @@ export class SFX {
       // Страховка: если что-то остановилось — возобновляем (файл — с места,
       // секвенсор — перезапуском), иначе музыка «умирает» до перезагрузки.
       if (!this.musicMuted) {
-        if (this.filePlayer.active) this.filePlayer.resume()
-        if (this.musicTimer === null && !this.filePlayer.active) this.scheduleMusic()
+        if (this.fileMode) {
+          this.stopMusicTimer()
+          if (this.filePlayer.active) this.filePlayer.resume()
+          else this.playFileMusic()
+        } else {
+          this.filePlayer.stop()
+          if (this.musicTimer === null) this.scheduleMusic()
+        }
       }
       return
     }
@@ -174,8 +185,19 @@ export class SFX {
     this.musicOn = true
     this.nextBeat = this.ctx ? this.ctx.currentTime + 0.06 : 0
     this.musicStep = 0
-    if (this.fileMode && !this.musicMuted) this.playFileMusic()
-    else if (!this.musicMuted) this.scheduleMusic()
+    if (this.fileMode) {
+      this.stopMusicTimer()
+      if (!this.musicMuted) this.playFileMusic()
+    } else {
+      this.filePlayer.stop()
+      if (!this.musicMuted) this.scheduleMusic()
+    }
+  }
+
+  private stopMusicTimer() {
+    if (this.musicTimer === null) return
+    window.clearTimeout(this.musicTimer)
+    this.musicTimer = null
   }
 
   stopMusic() {

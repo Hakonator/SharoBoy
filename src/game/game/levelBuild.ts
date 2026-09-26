@@ -1,6 +1,7 @@
 import type { Game } from "../game"
 import { Physics } from "../physics"
 import { layoutBlocks, densityFactor } from "../levelBuilder"
+import { generateMotifSpec } from "../levelMotifs"
 import { gridBlocks, buildBossArena } from "../levelPatterns"
 import { LEVELS } from "../levels"
 import { clamp, rand, mulberry32, daySeed } from "../utils"
@@ -8,7 +9,7 @@ import type { Ball, Block, BossState } from "../types"
 import type { BossVariant } from "../bossVariants"
 import { JELLY_SEG_RADII, JELLY_SEG_COUNT, JELLY_TENTACLES, JELLY_BOLT_EVERY } from "../bossJelly"
 import { updateJellyTentacles } from "../bossJelly"
-import type { LevelSpec, PatternSpec } from "../levels"
+import type { LevelSpec } from "../levels"
 
 import { pushHud } from "./hudSync"
 import { resetMiniboss } from "./minibossRuntime"
@@ -38,7 +39,9 @@ export function buildFromSpec(g: Game, spec: LevelSpec) {
     g.bossSys.spawn(boss)
     g.blocks = blocks
   } else if ("layout" in spec) {
-    g.blocks = layoutBlocks(spec, g.w, g.h, densityFactor(g.w, g.h), top)
+    const seededLayout = "motif" in spec
+    const rng = seededLayout ? mulberry32(spec.seed) : undefined
+    g.blocks = layoutBlocks(spec, g.w, g.h, densityFactor(g.w, g.h), top, rng, seededLayout)
   } else {
     g.blocks = gridBlocks(spec, g.w, g.h, densityFactor(g.w, g.h), top)
   }
@@ -60,23 +63,7 @@ export function buildWave(g: Game, n: number) {
     buildBossLevel(g, 38 + n * 4, Math.min(5, 3 + Math.floor(n / 10)), 4)
     return
   }
-  const rng = mulberry32(daySeed() * 31 + n * 7919)
-  const rows = clamp(5 + Math.floor(n / 3), 5, 8)
-  const spec: PatternSpec = {
-    name: g.waveSpec.name,
-    speed: g.waveSpec.speed,
-    rows,
-    counts: Array.from({ length: rows }, (_, r) =>
-      clamp(6 + ((r + n) % 3) + Math.floor(n / 4), 6, 10)
-    ),
-    shape: () => {
-      const t = rng()
-      return (t < 0.5 ? "circle" : t < 0.78 ? "eh" : "ev") as "circle" | "eh" | "ev"
-    },
-    hp: (r) =>
-      (r < rows * 0.4 ? (rng() < 0.4 ? 3 : 2) : r < rows * 0.75 ? (rng() < 0.45 ? 2 : 1) : 1) as
-        1 | 2 | 3,
-  }
+  const spec = generateMotifSpec(daySeed() * 31 + n * 7919, n, g.waveSpec.speed)
   buildFromSpec(g, spec)
 }
 

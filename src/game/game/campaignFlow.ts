@@ -2,6 +2,7 @@ import type { Game } from "../game"
 import { pickBossVariant } from "../bossVariants"
 import { minibossHpFor, rollMinibossLive } from "../minibosses"
 import { LEVELS } from "../levels"
+import { generateMotifSpec } from "../levelMotifs"
 import { generateCampaignMap, EVENT_TEXTS, EVENT_MAX_BACK_TIERS } from "../campaignMapLayout"
 import { nodeById, outgoingIds, visibleFrom, isAdjacent } from "../campaignMap"
 import { daySeed } from "../utils"
@@ -227,7 +228,8 @@ export function startMapBattle(g: Game, node: CampaignNode) {
 
 /** Раскладка обычного узла: авторские уровни по кругу (босс исключён). */
 export function nodeSpecFor(g: Game, node: CampaignNode): LevelSpec {
-  return LEVELS[node.tier % (LEVELS.length - 1)]
+  const speed = Math.min(650, 380 + node.tier * 7)
+  return generateMotifSpec(g.campaignSeed + node.id * 7919, node.tier + 1, speed)
 }
 
 /** Общий вход в бой: подача шара, трек, баннер и бонусы прокачки. */

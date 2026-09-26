@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { EVENT_MAX_BACK_TIERS, type CampaignNode } from "./campaignMap"
 import { makeEnv } from "./campaignFlow.helpers"
+import { nodeSpecFor } from "./game/campaignFlow"
+import { LEVEL_MOTIF_NAMES } from "./levelMotifs"
+import type { Game } from "./game"
 
 /**
  * Сквозной прогон рогаликового цикла кампании на НАСТОЯЩЕМ движке:
@@ -18,6 +21,23 @@ describe("сквозной цикл кампании по карте", () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
+  })
+
+  it("генерирует разные устойчивые мотивы для узлов одного забега", () => {
+    const { g } = makeEnv()
+    const raw = g as unknown as { campaignSeed: number }
+    raw.campaignSeed = 481516
+    const a = { id: 11, tier: 4, x: 0, y: 0, isBoss: false, isEvent: false, name: "A" }
+    const b = { ...a, id: 22 }
+    const game = g as unknown as Game
+    const first = nodeSpecFor(game, a)
+    expect(nodeSpecFor(game, a)).toEqual(first)
+    const seen = new Set([first.name, nodeSpecFor(game, b).name])
+    for (let id = 23; seen.size < LEVEL_MOTIF_NAMES.length && id < 80; id++) {
+      seen.add(nodeSpecFor(game, { ...a, id }).name)
+    }
+    expect(seen.size).toBeGreaterThanOrEqual(5)
+    g.destroy()
   })
 
   it("startGame открывает карту с туманом войны и валидным снимком для HUD", () => {

@@ -4,7 +4,7 @@
  */
 import type { LayoutSpec } from "./levels"
 import type { Block } from "./types"
-import { clamp, rand } from "./utils"
+import { clamp } from "./utils"
 import { REF_DIAG } from "./viewport"
 
 /**
@@ -79,6 +79,7 @@ export function makeBlock(opts: {
   circle?: boolean
   bomb?: boolean
   splits?: boolean
+  random?: () => number
   minionOrbit?: Block["minionOrbit"]
   /** знак частоты покачивания — задаётся только для процедурной сетки */
   swaySign?: 1 | -1
@@ -94,12 +95,12 @@ export function makeBlock(opts: {
     maxHp: opts.hp,
     tier: opts.hp,
     flash: 0,
-    seed: rand(0, Math.PI * 2),
+    seed: (opts.random ?? Math.random)() * Math.PI * 2,
     dead: false,
     x0: opts.x,
-    swayAmp: opts.swaySign ? rand(5, 13) : 0,
-    swayFreq: opts.swaySign ? rand(0.5, 1.0) * opts.swaySign : 0,
-    swayPh: opts.swaySign ? rand(0, Math.PI * 2) : 0,
+    swayAmp: opts.swaySign ? 5 + (opts.random ?? Math.random)() * 8 : 0,
+    swayFreq: opts.swaySign ? (0.5 + (opts.random ?? Math.random)() * 0.5) * opts.swaySign : 0,
+    swayPh: opts.swaySign ? (opts.random ?? Math.random)() * Math.PI * 2 : 0,
     bomb: opts.bomb ?? false,
     splits: opts.splits ?? false,
     minionOrbit: opts.minionOrbit,
@@ -113,7 +114,9 @@ export function layoutBlocks(
   h: number,
   density = 1,
   /** Верх зоны блоков в мировых единицах; по умолчанию — 14% высоты мира. */
-  topOverride?: number
+  topOverride?: number,
+  random: () => number = Math.random,
+  preserveLayout = false
 ): Block[] {
   const margin = clamp(w * 0.055, 22, 72)
   const top = topOverride ?? clamp(h * 0.14, 86, 160)
@@ -145,24 +148,26 @@ export function layoutBlocks(
       hp: it.hp,
       bomb: it.bomb,
       splits: it.splits,
+      random,
     })
   })
 
   /* На плотных экранах (4K и выше) дополнительно рассыпаем мелкие блоки
      в свободные места авторской раскладки — без пересечений с ней. */
-  if (density > 1.01) {
+  if (density > 1.01 && !preserveLayout) {
     const extra = Math.min(Math.round((density - 1) * spec.layout.length * 1.2), 60)
     for (let k = 0; k < extra; k++) {
       for (let attempt = 0; attempt < 14; attempt++) {
         const rr = Math.max(unit * 0.3, 10)
-        const cx = rand(margin + rr, w - margin - rr)
-        const cy = rand(top + rr, top + zoneH - rr)
+        const cx = margin + rr + random() * (w - margin * 2 - rr * 2)
+        const cy = top + rr + random() * (zoneH - rr * 2)
         const cand = makeBlock({
           x: cx,
           y: cy,
           rx: rr,
           ry: rr,
           hp: 1,
+          random,
         })
         if (blocks.some((b) => overlaps(b, cand))) continue
         blocks.push(cand)
