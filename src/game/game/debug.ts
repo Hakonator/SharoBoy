@@ -33,7 +33,6 @@ export function toggleFps(g: Game): boolean {
 export function toggleHitboxes(g: Game): boolean {
   if (!DEBUG_TOOLS) return false
   g.showHitboxes = !g.showHitboxes
-  console.log(`[ШАРОБОЙ][debug] хитбоксы: ${g.showHitboxes ? "вкл" : "выкл"}`)
   return g.showHitboxes
 }
 
@@ -41,7 +40,6 @@ export function toggleHitboxes(g: Game): boolean {
 export function toggleSlowMotion(g: Game): boolean {
   if (!DEBUG_TOOLS) return false
   g.slowMotion = !g.slowMotion
-  console.log(`[ШАРОБОЙ][debug] замедление: ${g.slowMotion ? "вкл (×0.25)" : "выкл"}`)
   return g.slowMotion
 }
 
@@ -49,7 +47,6 @@ export function toggleSlowMotion(g: Game): boolean {
 export function toggleInvincible(g: Game): boolean {
   if (!DEBUG_TOOLS) return false
   g.invincible = !g.invincible
-  console.log(`[ШАРОБОЙ][debug] бессмертие: ${g.invincible ? "вкл" : "выкл"}`)
   return g.invincible
 }
 
@@ -129,7 +126,6 @@ export function debugDamageUp(g: Game) {
   g.debugBallDamage += 1
   g.sfx.ensure()
   g.sfx.ui()
-  console.log(`[ШАРОБОЙ][debug] урон шара: ${g.debugBallDamage}`)
   pushHud(g)
 }
 
@@ -151,7 +147,6 @@ export function debugSkipLevel(g: Game) {
   g.boomQueue = []
   // зачистка ждёт упавшую жизнь — для мгновенного перехода убираем её
   g.powers = g.powers.filter((p) => p.type !== "life")
-  console.log("[ШАРОБОЙ][debug] уровень зачищен клавишей «+»")
   pushHud(g)
 }
 

@@ -34,15 +34,18 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1) {
   // Если уничтожен сегмент щупальца, то уничтожаем все сегменты,
   // которые дальше от туловища (с большим номером tentacleSeg).
   if (b.isTentacle) {
-    const tentacleId = (b as any).tentacleId
-    const seg = (b as any).tentacleSeg!
-    for (const other of g.blocks) {
-      if (
-        other.isTentacle &&
-        (other as any).tentacleId === tentacleId &&
-        (other as any).tentacleSeg! > seg
-      ) {
-        other.dead = true
+    const tentacleId = b.tentacleId
+    const seg = b.tentacleSeg
+    if (tentacleId !== undefined && seg !== undefined) {
+      for (const other of g.blocks) {
+        if (
+          other.isTentacle &&
+          other.tentacleId === tentacleId &&
+          other.tentacleSeg !== undefined &&
+          other.tentacleSeg > seg
+        ) {
+          other.dead = true
+        }
       }
     }
   }
