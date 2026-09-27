@@ -55,9 +55,10 @@ export function onBallHitSpecial(
     g.fx.burst(b.x, b.y, "#e8e2f6", 6, 90)
   }
   // крутящийся: импульс от удара в одну из половин, сильнее к краю
-  if (sp.rotVel !== undefined) {
+  if (sp.rotVel !== undefined && b.spinDeathT === undefined) {
     const side = lx >= 0 ? 1 : -1
     const edge = Math.min(1, Math.abs(lx) / (ex || 1))
+    sp.rotDir = side
     sp.rotVel = clamp(sp.rotVel + side * SPIN_KICK * (0.4 + 0.6 * edge), -SPIN_MAX, SPIN_MAX)
   }
   // телепорт: переброс в парный блок, контакт поглощён целиком

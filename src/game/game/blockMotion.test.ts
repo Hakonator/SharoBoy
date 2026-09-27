@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { PULSE_AMPLITUDE } from "../blockKinds"
+import { DRIFT_MAX_RADIUS_MULT, PULSE_AMPLITUDE } from "../blockKinds"
 import type { Game } from "../game"
 import type { Block } from "../types"
 
@@ -92,8 +92,26 @@ describe("stepBlock — неигровая HUD-зона сверху (тольк
 
   it("дрейф §6 по вертикали клампится границей HUD-зоны", () => {
     const b = makeBlock({ y: 40, y0: 40, sp: { drift: { kind: "v", amp: 60, freq: 1, ph: 0 } } })
-    stepBlock(portraitGame(Math.PI / 2), b, 0.016) // сырой y = 100 < yMin
-    expect(b.y).toBe(140 + 16)
+    stepBlock(portraitGame(Math.PI / 2), b, 0.016)
+    expect(b.y - b.ry).toBeGreaterThanOrEqual(140)
+  })
+
+  it("вертикальный дрейф остаётся ниже HUD на всём диапазоне и не меняет X", () => {
+    const b = makeBlock({
+      x: 200,
+      x0: 200,
+      y: 150,
+      y0: 150,
+      ry: 16,
+      sp: { drift: { kind: "v", amp: 500, freq: 1, ph: 0 } },
+    })
+    const game = portraitGame(0)
+    for (let i = 0; i <= 12; i++) {
+      game.time = (Math.PI * i) / 6
+      stepBlock(game, b, 0.016)
+      expect(b.y - b.ry).toBeGreaterThanOrEqual(140)
+      expect(b.x).toBe(200)
+    }
   })
 
   it("дрейф §6 по окружности тоже уважает границу", () => {
@@ -104,7 +122,7 @@ describe("stepBlock — неигровая HUD-зона сверху (тольк
       sp: { drift: { kind: "circle", amp: 60, freq: 1, ph: 0 } },
     })
     stepBlock(portraitGame(Math.PI / 2), b, 0.016)
-    expect(b.y).toBe(140 + 16)
+    expect(b.y - b.ry).toBeGreaterThanOrEqual(140)
   })
 
   it("масштаб окна учитывается: 140 css px / scale", () => {
@@ -123,6 +141,21 @@ describe("stepBlock — спецблоки §6", () => {
     stepBlock(makeGame(Math.PI / 2), b, 0.016)
     expect(b.x).toBeCloseTo(214)
     expect(b.y).toBe(150) // по вертикали не двигается
+  })
+
+  it("ограничивает амплитуду дрейфа тремя размерами блока", () => {
+    const horizontal = makeBlock({
+      rx: 10,
+      sp: { drift: { kind: "h", amp: 100, freq: 1, ph: 0 } },
+    })
+    const vertical = makeBlock({
+      ry: 8,
+      sp: { drift: { kind: "v", amp: 100, freq: 1, ph: 0 } },
+    })
+    stepBlock(makeGame(Math.PI / 2), horizontal, 0.016)
+    stepBlock(makeGame(Math.PI / 2), vertical, 0.016)
+    expect(horizontal.x - horizontal.x0).toBeCloseTo(10 * DRIFT_MAX_RADIUS_MULT)
+    expect(vertical.y - (vertical.y0 ?? 150)).toBeCloseTo(8 * DRIFT_MAX_RADIUS_MULT)
   })
 
   it("дрейф по окружности двигает и x, и y (эллипс 0.6 по вертикали)", () => {
@@ -155,6 +188,16 @@ describe("stepBlock — спецблоки §6", () => {
     // long stall: за ~10 с трение погасит вращение
     for (let i = 0; i < 600; i++) stepBlock(makeGame(i * 0.016), b, 0.016)
     expect(b.sp!.rotVel).toBe(0)
+  })
+
+  it("предсмертное вращение длится ровно одну секунду", () => {
+    const b = makeBlock({ spinDeathT: 1, sp: { rotVel: 6, rotDir: 1 } })
+    stepBlock(makeGame(0), b, 0.4)
+    expect(b.spinDeathT).toBeCloseTo(0.6)
+    expect(b.hp).toBe(2)
+    stepBlock(makeGame(0.4), b, 0.6)
+    expect(b.spinDeathT).toBe(0)
+    expect(b.hp).toBe(2)
   })
 
   it("кулдаун портала тикает вниз до нуля", () => {

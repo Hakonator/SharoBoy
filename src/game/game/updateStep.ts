@@ -84,6 +84,8 @@ export function update(g: Game, dt: number) {
   // живые ряды: маршрутизатор траекторий (покачивание, дрейф §6, пульсация,
   // вращение, кулдаун порталов)
   for (const b of g.blocks) stepBlock(g, b, dt)
+  // Деструкция крутящихся блоков завершается после ровно одной секунды анимации.
+  g.physics.finishSpinDeaths()
 
   // плавный дрейф поля
   if (g.fieldShift) {

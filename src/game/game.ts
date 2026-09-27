@@ -48,6 +48,7 @@ import {
   isDebugEffectActive,
   spawnDebugBoss,
   spawnDebugMiniboss,
+  spawnDebugSpecialBlocks,
   debugDamageUp,
   debugSkipLevel,
 } from "./game/debug"
@@ -315,6 +316,9 @@ export class Game {
   }
   spawnDebugMiniboss(kind: MinibossKind) {
     spawnDebugMiniboss(this, kind)
+  }
+  spawnDebugSpecialBlocks() {
+    spawnDebugSpecialBlocks(this)
   }
   setMusicVolume(v: number) {
     setMusicVolume(this, v)

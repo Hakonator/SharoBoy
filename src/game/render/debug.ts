@@ -91,3 +91,20 @@ export function drawDebugFlags(
   ctx.fillText(`DEV: ${flags.join(" · ")}`, 8, h - 8 - fontPx * 1.6)
   ctx.restore()
 }
+
+/** Номер сборки — общий debug-элемент в правом нижнем углу. */
+export function drawBuildVersion(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  version: string,
+  fontPx: number
+): void {
+  ctx.save()
+  ctx.font = `${fontPx}px ui-monospace, monospace`
+  ctx.textAlign = "right"
+  ctx.textBaseline = "alphabetic"
+  ctx.fillStyle = "rgba(159, 214, 234, 0.62)"
+  ctx.fillText(`build ${version}`, w - 8, h - 8)
+  ctx.restore()
+}

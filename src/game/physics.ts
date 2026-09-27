@@ -23,6 +23,7 @@ import {
 } from "./physics/collide"
 import {
   damageBlock as applyBlockDamage,
+  finishSpinDeaths as applySpinDeathFinisher,
   spawnScatter as scatterBlocks,
   updateBombs as moveBombs,
 } from "./physics/destruction"
@@ -269,6 +270,11 @@ export class Physics {
   /** Урон блоку; при разрушении — очки, эффекты, дроп бонуса, «матрёшка». */
   damageBlock(b: Block, dmg = 1) {
     applyBlockDamage(this.g, b, dmg)
+  }
+
+  /** Завершает минутную анимацию вращения перед разрушением блока. */
+  finishSpinDeaths() {
+    applySpinDeathFinisher(this.g)
   }
 
   /** «Матрёшка»: вокруг разбитого блока рассыпаются 3–10 крупных шаров. */

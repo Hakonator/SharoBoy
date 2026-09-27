@@ -2,7 +2,7 @@ import { TIER } from "../palette"
 import { Block } from "../types"
 import { mulberry32 } from "../utils"
 
-import { drawSpecialBody, drawSpecialMarks } from "./blockKinds"
+import { drawSpecialBody, drawSpinMarks } from "./blockKinds"
 import { gradient } from "./gradCache"
 import { type Ctx } from "./shapes"
 
@@ -34,6 +34,17 @@ function drawBomb(ctx: Ctx, b: Block, x: number, y: number, time: number) {
   ctx.beginPath()
   ctx.arc(x + 12, y - b.ry - 4, 3 + pulse * 2, 0, Math.PI * 2)
   ctx.fill()
+  ctx.restore()
+}
+
+function drawDebugLabel(ctx: Ctx, b: Block, x: number, y: number) {
+  if (!b.debugLabel) return
+  ctx.save()
+  ctx.font = '700 10px "Russo One", sans-serif'
+  ctx.textAlign = "center"
+  ctx.textBaseline = "bottom"
+  ctx.fillStyle = "rgba(234,247,255,0.82)"
+  ctx.fillText(b.debugLabel, x, y - b.ry - 7)
   ctx.restore()
 }
 
@@ -115,8 +126,9 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
       if (!b.bolt) drawBomb(ctx, b, b.x, b.y, time)
       continue
     }
-    const x = b.x + Math.sin(time * 0.9 + b.seed) * 1.4
-    const y = b.y + Math.cos(time * 0.8 + b.seed) * 1.4
+    const isVerticalDrift = b.sp?.drift?.kind === "v"
+    const x = isVerticalDrift ? b.x : b.x + Math.sin(time * 0.9 + b.seed) * 1.4
+    const y = isVerticalDrift ? b.y : b.y + Math.cos(time * 0.8 + b.seed) * 1.4
     if (b.frozen) {
       drawFrozenBlock(ctx, b, x, y, time)
       continue
@@ -125,6 +137,7 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
     // пульсация/дрейф/вращение — стандартное тело + метки поверх.
     if (b.sp?.portalId || b.sp?.spring || b.sp?.cotton) {
       drawSpecialBody(ctx, b, x, y, time)
+      drawDebugLabel(ctx, b, x, y)
       continue
     }
     const tier = TIER[b.tier]
@@ -156,9 +169,6 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
     }
     ctx.restore()
 
-    // метки спецблоков поверх тела: кольцо пульсации, штрихи маршрута, стрелки
-    if (b.sp) drawSpecialMarks(ctx, b, x, y, time)
-
     // трещины
     const dmg = b.maxHp - b.hp
     if (dmg > 0) {
@@ -183,6 +193,9 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
         ctx.fill()
       }
     }
+
+    drawDebugLabel(ctx, b, x, y)
+    drawSpinMarks(ctx, b, x, y)
 
     // «матрёшка»: мини-шарики внутри
     if (b.splits) {

@@ -1,4 +1,4 @@
-import { DEBUG_TOOLS } from "../../config"
+import { BUILD_VERSION, DEBUG_TOOLS } from "../../config"
 import { gradient } from "../render/gradCache"
 import type { Game } from "../game"
 import {
@@ -7,6 +7,7 @@ import {
   drawBlocks,
   drawBoss,
   drawDebugFlags,
+  drawBuildVersion,
   drawFps,
   drawHitboxes,
   drawLaserBeams,
@@ -155,5 +156,6 @@ export function draw(g: Game) {
   }
   if (DEBUG_TOOLS) {
     drawDebugFlags(ctx, w, h, g.slowMotion, g.invincible, Math.max(9, Math.round(11 / g.scale)))
+    drawBuildVersion(ctx, w, h, BUILD_VERSION, Math.max(8, Math.round(10 / g.scale)))
   }
 }

@@ -3,7 +3,6 @@
  * стандартное тело блока, пульсация/дрейф/вращение добавляют метки поверх.
  * Градиенты — через gradCache (координаты в единичной локальной системе).
  */
-import { PULSE_AMPLITUDE } from "../blockKinds"
 import { TIER } from "../palette"
 import type { Block } from "../types"
 
@@ -40,7 +39,7 @@ function drawSpringBody(ctx: Ctx, b: Block, x: number, y: number) {
   ctx.restore()
 }
 
-/** Ватный блок: пушистое облако из перекрывающихся кругов, мягко дышит. */
+/** Ватный блок: мягкий овальный силуэт с внутренними овальными волокнами. */
 function drawCottonBody(ctx: Ctx, b: Block, x: number, y: number, time: number) {
   const wobble = Math.sin(time * 2 + b.seed) * 0.05
   ctx.save()
@@ -48,22 +47,58 @@ function drawCottonBody(ctx: Ctx, b: Block, x: number, y: number, time: number) 
   ctx.rotate(b.rot)
   ctx.scale(b.rx, b.ry)
   ctx.fillStyle = "rgba(246,243,255,0.95)"
-  const puffs: [number, number, number][] = [
-    [-0.35, -0.2, 0.55],
-    [0.3, -0.3, 0.5],
-    [0.05, 0.25, 0.6],
-    [-0.1 + wobble, -0.45, 0.4],
-  ]
-  for (const [px, py, pr] of puffs) {
-    ctx.beginPath()
-    ctx.arc(px, py, pr, 0, Math.PI * 2)
-    ctx.fill()
-  }
-  ctx.strokeStyle = "rgba(160,140,200,0.5)"
-  ctx.lineWidth = 1.8 / Math.max(b.rx, b.ry)
   ctx.beginPath()
-  ctx.arc(0, 0, 0.95, 0, Math.PI * 2)
-  ctx.stroke()
+  ctx.ellipse(0, wobble * 0.2, 1, 0.76, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = "rgba(255,255,255,0.34)"
+  ctx.beginPath()
+  ctx.ellipse(-0.28, -0.28, 0.38, 0.12, -0.18, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = "rgba(190,180,220,0.22)"
+  ctx.beginPath()
+  ctx.ellipse(0.32, 0.25, 0.28, 0.11, 0.2, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+}
+
+function drawSpinArrows(ctx: Ctx, b: Block, x: number, y: number) {
+  const sp = b.sp
+  if (!sp || sp.rotDir === undefined) return
+  const dir = sp.rotDir
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(b.rot)
+  ctx.strokeStyle = "rgba(255,255,255,0.72)"
+  ctx.lineWidth = 2
+  ctx.lineCap = "round"
+  const arrowSize = Math.min(b.rx, b.ry) * 0.14
+  for (const side of [-1, 1]) {
+    const cx = side * b.rx * 0.48
+    const cy = 0
+    const start = side < 0 ? -Math.PI * 0.85 : Math.PI * 0.15
+    const end = start + dir * Math.PI * 0.8
+    ctx.beginPath()
+    ctx.arc(cx, cy, Math.min(b.rx, b.ry) * 0.22, start, end, dir < 0)
+    ctx.stroke()
+    const tipX = cx + Math.cos(end) * Math.min(b.rx, b.ry) * 0.22
+    const tipY = cy + Math.sin(end) * Math.min(b.rx, b.ry) * 0.22
+    ctx.beginPath()
+    ctx.moveTo(tipX, tipY)
+    ctx.lineTo(
+      tipX - Math.cos(end - dir * 0.6) * arrowSize,
+      tipY - Math.sin(end - dir * 0.6) * arrowSize
+    )
+    ctx.moveTo(tipX, tipY)
+    ctx.lineTo(
+      tipX - Math.cos(end + dir * 0.6) * arrowSize,
+      tipY - Math.sin(end + dir * 0.6) * arrowSize
+    )
+    ctx.stroke()
+  }
+  ctx.fillStyle = "rgba(4,18,26,0.32)"
+  ctx.beginPath()
+  ctx.ellipse(0, 0, b.rx * 0.16, b.ry * 0.16, 0, 0, Math.PI * 2)
+  ctx.fill()
   ctx.restore()
 }
 
@@ -106,55 +141,7 @@ export function drawSpecialBody(ctx: Ctx, b: Block, x: number, y: number, time: 
   else drawCottonBody(ctx, b, x, y, time)
 }
 
-/**
- * Метки поверх стандартного тела: внешнее кольцо пульсации, штрихи маршрута
- * дрейфа, стрелки направления вращения.
- */
-export function drawSpecialMarks(ctx: Ctx, b: Block, x: number, y: number, time: number) {
-  const sp = b.sp!
-  if (sp.pulse) {
-    const k = 1 + Math.sin(time * sp.pulse.freq + sp.pulse.ph) * PULSE_AMPLITUDE
-    ctx.strokeStyle = "rgba(255,255,255,0.35)"
-    ctx.lineWidth = 1.2
-    ctx.beginPath()
-    ctx.ellipse(x, y, b.rx * k * 1.16 + 3, b.ry * k * 1.16 + 3, b.rot, 0, Math.PI * 2)
-    ctx.stroke()
-  }
-  if (sp.drift) {
-    const d = sp.drift
-    ctx.strokeStyle = "rgba(255,255,255,0.28)"
-    ctx.lineWidth = 1.2
-    ctx.beginPath()
-    if (d.kind === "h") {
-      ctx.moveTo(x - b.rx - d.amp, y)
-      ctx.lineTo(x - b.rx - 4, y)
-      ctx.moveTo(x + b.rx + 4, y)
-      ctx.lineTo(x + b.rx + d.amp, y)
-    } else if (d.kind === "v") {
-      ctx.moveTo(x, y - b.ry - d.amp)
-      ctx.lineTo(x, y - b.ry - 4)
-      ctx.moveTo(x, y + b.ry + 4)
-      ctx.lineTo(x, y + b.ry + d.amp)
-    } else {
-      ctx.ellipse(x, b.y0 ?? y, d.amp + b.rx, (d.amp + b.ry) * 0.6, 0, 0, Math.PI * 2)
-    }
-    ctx.stroke()
-  }
-  if (sp.rotVel !== undefined) {
-    // стрелки на концах длинной оси: показывают направление (и сам факт) вращения
-    const dir = sp.rotVel >= 0 ? 1 : -1
-    const alpha = sp.rotVel === 0 ? 0.18 : 0.5
-    ctx.strokeStyle = `rgba(255,255,255,${alpha})`
-    ctx.lineWidth = 1.6
-    const long = Math.max(b.rx, b.ry)
-    for (const s of [-1, 1]) {
-      const ax = Math.cos(b.rot) * long * 0.55 * s
-      const ay = Math.sin(b.rot) * long * 0.55 * s
-      ctx.beginPath()
-      ctx.moveTo(x + ax - dir * ay * 0.25, y + ay + dir * ax * 0.25)
-      ctx.lineTo(x + ax * 1.25, y + ay * 1.25)
-      ctx.lineTo(x + ax + dir * ay * 0.25, y + ay - dir * ax * 0.25)
-      ctx.stroke()
-    }
-  }
+/** Внутренние стрелки вращающегося блока: не создают внешний контур. */
+export function drawSpinMarks(ctx: Ctx, b: Block, x: number, y: number) {
+  if (b.sp?.rotVel !== undefined) drawSpinArrows(ctx, b, x, y)
 }

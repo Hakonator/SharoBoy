@@ -4,10 +4,12 @@ import { fixedVariant } from "../bossVariants"
 import { minibossName } from "../minibosses"
 import { lsSet } from "../utils"
 import type { MinibossKind } from "../minibosses"
+import { buildSpecialBlocks } from "../debugLevels"
 
 import { pushHud, setBanner } from "./hudSync"
 import { buildOctopusBoss, buildJellyfishBoss, buildWave, serveBall } from "./levelBuild"
 import { addMiniboss, resetMiniboss } from "./minibossRuntime"
+import { blockTop } from "./paddleControl"
 
 /** Ключ localStorage для настройки «показывать счётчик FPS». */
 export const FPS_LS_KEY = "sharoboy-fps"
@@ -120,6 +122,25 @@ export function spawnDebugMiniboss(g: Game, kind: MinibossKind) {
   if (g.phase === "menu") g.phase = "playing"
   serveBall(g)
   setBanner(g, `МИНИ-БОСС: ${minibossName(kind)}`)
+  pushHud(g)
+}
+
+/** Отдельный стенд всех специальных блоков, не связанный с кампанией. */
+export function spawnDebugSpecialBlocks(g: Game) {
+  g.debugBossType = null
+  g.mode = "endless"
+  g.onBossNode = false
+  g.balls = []
+  g.powers = []
+  g.projectiles = []
+  g.bossSys.clear()
+  g.boomQueue = []
+  resetMiniboss(g)
+  g.blocks = buildSpecialBlocks(g.w, g.h, blockTop(g))
+  g.blocksInitial = g.blocks.length
+  if (g.phase === "menu") g.phase = "playing"
+  serveBall(g)
+  setBanner(g, "СТЕНД СПЕЦБЛОКОВ")
   pushHud(g)
 }
 export function debugDamageUp(g: Game) {

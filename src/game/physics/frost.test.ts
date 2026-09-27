@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import { Physics, type PhysicsWorld } from "../physics"
 import type { Ball, Block } from "../types"
+import { SPIN_DEATH_DURATION, SPIN_MAX } from "../blockKinds"
 
 import { damageBlock } from "./destruction"
 import { FROST_FREEZE_RADIUS, freezeCluster } from "./frost"
@@ -192,5 +193,37 @@ describe("морозный мяч — удар о блок", () => {
     const world2 = makeWorld([makeBlock({ x: 200, y: 100, hp: 1, frozen: true })], false)
     for (let i = 0; i < 12; i++) new Physics(world2.world).updateBall(ball2, 0.016)
     expect(world2.world.blocks.find((b) => b.x === 200)?.dead ?? true).toBe(true)
+  })
+
+  it("крутящийся блок с последним HP не удаляется до окончания секундного вращения", () => {
+    const block = makeBlock({ hp: 1, maxHp: 1, sp: { rotVel: 0, rotDir: -1 } })
+    const { world, sfx } = makeWorld([block], false)
+    damageBlock(world, block, 1)
+    expect(block.dead).toBe(false)
+    expect(block.hp).toBe(1)
+    expect(block.spinDeathT).toBe(SPIN_DEATH_DURATION)
+    expect(block.sp?.rotVel).toBe(-SPIN_MAX)
+    expect(block.sp?.rotDir).toBe(-1)
+    expect(world.blocks).toContain(block)
+
+    damageBlock(world, block, 1) // повторное попадание не сбрасывает анимацию
+    expect(block.spinDeathT).toBe(SPIN_DEATH_DURATION)
+    const physics = new Physics(world)
+    physics.finishSpinDeaths()
+    expect(block.dead).toBe(false) // пока таймер активен, блок остаётся
+    block.spinDeathT = 0 // имитируем истечение таймера после обновления блока
+    physics.finishSpinDeaths()
+    expect(block.dead).toBe(true)
+    expect(world.blocks).not.toContain(block)
+    expect(sfx.destroy).toHaveBeenCalledOnce()
+  })
+
+  it("крутящийся блок с несколькими HP уничтожается обычным образом до последнего удара", () => {
+    const block = makeBlock({ hp: 2, maxHp: 2, sp: { rotVel: 0, rotDir: 1 } })
+    const { world } = makeWorld([block], false)
+    damageBlock(world, block, 1)
+    expect(block.hp).toBe(1)
+    expect(block.spinDeathT).toBeUndefined()
+    expect(world.blocks).toContain(block)
   })
 })

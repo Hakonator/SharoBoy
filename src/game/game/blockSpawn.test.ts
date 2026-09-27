@@ -141,6 +141,7 @@ describe("decorateBlocks", () => {
       if (b.sp?.rotVel !== undefined) {
         expect(b.circle).toBe(false)
         expect(b.rx).toBeGreaterThanOrEqual(b.ry)
+        expect(b.sp.rotDir).toBeDefined()
       }
     }
   })

@@ -31,3 +31,6 @@ export const LEADERBOARD_ENABLED = SUPABASE_URL.trim() !== "" && SUPABASE_ANON_K
  * шага build в workflow) — код менять не нужно.
  */
 export const DEBUG_TOOLS = import.meta.env.VITE_DEBUG_TOOLS !== "0"
+
+/** Версия сборки для диагностического оверлея; в локальном запуске — dev. */
+export const BUILD_VERSION = import.meta.env.VITE_BUILD_VERSION ?? "dev"

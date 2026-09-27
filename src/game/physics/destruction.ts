@@ -1,4 +1,5 @@
 import { TIER } from "../palette"
+import { SPIN_DEATH_DURATION, SPIN_MAX } from "../blockKinds"
 import type { Block } from "../types"
 import { clamp, compactInPlace, rand } from "../utils"
 import type { PhysicsWorld } from "../physics"
@@ -19,7 +20,14 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1) {
     g.damageMiniboss(dmg, b)
     return
   }
-  b.hp -= dmg
+  const finishingSpin = b.spinDeathT === 0
+  if (b.spinDeathT !== undefined && !finishingSpin) return
+  if (finishingSpin) {
+    b.spinDeathT = undefined
+    b.hp = 0
+  } else {
+    b.hp -= dmg
+  }
   b.flash = 1
   if (b.hp > 0) {
     g.sfx.brick(b.tier)
@@ -27,6 +35,17 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1) {
     g.combo++
     g.addScore(10 * comboMult(g), b.x, b.y, "#9fd6ea", 12)
     if (b.tier === 3) g.hitStop = Math.max(g.hitStop, 0.03)
+    g.pushHud()
+    return
+  }
+  if (!finishingSpin && b.sp?.rotVel !== undefined && b.hp <= 0) {
+    b.hp = 1
+    b.spinDeathT = SPIN_DEATH_DURATION
+    if (b.sp.rotVel !== 0) b.sp.rotDir = b.sp.rotVel < 0 ? -1 : 1
+    b.sp.rotDir ??= 1
+    b.sp.rotVel = b.sp.rotDir * SPIN_MAX
+    g.sfx.brick(b.tier)
+    g.fx.burst(b.x, b.y, TIER[b.tier].base, 5, 130)
     g.pushHud()
     return
   }
@@ -107,6 +126,14 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1) {
     g.powers.push({ x: b.x, y: b.y, vy: 150, type: "coin", t: 0 })
   }
   g.pushHud()
+}
+
+/** Завершить отложенное разрушение крутящихся блоков после их анимации. */
+export function finishSpinDeaths(g: PhysicsWorld) {
+  for (let i = g.blocks.length - 1; i >= 0; i--) {
+    const block = g.blocks[i]
+    if (block.spinDeathT === 0) damageBlock(g, block, 0)
+  }
 }
 
 /** «Матрёшка»: вокруг разбитого блока рассыпаются 3–10 крупных шаров. */

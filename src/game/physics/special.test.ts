@@ -114,6 +114,7 @@ describe("крутящийся блок", () => {
     onBallHitSpecial(world, edge, makeBall(), 30, 30)
     onBallHitSpecial(world, center, makeBall(), 0, 30)
     expect(edge.sp!.rotVel).toBeCloseTo(SPIN_KICK)
+    expect(edge.sp!.rotDir).toBe(1)
     expect(center.sp!.rotVel).toBeCloseTo(SPIN_KICK * 0.4)
   })
 
@@ -121,6 +122,7 @@ describe("крутящийся блок", () => {
     const b = makeBlock({ sp: { rotVel: 0 } })
     onBallHitSpecial(makeWorld([b]), b, makeBall(), -30, 30)
     expect(b.sp!.rotVel).toBeCloseTo(-SPIN_KICK)
+    expect(b.sp!.rotDir).toBe(-1)
   })
 
   it("импульс суммируется и ограничен SPIN_MAX", () => {

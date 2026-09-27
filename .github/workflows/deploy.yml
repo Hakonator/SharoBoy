@@ -92,6 +92,7 @@ jobs:
         working-directory: main-src
         env:
           GH_PAGES_BASE: /SharoBoy/
+          VITE_BUILD_VERSION: ${{ github.run_number }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
@@ -134,6 +135,7 @@ jobs:
         working-directory: beta-src
         env:
           GH_PAGES_BASE: /SharoBoy/beta/
+          VITE_BUILD_VERSION: ${{ github.run_number }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build

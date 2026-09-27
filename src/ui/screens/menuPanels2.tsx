@@ -65,6 +65,7 @@ export function MenuDebug({
                       label: "Медуза (мини)",
                       icon: <IconJelly className="h-3.5 w-3.5" />,
                     },
+                    { id: "specialBlocks", label: "Спецблоки (стенд)" },
                   ] as BossOption[]
                 ).map((b) => (
                   <label

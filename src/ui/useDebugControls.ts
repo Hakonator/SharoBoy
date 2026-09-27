@@ -49,6 +49,8 @@ export function useDebugControls(gameRef: RefObject<Game | null>) {
       game.spawnDebugMiniboss("fish")
     } else if (debugBoss === "minibossJelly") {
       game.spawnDebugMiniboss("jelly")
+    } else if (debugBoss === "specialBlocks") {
+      game.spawnDebugSpecialBlocks()
     } else {
       // Пустой уровень со случайными блоками (стандартный wave 1)
       game.startEndless()

@@ -93,6 +93,10 @@ export interface Block {
   splits: boolean
   /** Особый тип блока (§6): пульсация/пружина/вата/вращение/дрейф/телепорт. */
   sp?: BlockSpecial
+  /** Подпись стенда спецблоков в диагностическом режиме. */
+  debugLabel?: string
+  /** Блок уничтожен ударом, но ждёт конца анимации вращения. */
+  spinDeathT?: number
   /** Заморожен морозным мячом: колется с одного удара, рисуется льдом. */
   frozen?: boolean
   minionOrbit?: { ang: number; rad: number; dir: number; speed: number }

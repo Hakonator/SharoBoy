@@ -13,6 +13,8 @@ export interface BlockSpecial {
   cotton?: boolean
   /** Крутящийся: угловая скорость (рад/с), гасится трением. */
   rotVel?: number
+  /** Стабильное направление визуальных стрелок крутящегося блока. */
+  rotDir?: 1 | -1
   /** Дрейф по маршруту: горизонталь / вертикаль / окружность. */
   drift?: { kind: "h" | "v" | "circle"; amp: number; freq: number; ph: number }
   /** Телепорт: общий id пары; переброс шара в блок с тем же id. */
@@ -28,7 +30,7 @@ export const SPRING_SPEED_MULT = 1.3
 /** Время действия разгона пружины, сек. */
 export const SPRING_TIME = 2.2
 /** Множитель скорости шара под эффектом ваты. */
-export const COTTON_SPEED_MULT = 0.68
+export const COTTON_SPEED_MULT = 0.5
 /** Время действия замедления ваты, сек. */
 export const COTTON_TIME = 2.0
 /** Кулдаун пары порталов после прыжка, сек. */
@@ -37,3 +39,7 @@ export const PORTAL_CD = 1.1
 export const SPIN_KICK = 3.2
 /** Предел угловой скорости крутящегося блока (рад/с). */
 export const SPIN_MAX = 6
+/** Перед разрушением крутящийся блок эффектно вращается одну секунду. */
+export const SPIN_DEATH_DURATION = 1
+/** Максимальная амплитуда маршрута в радиусах соответствующей оси блока. */
+export const DRIFT_MAX_RADIUS_MULT = 3

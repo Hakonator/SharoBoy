@@ -5,6 +5,7 @@
  * с общим id. Боссы, минибоссы и бомбы не трогаются.
  */
 import type { Block } from "../types"
+import { DRIFT_MAX_RADIUS_MULT } from "../blockKinds"
 import { clamp } from "../utils"
 
 /** Блоки, которым разрешены специальные типы. */
@@ -31,10 +32,11 @@ function makePulse(b: Block, rng: () => number) {
 function makeDrift(b: Block, rng: () => number) {
   const kinds = ["h", "v", "circle"] as const
   const kind = kinds[Math.floor(rng() * kinds.length)]
+  const maxAmp = kind === "h" ? b.rx * DRIFT_MAX_RADIUS_MULT : b.ry * DRIFT_MAX_RADIUS_MULT
   b.sp = {
     drift: {
       kind,
-      amp: 12 + rng() * 14,
+      amp: Math.min(12 + rng() * 14, maxAmp),
       freq: 0.5 + rng() * 0.6,
       ph: rng() * Math.PI * 2,
     },
@@ -52,7 +54,7 @@ function assignSpecial(b: Block, rng: () => number) {
   else if (roll < 0.85) makeDrift(b, rng)
   // крутящийся — только вытянутый блок; круглый заменяем пульсацией
   else if (b.circle || b.rx < b.ry) makePulse(b, rng)
-  else b.sp = { rotVel: 0 }
+  else b.sp = { rotVel: 0, rotDir: rng() < 0.5 ? -1 : 1 }
 }
 
 /** Превращает два свободных блока в пару порталов с общим id. */

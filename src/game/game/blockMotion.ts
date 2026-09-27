@@ -6,7 +6,7 @@
  */
 import type { Game } from "../game"
 import type { Block } from "../types"
-import { PULSE_AMPLITUDE } from "../blockKinds"
+import { DRIFT_MAX_RADIUS_MULT, PULSE_AMPLITUDE, SPIN_DEATH_DURATION } from "../blockKinds"
 import { clamp } from "../utils"
 
 import { blockTop } from "./paddleControl"
@@ -14,6 +14,9 @@ import { blockTop } from "./paddleControl"
 /** Один шаг анимации/движения блока (каждый блок — каждый кадр). */
 export function stepBlock(g: Game, b: Block, dt: number) {
   const t = g.time
+  if (b.spinDeathT !== undefined) {
+    b.spinDeathT = Math.max(0, Math.min(SPIN_DEATH_DURATION, b.spinDeathT) - dt)
+  }
   // нижняя граница по вертикали: блок не заходит в неигровую HUD-зону сверху
   const yMin = blockTop(g) + b.ry
   // горизонтальное покачивание (сетка)
@@ -56,15 +59,32 @@ export function stepBlock(g: Game, b: Block, dt: number) {
   // дрейф по маршруту: база — x0 (и y0 для вертикали/окружности)
   if (sp.drift) {
     const d = sp.drift
-    const baseY = b.y0 ?? b.y
-    const off = Math.sin(t * d.freq + d.ph) * d.amp
+    const horizontalAmp = Math.min(d.amp, b.rx * DRIFT_MAX_RADIUS_MULT)
+    const verticalAmp = Math.min(d.amp, b.ry * DRIFT_MAX_RADIUS_MULT)
+    const phase = t * d.freq + d.ph
     if (d.kind === "h") {
+      const off = Math.sin(phase) * horizontalAmp
       b.x = clamp(b.x0 + off, b.rx + 4, g.w - b.rx - 4)
     } else if (d.kind === "v") {
-      b.y = clamp(baseY + off, yMin, g.h * 0.75)
+      b.y0 ??= b.y
+      const base = b.y0
+      const maxCenter = g.h * 0.75 - b.ry
+      const centerMin = yMin + verticalAmp
+      const centerMax = maxCenter - verticalAmp
+      const safeBase =
+        centerMin <= centerMax ? clamp(base, centerMin, centerMax) : (yMin + maxCenter) / 2
+      b.y = safeBase + Math.sin(phase) * verticalAmp
     } else {
-      b.x = clamp(b.x0 + Math.cos(t * d.freq + d.ph) * d.amp, b.rx + 4, g.w - b.rx - 4)
-      b.y = clamp(baseY + Math.sin(t * d.freq + d.ph) * d.amp * 0.6, yMin, g.h * 0.75)
+      b.x = clamp(b.x0 + Math.cos(phase) * horizontalAmp, b.rx + 4, g.w - b.rx - 4)
+      b.y0 ??= b.y
+      const base = b.y0
+      const maxCenter = g.h * 0.75 - b.ry
+      const circleVerticalAmp = verticalAmp * 0.6
+      const centerMin = yMin + circleVerticalAmp
+      const centerMax = maxCenter - circleVerticalAmp
+      const safeBase =
+        centerMin <= centerMax ? clamp(base, centerMin, centerMax) : (yMin + maxCenter) / 2
+      b.y = safeBase + Math.sin(phase) * circleVerticalAmp
     }
   }
   // пульсация размера: хитбокс (collideBlocks читает rx/ry) следует за визуалом
