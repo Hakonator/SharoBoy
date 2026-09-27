@@ -22,16 +22,16 @@ export function drawJelly(ctx: Ctx, parts: Block[], time: number) {
   const bottom = d.y + d.h
 
   // щупальца: цепочки, качающиеся волной с амплитудой, растущей к кончикам
-  const sorted = [...tents].sort((a, b) => a.x - b.x || a.y - b.y)
-  const chains: Block[][] = []
-  for (const p of sorted) {
-    const last = chains[chains.length - 1]
-    if (last && p.x - last[0].x < 9) last.push(p)
-    else chains.push([p])
+  const chains = new Map<number, Block[]>()
+  for (const p of tents) {
+    const id = p.tentacleId ?? 0
+    const chain = chains.get(id)
+    if (chain) chain.push(p)
+    else chains.set(id, [p])
   }
   ctx.lineCap = "round"
-  for (let ci = 0; ci < chains.length; ci++) {
-    const chain = chains[ci]
+  let ci = 0
+  for (const chain of chains.values()) {
     if (chain.length < 2) continue
     const base = [...chain].sort((a, b) => a.y - b.y)
     const pts = base.map((p, i) => ({
@@ -54,6 +54,7 @@ export function drawJelly(ctx: Ctx, parts: Block[], time: number) {
       ctx.lineWidth = pass.width
       ctx.stroke()
     }
+    ci++
   }
 
   // купол: верх — гладкая арка, низ — фестоны, всё дышит пульсом

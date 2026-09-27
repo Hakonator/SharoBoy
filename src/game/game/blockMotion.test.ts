@@ -44,6 +44,26 @@ describe("stepBlock — базовые дрейфы", () => {
     expect(b.x).toBeCloseTo(210)
   })
 
+  it("минибосс движется целиком и не выходит за боковую границу", () => {
+    const parts = [
+      makeBlock({ x: 80, x0: 80, rx: 40, isMiniboss: true, mbGroup: 7, swayAmp: 500, swayFreq: 1 }),
+      makeBlock({
+        x: 720,
+        x0: 720,
+        rx: 40,
+        isMiniboss: true,
+        mbGroup: 7,
+        swayAmp: 500,
+        swayFreq: 1,
+      }),
+    ]
+    const game = makeGame(Math.PI / 2, { blocks: parts })
+    for (const part of parts) stepBlock(game, part, 0.016)
+    expect(parts[0].x).toBe(116)
+    expect(parts[1].x).toBe(756)
+    expect(parts[1].x - parts[0].x).toBe(640)
+  })
+
   it("вертикальный дрейф медузы сохранён (база y0)", () => {
     const b = makeBlock({ y0: 150, bobAmp: 20, bobFreq: 1, bobPh: 0 })
     stepBlock(makeGame(Math.PI / 2), b, 0.016)

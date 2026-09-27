@@ -99,6 +99,8 @@ function makePart(opts: {
   bobFreq?: number
   bobPh?: number
   group?: number
+  tentacleId?: number
+  tentacleSeg?: number
 }): Block {
   return {
     x: opts.x,
@@ -126,6 +128,8 @@ function makePart(opts: {
     isMiniboss: true,
     mbGroup: opts.group ?? 0,
     mbPart: opts.part,
+    tentacleId: opts.tentacleId,
+    tentacleSeg: opts.tentacleSeg,
   }
 }
 
@@ -204,7 +208,20 @@ export function buildJelly(w: number, h: number, top: number, group = 0, cx = w 
   for (let t = 0; t < 5; t++) {
     const tx = -32 + t * 16
     for (let s = 0; s < 4; s++) {
-      blocks.push(p(tx + (s % 2 ? 3 : -3), 36 + s * 14, 6.5, 6.5, 1, "tentacle"))
+      blocks.push(
+        makePart({
+          x: cx + tx + (s % 2 ? 3 : -3),
+          y: cy + 36 + s * 14,
+          rx: 6.5,
+          ry: 6.5,
+          tier: 1,
+          part: "tentacle",
+          group,
+          tentacleId: t,
+          tentacleSeg: s,
+          ...S,
+        })
+      )
     }
   }
   return blocks

@@ -64,6 +64,9 @@ describe("minibosses", () => {
     expect(jelly.filter((b) => b.mbPart === "dome").length).toBe(2) // купол без лишних шариков
     expect(jelly.filter((b) => b.mbPart === "fringe").length).toBe(7) // бахрома
     expect(jelly.filter((b) => b.mbPart === "tentacle").length).toBe(20) // 5 × 4
+    expect(new Set(jelly.filter((b) => b.mbPart === "tentacle").map((b) => b.tentacleId))).toEqual(
+      new Set([0, 1, 2, 3, 4])
+    )
   })
 
   it("пул HP существа: 20 на старте кампании, 100 в конце", () => {

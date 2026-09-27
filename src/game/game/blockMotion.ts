@@ -18,7 +18,24 @@ export function stepBlock(g: Game, b: Block, dt: number) {
   const yMin = blockTop(g) + b.ry
   // горизонтальное покачивание (сетка)
   if (b.swayAmp > 0) {
-    b.x = clamp(b.x0 + Math.sin(t * b.swayFreq + b.swayPh) * b.swayAmp, b.rx + 4, g.w - b.rx - 4)
+    const rawOffset = Math.sin(t * b.swayFreq + b.swayPh) * b.swayAmp
+    if (b.isMiniboss) {
+      // Все части существа получают один и тот же сдвиг. Кламп по каждой
+      // части отдельно растягивал медузу у стены и оставлял её «упираться».
+      let minEdge = Infinity
+      let maxEdge = -Infinity
+      for (const part of g.blocks) {
+        if (!part.isMiniboss || part.mbGroup !== b.mbGroup) continue
+        minEdge = Math.min(minEdge, part.x0 - part.rx)
+        maxEdge = Math.max(maxEdge, part.x0 + part.rx)
+      }
+      const minOffset = 4 - minEdge
+      const maxOffset = g.w - 4 - maxEdge
+      const offset = clamp(rawOffset, minOffset, maxOffset)
+      b.x = b.x0 + offset
+    } else {
+      b.x = clamp(b.x0 + rawOffset, b.rx + 4, g.w - b.rx - 4)
+    }
   }
   // вертикальный дрейф медузы: вся медуза целиком (одна фаза bobPh)
   if (b.bobAmp && b.bobFreq) {
