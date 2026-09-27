@@ -26,9 +26,19 @@ export function resetMiniboss(g: Game) {
 export function addMiniboss(g: Game, kind: MinibossKind, hp = MINIBOSS_HP_FIRST) {
   const top = blockTop(g)
   const group = ++g.mbGroupSeq
-  // Дуэт: второе существо рождается со сдвигом вправо — иначе оба существа
-  // строятся вокруг одного центра и налегают друг на друга с первого кадра.
-  const duetShift = g.minibosses.length > 0 ? g.w * MINIBOSS_DUET_SHIFT : 0
+  // Дуэт занимает поле симметрично: первое существо сдвигается влево, второе
+  // рождается на таком же расстоянии вправо. Односторонний сдвиг оставлял
+  // второе существо у правой стены, где его патруль сразу упирался в границу.
+  const duetShift = g.minibosses.length > 0 ? g.w * MINIBOSS_DUET_SHIFT * 0.5 : 0
+  if (duetShift > 0) {
+    const first = g.minibosses[0]
+    for (const b of g.blocks) {
+      if (!b.isMiniboss || b.mbGroup !== first.group) continue
+      b.x -= duetShift
+      b.x0 -= duetShift
+    }
+    first.dropX -= duetShift
+  }
   const creature =
     kind === "fish"
       ? buildFish(g.w, g.h, top, group, g.w / 2 + duetShift)

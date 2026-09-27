@@ -31,10 +31,10 @@ describe("MapScreen: маршрут события кампании", () => {
       <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
     )
 
-    expect(html).toContain("stroke-dasharray=\"2 1.4\"")
-    expect(html).toContain("stroke-width=\"0.35\"")
-    expect(html).toContain("markerWidth=\"3\"")
-    expect(html).toContain("marker-end=\"url(#campaign-event-arrow)\"")
+    expect(html).toContain('stroke-dasharray="2 1.4"')
+    expect(html).toContain('stroke-width="0.35"')
+    expect(html).toContain('markerWidth="1"')
+    expect(html).toContain('marker-end="url(#campaign-event-arrow)"')
     expect(html).toContain("rgba(255,201,77,0.85)")
     expect(html).toContain(target.name)
   })

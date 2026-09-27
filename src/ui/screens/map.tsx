@@ -90,14 +90,14 @@ export function MapScreen({
             <defs>
               <marker
                 id="campaign-event-arrow"
-                markerWidth="3"
-                markerHeight="3"
-                refX="2.6"
-                refY="1.5"
+                markerWidth="1"
+                markerHeight="1"
+                refX="0.87"
+                refY="0.5"
                 orient="auto"
                 markerUnits="userSpaceOnUse"
               >
-                <path d="M0 0 L3 1.5 L0 3 Z" fill="#ffc94d" />
+                <path d="M0 0 L1 0.5 L0 1 Z" fill="#ffc94d" />
               </marker>
             </defs>
             {revealedEdges.map((e) => {
@@ -148,12 +148,12 @@ export function MapScreen({
               const tint = isEventTarget
                 ? "border-2 border-gold bg-gold text-abyss shadow-[0_0_0_4px_rgba(255,201,77,0.25),0_0_24px_rgba(255,201,77,0.85)] animate-pulse"
                 : n.isBoss
-                ? "bg-coral shadow-[0_0_18px_rgba(255,106,92,0.85)]"
-                : isCurrent
-                  ? "bg-cyan-neon shadow-[0_0_16px_rgba(53,224,255,0.9)]"
-                  : clickable
-                    ? "bg-mint shadow-[0_0_14px_rgba(93,255,176,0.75)]"
-                    : "bg-deep border border-line"
+                  ? "bg-coral shadow-[0_0_18px_rgba(255,106,92,0.85)]"
+                  : isCurrent
+                    ? "bg-cyan-neon shadow-[0_0_16px_rgba(53,224,255,0.9)]"
+                    : clickable
+                      ? "bg-mint shadow-[0_0_14px_rgba(93,255,176,0.75)]"
+                      : "bg-deep border border-line"
               return (
                 <button
                   key={n.id}
@@ -193,7 +193,9 @@ export function MapScreen({
                     </span>
                   )}
                   {(clickable || isEventTarget) && (
-                    <span className={`whitespace-nowrap font-display text-[10px] tracking-wider drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs ${isEventTarget ? "text-gold" : "text-foam"}`}>
+                    <span
+                      className={`whitespace-nowrap font-display text-[10px] tracking-wider drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs ${isEventTarget ? "text-gold" : "text-foam"}`}
+                    >
                       {n.name}
                     </span>
                   )}
