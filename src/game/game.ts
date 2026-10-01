@@ -20,7 +20,7 @@ import type { CampaignMap } from "./campaignMap"
 import type { LevelSpec } from "./levels"
 import type { MinibossKind } from "./minibosses"
 import { makeBossHost, makePowersHost } from "./game/hosts"
-import { makePhysicsHost, makeWeaponsHost } from "./game/hostsWorld"
+import { makePhysicsHost, makeWeaponsHost } from "./game/hosts"
 import { paddleShape } from "./game/paddleControl"
 import { loadProgress, buyUpgrade } from "./game/progress"
 import {

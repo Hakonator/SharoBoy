@@ -9,8 +9,7 @@ import type { HudData } from "../../game/types"
 
 import { MenuSection } from "./shared"
 import { MenuRecords, MenuGlobalTop } from "./menuTop"
-import { MenuCornerControls, MenuUpgrades } from "./menuPanels"
-import { MenuDebug } from "./menuPanels2"
+import { MenuCornerControls, MenuDebug, MenuUpgrades } from "./menuPanels"
 import type { PlayerStats } from "./types"
 
 export function MenuScreen({

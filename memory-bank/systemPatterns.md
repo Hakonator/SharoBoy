@@ -11,13 +11,13 @@
   `(g: Game, ...)` в соседних модулях: `updateStep`, `drawScene`, `runFlow`,
   `campaignFlow`, `levelBuild`, `minibossRuntime`/`minibossFx`, `lifecycle`,
   `modes`, `audioControls`, `paddleControl`, `debug`, `hudSync`, `progress`,
-  `hosts`/`hostsWorld`.
+  `hosts`.
 
 ## Ключевые паттерны
 
 - **Host-pattern**: подсистемы (`Physics`, `PowersSystem`, `BossSystem`,
   `WeaponsSystem`) получают мир через интерфейсы (`PhysicsWorld`, `PowersWorld`,
-  `BossHost`, `WeaponsWorld`); фабрики хостов — `game/hosts.ts`, `game/hostsWorld.ts`.
+  `BossHost`, `WeaponsWorld`); фабрики хостов — `game/hosts.ts`.
 - **Facade re-export**: фасады `game.ts`, `render.ts`, `audio.ts`, `physics.ts`,
   `powers.ts`, `screens.tsx` сохраняют старые пути импорта потребителей.
 - **Кэш градиентов**: `render/gradCache.ts` — CanvasGradient создаётся один раз
@@ -39,5 +39,7 @@
   пишет каждый fill/stroke с матрицей трансформа, alpha, strokeStyle и
   lineWidth — так проверяется «нарисовано под трансформом и при alpha=1» без
   браузера.
-- Лимит размера: ≤300 строк (≤500 для `render/` и `audio.ts`), разбивать по единой
-  ответственности. Никаких `any`/`@ts-ignore`, только ESM.
+- Размер файла не является жёстким лимитом: модули группируются по бизнес-смыслу и
+  высокой связности, искусственное дробление ради счётчика строк запрещено. Если
+  файл становится действительно гигантским (например, >1000 строк) и теряет фокус,
+  разделять его по зонам ответственности. Никаких `any`/`@ts-ignore`, только ESM.
