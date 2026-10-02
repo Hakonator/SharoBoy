@@ -140,7 +140,7 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
       drawDebugLabel(ctx, b, x, y)
       continue
     }
-    const tier = TIER[b.tier]
+    const tier = TIER[Math.min(Math.max(Math.round(b.hp), 1), 3) as 1 | 2 | 3]
     ctx.save()
     ctx.translate(x, y)
     ctx.rotate(b.rot)
@@ -168,31 +168,6 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
       ctx.fill()
     }
     ctx.restore()
-
-    // трещины
-    const dmg = b.maxHp - b.hp
-    if (dmg > 0) {
-      ctx.strokeStyle = "rgba(4,18,26,0.5)"
-      ctx.lineWidth = 1.6
-      for (let i = 0; i < dmg; i++) {
-        const a0 = b.seed + i * 2.1
-        ctx.beginPath()
-        ctx.moveTo(x + Math.cos(a0) * b.rx * 0.2, y + Math.sin(a0) * b.ry * 0.2)
-        ctx.lineTo(x + Math.cos(a0 + 0.5) * b.rx * 0.75, y + Math.sin(a0 + 0.5) * b.ry * 0.75)
-        ctx.lineTo(x + Math.cos(a0 + 0.9) * b.rx * 0.55, y + Math.sin(a0 + 0.9) * b.ry * 0.55)
-        ctx.stroke()
-      }
-    }
-
-    // пипсы HP
-    if (b.maxHp > 1 && b.hp > 1) {
-      ctx.fillStyle = "rgba(4,18,26,0.75)"
-      for (let i = 0; i < b.hp; i++) {
-        ctx.beginPath()
-        ctx.arc(x + (i - (b.hp - 1) / 2) * 8, y + b.ry * 0.55, 2.2, 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
 
     drawDebugLabel(ctx, b, x, y)
     drawSpinMarks(ctx, b, x, y)
