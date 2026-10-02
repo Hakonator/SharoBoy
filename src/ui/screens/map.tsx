@@ -231,13 +231,16 @@ export function MapScreen({
 
       {/* Оверлей события: боя не было — игрока отнесло в пройденный узел */}
       {hud.campaignEvent && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-abyss/70 p-4">
-          <div className="hud-chip flex max-w-md flex-col items-center px-6 py-5 text-center">
-            <div className="hud-label mb-2">СЛУЧАЙНОЕ СОБЫТИЕ</div>
-            <p className="font-display text-sm leading-relaxed text-foam sm:text-base">
+        <div className="absolute inset-0 z-30 flex items-start justify-center bg-abyss/25 px-3 pt-20 sm:items-center sm:bg-abyss/70 sm:p-4">
+          <div className="hud-chip flex max-w-[min(90vw,28rem)] flex-col items-center bg-abyss/75 px-4 py-3 text-center backdrop-blur-sm sm:px-6 sm:py-5">
+            <div className="hud-label mb-1 sm:mb-2">СЛУЧАЙНОЕ СОБЫТИЕ</div>
+            <p className="font-display text-xs leading-relaxed text-foam sm:text-base">
               {hud.campaignEvent}
             </p>
-            <button className="btn-ghost mt-4 px-5 py-2 text-sm" onClick={onEventDismiss}>
+            <button
+              className="btn-ghost mt-2 px-4 py-1.5 text-xs sm:mt-4 sm:px-5 sm:py-2 sm:text-sm"
+              onClick={onEventDismiss}
+            >
               ПЛЫТЬ ДАЛЬШЕ
             </button>
           </div>

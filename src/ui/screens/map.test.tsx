@@ -2,11 +2,18 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 
 import { generateCampaignMap } from "../../game/campaignMap"
+import { EVENT_TEXTS } from "../../game/campaignMapLayout"
 import type { HudData } from "../../game/types"
 
 import { MapScreen } from "./map"
 
 describe("MapScreen: маршрут события кампании", () => {
+  it("показывает название цели как название локации, не пытаясь склонять его", () => {
+    expect(EVENT_TEXTS[1].replace("{place}", "АВАНПОСТ")).toBe(
+      "ПОДВОДНОЕ ТЕЧЕНИЕ УНЕСЛО ШАР ПРЯМО В ЛОКАЦИЮ «АВАНПОСТ»."
+    )
+  })
+
   it("раскрывает цель, подсвечивает её и указывает пунктирной стрелкой", () => {
     const map = generateCampaignMap(541)
     const player = map.nodes.find((node) => node.id === map.startId)!
@@ -37,5 +44,7 @@ describe("MapScreen: маршрут события кампании", () => {
     expect(html).toContain('marker-end="url(#campaign-event-arrow)"')
     expect(html).toContain("rgba(255,201,77,0.85)")
     expect(html).toContain(target.name)
+    expect(html).toContain("bg-abyss/25")
+    expect(html).toContain("backdrop-blur-sm")
   })
 })
