@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { FIREBALL_DAMAGE_MULT, Physics, type PhysicsWorld } from "./physics"
 import type { Ball, Block } from "./types"
+import { spawnScatter } from "./physics/destruction"
 
 /** Регрессия 26dc66b: знак surfaceAt для «convex» инвертировали «для симметрии»
  *  с чашей — все потребители (старт шара, прилипание, выталкивание, пилоны)
@@ -173,6 +174,7 @@ describe("Physics — верхняя неигровая HUD-зона", () => {
       w: 400,
       h: 600,
       blockTop,
+      blockSpawnTop: blockTop,
       time: 0,
       paddle: { x: 200, y: 560, w: 90, h: 14 },
       blocksInitial: 0,
@@ -242,5 +244,30 @@ describe("Physics — верхняя неигровая HUD-зона", () => {
     physics.updateBall(ball, 0.016)
     expect(ball.y - ball.r).toBe(150)
     expect(ball.vy).toBeGreaterThan(0)
+  })
+
+  it("рассыпь не создаёт новые блоки за HUD на портретном экране", () => {
+    const world = makeTopWorld(150)
+    world.fx = {
+      burst() {},
+      particles: [],
+      rings: [],
+      popups: [],
+    } as unknown as PhysicsWorld["fx"]
+    const source = {
+      x: 180,
+      y: 170,
+      rx: 18,
+      ry: 18,
+      tier: 1,
+      seed: 1,
+    } as Block
+
+    spawnScatter(world, source)
+
+    expect(world.blocks.length).toBeGreaterThan(0)
+    for (const block of world.blocks) {
+      expect(block.y - block.ry).toBeGreaterThanOrEqual(150)
+    }
   })
 })

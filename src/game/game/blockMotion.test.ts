@@ -64,6 +64,31 @@ describe("stepBlock — базовые дрейфы", () => {
     expect(parts[1].x - parts[0].x).toBe(640)
   })
 
+  it("минибосс проходит весь доступный горизонтальный диапазон", () => {
+    const part = makeBlock({
+      x: 200,
+      x0: 200,
+      rx: 30,
+      ry: 10,
+      rot: Math.PI / 4,
+      isMiniboss: true,
+      mbGroup: 3,
+      swayAmp: 500,
+      swayFreq: 1,
+      swayPh: -Math.PI / 2,
+    })
+    const game = makeGame(0, { blocks: [part] })
+    const rotatedRadius = Math.hypot(part.rx * Math.cos(part.rot), part.ry * Math.sin(part.rot))
+    const minCenter = 4 + rotatedRadius
+    const maxCenter = game.w - 4 - rotatedRadius
+
+    stepBlock(game, part, 0.016)
+    expect(part.x).toBeCloseTo(minCenter)
+    game.time = Math.PI
+    stepBlock(game, part, 0.016)
+    expect(part.x).toBeCloseTo(maxCenter)
+  })
+
   it("вертикальный дрейф медузы сохранён (база y0)", () => {
     const b = makeBlock({ y0: 150, bobAmp: 20, bobFreq: 1, bobPh: 0 })
     stepBlock(makeGame(Math.PI / 2), b, 0.016)

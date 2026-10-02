@@ -26,6 +26,8 @@ export interface PowersWorld {
   readonly h: number
   /** Верхняя неигровая HUD-зона (мировые единицы): спавн/дрейф поля — ниже. */
   readonly blockTop: number
+  /** Нижний край видимого HUD в обеих ориентациях — только для спавна блоков. */
+  readonly blockSpawnTop: number
   readonly time: number
   readonly paddle: PaddleState
   readonly balls: Ball[]
@@ -88,7 +90,7 @@ export class PowersSystem {
       }
       const cx = rand(rx + 10, g.w - rx - 10)
       // неигровая HUD-зона сверху: новые блоки появляются только ниже неё
-      const lo = g.blockTop + ry + 6
+      const lo = g.blockSpawnTop + ry + 6
       const cy = rand(lo, Math.max(lo, g.h * 0.5))
       let overlaps = false
       for (const b of g.blocks) {

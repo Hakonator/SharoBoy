@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest"
 
-import { densityFactor, gridBlocks, layoutBlocks } from "./levelBuilder"
+import { densityFactor, desktopDensity, gridBlocks, layoutBlocks } from "./levelBuilder"
 import { LEVELS, type LayoutSpec, type PatternSpec } from "./levels"
 import type { Block } from "./types"
+import { mulberry32 } from "./utils"
 
 function overlaps(a: Block, b: Block): boolean {
   const nx = a.rx + b.rx
@@ -39,6 +40,13 @@ describe("densityFactor — мировые размеры поля", () => {
     expect(densityFactor(5000, 2000)).toBe(1.35)
     expect(densityFactor(400, 400)).toBe(0.65)
   })
+
+  it("большой desktop получает большую плотность, чем телефон", () => {
+    expect(desktopDensity(1920)).toBeCloseTo(1.333, 2)
+    expect(desktopDensity(2560)).toBeCloseTo(1.778, 2)
+    expect(desktopDensity(3840)).toBe(2.1)
+    expect(desktopDensity(927)).toBe(1)
+  })
 })
 
 describe("gridBlocks", () => {
@@ -70,6 +78,12 @@ describe("layoutBlocks", () => {
   it("на эталонном поле — авторская раскладка без дополнений", () => {
     const desktop = layoutBlocks(spec, 1920, 1080, densityFactor(1920, 1080))
     expect(desktop.length).toBe(spec.layout.length)
+  })
+
+  it("процедурная desktop-плотность добавляет блоки к композиции", () => {
+    const blocks = layoutBlocks(spec, 1920, 1080, desktopDensity(1920), 0, mulberry32(123))
+    expect(blocks.length).toBeGreaterThan(spec.layout.length)
+    expect(countOverlaps(blocks)).toBe(0)
   })
 
   it("topOverride опускает раскладку ниже — под HUD-плашки", () => {

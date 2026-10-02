@@ -93,3 +93,8 @@ export function blockTop(g: Game): number {
   if (g.cssH <= g.cssW) return 0
   return Math.min(Math.max(g.h * 0.14, hudTopCss(g.cssW, g.cssH) / g.scale), g.h * 0.35)
 }
+
+/** Верхняя безопасная граница для спавна блоков: учитывает HUD в landscape. */
+export function blockSpawnTop(g: Game): number {
+  return Math.max(blockTop(g), hudTopCss(g.cssW, g.cssH) / g.scale)
+}

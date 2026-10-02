@@ -6,7 +6,7 @@ import type { WeaponsWorld } from "../weapons"
 
 import { addCoins } from "./progress"
 import { pushHud } from "./hudSync"
-import { blockTop } from "./paddleControl"
+import { blockSpawnTop, blockTop } from "./paddleControl"
 import { isDebugEffectActive } from "./debug"
 import { damageMiniboss } from "./minibossRuntime"
 import { addRawScore, addScore, onBombHitPaddle, onBossKilled } from "./runFlow"
@@ -80,6 +80,9 @@ export function makePowersHost(g: Game): PowersWorld {
     },
     get blockTop() {
       return blockTop(g)
+    },
+    get blockSpawnTop() {
+      return blockSpawnTop(g)
     },
     paddle: g.paddle,
     get balls() {
@@ -230,6 +233,9 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     get blockTop() {
       return blockTop(g)
+    },
+    get blockSpawnTop() {
+      return blockSpawnTop(g)
     },
     get debugBallDamage() {
       return g.debugBallDamage

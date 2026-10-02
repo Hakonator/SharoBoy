@@ -10,6 +10,7 @@ describe("PowersSystem — неигровая HUD-зона сверху", () => 
       w: 800,
       h: 900,
       blockTop: 300,
+      blockSpawnTop: 300,
       time: 0,
       paddle: { x: 400, y: 850, w: 90, h: 14 },
       balls: [],
@@ -66,5 +67,14 @@ describe("PowersSystem — неигровая HUD-зона сверху", () => 
     // случайный dy всегда в пределах ±24, поэтому зажимается до blockTop − minY
     expect(g.fieldShift).not.toBeNull()
     expect(g.fieldShift!.dy).toBeCloseTo((g.blockTop - 230) * 2.2)
+  })
+
+  it("периодический спавн оставляет landscape HUD свободным", () => {
+    const g = makeWorld({ blockTop: 0, blockSpawnTop: 96 })
+    new PowersSystem(g).periodicSpawn(0.016)
+    expect(g.blocks.length).toBeGreaterThan(0)
+    for (const block of g.blocks) {
+      expect(block.y - block.ry).toBeGreaterThanOrEqual(96)
+    }
   })
 })

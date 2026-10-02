@@ -62,6 +62,8 @@ export interface PhysicsWorld {
   readonly h: number
   /** Верхняя неигровая HUD-зона (мировые единицы): шар не заходит выше неё. */
   readonly blockTop: number
+  /** Нижний край видимого HUD в обеих ориентациях — только для новых блоков. */
+  readonly blockSpawnTop: number
   readonly time: number
   readonly paddle: PaddleState
   readonly blocksInitial: number

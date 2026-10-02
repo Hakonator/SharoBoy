@@ -38,23 +38,22 @@ describe("addMiniboss: дуэт двух существ в уровне", () => 
     }
   })
 
-  it("обычные блоки уровня под существами вырезаются, чужие существа — нет", () => {
+  it("сохраняет все блоки уровня при появлении минибоссов", () => {
     const { game, restoreRandom } = makeEnv()
     try {
       resetMiniboss(game)
       game.phase = "playing"
       game.blocks = game.blocks.filter((b) => !b.isMiniboss)
-      const levelBefore = game.blocks.length
+      const levelBlocks = game.blocks.filter((b) => !b.isMiniboss)
       addMiniboss(game, "jelly") // первое — в центре
-      const jellyBlocks = game.blocks.length - levelBefore
-      const levelAfterFirst = game.blocks.length
-      addMiniboss(game, "fish") // второе — налегает на первое при старом баге
-      const fishBlocks = game.blocks.length - levelAfterFirst
-      // вырезались только обычные блоки уровня; оба силуэта целиком в g.blocks
-      expect(game.blocks.filter((b) => (b.mbGroup ?? 0) === 1).length).toBe(jellyBlocks)
-      expect(game.blocks.filter((b) => (b.mbGroup ?? 0) === 2).length).toBe(fishBlocks)
-      expect(jellyBlocks).toBe(29)
-      expect(fishBlocks).toBe(9)
+      const minibossCountAfterFirst = game.blocks.filter((b) => b.isMiniboss).length
+      addMiniboss(game, "fish")
+      const minibossCountAfterSecond = game.blocks.filter((b) => b.isMiniboss).length
+      // Ни один блок уровня не удалён и не подменён.
+      expect(game.blocks.filter((b) => !b.isMiniboss)).toEqual(levelBlocks)
+      expect(minibossCountAfterFirst).toBe(29)
+      expect(minibossCountAfterSecond - minibossCountAfterFirst).toBe(9)
+      expect(minibossCountAfterSecond).toBe(38)
     } finally {
       restoreRandom()
       game.destroy()

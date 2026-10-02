@@ -152,13 +152,20 @@ describe("generateCampaignMap", () => {
         if (!n.isEvent) continue
         totalEvents++
         expect(n.isBoss).toBe(false)
-        expect(n.tier).toBeGreaterThan(0)
+        expect(n.tier).toBeGreaterThan(1)
         expect(n.tier).toBeLessThan(map.tiers - 1)
         expect(["ВОДОВОРОТ", "ТЕЧЕНИЕ", "ГРОТ", "ГЕЙЗЕР"]).toContain(n.name)
       }
     }
     // за 60 карт события обязаны встретиться
     expect(totalEvents).toBeGreaterThan(0)
+  })
+
+  it("на первом боевом ярусе нет события, которое всегда переносит на старт", () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      const map = generateCampaignMap(seed)
+      expect(map.nodes.filter((node) => node.tier === 1 && node.isEvent)).toHaveLength(0)
+    }
   })
 
   it("дети держатся возле родителей: рёбра — короткие диагонали вверх/вниз", () => {

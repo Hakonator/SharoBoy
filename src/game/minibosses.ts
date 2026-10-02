@@ -227,33 +227,23 @@ export function buildJelly(w: number, h: number, top: number, group = 0, cx = w 
   return blocks
 }
 
-/** Нормализованная проверка пересечения кругов с запасом (pad, px). */
-function circlesOverlap(
-  ax: number,
-  ay: number,
-  ar: number,
-  bx: number,
-  by: number,
-  br: number,
-  pad = 0
-): boolean {
-  const dx = ax - bx
-  const dy = ay - by
-  const rr = ar + br + pad
-  return dx * dx + dy * dy < rr * rr
+/** Консервативная проверка пересечения двух эллипсов с небольшим зазором. */
+function ellipsesOverlap(a: Block, b: Block, pad = 2): boolean {
+  const rx = a.rx + b.rx + pad
+  const ry = a.ry + b.ry + pad
+  if (rx <= 0 || ry <= 0) return true
+  const dx = (a.x - b.x) / rx
+  const dy = (a.y - b.y) / ry
+  return dx * dx + dy * dy < 1
 }
 
 /**
- * Убирает из раскладки уровня блоки, на которые налегает существо, —
- * силуэт минибосса остаётся аккуратным и целостным, без наложений.
+ * Убирает только блоки, реально пересекающие эллипсы существа, —
+ * силуэт минибосса остаётся аккуратным, соседние блоки сохраняют фигуру.
  * Блоки ДРУГИХ существ (дуэт) не трогает: перекрытие двух существ во время
  * патруля допустимо, а вырезание частей чужого силуэта ломало рендер —
  * существо оставалось в g.minibosses с HP-полоской, но становилось невидимым.
  */
 export function carveLevelBlocks(level: Block[], creature: Block[]): Block[] {
-  return level.filter(
-    (b) =>
-      b.isMiniboss === true ||
-      !creature.some((c) => circlesOverlap(b.x, b.y, Math.max(b.rx, b.ry), c.x, c.y, c.rx, 6))
-  )
+  return level.filter((b) => b.isMiniboss === true || !creature.some((c) => ellipsesOverlap(b, c)))
 }

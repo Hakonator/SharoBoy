@@ -2,7 +2,6 @@ import type { Game } from "../game"
 import {
   buildFish,
   buildJelly,
-  carveLevelBlocks,
   minibossName,
   MINIBOSS_HP_FIRST,
   MINIBOSS_LIFE_CHANCE,
@@ -43,8 +42,8 @@ export function addMiniboss(g: Game, kind: MinibossKind, hp = MINIBOSS_HP_FIRST)
     kind === "fish"
       ? buildFish(g.w, g.h, top, group, g.w / 2 + duetShift)
       : buildJelly(g.w, g.h, top, group, g.w / 2 + duetShift)
-  // Существу нужен целостный силуэт: убираем обычные блоки, с которыми оно налегает.
-  g.blocks = [...carveLevelBlocks(g.blocks, creature), ...creature]
+  // Минибосс появляется поверх раскладки, не удаляя блоки уровня.
+  g.blocks = [...g.blocks, ...creature]
   g.blocksInitial = Math.max(1, g.blocks.length)
   const dropX = creature.reduce((s, b) => s + b.x, 0) / creature.length
   const dropY = creature.reduce((s, b) => s + b.y, 0) / creature.length

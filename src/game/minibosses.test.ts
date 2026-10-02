@@ -189,6 +189,22 @@ describe("minibosses", () => {
     expect(kept).toEqual([far])
   })
 
+  it("не вырезает близкие блоки вне реального эллипса части существа", () => {
+    const body = buildFish(W, H, TOP)[0]
+    const creature = [body]
+    const near: Block = {
+      ...body,
+      x: body.x + body.rx + 4 + 4,
+      y: body.y,
+      rx: 4,
+      ry: 4,
+      isMiniboss: false,
+      mbGroup: undefined,
+      mbPart: undefined,
+    }
+    expect(carveLevelBlocks([near], creature)).toEqual([near])
+  })
+
   it("carveLevelBlocks не трогает блоки другого существа (дуэт)", () => {
     // Регресс «невидимой медузы»: даже если второе существо налегает на первое,
     // вырезаются только ОБЫЧНЫЕ блоки уровня, чужой силуэт остаётся целым.

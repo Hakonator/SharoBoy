@@ -59,6 +59,34 @@ function recordBlock(hp: number) {
   return { fills, strokes, gradientColors }
 }
 
+function recordHpSequence(hps: number[]) {
+  const gradientColors: string[] = []
+  const ctx = {
+    globalAlpha: 1,
+    fillStyle: "",
+    strokeStyle: "",
+    lineWidth: 1,
+    save: () => {},
+    restore: () => {},
+    translate: () => {},
+    rotate: () => {},
+    scale: () => {},
+    beginPath: () => {},
+    arc: () => {},
+    fill: () => {},
+    stroke: () => {},
+    createRadialGradient: () => ({
+      addColorStop: (_offset: number, color: string) => gradientColors.push(color),
+    }),
+  } as unknown as CanvasRenderingContext2D
+  const target = block(hps[0])
+  for (const hp of hps) {
+    target.hp = hp
+    drawBlocks(ctx, [target], 0)
+  }
+  return gradientColors
+}
+
 describe("drawBlocks", () => {
   it.each([
     [1, "#5dffb0"],
@@ -67,6 +95,22 @@ describe("drawBlocks", () => {
   ])("цвет обычного блока с %i HP соответствует уровню HP", (hp, color) => {
     const { gradientColors } = recordBlock(hp)
     expect(gradientColors).toContain(color)
+  })
+
+  it.each([
+    [
+      [3, 2, 1],
+      ["#ff6a5c", "#ffc94d", "#5dffb0"],
+    ],
+    [
+      [2, 1],
+      ["#ffc94d", "#5dffb0"],
+    ],
+  ])("обновляет цвет блока при переходе HP %j в одном Canvas", (hps, colors) => {
+    const baseColors = recordHpSequence(hps).filter((color) =>
+      ["#ff6a5c", "#ffc94d", "#5dffb0"].includes(color)
+    )
+    expect(baseColors).toEqual(colors)
   })
 
   it("не рисует трещины и точки HP на обычном блоке", () => {

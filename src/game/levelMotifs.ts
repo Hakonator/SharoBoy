@@ -13,10 +13,15 @@ interface Motif {
 }
 
 function ring(): Point[] {
-  return Array.from({ length: 24 }, (_, i) => {
+  const outer = Array.from({ length: 24 }, (_, i) => {
     const a = (i / 24) * Math.PI * 2
     return { x: Math.cos(a) * 1.45, y: 3.5 + Math.sin(a) * 2.5 }
   })
+  const inner = Array.from({ length: 8 }, (_, i) => {
+    const a = ((i + 0.5) / 8) * Math.PI * 2
+    return { x: Math.cos(a) * 0.78, y: 3.5 + Math.sin(a) * 1.35 }
+  })
+  return [...outer, ...inner]
 }
 
 function fortress(): Point[] {
@@ -32,7 +37,7 @@ function wave(): Point[] {
   for (let i = 0; i < 12; i++) {
     const x = -3.6 + i * 0.65
     points.push({ x, y: 0.7 + Math.sin(i * 0.45) * 0.36 })
-    if (i % 2 === 0) points.push({ x, y: 3.2 + Math.sin(i * 0.45 + 1) * 0.34 })
+    points.push({ x, y: 3.2 + Math.sin(i * 0.45 + 1) * 0.34 })
     if (i % 3 === 0) points.push({ x, y: 5.9 + Math.sin(i * 0.45 + 2) * 0.3 })
   }
   return points
@@ -49,6 +54,11 @@ function star(): Point[] {
       const t = j / 3
       points.push({ x: tip.x + (valley.x - tip.x) * t, y: tip.y + (valley.y - tip.y) * t })
     }
+  }
+  // Небольшое внутреннее кольцо добавляет цели в центре, не размывая лучи звезды.
+  for (let i = 0; i < 8; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI * 2) / 8
+    points.push({ x: Math.cos(a) * 0.78, y: 3.5 + Math.sin(a) * 0.74 })
   }
   return points
 }
@@ -100,10 +110,10 @@ const MOTIFS: Motif[] = [
   { name: "РАЗЛОМ", points: splitCore(), difficulty: 0.09 },
 ]
 
-function makeItem(p: Point, i: number, rng: () => number, tier: number): LayoutItem {
+function makeItem(p: Point, i: number, rng: () => number, tier: number, blockSize = 1): LayoutItem {
   const center = Math.abs(p.x) < 0.7 && p.y > 1.8 && p.y < 5.3
   const edge = Math.abs(p.x) > 2.7 || p.y < 1.2 || p.y > 5.9
-  const rx = 0.24 + rng() * 0.04
+  const rx = (0.24 + rng() * 0.04) * blockSize
   return {
     x: p.x,
     y: p.y,
@@ -130,7 +140,9 @@ export function generateMotifSpec(seedIn: number, tier: number, speed: number): 
     speed: speed * (1 + Math.min(0.15, tier * 0.002) + motif.difficulty),
     seed: seedIn | 0 || 1,
     motif: true,
-    layout: points.map((p, i) => makeItem(p, i, rng, tier)),
+    layout: points.map((p, i) =>
+      makeItem(p, i, rng, tier, ["КОЛЬЦО", "ВОЛНА", "ЗВЕЗДА"].includes(motif.name) ? 1.1 : 1)
+    ),
   }
 }
 

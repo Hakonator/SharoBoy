@@ -9,6 +9,24 @@ function overlap(a: Block, b: Block): boolean {
 }
 
 describe("generateMotifSpec", () => {
+  it("уплотняет только малые мотивы, оставляя крупные без изменений", () => {
+    const expectedCounts: Record<string, number> = {
+      КОЛЬЦО: 32,
+      ВОЛНА: 28,
+      ЗВЕЗДА: 23,
+      КРЕПОСТЬ: 36,
+      ЗМЕЯ: 52,
+      ВОРОТА: 57,
+      РАЗЛОМ: 48,
+    }
+    const found = new Map<string, number>()
+    for (let seed = 1; found.size < LEVEL_MOTIF_NAMES.length; seed++) {
+      const spec = generateMotifSpec(seed, 1, 380)
+      found.set(spec.name, spec.layout.length)
+    }
+    expect(Object.fromEntries(found)).toEqual(expectedCounts)
+  })
+
   it("воспроизводит полностью одинаковый уровень для одного seed", () => {
     expect(generateMotifSpec(741, 8, 500)).toEqual(generateMotifSpec(741, 8, 500))
   })
@@ -16,7 +34,9 @@ describe("generateMotifSpec", () => {
   it("выбирает все заданные мотивы на наборе seed и меняет композицию", () => {
     const specs = Array.from({ length: 300 }, (_, seed) => generateMotifSpec(seed + 1, 3, 400))
     const names = new Set(specs.map((spec) => spec.name))
-    const layouts = new Set(specs.map((spec) => spec.layout.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(";")))
+    const layouts = new Set(
+      specs.map((spec) => spec.layout.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(";"))
+    )
     expect(names.size).toBe(LEVEL_MOTIF_NAMES.length)
     expect(layouts.size).toBeGreaterThan(LEVEL_MOTIF_NAMES.length * 10)
   })
@@ -48,7 +68,10 @@ describe("generateMotifSpec", () => {
       }
       for (let i = 0; i < blocks.length; i++) {
         for (let j = i + 1; j < blocks.length; j++) {
-          expect(overlap(blocks[i], blocks[j]), `${spec.name} ${w}x${h}: ${i}(${blocks[i].x},${blocks[i].y}) overlaps ${j}(${blocks[j].x},${blocks[j].y})`).toBe(false)
+          expect(
+            overlap(blocks[i], blocks[j]),
+            `${spec.name} ${w}x${h}: ${i}(${blocks[i].x},${blocks[i].y}) overlaps ${j}(${blocks[j].x},${blocks[j].y})`
+          ).toBe(false)
         }
       }
     }

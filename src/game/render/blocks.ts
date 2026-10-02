@@ -140,14 +140,15 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
       drawDebugLabel(ctx, b, x, y)
       continue
     }
-    const tier = TIER[Math.min(Math.max(Math.round(b.hp), 1), 3) as 1 | 2 | 3]
+    const hpTier = Math.min(Math.max(Math.round(b.hp), 1), 3) as 1 | 2 | 3
+    const tier = TIER[hpTier]
     ctx.save()
     ctx.translate(x, y)
     ctx.rotate(b.rot)
     ctx.scale(b.rx, b.ry)
     /* Градиент один на tier и общий для всех блоков: рисуем в единичной
        локальной системе, координаты градиента резолвятся при заливке. */
-    const g = gradient(ctx, `tier${b.tier}`, (c) => {
+    const g = gradient(ctx, `tier${hpTier}`, (c) => {
       const rg = c.createRadialGradient(-0.35, -0.4, 0.05, 0, 0, 1.15)
       rg.addColorStop(0, tier.light)
       rg.addColorStop(0.5, tier.base)

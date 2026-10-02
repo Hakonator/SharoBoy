@@ -9,12 +9,16 @@ import { REF_DIAG } from "./viewport"
 
 /**
  * Множитель плотности расстановки блоков. Мир масштабируется единообразно
- * (см. viewport.ts), поэтому плотность зависит только от пропорций мирового
- * поля: на эталонном окне 1920×1080 и «пропорциональных» ему экранах — 1,
+ * (см. viewport.ts), поэтому плотность зависит от пропорций мирового поля:
  * заметно вытянутые поля мягко корректируются (0.65 — реже, 1.35 — плотнее).
  */
-export function densityFactor(w: number, h: number): number {
-  return clamp(Math.hypot(w, h) / REF_DIAG, 0.65, 1.35)
+export function densityFactor(w: number, h: number, min = 0.65, max = 1.35): number {
+  return clamp(Math.hypot(w, h) / REF_DIAG, min, max)
+}
+
+/** Отдельный прирост плотности процедурных раскладок на широких desktop. */
+export function desktopDensity(cssW: number): number {
+  return clamp(cssW / 1440, 1, 2.1)
 }
 
 /** Нормализованная проверка пересечения двух блоков (эллипсы/круги). */

@@ -1,6 +1,6 @@
 import type { Game } from "../game"
 import { Physics } from "../physics"
-import { layoutBlocks, densityFactor } from "../levelBuilder"
+import { layoutBlocks, densityFactor, desktopDensity } from "../levelBuilder"
 import { generateMotifSpec } from "../levelMotifs"
 import { gridBlocks, buildBossArena } from "../levelPatterns"
 import { LEVELS } from "../levels"
@@ -41,7 +41,8 @@ export function buildFromSpec(g: Game, spec: LevelSpec) {
   } else if ("layout" in spec) {
     const seededLayout = "motif" in spec
     const rng = seededLayout ? mulberry32(spec.seed) : undefined
-    g.blocks = layoutBlocks(spec, g.w, g.h, densityFactor(g.w, g.h), top, rng, seededLayout)
+    const layoutDensity = seededLayout ? desktopDensity(g.cssW) : densityFactor(g.w, g.h)
+    g.blocks = layoutBlocks(spec, g.w, g.h, layoutDensity, top, rng)
   } else {
     g.blocks = gridBlocks(spec, g.w, g.h, densityFactor(g.w, g.h), top)
   }

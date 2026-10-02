@@ -29,12 +29,17 @@ export function stepBlock(g: Game, b: Block, dt: number) {
       let maxEdge = -Infinity
       for (const part of g.blocks) {
         if (!part.isMiniboss || part.mbGroup !== b.mbGroup) continue
-        minEdge = Math.min(minEdge, part.x0 - part.rx)
-        maxEdge = Math.max(maxEdge, part.x0 + part.rx)
+        const cos = Math.cos(part.rot)
+        const sin = Math.sin(part.rot)
+        const horizontalRadius = Math.hypot(part.rx * cos, part.ry * sin)
+        minEdge = Math.min(minEdge, part.x0 - horizontalRadius)
+        maxEdge = Math.max(maxEdge, part.x0 + horizontalRadius)
       }
       const minOffset = 4 - minEdge
       const maxOffset = g.w - 4 - maxEdge
-      const offset = clamp(rawOffset, minOffset, maxOffset)
+      const offset =
+        (minOffset + maxOffset) / 2 +
+        (Math.sin(t * b.swayFreq + b.swayPh) * (maxOffset - minOffset)) / 2
       b.x = b.x0 + offset
     } else {
       b.x = clamp(b.x0 + rawOffset, b.rx + 4, g.w - b.rx - 4)

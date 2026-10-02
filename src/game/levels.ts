@@ -1,6 +1,6 @@
 /**
- * Спецификации уровней кампании: типы описаний, авторская раскладка
- * «СТРЕЛА» и список уровней (последний — босс «ЦАРЬ-ШАР»).
+ * Типы спецификаций и legacy-раскладки для прямого запуска уровня в отладке.
+ * Обычные узлы карты кампании генерируются отдельно в levelMotifs.ts.
  */
 
 interface BaseSpec {
@@ -36,7 +36,7 @@ interface BossSpec extends BaseSpec {
 }
 export type LevelSpec = PatternSpec | LayoutSpec | MotifSpec | BossSpec
 
-/** «СТРЕЛА» — плотная авторская раскладка первого уровня. */
+/** Legacy-раскладка «СТРЕЛА» для startLevelBattle/отладки, не для карты кампании. */
 const ARROW_LAYOUT: LayoutItem[] = [
   // верхняя полоса мелких шаров
   ...Array.from({ length: 13 }, (_, i): LayoutItem => ({

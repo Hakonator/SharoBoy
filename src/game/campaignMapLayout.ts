@@ -58,7 +58,10 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
     const row: number[] = []
     for (let i = 0; i < widths[t]; i++) {
       const isBoss = t === tiers - 1
-      const isEvent = !isBoss && t > 0 && rng() < EVENT_NODE_CHANCE
+      // На первом боевом ярусе игрок посещал только старт, поэтому событие
+      // всегда возвращало бы его туда. События начинаются со второго яруса,
+      // где уже есть несколько возможных целей для переноса.
+      const isEvent = !isBoss && t > 1 && rng() < EVENT_NODE_CHANCE
       nodes.push({
         id,
         tier: t,

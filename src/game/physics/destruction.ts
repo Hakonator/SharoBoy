@@ -145,7 +145,7 @@ export function spawnScatter(g: PhysicsWorld, b: Block) {
     const d = Math.max(b.rx, b.ry) * rand(1.7, 2.4)
     const r = rand(17, 23)
     const cx = clamp(b.x + Math.cos(a) * d, r + 6, g.w - r - 6)
-    const cy = clamp(b.y + Math.sin(a) * d, r + 6, g.h * 0.72)
+    const cy = clamp(b.y + Math.sin(a) * d, g.blockSpawnTop + r + 6, g.h * 0.72)
     g.blocks.push({
       x: cx,
       y: cy,
