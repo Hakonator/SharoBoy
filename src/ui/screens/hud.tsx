@@ -1,3 +1,6 @@
+import { useEffect, useRef, useState } from "react"
+
+import { DEBUG_TOOLS } from "../../config"
 import {
   IconBall,
   IconMusic,
@@ -19,6 +22,8 @@ export function HudOverlay({
   onMusic,
   onMusicVolume,
   onSfxVolume,
+  debug,
+  onDebugSkipLevel,
 }: {
   hud: HudData
   inGame: boolean
@@ -32,7 +37,41 @@ export function HudOverlay({
   onMusicVolume: (v: number) => void
   /** Ползунок громкости эффектов (0..1). */
   onSfxVolume: (v: number) => void
+  /** Режим отладки включён в меню. */
+  debug: boolean
+  /** Мгновенно завершить уровень через debug API. */
+  onDebugSkipLevel: () => void
 }) {
+  const [skipArmed, setSkipArmed] = useState(false)
+  const skipTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const canSkipLevel = DEBUG_TOOLS && debug && hud.phase === "playing"
+  useEffect(
+    () => () => {
+      if (skipTimer.current !== null) clearTimeout(skipTimer.current)
+    },
+    []
+  )
+  useEffect(() => {
+    if (!canSkipLevel && skipTimer.current !== null) {
+      clearTimeout(skipTimer.current)
+      skipTimer.current = null
+      setSkipArmed(false)
+    }
+  }, [canSkipLevel])
+  const cancelSkip = () => {
+    if (skipTimer.current !== null) clearTimeout(skipTimer.current)
+    skipTimer.current = null
+    setSkipArmed(false)
+  }
+  const startSkip = () => {
+    if (skipTimer.current !== null) return
+    setSkipArmed(true)
+    skipTimer.current = setTimeout(() => {
+      skipTimer.current = null
+      setSkipArmed(false)
+      onDebugSkipLevel()
+    }, 500)
+  }
   /* Портрет: чипы и кнопки компактнее — зона HUD уже (HUD_TOP_PORTRAIT_CSS),
    * и на планшетах в портрете чипы не растут до десктопных размеров. */
   const pad = portrait ? "px-2 py-1" : "px-3 py-1.5 sm:px-3.5 sm:py-2"
@@ -120,6 +159,32 @@ export function HudOverlay({
       >
         {hud.phase === "paused" ? <IconPlay /> : <IconPause />}
       </button>
+      {canSkipLevel && (
+        <button
+          type="button"
+          className={`pointer-coarse:flex pointer-events-auto hidden h-11 w-11 shrink-0 items-center justify-center rounded border font-display text-base leading-tight text-gold ${
+            skipArmed ? "border-gold bg-gold/30" : "border-gold/50 bg-abyss/80"
+          }`}
+          aria-label="Удерживайте, чтобы завершить уровень"
+          onPointerDown={(event) => {
+            event.preventDefault()
+            startSkip()
+          }}
+          onPointerUp={cancelSkip}
+          onPointerCancel={cancelSkip}
+          onPointerLeave={cancelSkip}
+          onKeyDown={(event) => {
+            if (event.key === " " || event.key === "Enter") {
+              event.preventDefault()
+              startSkip()
+            }
+          }}
+          onKeyUp={cancelSkip}
+          onBlur={cancelSkip}
+        >
+          <span aria-hidden="true">{skipArmed ? "…" : "⏭"}</span>
+        </button>
+      )}
       <div className="flex items-center gap-1.5">
         <button
           className={`icon-btn pointer-events-auto flex ${iconBtn} items-center justify-center`}

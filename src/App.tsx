@@ -151,6 +151,8 @@ export default function App() {
         onMusic={() => g()?.toggleMusic()}
         onMusicVolume={(v) => g()?.setMusicVolume(v)}
         onSfxVolume={(v) => g()?.setSfxVolume(v)}
+        debug={debug.debug}
+        onDebugSkipLevel={() => g()?.debugSkipLevel()}
       />
 
       {hud.phase === "map" && (
