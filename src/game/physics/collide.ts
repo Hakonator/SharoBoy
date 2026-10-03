@@ -153,6 +153,9 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
   const fire = g.fireActive()
   for (const b of g.blocks) {
     if (b.dead) continue
+    // Порталы на кулдауне после телепорта полностью прозрачны для шара:
+    // не отражают его и не получают урон обычным/огненным попаданием.
+    if (b.sp?.portalId !== undefined && (b.sp.portalCd ?? 0) > 0) continue
     const ex = b.rx + ball.r
     const ey = b.ry + ball.r
     const dx = ball.x - b.x

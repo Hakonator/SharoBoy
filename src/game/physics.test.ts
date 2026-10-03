@@ -165,6 +165,19 @@ describe("Physics — огненное ядро", () => {
     expect(block.hp).toBe(999 - 3 * stats.hits) // каждое касание — ровно ×3 обычного урона
     expect(ball.vy).toBeLessThan(0) // прошёл насквозь
   })
+
+  it("портал на кулдауне полностью пропускает шар без урона", () => {
+    const block = makeBlock(false)
+    block.sp = { portalId: 1, portalCd: 0.5 }
+    const { world, ball } = makeWorld(block, false)
+
+    run(world, ball)
+
+    expect(block.hp).toBe(block.maxHp)
+    expect(block.dead).toBe(false)
+    expect(ball.vy).toBeLessThan(0)
+    expect(ball.y).toBeLessThan(block.y)
+  })
 })
 
 /** Верхняя неигровая HUD-зона: шар отражается от её нижней границы. */
