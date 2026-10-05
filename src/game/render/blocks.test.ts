@@ -88,6 +88,93 @@ function recordHpSequence(hps: number[]) {
 }
 
 describe("drawBlocks", () => {
+  it("рисует отличительные оверлеи новых механик", () => {
+    const arcs: number[] = []
+    const dashes: number[][] = []
+    const ctx = {
+      globalAlpha: 1,
+      fillStyle: "",
+      strokeStyle: "",
+      lineWidth: 1,
+      save() {},
+      restore() {},
+      translate() {},
+      rotate() {},
+      scale() {},
+      setLineDash(value: number[]) {
+        dashes.push(value)
+      },
+      beginPath() {},
+      arc(_x: number, _y: number, radius: number) {
+        arcs.push(radius)
+      },
+      ellipse(_x: number, _y: number, rx: number) {
+        arcs.push(rx)
+      },
+      moveTo() {},
+      lineTo() {},
+      closePath() {},
+      fill() {},
+      stroke() {},
+      createRadialGradient: () => ({ addColorStop() {} }),
+    } as unknown as CanvasRenderingContext2D
+    const target = block(2)
+    target.sp = {
+      armor: 1,
+      brittle: { radius: 40, damage: 1 },
+      phase: { period: 2, active: 0.5, offset: 0 },
+      magnet: { radius: 60, force: 400 },
+    }
+
+    drawBlocks(ctx, [target], 0.2)
+
+    expect(arcs.length).toBeGreaterThan(0)
+    expect(arcs).toContain(60)
+    expect(dashes).toContainEqual([7, 6])
+  })
+
+  it("броня рисует внешние чёрные эллипсы и цветные разделители по числу зарядов", () => {
+    const ellipses: { rx: number; ry: number; color: unknown }[] = []
+    const ctx = {
+      globalAlpha: 1,
+      fillStyle: "",
+      strokeStyle: "",
+      lineWidth: 1,
+      save() {},
+      restore() {},
+      translate() {},
+      rotate() {},
+      scale() {},
+      beginPath() {},
+      arc() {},
+      ellipse(_x: number, _y: number, rx: number, ry: number) {
+        ellipses.push({ rx, ry, color: ctx.strokeStyle })
+      },
+      fill() {},
+      stroke() {},
+      moveTo() {},
+      lineTo() {},
+      createRadialGradient: () => ({ addColorStop() {} }),
+    } as unknown as CanvasRenderingContext2D
+    const target = block(2)
+    target.sp = { armor: 2, armorMax: 2 }
+
+    drawBlocks(ctx, [target], 0)
+    expect(ellipses.filter((ellipse) => ellipse.color === "#080808")).toHaveLength(2)
+    expect(ellipses.filter((ellipse) => ellipse.color === "#ff6a5c")).toHaveLength(1)
+    for (const [index, ellipse] of ellipses.filter((item) => item.color === "#080808").entries()) {
+      const expectedOffset = Math.max(3.5, Math.min(target.rx, target.ry) * 0.1) * (2 - index)
+      expect(ellipse.rx).toBeCloseTo(target.rx + expectedOffset)
+      expect(ellipse.ry).toBeCloseTo(target.ry + expectedOffset)
+    }
+
+    ellipses.length = 0
+    target.sp.armor = 1
+    drawBlocks(ctx, [target], 0)
+    expect(ellipses.filter((ellipse) => ellipse.color === "#080808")).toHaveLength(1)
+    expect(ellipses.filter((ellipse) => ellipse.color === "#ff6a5c")).toHaveLength(0)
+  })
+
   it.each([
     [1, "#5dffb0"],
     [2, "#ffc94d"],

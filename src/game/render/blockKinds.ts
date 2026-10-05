@@ -61,6 +61,52 @@ function drawCottonBody(ctx: Ctx, b: Block, x: number, y: number, time: number) 
   ctx.restore()
 }
 
+/** Хрупкий кристалл: стеклянная заливка, световой кант, грани и блики. */
+function drawBrittleBody(ctx: Ctx, b: Block, x: number, y: number, time: number) {
+  const shimmer = 0.78 + Math.sin(time * 2.5 + b.seed) * 0.12
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(b.rot)
+  ctx.scale(b.rx, b.ry)
+  ctx.fillStyle = gradient(ctx, "brittle", (c) => {
+    const rg = c.createRadialGradient(-0.35, -0.38, 0.04, 0, 0, 1.1)
+    rg.addColorStop(0, "rgba(245,255,255,0.42)")
+    rg.addColorStop(0.58, "rgba(110,231,255,0.22)")
+    rg.addColorStop(1, "rgba(77,160,220,0.34)")
+    return rg
+  })
+  ctx.beginPath()
+  ctx.arc(0, 0, 1, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.lineWidth = 2.2 / Math.max(b.rx, b.ry)
+  ctx.strokeStyle = "rgba(185,247,255,0.95)"
+  ctx.shadowColor = "#83eeff"
+  ctx.shadowBlur = 8 * shimmer
+  ctx.stroke()
+  ctx.shadowBlur = 0
+  ctx.lineWidth = 1.4 / Math.max(b.rx, b.ry)
+  ctx.strokeStyle = `rgba(229,255,255,${0.68 * shimmer})`
+  ctx.beginPath()
+  ctx.moveTo(-0.62, -0.28)
+  ctx.lineTo(-0.12, -0.58)
+  ctx.lineTo(0.13, -0.08)
+  ctx.lineTo(0.55, -0.38)
+  ctx.moveTo(-0.12, -0.58)
+  ctx.lineTo(-0.38, 0.15)
+  ctx.lineTo(0.13, -0.08)
+  ctx.lineTo(0.36, 0.46)
+  ctx.stroke()
+  ctx.fillStyle = `rgba(255,255,255,${0.58 * shimmer})`
+  ctx.beginPath()
+  ctx.ellipse(-0.28, -0.43, 0.3, 0.075, -0.35, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = `rgba(255,255,255,${0.9 * shimmer})`
+  ctx.beginPath()
+  ctx.arc(0.48, -0.47, 0.055, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+}
+
 function drawSpinArrows(ctx: Ctx, b: Block, x: number, y: number) {
   const sp = b.sp
   if (!sp || sp.rotDir === undefined) return
@@ -144,4 +190,88 @@ export function drawSpecialBody(ctx: Ctx, b: Block, x: number, y: number, time: 
 /** Внутренние стрелки вращающегося блока: не создают внешний контур. */
 export function drawSpinMarks(ctx: Ctx, b: Block, x: number, y: number) {
   if (b.sp?.rotVel !== undefined) drawSpinArrows(ctx, b, x, y)
+}
+
+/** Оверлеи новых механик: броня, фазы и поле магнита. */
+export function drawPriorityMarks(ctx: Ctx, b: Block, x: number, y: number, time: number) {
+  const sp = b.sp
+  if (!sp) return
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(b.rot)
+  if (sp.armor && sp.armor > 0) {
+    const currentArmor = Math.max(0, Math.floor(sp.armor))
+    const maxArmor = Math.max(currentArmor, Math.floor(sp.armorMax ?? currentArmor))
+    const removedArmor = maxArmor - currentArmor
+    const rx = b.rx
+    const ry = b.ry
+    const ringGap = Math.max(3.5, Math.min(rx, ry) * 0.1)
+    for (let i = removedArmor; i < maxArmor; i++) {
+      const offset = ringGap * (maxArmor - i)
+      const ringRx = rx + offset
+      const ringRy = ry + offset
+      ctx.lineWidth = Math.max(3, Math.min(rx, ry) * 0.14)
+      ctx.strokeStyle = "#080808"
+      ctx.beginPath()
+      ctx.ellipse(0, 0, ringRx, ringRy, 0, 0, Math.PI * 2)
+      ctx.stroke()
+      if (i + 1 >= maxArmor) continue
+      ctx.strokeStyle = TIER[b.tier].base
+      ctx.lineWidth = Math.max(1.2, Math.min(rx, ry) * 0.04)
+      ctx.beginPath()
+      ctx.ellipse(0, 0, ringRx - ringGap / 2, ringRy - ringGap / 2, 0, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+  }
+  if (sp.brittle) {
+    ctx.strokeStyle = "rgba(255,245,190,0.8)"
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(-b.rx * 0.45, -b.ry * 0.45)
+    ctx.lineTo(-b.rx * 0.08, 0)
+    ctx.lineTo(-b.rx * 0.28, b.ry * 0.42)
+    ctx.moveTo(-b.rx * 0.08, 0)
+    ctx.lineTo(b.rx * 0.3, -b.ry * 0.22)
+    ctx.lineTo(b.rx * 0.43, b.ry * 0.34)
+    ctx.stroke()
+  }
+  if (sp.phase) {
+    const position =
+      (((time + sp.phase.offset) % sp.phase.period) + sp.phase.period) % sp.phase.period
+    const active = position < sp.phase.period * sp.phase.active
+    ctx.globalAlpha = active ? 0.9 : 0.32
+    ctx.strokeStyle = active ? "#7cf5ff" : "#b8c0cc"
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    ctx.arc(0, 0, Math.min(b.rx, b.ry) * 0.38, 0, Math.PI * 2 * sp.phase.active)
+    ctx.stroke()
+  }
+  if (sp.magnet) {
+    ctx.strokeStyle = "rgba(255,110,210,0.72)"
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(-b.rx * 0.4, -b.ry * 0.2)
+    ctx.lineTo(b.rx * 0.35, -b.ry * 0.2)
+    ctx.moveTo(-b.rx * 0.4, b.ry * 0.2)
+    ctx.lineTo(b.rx * 0.35, b.ry * 0.2)
+    ctx.stroke()
+  }
+  const magnet = sp.magnet
+  ctx.restore()
+  if (magnet && Number.isFinite(magnet.radius) && magnet.radius > 0) {
+    ctx.save()
+    ctx.globalAlpha *= 0.62
+    ctx.strokeStyle = "rgba(255,110,210,0.9)"
+    ctx.lineWidth = 1.8
+    ctx.setLineDash([7, 6])
+    ctx.beginPath()
+    ctx.arc(x, y, magnet.radius, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.restore()
+  }
+}
+
+export function drawBrittleBlock(ctx: Ctx, b: Block, x: number, y: number, time: number) {
+  drawBrittleBody(ctx, b, x, y, time)
 }

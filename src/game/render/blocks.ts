@@ -2,7 +2,7 @@ import { TIER } from "../palette"
 import { Block } from "../types"
 import { mulberry32 } from "../utils"
 
-import { drawSpecialBody, drawSpinMarks } from "./blockKinds"
+import { drawBrittleBlock, drawPriorityMarks, drawSpecialBody, drawSpinMarks } from "./blockKinds"
 import { gradient } from "./gradCache"
 import { type Ctx } from "./shapes"
 
@@ -133,11 +133,29 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
       drawFrozenBlock(ctx, b, x, y, time)
       continue
     }
+    const phaseActive =
+      !b.sp?.phase ||
+      (() => {
+        const phase = b.sp.phase
+        if (phase.period <= 0) return true
+        const position = (((time + phase.offset) % phase.period) + phase.period) % phase.period
+        return position < phase.period * phase.active
+      })()
+    ctx.save()
+    if (!phaseActive) ctx.globalAlpha *= 0.32
+    if (b.sp?.brittle) {
+      drawBrittleBlock(ctx, b, x, y, time)
+      drawDebugLabel(ctx, b, x, y)
+      drawPriorityMarks(ctx, b, x, y, time)
+      ctx.restore()
+      continue
+    }
     // Спецблоки §6: пружина/вата/портал рисуются целиком кастомно;
     // пульсация/дрейф/вращение — стандартное тело + метки поверх.
     if (b.sp?.portalId || b.sp?.spring || b.sp?.cotton) {
       drawSpecialBody(ctx, b, x, y, time)
       drawDebugLabel(ctx, b, x, y)
+      ctx.restore()
       continue
     }
     const hpTier = Math.min(Math.max(Math.round(b.hp), 1), 3) as 1 | 2 | 3
@@ -172,6 +190,7 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
 
     drawDebugLabel(ctx, b, x, y)
     drawSpinMarks(ctx, b, x, y)
+    drawPriorityMarks(ctx, b, x, y, time)
 
     // «матрёшка»: мини-шарики внутри
     if (b.splits) {
@@ -191,5 +210,6 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
         ctx.fill()
       }
     }
+    ctx.restore()
   }
 }

@@ -39,6 +39,7 @@ export function onBallHitSpecial(
   b: Block,
   ball: Ball,
   lx: number,
+  ly: number,
   ex: number
 ): boolean {
   const sp = b.sp
@@ -56,7 +57,13 @@ export function onBallHitSpecial(
   }
   // крутящийся: импульс от удара в одну из половин, сильнее к краю
   if (sp.rotVel !== undefined && b.spinDeathT === undefined) {
-    const side = lx >= 0 ? 1 : -1
+    const cos = Math.cos(b.rot)
+    const sin = Math.sin(b.rot)
+    const localVx = ball.vx * cos + ball.vy * sin
+    const localVy = -ball.vx * sin + ball.vy * cos
+    // Импульс блока противоположен скорости входящего шара: τ = r × (-v).
+    const torque = lx * localVy - ly * localVx
+    const side: 1 | -1 = torque === 0 ? (lx >= 0 ? 1 : -1) : torque > 0 ? 1 : -1
     const edge = Math.min(1, Math.abs(lx) / (ex || 1))
     sp.rotDir = side
     sp.rotVel = clamp(sp.rotVel + side * SPIN_KICK * (0.4 + 0.6 * edge), -SPIN_MAX, SPIN_MAX)

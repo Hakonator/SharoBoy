@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { mulberry32 } from "../utils"
 import type { Block } from "../types"
+import { BLOCK_MAGNET_RADIUS_MULT } from "../blockKinds"
 
 import { decorateBlocks, specialIntensity } from "./blockSpawn"
 
@@ -39,6 +40,10 @@ function kindOf(b: Block): string | null {
   if (sp.pulse) return "pulse"
   if (sp.drift) return "drift"
   if (sp.rotVel !== undefined) return "spin"
+  if (sp.armor) return "armor"
+  if (sp.brittle) return "brittle"
+  if (sp.phase) return "phase"
+  if (sp.magnet) return "magnet"
   return "unknown"
 }
 
@@ -61,12 +66,34 @@ describe("decorateBlocks", () => {
   it("каждому блоку — не больше одного спецтипа, типы корректны", () => {
     const blocks = Array.from({ length: 60 }, (_, i) => makeBlock({ seed: i }))
     decorateBlocks(blocks, 15, mulberry32(7))
-    const known = new Set(["spring", "cotton", "pulse", "drift", "spin", "portal"])
+    const known = new Set([
+      "spring",
+      "cotton",
+      "pulse",
+      "drift",
+      "spin",
+      "portal",
+      "armor",
+      "brittle",
+      "phase",
+      "magnet",
+    ])
     for (const b of blocks) {
       const kind = kindOf(b)
       if (kind === null) continue
       expect(known.has(kind), `неизвестный тип ${kind}`).toBe(true)
     }
+  })
+
+  it("магнитная зона примерно равна двум диаметрам блока", () => {
+    let magnet: Block | undefined
+    for (let seed = 0; seed < 100 && !magnet; seed++) {
+      const blocks = Array.from({ length: 100 }, (_, i) => makeBlock({ seed: i }))
+      decorateBlocks(blocks, 20, mulberry32(seed))
+      magnet = blocks.find((b) => b.sp?.magnet)
+    }
+    expect(magnet?.sp?.magnet?.radius).toBe(Math.max(magnet?.rx ?? 0, magnet?.ry ?? 0) * 4)
+    expect(BLOCK_MAGNET_RADIUS_MULT).toBe(4)
   })
 
   it("порталы образуют пары с общим id и hp=2", () => {

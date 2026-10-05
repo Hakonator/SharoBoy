@@ -91,7 +91,7 @@ export interface Block {
   bomb: boolean
   boomQueued?: boolean
   splits: boolean
-  /** Особый тип блока (§6): пульсация/пружина/вата/вращение/дрейф/телепорт. */
+  /** Механики спецблоков: броня/цепь/фазы/магнит и существующие типы. */
   sp?: BlockSpecial
   /** Подпись стенда спецблоков в диагностическом режиме. */
   debugLabel?: string

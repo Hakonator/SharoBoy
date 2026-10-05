@@ -5,6 +5,16 @@
  */
 
 export interface BlockSpecial {
+  /** Защитные очки брони, поглощаемые до основного HP. */
+  armor?: number
+  /** Исходный запас брони: нужен для отображения снятых внешних колец. */
+  armorMax?: number
+  /** Цепной взрыв: радиус мировых единиц и урон соседям. */
+  brittle?: { radius: number; damage: number }
+  /** Цикл активной/неактивной физики. */
+  phase?: { period: number; active: number; offset: number }
+  /** Мягкое притяжение шара за пределами хитбокса. */
+  magnet?: { radius: number; force: number }
   /** Пульсация: масштаб rx/ry по синусоиде вокруг базовых размеров. */
   pulse?: { freq: number; ph: number; rx0: number; ry0: number }
   /** Пружинный: удар временно разгоняет шар. */
@@ -43,3 +53,19 @@ export const SPIN_MAX = 6
 export const SPIN_DEATH_DURATION = 1
 /** Максимальная амплитуда маршрута в радиусах соответствующей оси блока. */
 export const DRIFT_MAX_RADIUS_MULT = 3
+/** Радиус цепной хрупкости относительно размера исходного блока. */
+export const BRITTLE_RADIUS_MULT = 2.5
+/** Максимальное число соседей одной цепной реакции (помимо источника). */
+export const BRITTLE_CHAIN_MAX = 12
+/** Период фазового блока по умолчанию (сек). */
+export const PHASE_PERIOD = 3.2
+/** Доля активной фазы. */
+export const PHASE_ACTIVE_FRACTION = 0.62
+/** Радиус действия магнитного блока относительно размера блока. */
+export const BLOCK_MAGNET_RADIUS_MULT = 4
+/** Ускорение магнитного поля в мировых единицах/сек². */
+export const BLOCK_MAGNET_FORCE = 2200
+/** Максимальное ускорение от магнитных блоков за кадр. */
+export const BLOCK_MAGNET_MAX_DELTA_V = 72
+/** Максимальная угловая скорость поворота шара в поле блока (рад/с). */
+export const BLOCK_MAGNET_STEER_RATE = 4.5

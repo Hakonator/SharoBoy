@@ -178,6 +178,59 @@ describe("Physics — огненное ядро", () => {
     expect(ball.vy).toBeLessThan(0)
     expect(ball.y).toBeLessThan(block.y)
   })
+
+  it("магнитный блок притягивает шар, пока тот вне хитбокса", () => {
+    const block = makeBlock(false)
+    block.sp = { magnet: { radius: 100, force: 500 } }
+    const { world, ball } = makeWorld(block, false)
+    ball.x = 275
+    ball.y = 100
+    ball.vx = 0
+    ball.vy = -ball.speed
+    ball.sinceHit = 0
+
+    const physics = new Physics(world)
+    for (let i = 0; i < 20; i++) physics.updateBall(ball, 0.016)
+
+    expect(ball.vx).toBeLessThan(-ball.speed * 0.015)
+    expect(ball.vx).toBeGreaterThan(-ball.speed * 0.35)
+    expect(block.hp).toBe(block.maxHp)
+  })
+
+  it("отрицательная сила/радиус магнита не ускоряют мяч к блоку", () => {
+    const block = makeBlock(false)
+    block.sp = { magnet: { radius: 100, force: -500 } }
+    const { world, ball } = makeWorld(block, false)
+    ball.x = 275
+    ball.y = 100
+    ball.vx = 0
+    ball.vy = 0
+    new Physics(world).updateBall(ball, 0.016)
+    // Общая страховка физики не позволяет шару иметь нулевую скорость.
+    expect(ball.vx).toBeGreaterThanOrEqual(0)
+  })
+
+  it("неактивная фаза не отражает шар и не наносит урон", () => {
+    const block = makeBlock(false)
+    block.sp = { phase: { period: 2, active: 0.5, offset: 1 } }
+    const { world, ball } = makeWorld(block, false)
+
+    run(world, ball)
+
+    expect(block.hp).toBe(block.maxHp)
+    expect(ball.vy).toBeLessThan(0)
+    expect(ball.y).toBeLessThan(block.y)
+  })
+
+  it("невалидная доля/период фазы безопасно оставляет блок активным", () => {
+    const block = makeBlock(false)
+    block.sp = { phase: { period: Number.NaN, active: 0, offset: 0 } }
+    const { world, ball } = makeWorld(block, false)
+
+    run(world, ball)
+
+    expect(block.hp).toBeLessThan(block.maxHp)
+  })
 })
 
 /** Верхняя неигровая HUD-зона: шар отражается от её нижней границы. */

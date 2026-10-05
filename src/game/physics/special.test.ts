@@ -70,7 +70,7 @@ describe("пружинный и ватный блоки", () => {
     const b = makeBlock({ sp: { spring: true } })
     const world = makeWorld([b])
     const ball = makeBall()
-    expect(onBallHitSpecial(world, b, ball, 0, 30)).toBe(false) // отскок обычный
+    expect(onBallHitSpecial(world, b, ball, 0, 0, 30)).toBe(false) // отскок обычный
     expect(ball.springT).toBe(SPRING_TIME)
     expect(world.sfx.spring).toHaveBeenCalledOnce()
   })
@@ -79,7 +79,7 @@ describe("пружинный и ватный блоки", () => {
     const b = makeBlock({ sp: { cotton: true } })
     const world = makeWorld([b])
     const ball = makeBall()
-    expect(onBallHitSpecial(world, b, ball, 0, 30)).toBe(false)
+    expect(onBallHitSpecial(world, b, ball, 0, 0, 30)).toBe(false)
     expect(ball.cottonT).toBe(COTTON_TIME)
     expect(world.sfx.thud).toHaveBeenCalledOnce()
   })
@@ -101,34 +101,40 @@ describe("пружинный и ватный блоки", () => {
     const b = makeBlock({ sp: { spring: true } })
     const world = makeWorld([b])
     const ball = makeBall({ springT: 1.5 })
-    onBallHitSpecial(world, b, ball, 0, 30)
+    onBallHitSpecial(world, b, ball, 0, 0, 30)
     expect(ball.springT).toBe(1.5)
   })
 })
 
 describe("крутящийся блок", () => {
-  it("удар в правую половину раскручивает по часовой, сила растёт к краю", () => {
+  it("удар в правую половину раскручивает по моменту входящего шара", () => {
     const edge = makeBlock({ sp: { rotVel: 0 } })
     const center = makeBlock({ sp: { rotVel: 0 } })
     const world = makeWorld([edge])
-    onBallHitSpecial(world, edge, makeBall(), 30, 30)
-    onBallHitSpecial(world, center, makeBall(), 0, 30)
-    expect(edge.sp!.rotVel).toBeCloseTo(SPIN_KICK)
-    expect(edge.sp!.rotDir).toBe(1)
+    onBallHitSpecial(world, edge, makeBall(), 30, 0, 30)
+    onBallHitSpecial(world, center, makeBall(), 0, 0, 30)
+    expect(edge.sp!.rotVel).toBeCloseTo(-SPIN_KICK)
+    expect(edge.sp!.rotDir).toBe(-1)
     expect(center.sp!.rotVel).toBeCloseTo(SPIN_KICK * 0.4)
   })
 
   it("удар в левую половину крутит в противоположную сторону", () => {
     const b = makeBlock({ sp: { rotVel: 0 } })
-    onBallHitSpecial(makeWorld([b]), b, makeBall(), -30, 30)
-    expect(b.sp!.rotVel).toBeCloseTo(-SPIN_KICK)
-    expect(b.sp!.rotDir).toBe(-1)
+    onBallHitSpecial(makeWorld([b]), b, makeBall(), -30, 0, 30)
+    expect(b.sp!.rotVel).toBeCloseTo(SPIN_KICK)
+    expect(b.sp!.rotDir).toBe(1)
   })
 
   it("импульс суммируется и ограничен SPIN_MAX", () => {
     const b = makeBlock({ sp: { rotVel: SPIN_KICK * 2 } })
-    onBallHitSpecial(makeWorld([b]), b, makeBall(), 30, 30)
+    onBallHitSpecial(makeWorld([b]), b, makeBall(), 30, 0, 30)
     expect(b.sp!.rotVel).toBeLessThanOrEqual(6)
+  })
+
+  it("направление определяется вектором скорости и точкой удара", () => {
+    const b = makeBlock({ sp: { rotVel: 0 } })
+    onBallHitSpecial(makeWorld([b]), b, makeBall({ vx: -100, vy: 0 }), 0, -12, 30)
+    expect(b.sp!.rotVel).toBeLessThan(0)
   })
 })
 
@@ -138,7 +144,7 @@ describe("парный телепорт «чёрная дыра»", () => {
     const c = makeBlock({ x: 300, y: 200, rx: 20, ry: 20, circle: true, sp: { portalId: 1 } })
     const world = makeWorld([a, c])
     const ball = makeBall({ x: 100, y: 130, vx: 80, vy: -300 })
-    expect(onBallHitSpecial(world, a, ball, 0, 20)).toBe(true)
+    expect(onBallHitSpecial(world, a, ball, 0, 0, 20)).toBe(true)
     // скорость не изменилась, позиция — у выхода из партнёра по вектору скорости
     expect(ball.vx).toBe(80)
     expect(ball.vy).toBe(-300)
@@ -157,7 +163,7 @@ describe("парный телепорт «чёрная дыра»", () => {
     const a = makeBlock({ sp: { portalId: 1, portalCd: 0.5 } })
     const c = makeBlock({ sp: { portalId: 1 } })
     const ball = makeBall()
-    expect(onBallHitSpecial(makeWorld([a, c]), a, ball, 0, 30)).toBe(false)
+    expect(onBallHitSpecial(makeWorld([a, c]), a, ball, 0, 0, 30)).toBe(false)
     expect(ball.x).toBe(200) // позиция не тронута
   })
 
@@ -166,14 +172,14 @@ describe("парный телепорт «чёрная дыра»", () => {
     const dead = makeBlock({ sp: { portalId: 1 }, dead: true })
     const other = makeBlock({ sp: { portalId: 2 } })
     const ball = makeBall()
-    expect(onBallHitSpecial(makeWorld([a, dead]), a, ball, 0, 30)).toBe(false)
-    expect(onBallHitSpecial(makeWorld([a, other]), a, ball, 0, 30)).toBe(false)
+    expect(onBallHitSpecial(makeWorld([a, dead]), a, ball, 0, 0, 30)).toBe(false)
+    expect(onBallHitSpecial(makeWorld([a, other]), a, ball, 0, 0, 30)).toBe(false)
   })
 
   it("блок без спецтипа — мгновенный выход false без эффектов", () => {
     const b = makeBlock()
     const world = makeWorld([b])
-    expect(onBallHitSpecial(world, b, makeBall(), 0, 30)).toBe(false)
+    expect(onBallHitSpecial(world, b, makeBall(), 0, 0, 30)).toBe(false)
     expect(world.sfx.warp).not.toHaveBeenCalled()
   })
 })

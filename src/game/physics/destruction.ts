@@ -1,5 +1,5 @@
 import { TIER } from "../palette"
-import { SPIN_DEATH_DURATION, SPIN_MAX } from "../blockKinds"
+import { BRITTLE_CHAIN_MAX, SPIN_DEATH_DURATION, SPIN_MAX } from "../blockKinds"
 import type { Block } from "../types"
 import { clamp, compactInPlace, rand } from "../utils"
 import type { PhysicsWorld } from "../physics"
@@ -13,14 +13,32 @@ export function comboMult(g: PhysicsWorld): number {
 }
 
 /** Урон блоку; при разрушении — очки, эффекты, дроп бонуса, «матрёшка». */
-export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1) {
+export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1, allowBrittle = true) {
+  if (b.dead) return
+  dmg = Number.isFinite(dmg) ? Math.max(0, dmg) : 0
   // Блоки минибосса неразрушаемы: урон идёт в пул HP его существа.
   if (b.isMiniboss) {
     b.flash = 1
     g.damageMiniboss(dmg, b)
     return
   }
+  if (b.sp?.armor !== undefined) {
+    b.sp.armor = Number.isFinite(b.sp.armor) ? Math.max(0, b.sp.armor) : 0
+  }
+  if (b.sp?.armor && b.sp.armor > 0) {
+    const absorbed = Math.min(b.sp.armor, dmg)
+    b.sp.armor -= absorbed
+    dmg -= absorbed
+    b.flash = 1
+    if (dmg <= 0) {
+      g.sfx.brick(b.tier)
+      g.fx.burst(b.x, b.y, "#bfeaff", 5, 130)
+      g.pushHud()
+      return
+    }
+  }
   const finishingSpin = b.spinDeathT === 0
+  if (dmg === 0 && !finishingSpin) return
   if (b.spinDeathT !== undefined && !finishingSpin) return
   if (finishingSpin) {
     b.spinDeathT = undefined
@@ -48,6 +66,20 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1) {
     g.fx.burst(b.x, b.y, TIER[b.tier].base, 5, 130)
     g.pushHud()
     return
+  }
+  if (allowBrittle && b.sp?.brittle) {
+    const radius = Number.isFinite(b.sp.brittle.radius) ? Math.max(0, b.sp.brittle.radius) : 0
+    const chainDamage = Number.isFinite(b.sp.brittle.damage) ? Math.max(0, b.sp.brittle.damage) : 0
+    if (radius > 0 && chainDamage > 0) {
+      const candidates: Block[] = []
+      for (const other of g.blocks) {
+        if (other === b || other.dead || other.isMiniboss) continue
+        if (Math.hypot(other.x - b.x, other.y - b.y) > radius) continue
+        candidates.push(other)
+        if (candidates.length >= BRITTLE_CHAIN_MAX) break
+      }
+      for (const other of candidates) damageBlock(g, other, chainDamage, false)
+    }
   }
   b.dead = true
   // Если уничтожен сегмент щупальца, то уничтожаем все сегменты,

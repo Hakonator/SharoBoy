@@ -17,6 +17,7 @@ import type {
 import { clamp, rand } from "./utils"
 import { convexBump, surfaceAt } from "./physics/shapes"
 import {
+  applyBlockMagnets,
   collideBlocks as blockBounce,
   collideBoss as bossBounce,
   collidePaddle as paddleBounce,
@@ -267,6 +268,8 @@ export class Physics {
       const k = Math.min(1.6, 0.5 + (ball.sinceHit - 4) * 0.35) * dt
       ball.vy += (Math.sign(ball.vy || -1) * sp - ball.vy) * k * 0.5
     }
+
+    applyBlockMagnets(g, ball, dt)
   }
 
   /** Урон блоку; при разрушении — очки, эффекты, дроп бонуса, «матрёшка». */

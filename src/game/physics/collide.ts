@@ -1,5 +1,6 @@
-import type { Ball, PaddleShapeKind } from "../types"
+import type { Ball, Block, PaddleShapeKind } from "../types"
 import { clamp } from "../utils"
+import { BLOCK_MAGNET_STEER_RATE } from "../blockKinds"
 import type { PhysicsWorld } from "../physics"
 
 import { convexBump, surfaceAt } from "./shapes"
@@ -145,14 +146,12 @@ export function collidePaddleShape(
   p.squash = 1
   g.combo = 0
   g.sfx.paddle(Math.abs(rel))
-  g.fx.burst(ball.x, ball.y - ball.r, "#7cf5ff", 6, 130)
-  g.pushHud()
 }
-/** Столкновения с блоками: локальные координаты повёрнутого эллипса, отражение по нормали. */
 export function collideBlocks(g: PhysicsWorld, ball: Ball) {
   const fire = g.fireActive()
   for (const b of g.blocks) {
     if (b.dead) continue
+    if (b.sp?.phase && !isBlockPhaseActive(b, g.time)) continue
     // Порталы на кулдауне после телепорта полностью прозрачны для шара:
     // не отражают его и не получают урон обычным/огненным попаданием.
     if (b.sp?.portalId !== undefined && (b.sp.portalCd ?? 0) > 0) continue
@@ -182,7 +181,7 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
     ball.sinceHit = 0
     // специальный блок (§6): пружина/вата/вращение/телепорт. Телепорт
     // поглощает контакт целиком (без отражения и урона от шара).
-    if (onBallHitSpecial(g, b, ball, lx, ex)) return
+    if (onBallHitSpecial(g, b, ball, lx, ly, ex)) return
     if (fire && !b.isMiniboss && !(g.frostActive() && !b.frozen)) {
       // обычные блоки огонь прожигает насквозь (без отскока)
       g.sfx.burn()
@@ -228,6 +227,51 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
       queueSparkChain(g.sparkQueue, sparkChainTargets(g.blocks, b, { exclude: b }), b, g.time)
     }
     return
+  }
+}
+
+/** Фаза определяется абсолютным временем, без накопления таймерной ошибки. */
+export function isBlockPhaseActive(b: Block, time: number): boolean {
+  const phase = b.sp?.phase
+  if (!phase) return true
+  if (!Number.isFinite(phase.period) || phase.period <= 0) return true
+  if (!Number.isFinite(phase.active) || !Number.isFinite(phase.offset)) return true
+  const active = clamp(phase.active, 0, 1)
+  const position = (((time + phase.offset) % phase.period) + phase.period) % phase.period
+  return position < phase.period * active
+}
+
+/** Поле магнита прикладывается после нормализации скорости игровым циклом. */
+export function applyBlockMagnets(g: PhysicsWorld, ball: Ball, dt: number) {
+  let magnetVx = 0
+  let magnetVy = 0
+  let strongestFalloff = 0
+  for (const block of g.blocks) {
+    const magnet = block.sp?.magnet
+    if (block.dead || !magnet || (block.sp?.phase && !isBlockPhaseActive(block, g.time))) continue
+    if (!Number.isFinite(magnet.radius) || !Number.isFinite(magnet.force)) continue
+    const dx = block.x - ball.x
+    const dy = block.y - ball.y
+    const distance = Math.hypot(dx, dy)
+    const range = Math.max(0, magnet.radius)
+    if (distance <= 1 || distance >= range) continue
+    const falloff = 1 - distance / range
+    strongestFalloff = Math.max(strongestFalloff, falloff)
+    const acceleration = Math.max(0, magnet.force) * falloff
+    magnetVx += (dx / distance) * acceleration
+    magnetVy += (dy / distance) * acceleration
+  }
+  const magnetDelta = Math.hypot(magnetVx, magnetVy)
+  const currentSpeed = Math.hypot(ball.vx, ball.vy)
+  if (magnetDelta > 0 && currentSpeed > 0) {
+    const from = Math.atan2(ball.vy, ball.vx)
+    const to = Math.atan2(magnetVy, magnetVx)
+    const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from))
+    const maxTurn = BLOCK_MAGNET_STEER_RATE * strongestFalloff * dt
+    const turn = clamp(delta, -maxTurn, maxTurn)
+    const angle = from + turn
+    ball.vx = Math.cos(angle) * currentSpeed
+    ball.vy = Math.sin(angle) * currentSpeed
   }
 }
 /** Столкновение с боссом: круговое отражение + урон (огненное ядро бьёт сильнее). */

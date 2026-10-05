@@ -5,7 +5,14 @@
  * с общим id. Боссы, минибоссы и бомбы не трогаются.
  */
 import type { Block } from "../types"
-import { DRIFT_MAX_RADIUS_MULT } from "../blockKinds"
+import {
+  BLOCK_MAGNET_FORCE,
+  BLOCK_MAGNET_RADIUS_MULT,
+  BRITTLE_RADIUS_MULT,
+  DRIFT_MAX_RADIUS_MULT,
+  PHASE_ACTIVE_FRACTION,
+  PHASE_PERIOD,
+} from "../blockKinds"
 import { clamp } from "../utils"
 
 /** Блоки, которым разрешены специальные типы. */
@@ -57,6 +64,31 @@ function assignSpecial(b: Block, rng: () => number) {
   else b.sp = { rotVel: 0, rotDir: rng() < 0.5 ? -1 : 1 }
 }
 
+function assignPrioritySpecial(b: Block, rng: () => number) {
+  const roll = rng()
+  if (roll < 0.25) {
+    const armor = 1 + (rng() < 0.2 ? 1 : 0)
+    b.sp = { armor, armorMax: armor }
+  } else if (roll < 0.5) {
+    b.sp = { brittle: { radius: Math.max(b.rx, b.ry) * BRITTLE_RADIUS_MULT, damage: 1 } }
+  } else if (roll < 0.75) {
+    b.sp = {
+      phase: {
+        period: PHASE_PERIOD * (0.85 + rng() * 0.3),
+        active: PHASE_ACTIVE_FRACTION,
+        offset: rng() * PHASE_PERIOD,
+      },
+    }
+  } else {
+    b.sp = {
+      magnet: {
+        radius: Math.max(b.rx, b.ry) * BLOCK_MAGNET_RADIUS_MULT,
+        force: BLOCK_MAGNET_FORCE,
+      },
+    }
+  }
+}
+
 /** Превращает два свободных блока в пару порталов с общим id. */
 function makePortalPair(pool: Block[], id: number, rng: () => number): boolean {
   const free = pool.filter((b) => !b.sp)
@@ -81,7 +113,10 @@ export function decorateBlocks(blocks: Block[], level: number, rng: () => number
   const pool = blocks.filter(eligible)
   const intensity = specialIntensity(level)
   for (const b of pool) {
-    if (rng() < intensity) assignSpecial(b, rng)
+    if (rng() < intensity) {
+      if (rng() < 0.3) assignPrioritySpecial(b, rng)
+      else assignSpecial(b, rng)
+    }
   }
   // парные телепорты — с 4-го уровня, вторая пара на высоких
   if (level >= 4 && rng() < clamp(0.15 + (level - 4) * 0.06, 0, 0.8)) {

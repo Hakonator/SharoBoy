@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import { Physics, type PhysicsWorld } from "../physics"
 import type { Ball, Block } from "../types"
-import { SPIN_DEATH_DURATION, SPIN_MAX } from "../blockKinds"
+import { BRITTLE_CHAIN_MAX, SPIN_DEATH_DURATION, SPIN_MAX } from "../blockKinds"
 
 import { damageBlock } from "./destruction"
 import { FROST_FREEZE_RADIUS, freezeCluster } from "./frost"
@@ -82,7 +82,13 @@ describe("freezeCluster", () => {
 
 /** Фейковый мир по образцу physics.test.ts — шар летит вверх в блок. */
 function makeWorld(blocks: Block[], frost: boolean) {
-  const sfx = { freeze: vi.fn(), iceShatter: vi.fn(), destroy: vi.fn(), brick: vi.fn() }
+  const sfx = {
+    freeze: vi.fn(),
+    iceShatter: vi.fn(),
+    destroy: vi.fn(),
+    brick: vi.fn(),
+    levelClear: vi.fn(),
+  }
   const fx = {
     burst: vi.fn(),
     iceShatter: vi.fn(),
@@ -145,6 +151,64 @@ function makeWorld(blocks: Block[], frost: boolean) {
 }
 
 describe("морозный мяч — удар о блок", () => {
+  it("броня поглощает урон раньше HP блока", () => {
+    const block = makeBlock({ hp: 2, sp: { armor: 1 } })
+    const { world } = makeWorld([block], false)
+    damageBlock(world, block, 1)
+    expect(block.sp?.armor).toBe(0)
+    expect(block.hp).toBe(2)
+    expect(block.dead).toBe(false)
+  })
+
+  it("последний заряд брони пропускает остаток урона в HP", () => {
+    const block = makeBlock({ hp: 2, sp: { armor: 1 } })
+    const { world } = makeWorld([block], false)
+    damageBlock(world, block, 2)
+    expect(block.sp?.armor).toBe(0)
+    expect(block.hp).toBe(1)
+  })
+
+  it("игнорирует отрицательный и нечисловой урон, нормализует повреждённую броню", () => {
+    const block = makeBlock({ hp: 2, sp: { armor: Number.NaN } })
+    const { world } = makeWorld([block], false)
+    damageBlock(world, block, -4)
+    expect(block.hp).toBe(2)
+    damageBlock(world, block, 1)
+    expect(block.sp?.armor).toBe(0)
+    expect(block.hp).toBe(1)
+  })
+
+  it("цепная хрупкость повреждает соседей при разрушении с ограниченным радиусом", () => {
+    const brittle = makeBlock({ x: 200, y: 100, hp: 1, sp: { brittle: { radius: 60, damage: 1 } } })
+    const near = makeBlock({ x: 245, y: 100, hp: 2 })
+    const far = makeBlock({ x: 300, y: 100, hp: 2 })
+    const { world } = makeWorld([brittle, near, far], false)
+    damageBlock(world, brittle, 1)
+    expect(brittle.dead).toBe(true)
+    expect(near.hp).toBe(1)
+    expect(far.hp).toBe(2)
+  })
+
+  it("ограничивает разветвлённую цепь общим лимитом и не обрабатывает блок повторно", () => {
+    const blocks = Array.from({ length: BRITTLE_CHAIN_MAX + 4 }, (_, i) =>
+      makeBlock({
+        x: 200 + i,
+        y: 100,
+        hp: i === 0 ? 1 : 2,
+        sp: i < 2 ? { brittle: { radius: 100, damage: 1 } } : undefined,
+      })
+    )
+    const allBlocks = [...blocks]
+    const { world } = makeWorld(blocks, false)
+
+    damageBlock(world, blocks[0], 1)
+
+    expect(allBlocks[0].dead).toBe(true)
+    expect(allBlocks.filter((block) => block.hp === 1)).toHaveLength(BRITTLE_CHAIN_MAX)
+    expect(allBlocks.slice(BRITTLE_CHAIN_MAX + 1).every((block) => block.hp === 2)).toBe(true)
+    expect(world.blocks).toHaveLength(allBlocks.length - 1)
+  })
+
   it("замораживает блок вместо урона и отскакивает", () => {
     const block = makeBlock({ x: 200, y: 100, hp: 2, maxHp: 2 })
     const { world, ball, sfx } = makeWorld([block], true)

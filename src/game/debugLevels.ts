@@ -1,6 +1,7 @@
 import { makeBlock } from "./levelBuilder"
 import { mulberry32 } from "./utils"
 import type { Block } from "./types"
+import { BLOCK_MAGNET_FORCE, BLOCK_MAGNET_RADIUS_MULT } from "./blockKinds"
 
 /** Отдельная раскладка для визуальной проверки всех спецблоков. */
 export function buildSpecialBlocks(w: number, h: number, top: number): Block[] {
@@ -30,5 +31,53 @@ export function buildSpecialBlocks(w: number, h: number, top: number): Block[] {
   })
   add(columns[3], rows[1], "PORTAL A", { portalId: 1 })
   add(columns[3] - w * 0.12, rows[1] + h * 0.13, "PORTAL B", { portalId: 1 })
+
+  const priorityY = rows[1] + h * 0.11
+  const armorStep = Math.min(86, w * 0.09)
+  const armorRx = Math.min(26, w * 0.027)
+  for (const armor of [1, 2, 3]) {
+    add(
+      w * 0.16 + (armor - 2) * armorStep,
+      priorityY,
+      w < 540 ? `A${armor}` : `ARMOR ${armor}`,
+      { armor, armorMax: armor },
+      { rx: armorRx, ry: (armorRx * 22) / 42, hp: 2, maxHp: 2 }
+    )
+  }
+  const brittleCenterX = w * 0.38
+  const brittleCenterY = priorityY + h * 0.03
+  const brittleStepX = 66
+  const brittleStepY = 44
+  for (let row = -1; row <= 1; row++) {
+    for (let col = -1; col <= 1; col++) {
+      const index = (row + 1) * 3 + (col + 1)
+      add(
+        brittleCenterX + col * brittleStepX,
+        brittleCenterY + row * brittleStepY,
+        row === 0 && col === 0 ? "BRITTLE CORE" : `BRITTLE ${index}`,
+        { brittle: { radius: 100, damage: 1 } },
+        { hp: 1, maxHp: 1 }
+      )
+    }
+  }
+  add(
+    w * 0.62,
+    priorityY,
+    "PHASE",
+    {
+      phase: { period: 2.4, active: 0.5, offset: 0 },
+    },
+    { hp: 2, maxHp: 2 }
+  )
+  const magnetBlockRadius = 42 * BLOCK_MAGNET_RADIUS_MULT
+  add(
+    w * 0.84,
+    priorityY,
+    "MAGNET",
+    {
+      magnet: { radius: magnetBlockRadius, force: BLOCK_MAGNET_FORCE },
+    },
+    { hp: 2, maxHp: 2 }
+  )
   return blocks
 }
