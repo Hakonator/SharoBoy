@@ -1,6 +1,7 @@
 import type { PaddleShapeKind } from "../types"
 import type { Game } from "../game"
 import { hudTopCss } from "../viewport"
+import { convexBump } from "../physics/shapes"
 
 import { isDebugEffectActive } from "./debug"
 
@@ -10,6 +11,20 @@ export function paddleShape(g: Game): PaddleShapeKind {
   if (isDebugEffectActive(g, "paddleConvex")) return "convex"
   if (isDebugEffectActive(g, "paddleConcave")) return "concave"
   return "flat"
+}
+
+/** Выходное направление вертикально падающего шара от формы ракетки в точке x. */
+export function paddleLaunchAngle(kind: PaddleShapeKind, rel: number, halfW: number): number {
+  if (kind === "flat") return -Math.PI / 2 + rel * 1.05
+  const sign = kind === "concave" ? -1 : 1
+  const slope = (sign * 2 * convexBump(halfW) * rel) / halfW
+  const length = Math.hypot(slope, 1)
+  const nx = slope / length
+  const ny = -1 / length
+  const dot = ny
+  const vx = -2 * dot * nx
+  const vy = 1 - 2 * dot * ny
+  return Math.atan2(-Math.abs(vy), vx)
 }
 
 /** Обновление поворота ракетки (режим отладки: ЛКМ/ПКМ = ±30°). */

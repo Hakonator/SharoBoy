@@ -64,6 +64,24 @@ describe("DEV-отладка: горячие клавиши F1–F4", () => {
 })
 
 describe("DEV-отладка (F2–F4)", () => {
+  it("прицел и отражение совмещаются с формой ракетки; отражение требует прицел", () => {
+    const { game, restoreRandom } = makeEnv()
+    try {
+      game.toggleDebugEffect("paddleConvex")
+      game.toggleDebugEffect("aimGuide")
+      game.toggleDebugEffect("bounceGuide")
+      expect(game.isDebugEffectActive("paddleConvex")).toBe(true)
+      expect(game.isAimGuideActive()).toBe(true)
+      expect(game.isBounceGuideActive()).toBe(true)
+      game.toggleDebugEffect("aimGuide")
+      expect(game.isBounceGuideActive()).toBe(false)
+      expect(game.isDebugEffectActive("paddleConvex")).toBe(true)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
+
   it("toggle-функции переключают флаги и возвращают новое состояние", () => {
     const { game, restoreRandom } = makeEnv()
     try {

@@ -35,7 +35,7 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
   if (lvy <= 0) return
   const rel = clamp(lx / (p.w / 2), -1, 1)
   // магнит: шар прилипает вместо отскока
-  if (g.magnetActive() && !ball.stuck) {
+  if ((g.magnetActive() || g.magneticPaddleActive()) && !ball.stuck) {
     ball.stuck = true
     ball.stuckOffset = clamp(lx, -p.w / 2 + ball.r, p.w / 2 - ball.r)
     ball.vx = 0

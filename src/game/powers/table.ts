@@ -22,6 +22,7 @@ export function buildPowerTable(o: PowerTableOpts): [PowerType, number][] {
     ["multi", 12],
     ["life", 6],
     ["shield", 10],
+    ["magneticPaddle", 7],
     ["laser", o.fewBlocks ? 72 : 9],
     ["rocket", o.fewBlocks ? 64 : 8],
     ["fire", 8],

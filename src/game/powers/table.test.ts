@@ -40,6 +40,11 @@ describe("buildPowerTable", () => {
     expect(weight({ fewBlocks: true }, "rocket")).toBeGreaterThan(weight({}, "rocket"))
   })
 
+  it("магнитная ракетка доступна в обычных дропах и не зависит от босса", () => {
+    expect(types({})).toContain("magneticPaddle")
+    expect(types({ boss: true })).toContain("magneticPaddle")
+  })
+
   it("«замедление» сочетается с остальными фильтрами", () => {
     const t = types({ spedUp: true, boss: true, campaign: true })
     expect(t).toContain("slow")

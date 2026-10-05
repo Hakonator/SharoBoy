@@ -25,6 +25,10 @@ export interface InputHost {
   primaryAction(): void
   /** Клик/тап: запуск шара, если партия идёт. */
   launchIfPlaying(): void
+  aimWheel(delta: number): void
+  aimFromPointer(clientX: number, clientY: number): void
+  aimGuideActive(): boolean
+  ballStuck(): boolean
   /** Первый тач-ввод: хост адаптируется (поднимает ракетку над пальцем). */
   onTouchInput(): void
   /** Пауза/снятие паузы (клавиши P/Esc). */

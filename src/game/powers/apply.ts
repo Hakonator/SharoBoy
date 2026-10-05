@@ -63,6 +63,10 @@ export function applyPower(g: PowersWorld, type: PowerType) {
       g.magnetUntil = g.time + 7
       popup("МАГНИТ!")
       break
+    case "magneticPaddle":
+      g.magneticPaddleUntil = g.time + 12
+      popup("МАГНИТНАЯ РАКЕТКА!")
+      break
     case "multi": {
       // ×3: добавляем ровно ДВА дополнительных шара (раньше клонировался
       // каждый свободный шар, и при одном шаре в игре появлялся лишь один).

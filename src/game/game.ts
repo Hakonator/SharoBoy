@@ -127,6 +127,7 @@ export class Game {
   fpsFrames = 0
   fpsElapsed = 0
   paddle: PaddleState = { x: 480, y: 600, w: 150, baseW: 150, h: 18, vx: 0, squash: 0 }
+  aimAngle = -Math.PI / 2
   /** Импульсный поворот ракетки (однократный резкий доворот + возврат). */
   paddleImpulse: { dir: number; t: number } | null = null
   /** Предыдущее состояние кнопок мыши для детекта краёв нажатия. */
@@ -157,6 +158,7 @@ export class Game {
   frostUntil = 0
   sparkUntil = 0
   magnetUntil = 0
+  magneticPaddleUntil = 0
   weaponCd = 0
   shield = 0
   readonly bossSys: BossSystem
@@ -292,6 +294,13 @@ export class Game {
   }
   isDebugEffectActive(id: string): boolean {
     return isDebugEffectActive(this, id)
+  }
+  isAimGuideActive(): boolean {
+    return (this.upgrades.aimGuide ?? 0) > 0 || this.debugEffects.has("aimGuide")
+  }
+  isBounceGuideActive(): boolean {
+    if ((this.upgrades.aimGuide ?? 0) > 0 && (this.upgrades.bounceGuide ?? 0) > 0) return true
+    return this.isAimGuideActive() && this.debugEffects.has("bounceGuide")
   }
   enterMapNode(id: number) {
     enterMapNode(this, id)

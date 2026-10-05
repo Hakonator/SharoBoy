@@ -17,6 +17,7 @@ import {
 import { pushHud } from "./hudSync"
 import { startGame, togglePause } from "./modes"
 import { paddleBottomOffset } from "./paddleControl"
+import { paddleLaunchAngle, paddleShape } from "./paddleControl"
 import { realignOnOrientationChange } from "./rotateLayout"
 import { launch } from "./runFlow"
 
@@ -137,12 +138,45 @@ export function createInput(g: Game, canvas: HTMLCanvasElement): InputController
     isPlaying: () => g.phase === "playing",
     primaryAction: () => {
       if (g.phase === "menu" || g.phase === "over" || g.phase === "won") startGame(g)
-      else if (g.phase === "playing") launch(g)
-      else if (g.phase === "map") enterNextNodeOnAction(g)
+      else if (g.phase === "playing") {
+        if (g.balls.some((ball) => ball.stuck)) launch(g)
+        else g.input.keys.space = true
+      } else if (g.phase === "map") enterNextNodeOnAction(g)
     },
     launchIfPlaying: () => {
       if (g.phase === "playing") launch(g)
     },
+    aimWheel: (delta) => {
+      const currentOffset = g.balls.find((ball) => ball.stuck)?.stuckOffset ?? 0
+      const nextOffset = clamp(
+        currentOffset + Math.sign(delta) * g.paddle.w * 0.035,
+        -g.paddle.w * 0.42,
+        g.paddle.w * 0.42
+      )
+      for (const ball of g.balls) {
+        if (ball.stuck) {
+          ball.stuckOffset = nextOffset
+          const rel = nextOffset / (g.paddle.w / 2)
+          g.aimAngle = paddleLaunchAngle(paddleShape(g), rel, g.paddle.w / 2)
+          g.physics.stickToPaddle(ball)
+        }
+      }
+    },
+    aimFromPointer: (clientX, _clientY) => {
+      const rect = canvas.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return
+      const x = ((clientX - rect.left) / rect.width) * g.w
+      const ball = g.balls.find((item) => item.stuck)
+      if (!ball) return
+      const dx = x - g.paddle.x
+      const offset = clamp(dx, -g.paddle.w * 0.42, g.paddle.w * 0.42)
+      ball.stuckOffset = offset
+      const rel = offset / (g.paddle.w / 2)
+      g.aimAngle = paddleLaunchAngle(paddleShape(g), rel, g.paddle.w / 2)
+      g.physics.stickToPaddle(ball)
+    },
+    aimGuideActive: () => g.isAimGuideActive(),
+    ballStuck: () => g.balls.some((ball) => ball.stuck),
     onTouchInput: () => enableTouchMode(g),
     togglePause: () => togglePause(g),
     toggleMute: () => toggleMute(g),

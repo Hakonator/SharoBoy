@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { PowersSystem, type PowersWorld } from "./powers"
+import { applyPower } from "./powers/apply"
 import type { Block } from "./types"
 
 /** Неигровая HUD-зона: спавн блоков и дрейф поля — только ниже неё. */
@@ -76,5 +77,17 @@ describe("PowersSystem — неигровая HUD-зона сверху", () => 
     for (const block of g.blocks) {
       expect(block.y - block.ry).toBeGreaterThanOrEqual(96)
     }
+  })
+
+  it("бонус магнитной ракетки включает временный захват шара", () => {
+    const g = {
+      ...makeWorld({ time: 10 }),
+      magneticPaddleUntil: 0,
+      sfx: { power() {} },
+      fx: { popups: [], burst() {} },
+      pushHud() {},
+    }
+    applyPower(g as unknown as Parameters<typeof applyPower>[0], "magneticPaddle")
+    expect(g.magneticPaddleUntil).toBe(22)
   })
 })

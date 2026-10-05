@@ -14,6 +14,7 @@ export const POWER_META: Record<
   life: { label: "+1", good: true, color: "#4dff9e", edge: "#d2ffee" },
   coin: { label: "МОН", good: true, color: "#ffc94d", edge: "#fff1c4" },
   magnet: { label: "МАГ", good: true, color: "#4dff9e", edge: "#d2ffee" },
+  magneticPaddle: { label: "ПРИЛ", good: true, color: "#4dff9e", edge: "#d2ffee" },
   slow: { label: "СК↓", good: true, color: "#4dff9e", edge: "#d2ffee" },
   shield: { label: "ЩИТ", good: true, color: "#4dff9e", edge: "#d2ffee" },
   laser: { label: "ЛАЗ", good: true, color: "#4dff9e", edge: "#d2ffee" },

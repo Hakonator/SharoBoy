@@ -22,6 +22,7 @@ import {
   collideBoss as bossBounce,
   collidePaddle as paddleBounce,
 } from "./physics/collide"
+import { isBlockPhaseActive } from "./physics/collide"
 import {
   damageBlock as applyBlockDamage,
   finishSpinDeaths as applySpinDeathFinisher,
@@ -66,6 +67,7 @@ export interface PhysicsWorld {
   /** Нижний край видимого HUD в обеих ориентациях — только для новых блоков. */
   readonly blockSpawnTop: number
   readonly time: number
+  readonly aimAngle: number
   readonly paddle: PaddleState
   readonly blocksInitial: number
   readonly boss: BossState | null
@@ -90,6 +92,7 @@ export interface PhysicsWorld {
   slowActive(): boolean
   fastActive(): boolean
   magnetActive(): boolean
+  magneticPaddleActive(): boolean
   wideActive(): boolean
   shrinkActive(): boolean
   /** Форма верхней поверхности ракетки (эффекты отладки). */
@@ -97,6 +100,8 @@ export interface PhysicsWorld {
   /** Активен ли поворотный эффект (ЛКМ/ПКМ меняют наклон ракетки) — в этом
    *  режиме арканоидное «искажение» отскока отключается. */
   paddleRotatable(): boolean
+  aimGuideActive(): boolean
+  bounceGuideActive(): boolean
   addScore(n: number, x: number, y: number, color: string, size: number): void
   dropPower(x: number, y: number): void
   damageBoss(dmg: number, fromWeapon: boolean): void
@@ -160,6 +165,85 @@ export class Physics {
     ball.x = p.x + ball.stuckOffset
     const rel = clamp(ball.stuckOffset / (p.w / 2), -1, 1)
     ball.y = p.y - p.h / 2 - surfaceAt(p.w / 2, rel, g.paddleShape(), p.h) - ball.r - 2
+  }
+
+  /** Прицельная линия кончается на первом препятствии и отражается по его нормали. */
+  aimGuide(ball: Ball) {
+    const g = this.g
+    const angle = g.aimGuideActive() ? g.aimAngle : -Math.PI / 2
+    const dx = Math.cos(angle)
+    const dy = Math.sin(angle)
+    let distance = Infinity
+    let nx = 0
+    let ny = 0
+    const consider = (t: number, x: number, y: number) => {
+      if (t <= 1 || t >= distance) return
+      distance = t
+      nx = x
+      ny = y
+    }
+    if (dx < 0) consider((ball.r - ball.x) / dx, 1, 0)
+    if (dx > 0) consider((g.w - ball.r - ball.x) / dx, -1, 0)
+    if (dy < 0) consider((g.blockTop + ball.r - ball.y) / dy, 0, 1)
+    if (g.shield > 0 && dy > 0) consider((g.h - 14 - ball.r - ball.y) / dy, 0, -1)
+    for (const block of g.blocks) {
+      if (block.dead || (block.sp?.phase && !isBlockPhaseActive(block, g.time))) continue
+      if (block.sp?.portalId !== undefined && (block.sp.portalCd ?? 0) > 0) continue
+      const cs = Math.cos(block.rot)
+      const sn = Math.sin(block.rot)
+      const qx = (ball.x - block.x) * cs + (ball.y - block.y) * sn
+      const qy = -(ball.x - block.x) * sn + (ball.y - block.y) * cs
+      const vx = dx * cs + dy * sn
+      const vy = -dx * sn + dy * cs
+      const rx = block.rx + ball.r
+      const ry = block.ry + ball.r
+      const a = (vx * vx) / (rx * rx) + (vy * vy) / (ry * ry)
+      const b = (2 * qx * vx) / (rx * rx) + (2 * qy * vy) / (ry * ry)
+      const c = (qx * qx) / (rx * rx) + (qy * qy) / (ry * ry) - 1
+      const disc = b * b - 4 * a * c
+      if (disc < 0 || a === 0) continue
+      const root = Math.sqrt(disc)
+      const first = (-b - root) / (2 * a)
+      const second = (-b + root) / (2 * a)
+      const t = first > 1 ? first : second
+      const hx = qx + vx * t
+      const hy = qy + vy * t
+      const nl = Math.hypot(hx / (rx * rx), hy / (ry * ry)) || 1
+      const lnx = hx / (rx * rx) / nl
+      const lny = hy / (ry * ry) / nl
+      if (t > 1) consider(t, lnx * cs - lny * sn, lnx * sn + lny * cs)
+    }
+    const boss = g.boss
+    if (boss) {
+      const ox = ball.x - boss.x
+      const oy = ball.y - boss.y
+      const b = 2 * (ox * dx + oy * dy)
+      const c = ox * ox + oy * oy - (boss.r + ball.r) ** 2
+      const disc = b * b - 4 * c
+      if (disc >= 0) {
+        const t = (-b - Math.sqrt(disc)) / 2
+        const hx = ball.x + dx * t
+        const hy = ball.y + dy * t
+        const nl = Math.hypot(hx - boss.x, hy - boss.y) || 1
+        consider(t, (hx - boss.x) / nl, (hy - boss.y) / nl)
+      }
+    }
+    if (!Number.isFinite(distance)) distance = Math.max(g.w, g.h) * 2
+    const hitX = ball.x + dx * distance
+    const hitY = ball.y + dy * distance
+    const dot = dx * nx + dy * ny
+    return {
+      x: ball.x,
+      y: ball.y,
+      dx,
+      dy,
+      hitX,
+      hitY,
+      bounceX: hitX - 2 * dot * nx,
+      bounceY: hitY - 2 * dot * ny,
+      bounceDx: dx - 2 * dot * nx,
+      bounceDy: dy - 2 * dot * ny,
+    }
   }
 
   /** Интеграция движения шара с подшагами: стены, щит, потери, столкновения. */
@@ -229,6 +313,10 @@ export class Physics {
       }
 
       paddleBounce(this.g, ball)
+      if (ball.stuck) {
+        this.stickToPaddle(ball)
+        return
+      }
       blockBounce(this.g, ball)
       bossBounce(this.g, ball)
     }

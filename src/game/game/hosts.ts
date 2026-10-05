@@ -181,6 +181,12 @@ export function makePowersHost(g: Game): PowersWorld {
     set magnetUntil(v) {
       g.magnetUntil = v
     },
+    get magneticPaddleUntil() {
+      return g.magneticPaddleUntil
+    },
+    set magneticPaddleUntil(v) {
+      g.magneticPaddleUntil = v
+    },
     get laserArmed() {
       return g.laserArmed
     },
@@ -222,6 +228,9 @@ export function makePowersHost(g: Game): PowersWorld {
 /** Хост для Physics: кинематика ракетки/шара, предикаты эффектов, колбэки. */
 export function makePhysicsHost(g: Game): PhysicsWorld {
   return {
+    get aimAngle() {
+      return g.aimAngle
+    },
     get w() {
       return g.w
     },
@@ -304,7 +313,10 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     slowActive: () => g.time < g.slowUntil,
     fastActive: () => g.time < g.fastUntil,
     magnetActive: () => g.time < g.magnetUntil,
+    magneticPaddleActive: () => g.time < g.magneticPaddleUntil,
     paddleRotatable: () => isDebugEffectActive(g, "paddleRotation"),
+    aimGuideActive: () => g.isAimGuideActive(),
+    bounceGuideActive: () => g.isBounceGuideActive(),
     wideActive: () => g.time < g.wideUntil,
     shrinkActive: () => g.time < g.shrinkUntil,
     paddleShape: () => g.paddleShapeKind(),

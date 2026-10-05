@@ -50,6 +50,7 @@ export interface PowersWorld {
   frostUntil: number
   sparkUntil: number
   magnetUntil: number
+  magneticPaddleUntil: number
   laserArmed: boolean
   laserArmedUntil: number
   /** Форма верхней поверхности ракетки (купол/чаша/грань) для зоны ловли. */

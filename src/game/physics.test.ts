@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import { FIREBALL_DAMAGE_MULT, Physics, type PhysicsWorld } from "./physics"
 import type { Ball, Block } from "./types"
 import { spawnScatter } from "./physics/destruction"
+import { paddleLaunchAngle } from "./game/paddleControl"
 
 /** Регрессия 26dc66b: знак surfaceAt для «convex» инвертировали «для симметрии»
  *  с чашей — все потребители (старт шара, прилипание, выталкивание, пилоны)
@@ -42,6 +43,20 @@ describe("Physics.surfaceAt — высота поверхности над гр�
         expect(Physics.surfaceAt(60, rel, kind, 20)).toBeGreaterThanOrEqual(0)
       }
     }
+  })
+})
+
+describe("прицел запуска для чаши", () => {
+  it("отражает направление внутрь чаши симметрично от обоих краёв", () => {
+    const right = paddleLaunchAngle("concave", 0.8, 60)
+    const left = paddleLaunchAngle("concave", -0.8, 60)
+    expect(right).toBeLessThan(-Math.PI / 2)
+    expect(left).toBeGreaterThan(-Math.PI / 2)
+    expect(right + left).toBeCloseTo(-Math.PI)
+  })
+
+  it("в центре чаши направление вертикальное", () => {
+    expect(paddleLaunchAngle("concave", 0, 60)).toBeCloseTo(-Math.PI / 2)
   })
 })
 
@@ -310,6 +325,58 @@ describe("Physics — верхняя неигровая HUD-зона", () => {
     physics.updateBall(ball, 0.016)
     expect(ball.y - ball.r).toBe(150)
     expect(ball.vy).toBeGreaterThan(0)
+  })
+
+  it("прицел находит ближайшее столкновение с блоком и отражённый вектор", () => {
+    const world = makeTopWorld(0)
+    Object.assign(world, {
+      aimAngle: -Math.PI / 2,
+      aimGuideActive: () => true,
+      bounceGuideActive: () => true,
+      magneticPaddleActive: () => false,
+    })
+    world.blocks.push({
+      x: 200,
+      y: 180,
+      rx: 40,
+      ry: 16,
+      rot: 0,
+      dead: false,
+      hp: 1,
+    } as Block)
+    const ball = { ...makeTopBall(), x: 200, y: 300, r: 10 }
+    const guide = new Physics(world).aimGuide(ball)
+    expect(guide?.hitX).toBeCloseTo(200)
+    expect(guide?.hitY).toBeCloseTo(206)
+    expect(guide?.bounceDy).toBeGreaterThan(0)
+  })
+
+  it("магнитная ракетка ловит мяч в точке столкновения", () => {
+    const world = makeTopWorld(0)
+    const paddle = { x: 200, y: 560, w: 90, h: 14, vx: 0, squash: 0 }
+    Object.assign(world, {
+      paddle,
+      magneticPaddleActive: () => true,
+      magnetActive: () => false,
+      paddleShape: () => "flat" as const,
+      sfx: { paddle() {} },
+      fx: { burst() {} },
+    })
+    const ball = {
+      ...makeTopBall(),
+      x: 225,
+      y: 550,
+      vx: 0,
+      vy: 100,
+      r: 10,
+      sinceHit: 1,
+    }
+    const physics = new Physics(world)
+    physics.updateBall(ball, 0.016)
+    expect(ball.stuck).toBe(true)
+    expect(ball.stuckOffset).toBeCloseTo(25)
+    expect(ball.vx).toBe(0)
+    expect(ball.vy).toBe(0)
   })
 
   it("рассыпь не создаёт новые блоки за HUD на портретном экране", () => {

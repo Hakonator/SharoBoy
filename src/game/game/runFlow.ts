@@ -47,6 +47,8 @@ export function resetRun(g: Game) {
   g.sparkUntil = 0
   g.sparkQueue = []
   g.magnetUntil = 0
+  g.magneticPaddleUntil = 0
+  g.aimAngle = -Math.PI / 2
   g.shield = 0
   g.weaponCd = 0
   g.effectsKey = ""
@@ -58,7 +60,7 @@ export function launch(g: Game) {
   for (const b of g.balls) {
     if (b.stuck) {
       b.stuck = false
-      const ang = -Math.PI / 2 + rand(-0.3, 0.3)
+      const ang = g.isAimGuideActive() ? g.aimAngle : -Math.PI / 2 + rand(-0.3, 0.3)
       b.vx = Math.cos(ang) * b.speed
       b.vy = Math.sin(ang) * b.speed
       launched = true
@@ -183,6 +185,7 @@ export function loseLife(g: Game) {
   g.sparkUntil = 0
   g.sparkQueue = []
   g.magnetUntil = 0
+  g.magneticPaddleUntil = 0
   g.weaponCd = 0
   g.powers = []
   g.projectiles = []
@@ -222,6 +225,7 @@ export function clearAllEffects(g: Game) {
   g.sparkUntil = 0
   g.sparkQueue = []
   g.magnetUntil = 0
+  g.magneticPaddleUntil = 0
   g.weaponCd = 0
   g.shield = 0
   g.laserWasOn = false

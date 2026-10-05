@@ -211,6 +211,7 @@ export type PowerType =
   | "life"
   | "coin"
   | "magnet"
+  | "magneticPaddle"
   | "slow"
   | "shield"
   | "laser"
@@ -241,6 +242,20 @@ export interface PaddleState {
   squash: number
   /** Поворот в радианах (режим отладки: ЛКМ/ПКМ для удара с ускорением). */
   rot?: number
+}
+
+/** Направление запуска и предсказанные сегменты прицела перед подачей шара. */
+export interface AimGuide {
+  x: number
+  y: number
+  dx: number
+  dy: number
+  hitX: number
+  hitY: number
+  bounceX: number
+  bounceY: number
+  bounceDx: number
+  bounceDy: number
 }
 
 export interface Projectile {

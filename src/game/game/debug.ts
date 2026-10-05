@@ -58,7 +58,7 @@ export function toggleDebugEffect(g: Game, id: string) {
   // Режимы формы/поворота ракетки взаимоисключающие: физика отскока и
   // управление реализуют один и тот же ресурс (форма/угол ракетки).
   const paddleModes = ["paddleRotation", "paddleImpulse", "paddleConvex", "paddleConcave"]
-  if (turnOn) {
+  if (turnOn && paddleModes.includes(id)) {
     for (const m of paddleModes) if (m !== id) g.debugEffects.delete(m)
   }
   if (g.debugEffects.has(id)) g.debugEffects.delete(id)
@@ -69,6 +69,9 @@ export function toggleDebugEffect(g: Game, id: string) {
     g.paddleImpulse = null
     g.prevLeftDown = false
     g.prevRightDown = false
+  }
+  if (id === "aimGuide" && !g.debugEffects.has(id) && (g.upgrades.aimGuide ?? 0) === 0) {
+    g.debugEffects.delete("bounceGuide")
   }
   pushHud(g)
 }

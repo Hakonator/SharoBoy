@@ -23,6 +23,8 @@ export class InputController {
   rightButton = false
   /** PointerId пальца, который вращает ракетку (тач); -1 — нет такого пальца. */
   private touchRotateId = -1
+  private touchAimId = -1
+  private primaryTouchId = -1
 
   private virtualX: number | null = null
   private tapFire = false
@@ -86,6 +88,7 @@ export class InputController {
     this.canvas.addEventListener("mousedown", this.handleMouseDown)
     window.addEventListener("mouseup", this.handleMouseUp)
     this.canvas.addEventListener("contextmenu", this.handleContextMenu)
+    this.canvas.addEventListener("wheel", this.handleWheel, { passive: false })
   }
 
   destroy() {
@@ -101,6 +104,7 @@ export class InputController {
     this.canvas.removeEventListener("mousedown", this.handleMouseDown)
     window.removeEventListener("mouseup", this.handleMouseUp)
     this.canvas.removeEventListener("contextmenu", this.handleContextMenu)
+    this.canvas.removeEventListener("wheel", this.handleWheel)
   }
 
   /** Отпустить захват мыши (пауза, конец партии). Помечаем снятие как
@@ -222,17 +226,22 @@ export class InputController {
   }
 
   private handlePointerMove = (e: PointerEvent | MouseEvent) => {
+    // Палец, вращающий ракетку, её не двигает — иначе ракетка «прыгала»
+    // к месту касания при попытке повернуть. Вращение и движение —
+    // независимые жесты (вращающий палец фиксируется в handlePointerDown).
+    const pid = (e as PointerEvent).pointerId
+    if (pid !== undefined && pid === this.touchAimId) {
+      this.host.aimFromPointer(e.clientX, e.clientY)
+      return
+    }
+    if (pid !== undefined && pid === this.touchRotateId) return
+    if (pid !== undefined && pid !== this.primaryTouchId && this.primaryTouchId >= 0) return
     if (this.locked) {
       const vx = (this.virtualX ?? this.host.paddleX()) + e.movementX * this.worldPerCssPx()
       this.virtualX = clamp(vx, 0, this.host.worldWidth())
       this.pointerX = this.virtualX
       return
     }
-    // Палец, вращающий ракетку, её не двигает — иначе ракетка «прыгала»
-    // к месту касания при попытке повернуть. Вращение и движение —
-    // независимые жесты (вращающий палец фиксируется в handlePointerDown).
-    const pid = (e as PointerEvent).pointerId
-    if (pid !== undefined && pid === this.touchRotateId) return
     // Подавляем только эмулированные мышиные события после тача (у MouseEvent
     // нет pointerId). Настоящие pointer-события от пальца/стилуса работают
     // сразу — иначе движение ракетки «замирало» на полсекунды после касания.
@@ -240,6 +249,12 @@ export class InputController {
     // Сразу после снятия захвата браузер шлёт mousemove с реальной позицией
     // курсора — игнорируем короткое окно, чтобы ракетка не прыгала.
     this.pointerX = this.clientToGameX(e.clientX)
+  }
+
+  private handleWheel = (e: WheelEvent) => {
+    if (!this.host.isPlaying() || !this.host.aimGuideActive() || !this.host.ballStuck()) return
+    e.preventDefault()
+    this.host.aimWheel(e.deltaY || e.deltaX)
   }
 
   private handlePointerDown = (e: PointerEvent) => {
@@ -265,6 +280,14 @@ export class InputController {
           this.rightButton = side > 0
           return // палец занят поворотом — шар при отпускании не запускаем
         }
+        if (this.host.aimGuideActive() && this.host.ballStuck()) {
+          if (this.primaryTouchId < 0) {
+            this.primaryTouchId = e.pointerId
+          } else if (this.touchAimId < 0 && e.pointerId !== this.primaryTouchId) {
+            this.touchAimId = e.pointerId
+            this.host.aimFromPointer(e.clientX, e.clientY)
+          }
+        }
         return // обычный тач: шар запускается при отпускании (handlePointerUp)
       }
       // Мышь/стилус: запуск сразу + pointer lock, как раньше.
@@ -276,6 +299,13 @@ export class InputController {
   /* Отпускание пальца на таче = запуск шара (если он на ракетке),
      кроме пальца, который вращал ракетку. */
   private handlePointerUp = (e: PointerEvent) => {
+    if (this.touchAimId === e.pointerId) {
+      this.touchAimId = -1
+      if (e.pointerType === "touch") this.suppressMouseUntil = performance.now() + 600
+      return
+    }
+    const primaryAimTouch = this.primaryTouchId === e.pointerId
+    if (primaryAimTouch) this.primaryTouchId = -1
     if (this.touchRotateId === e.pointerId) {
       this.touchRotateId = -1
       this.leftButton = false
@@ -285,7 +315,14 @@ export class InputController {
       if (e.pointerType === "touch") this.suppressMouseUntil = performance.now() + 600
       return
     }
-    if (this.host.isPlaying() && (e.pointerType === "touch" || e.pointerType === "pen")) {
+    if (
+      this.host.isPlaying() &&
+      (e.pointerType === "touch" || e.pointerType === "pen") &&
+      (e.pointerType !== "touch" ||
+        primaryAimTouch ||
+        !this.host.ballStuck() ||
+        !this.host.aimGuideActive())
+    ) {
       this.host.launchIfPlaying()
       if (e.pointerType === "touch") this.suppressMouseUntil = performance.now() + 600
     }
@@ -294,6 +331,8 @@ export class InputController {
   /* Отмена касания браузером (системный жест, смена пальца) — указатель
      теряется без pointerup. Сбрасываем кнопки поворота, шар не запускаем. */
   private handlePointerCancel = (e: PointerEvent) => {
+    if (this.touchAimId === e.pointerId) this.touchAimId = -1
+    if (this.primaryTouchId === e.pointerId) this.primaryTouchId = -1
     if (this.touchRotateId === e.pointerId) {
       this.touchRotateId = -1
       this.leftButton = false

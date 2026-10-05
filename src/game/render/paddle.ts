@@ -1,4 +1,4 @@
-import { PaddleShapeKind, PaddleState, RenderView } from "../types"
+import { AimGuide, PaddleShapeKind, PaddleState, RenderView } from "../types"
 import { Physics } from "../physics"
 import { clamp } from "../utils"
 
@@ -12,8 +12,36 @@ export interface PaddleView extends RenderView {
   laserArmed: boolean
   rocketUntil: number
   magnetUntil: number
+  magneticPaddleUntil?: number
   /** Форма верхней поверхности: «convex» — купол, «concave» — чаша. */
   shape?: PaddleShapeKind
+}
+
+export function drawAimGuide(ctx: Ctx, guide: AimGuide, time: number, bounce: boolean) {
+  const stroke = (x: number, y: number, dx: number, dy: number, color: string) => {
+    ctx.save()
+    ctx.strokeStyle = color
+    ctx.lineWidth = 2.4
+    ctx.lineCap = "round"
+    ctx.setLineDash([8, 8])
+    ctx.lineDashOffset = -time * 42
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.lineTo(x + dx, y + dy)
+    ctx.stroke()
+    ctx.restore()
+  }
+  stroke(guide.x, guide.y, guide.hitX - guide.x, guide.hitY - guide.y, "rgba(174,247,255,0.9)")
+  if (bounce) {
+    const length = 180
+    stroke(
+      guide.hitX,
+      guide.hitY,
+      guide.bounceDx * length,
+      guide.bounceDy * length,
+      "rgba(255,201,77,0.9)"
+    )
+  }
 }
 
 export function drawPaddle(ctx: Ctx, v: PaddleView) {
@@ -173,6 +201,13 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     ctx.stroke()
     ctx.setLineDash([])
     ctx.lineDashOffset = 0
+  }
+  if (v.magneticPaddleUntil !== undefined && time < v.magneticPaddleUntil) {
+    ctx.strokeStyle = "rgba(77,255,158,0.9)"
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.arc(0, -hh / 2 - 2, 5 + Math.sin(time * 9) * 1.5, 0, Math.PI * 2)
+    ctx.stroke()
   }
   ctx.restore()
 }

@@ -16,6 +16,7 @@ import {
   drawLightnings,
   drawMouthBubbles,
   drawPaddle,
+  drawAimGuide,
   drawParticles,
   drawPopups,
   drawPowers,
@@ -50,6 +51,11 @@ export function draw(g: Game) {
   drawMouthBubbles(ctx, g.mouthBubbles)
   drawMinibossBar(ctx, g.minibosses, g.blocks)
   drawBoss(ctx, g.bossSys.boss, g.balls, g.blocks)
+  const stuckBall = g.balls.find((ball) => ball.stuck)
+  if (stuckBall && g.isAimGuideActive()) {
+    const guide = g.physics.aimGuide(stuckBall)
+    if (guide) drawAimGuide(ctx, guide, g.time, g.isBounceGuideActive())
+  }
   drawRings(ctx, g.fx.rings)
   drawLightnings(ctx, g.fx.lightnings)
   drawPowers(ctx, g.powers)
@@ -83,6 +89,7 @@ export function draw(g: Game) {
       laserArmed: g.laserArmed,
       rocketUntil: g.rocketUntil,
       magnetUntil: g.magnetUntil,
+      magneticPaddleUntil: g.magneticPaddleUntil,
       shape: g.paddleShapeKind(),
     })
   }
