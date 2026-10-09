@@ -325,6 +325,8 @@ Status: ready
 Priority: high
 Assigned to: luna
 
+Comment: Разблокировано по Q-010: в allowed_files добавлен `src/game/game/rotateLayout.ts`. В `realignOnOrientationChange` пересчитывать сдвиг вниз dy при повороте в любую сторону (если блоки/босс оказались выше актуального blockTop(g)).
+
 Описание:
 Согласно AD-006:
 Сейчас неигровая HUD-зона с затемнением, пунктирной линией и физическим отскоком шара работает только на вертикальном экране (`g.h > g.w`). В альбомной ориентации (landscape/десктоп) `blockTop(g)` возвращал 0. Из-за этого:
@@ -345,7 +347,9 @@ Assigned to: luna
    - Убедиться, что при спавне уровней (`gridBlocks`, `layoutBlocks`, `buildBossArena`) передаётся актуальный `blockTop(g)`.
 4. В генераторах уровней (`src/game/levelPatterns.ts`, `src/game/levelBuilder.ts`):
    - Убедиться, что верхние блоки с учётом их полурадиуса `ry` не пересекают границу `top`.
-5. Обновить затронутые unit-тесты (`blockMotion.test.ts`, `rotateLayout.test.ts`, `powers.test.ts`, `physics.test.ts` и др.), где ранее предполагалось `blockTop === 0` в ландшафте, приведя их в соответствие с новой архитектурой.
+5. В `src/game/game/rotateLayout.ts`:
+   - Поддержать пересчёт сдвига уровня при смене ориентации в обе стороны, чтобы блоки не оказывались под HUD-зоной после поворота окна.
+6. Обновить затронутые unit-тесты (`blockMotion.test.ts`, `rotateLayout.test.ts`, `powers.test.ts`, `physics.test.ts` и др.), где ранее предполагалось `blockTop === 0` в ландшафте, приведя их в соответствие с новой архитектурой.
 
 Allowed files:
 
@@ -355,6 +359,7 @@ Allowed files:
 - src/game/levelPatterns.ts
 - src/game/levelBuilder.ts
 - src/game/render/background.ts
+- src/game/game/rotateLayout.ts
 - src/game/game/blockMotion.test.ts
 - src/game/game/rotateLayout.test.ts
 - src/game/powers.test.ts

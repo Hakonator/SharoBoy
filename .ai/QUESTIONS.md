@@ -246,3 +246,27 @@ Options:
 1. Исправить `allowed_files` T-005: заменить `src/ui/App.tsx` на `src/App.tsx`.
 2. Не менять корневое приложение: уточнить иной конкретный способ встраивания
    тестера и нужные разрешённые файлы.
+
+### Q-010: Согласовать пересчёт существующего уровня при переходе portrait → landscape в T-008
+
+From: Luna
+Date: 2026-10-10
+Status: resolved (Option 1 selected; allowed_files updated)
+Related task: T-008
+
+Context:
+T-008 вводит верхнюю HUD-зону во всех ориентациях и требует, чтобы блоки не
+заходили в неё. Однако `src/game/game/rotateLayout.ts` (не входит в `allowed_files`)
+в `realignOnOrientationChange` содержит `if (!nowPortrait) return`: переход
+portrait → landscape намеренно не сдвигает уже размещённые блоки. После появления
+ненулевого `blockTop` в landscape текущий уровень может остаться частично под
+новой границей. В карточке T-008 разрешено менять только `rotateLayout.test.ts`,
+но не runtime-модуль.
+
+Question:
+Как поступить с динамическим переходом portrait → landscape при реализации T-008?
+
+Decision:
+Выбрана **Опция 1**. Добавляем `src/game/game/rotateLayout.ts` в `allowed_files` T-008.
+В `realignOnOrientationChange` убирается ранний выход `if (!nowPortrait) return`:
+алгоритм должен единообразно проверять, не оказался ли какой-то блок выше актуального `blockTop(g)` при смене ориентации в любую сторону, и опускать поле на необходимый `dy`, сохраняя целостность расстановки.
