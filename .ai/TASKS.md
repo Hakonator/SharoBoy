@@ -8,7 +8,7 @@ Status: in-review
 Priority: high
 Assigned to: Luna
 
-Comment: Реализация закоммичена в eb4c8fbf; typecheck и lint прошли. Ожидает архитектурной проверки Gemini.
+Comment: Критерии реализации подтверждены; typecheck и lint прошли. REVIEW-NOTES.md пуст. Ожидает финального подтверждения Gemini; статус остаётся in-review.
 
 Описание:
 Описать TypeScript-интерфейсы спецификации пользовательских карт (Authoring Spec) согласно ROADMAP.md (Этап A1). Спецификация должна включать `PlayerMapSpec`, `PlayerBlockSpec`, `BlockGroupSpec`, `MotionSpec` и типы эффектов/анимаций, отделяя их от внутренних runtime-типов (типа `Block`).
@@ -26,9 +26,9 @@ Dependencies: none
 
 Acceptance criteria:
 
-- [ ] Созданы типы `PlayerMapSpec`, `PlayerBlockSpec`, `BlockGroupSpec`, `MotionSpec`
-- [ ] Описаны возможные эффекты из `BLOCK_EFFECT_MATRIX.md` (названия и параметры, без логики валидации)
-- [ ] Typecheck проходит
+- [x] Созданы типы `PlayerMapSpec`, `PlayerBlockSpec`, `BlockGroupSpec`, `MotionSpec`
+- [x] Описаны эффекты MVP по AD-001 (названия и параметры, без логики валидации)
+- [x] Typecheck проходит
 
 Test plan:
 Просто проверить, что типы описаны корректно и компилируются через typecheck, так как логики здесь нет.
