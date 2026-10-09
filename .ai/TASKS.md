@@ -219,3 +219,45 @@ Test plan:
 Verification commands:
 npm run typecheck
 npm run lint
+
+### T-006: Исправить баг с дублированием звука при пересоздании Game
+
+Status: done
+Priority: high
+Assigned to: luna
+
+Описание:
+Баг: при пересоздании `Game` (например, при React StrictMode или HMR) класс `SFX` не отписывается от глобальных событий `window` (pointerdown, keydown, touchstart), которые были добавлены в `armGestureUnlock`. В результате "старые" убитые экземпляры `SFX` продолжают ловить вводы пользователя (например, клик "Играть" в Sandbox), запускать музыку через `startMusic()` и создавать неконтролируемые параллельные аудио-потоки.
+
+Шаги для исправления:
+
+1. В `src/game/audio.ts` сохранить ссылку на слушатель `onInput` как свойство класса, чтобы можно было отписаться от него. В `SFX` добавить метод `destroy()`, который будет вызывать `this.stopMusic()` и `window.removeEventListener` для всех трех событий.
+2. В `src/game/game/lifecycle.ts` в функции `destroy(g: Game)` заменить вызов `g.sfx.stopMusic()` на `g.sfx.destroy()`.
+
+Allowed files:
+
+- src/game/audio.ts
+- src/game/game/lifecycle.ts
+- src/game/game.ts
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: none
+
+Acceptance criteria:
+
+- [x] `SFX` имеет метод `destroy()`, который отписывается от `window` событий
+- [x] Метод `destroy` в `lifecycle.ts` корректно вызывает `g.sfx.destroy()`
+- [x] Typecheck проходит
+
+Test plan:
+Убедиться, что при многократном пересоздании `Game` глобальные события не накапливаются, и звук контролируется только текущим экземпляром игры.
+
+Verification commands:
+npm run typecheck
+npm run lint
+
+\n

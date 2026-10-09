@@ -53,7 +53,7 @@ export function destroy(g: Game) {
   g.input.destroy()
   // Движок уничтожен (например, пересоздание в dev-режиме) — музыка не должна
   // остаться играть «вторым» экземпляром.
-  g.sfx.stopMusic()
+  g.sfx.destroy()
 }
 
 export function resizeHandler(g: Game) {

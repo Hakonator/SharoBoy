@@ -1,6 +1,13 @@
 # Активный контекст (Active Context)
 
-## Последнее обновление (09.10.2026, T-005 завершена)
+## Последнее обновление (09.10.2026, T-006 завершена)
+
+- Исправлен баг аудио-потоков при пересоздании `Game`: `SFX` хранит identity
+  gesture unlock handler, а `SFX.destroy()` останавливает музыку и снимает
+  `pointerdown`, `keydown`, `touchstart`. Lifecycle вызывает teardown. Существующий
+  `destroy(tier)` для звукового эффекта сохранён overload-ом.
+- T-006 завершена; typecheck/lint и полный test (39 файлов, 331 тест) прошли.
+  Следующий шаг — задача от архитектора.
 
 - Gemini завершил on-place review T-004: APPROVED; отмечены custom start API,
   target/all-block win conditions, завершение тестового забега и исключение

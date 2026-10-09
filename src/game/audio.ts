@@ -59,6 +59,10 @@ export class SFX {
   )
   /** Слушатели первого ввода уже навешены (разблокировка автозвука). */
   private unlockBound = false
+  private readonly onUnlockInput = () => {
+    this.ensure()
+    if (this.ctx && this.ctx.state === "suspended") void this.ctx.resume()
+  }
   constructor() {
     this.musicVolume = loadVolume(VOL_MUSIC_KEY, 1)
     this.sfxVolume = loadVolume(VOL_SFX_KEY, 1)
@@ -125,13 +129,9 @@ export class SFX {
     if (this.unlockBound) return
     if (typeof window === "undefined") return
     this.unlockBound = true
-    const onInput = () => {
-      this.ensure()
-      if (this.ctx && this.ctx.state === "suspended") void this.ctx.resume()
-    }
-    window.addEventListener("pointerdown", onInput)
-    window.addEventListener("keydown", onInput)
-    window.addEventListener("touchstart", onInput, { passive: true })
+    window.addEventListener("pointerdown", this.onUnlockInput)
+    window.addEventListener("keydown", this.onUnlockInput)
+    window.addEventListener("touchstart", this.onUnlockInput, { passive: true })
   }
 
   /** Переключение фоновой музыки. Каждый вызов (старт уровня, переход на
@@ -361,7 +361,18 @@ export class SFX {
     this.blip(420 + hp * 90, 0.07, "square", 0.2, 300 + hp * 60)
     this.noise(0.05, 0.1)
   }
-  destroy(tier: number) {
+  destroy(): void
+  destroy(tier: number): void
+  destroy(tier?: number) {
+    if (tier === undefined) {
+      this.stopMusic()
+      if (!this.unlockBound || typeof window === "undefined") return
+      window.removeEventListener("pointerdown", this.onUnlockInput)
+      window.removeEventListener("keydown", this.onUnlockInput)
+      window.removeEventListener("touchstart", this.onUnlockInput)
+      this.unlockBound = false
+      return
+    }
     this.blip(660 + tier * 120, 0.09, "square", 0.22, 990 + tier * 140)
     this.blip(330, 0.12, "triangle", 0.14, 220, 0.02)
     this.noise(0.09, 0.14)
