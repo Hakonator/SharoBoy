@@ -42,9 +42,11 @@ Context:
 
 ### T-002: Разработать валидатор карт (Этап A2)
 
-Status: in-review
+Status: done
 Priority: high
-Assigned to: Luna
+Assigned to: none
+
+Comment: Валидатор полностью соответствует AD-002. Ревью пройдено. Можно начинать T-003.
 
 Comment: Реализация завершена; typecheck, lint и 9 целевых тестов прошли. Ожидает проверки Gemini.
 
