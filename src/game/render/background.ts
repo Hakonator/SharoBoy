@@ -43,8 +43,7 @@ export function drawBackground(ctx: Ctx, w: number, h: number, combo: number, bu
  * Затемнение неигровой HUD-зоны над верхней границей поля (Game.blockTop):
  * шары и блоки туда не заходят — зона читается как «стекло» над игрой, а
  * пунктирная линия показывает, от чего отскакивает шар. Показывается только
- * во время прохождения уровня на вертикальном экране — вне игры и в ландшафте
- * зоны нет вовсе (blockTop = 0). */
+ *  во время прохождения уровня во всех ориентациях. */
 export function drawTopZone(ctx: Ctx, w: number, top: number, hidden: boolean) {
   if (hidden || top <= 0) return
   ctx.fillStyle = gradient(ctx, `topzone:${w}x${Math.round(top)}`, (c) => {

@@ -98,18 +98,12 @@ export function paddleBottomOffset(g: Game): number {
   return (g.touchMode ? 110 : 44) / g.scale
 }
 
-/** Верх неигровой HUD-зоны в мировых единицах — существует только на
- *  вертикальных экранах: там HUD двухрядный и поле визуально начинается ниже
- *  (шар отскакивает от границы, блоки спавнятся/дрейфуют ниже неё). В
- *  ландшафте зоны нет — возвращаем 0, и всё откатывается к отскоку от верхней
- *  кромки. В портрете: нижняя граница HUD-плашек (viewport.hudTopCss), но не
- *  выше 35% и не ниже 14% высоты мира. */
+/** Верх неигровой HUD-зоны в мировых единицах для любой ориентации. */
 export function blockTop(g: Game): number {
-  if (g.cssH <= g.cssW) return 0
-  return Math.min(Math.max(g.h * 0.14, hudTopCss(g.cssW, g.cssH) / g.scale), g.h * 0.35)
+  return Math.min(Math.max(hudTopCss(g.cssW, g.cssH) / g.scale, g.h * 0.08), g.h * 0.35)
 }
 
-/** Верхняя безопасная граница для спавна блоков: учитывает HUD в landscape. */
+/** Верхняя безопасная граница спавна блоков совпадает с границей отскока. */
 export function blockSpawnTop(g: Game): number {
-  return Math.max(blockTop(g), hudTopCss(g.cssW, g.cssH) / g.scale)
+  return blockTop(g)
 }

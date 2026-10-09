@@ -44,6 +44,7 @@ export function gridBlocks(
         rx = clamp(slot * 0.27 * rand(0.9, 1), 10, 26)
         ry = clamp(gap * 0.47 * rand(0.9, 1), 15, 46)
       }
+      const safeCy = Math.max(cy, top + ry)
       const rot =
         kind !== "circle" && !isBomb && Math.random() < 0.65
           ? fitTilt(rx, ry, slot / 2 - 4, gap / 2 - 4)
@@ -51,7 +52,7 @@ export function gridBlocks(
       blocks.push(
         makeBlock({
           x: cx,
-          y: cy,
+          y: safeCy,
           rx,
           ry,
           rot,
@@ -94,7 +95,10 @@ export function buildBossArena(
     dropTimer: 5,
   }
   const blocks: Block[] = []
-  const orbit = clamp(r * 2.5, 110, Math.min(w * 0.3, 280))
+  const orbit = Math.min(
+    clamp(r * 2.5, 110, Math.min(w * 0.3, 280)),
+    Math.max(0, (baseY - top - 15) / 1.6)
+  )
   for (let i = 0; i < minions; i++) {
     blocks.push(
       makeBlock({

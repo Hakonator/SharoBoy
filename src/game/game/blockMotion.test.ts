@@ -6,9 +6,7 @@ import type { Block } from "../types"
 
 import { stepBlock } from "./blockMotion"
 
-/** Минимальный фейковый Game: stepBlock читает time/w/h и blockTop —
- *  последний считается из cssW/cssH/scale; дефолт ландшафтный (1920×1080) →
- *  blockTop = 0 (зона только в портрете). */
+/** Минимальный фейковый Game: stepBlock читает time/w/h и blockTop. */
 function makeGame(time: number, over: Partial<Game> = {}): Game {
   return { time, w: 800, h: 600, cssW: 1920, cssH: 1080, scale: 1, ...over } as unknown as Game
 }
@@ -96,17 +94,17 @@ describe("stepBlock — базовые дрейфы", () => {
   })
 })
 
-describe("stepBlock — неигровая HUD-зона сверху (только вертикальный экран)", () => {
+describe("stepBlock — неигровая HUD-зона сверху во всех ориентациях", () => {
   // портретный Game: 390×844, scale 1 → hudTopCss = 140 → blockTop = 140,
   // клампы h*0.14..h*0.35 (140..350) не бьют; лимит блока = blockTop + ry
   function portraitGame(time: number, over: Partial<Game> = {}): Game {
     return makeGame(time, { cssW: 390, cssH: 844, scale: 1, w: 800, h: 1000, ...over })
   }
 
-  it("в ландшафте зоны нет: blockTop = 0, блоки не клампятся сверху", () => {
+  it("в ландшафте блоки не заходят в HUD-зону", () => {
     const b = makeBlock({ y: 40, y0: 40, bobAmp: 40, bobFreq: 1, bobPh: 0 })
-    stepBlock(makeGame(Math.PI / 2), b, 0.016) // сырой y = 80 > 0 + ry = 16
-    expect(b.y).toBe(80)
+    stepBlock(makeGame(Math.PI / 2), b, 0.016) // верхняя граница = 96
+    expect(b.y).toBe(96 + 16)
   })
 
   it("вертикальный дрейф медузы не поднимает блок в HUD-зону", () => {

@@ -71,7 +71,7 @@ describe("PowersSystem — неигровая HUD-зона сверху", () => 
   })
 
   it("периодический спавн оставляет landscape HUD свободным", () => {
-    const g = makeWorld({ blockTop: 0, blockSpawnTop: 96 })
+    const g = makeWorld({ blockTop: 96, blockSpawnTop: 96 })
     new PowersSystem(g).periodicSpawn(0.016)
     expect(g.blocks.length).toBeGreaterThan(0)
     for (const block of g.blocks) {

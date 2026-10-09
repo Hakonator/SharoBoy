@@ -96,10 +96,9 @@ export function draw(g: Game) {
   drawParticles(ctx, g.fx.particles)
   drawPopups(ctx, g.fx.popups)
 
-  // неигровая HUD-зона существует только на вертикальном экране (blockTop = 0
-  // в ландшафте): затемнение + пунктирная линия отскока — в бою и в портрете
+  // Затемнение HUD-зоны и пунктирная граница отскока во всех ориентациях.
   const inPlay = g.phase === "playing" || g.phase === "paused"
-  drawTopZone(ctx, w, blockTop(g), !inPlay || g.h <= g.w)
+  drawTopZone(ctx, w, blockTop(g), !inPlay || blockTop(g) <= 0)
 
   // DEV (F2): хитбоксы поверх сущностей, но под экранным текстом.
   if (g.showHitboxes) {

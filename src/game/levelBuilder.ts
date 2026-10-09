@@ -145,7 +145,7 @@ export function layoutBlocks(
     const cx = clamp(w / 2 + offsetX + it.x * unit, margin * 0.5 + rx, w - margin * 0.5 - rx)
     return makeBlock({
       x: cx,
-      y: top + it.y * unit,
+      y: Math.max(top + it.y * unit, top + ry),
       rx,
       ry,
       rot: it.rot ?? 0,

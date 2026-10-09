@@ -50,10 +50,10 @@ describe("realignOnOrientationChange — пересчёт при перевор�
       blocks: [makeBlock({ y: 40, y0: 40 }), makeBlock({ y: 120, y0: 120 })],
     })
     realignOnOrientationChange(g, false)
-    // dy = blockTop 140 + ry 16 − самый высокий y 40 = 116
+    // blockTop 140 + ry 16 − самый высокий y 40 = dy 116
     expect(g.blocks[0].y).toBe(156)
     expect(g.blocks[1].y).toBe(236)
-    expect(g.blocks[0].y0).toBe(156) // база боба сдвинута так же
+    expect(g.blocks[0].y0).toBe(156)
     expect(g.blocks[1].y0).toBe(236)
   })
 
@@ -63,7 +63,7 @@ describe("realignOnOrientationChange — пересчёт при перевор�
     expect(g.blocks[0].y).toBe(400)
   })
 
-  it("орбитальные/бомбовые блоки не сдвигаются — их ведёт босс", () => {
+  it("учитывает полный радиус орбиты миньонов при сдвиге", () => {
     const g = makeGame({
       blocks: [
         makeBlock({ y: 40, minionOrbit: { ang: 0, dir: 1, speed: 1, rad: 100 } }),
@@ -74,13 +74,13 @@ describe("realignOnOrientationChange — пересчёт при перевор�
       } as unknown as Game["bossSys"],
     })
     realignOnOrientationChange(g, false)
-    // dy считает только босс: 140 + 30 − 120 = 50
-    expect((g.bossSys.boss as BossState).baseY).toBe(170)
+    // Орбита миньона требует dy = top + block radius + orbit - baseY = 136.
+    expect((g.bossSys.boss as BossState).baseY).toBe(256)
     expect(g.blocks[0].y).toBe(40)
-    expect(g.blocks[1].y).toBe(40)
+    expect(g.blocks[1].y).toBe(176)
   })
 
-  it("портрет → ландшафт: зона исчезла, ничего не двигаем", () => {
+  it("портрет → ландшафт: блоки также сдвигаются ниже HUD", () => {
     const b = makeBlock({ y: 40, y0: 40 })
     const g = makeGame({
       w: 1000,
@@ -90,7 +90,8 @@ describe("realignOnOrientationChange — пересчёт при перевор�
       blocks: [b],
     })
     realignOnOrientationChange(g, true)
-    expect(b.y).toBe(40)
+    // Landscape top = max(96 CSS px, 8% * 600) = 96; block radius = 16.
+    expect(b.y).toBe(112)
   })
 
   it("вне уровня (меню/итоги) расстановка не трогается", () => {

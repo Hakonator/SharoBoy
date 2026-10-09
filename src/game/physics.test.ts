@@ -4,6 +4,9 @@ import { FIREBALL_DAMAGE_MULT, Physics, type PhysicsWorld } from "./physics"
 import type { Ball, Block } from "./types"
 import { spawnScatter } from "./physics/destruction"
 import { paddleLaunchAngle } from "./game/paddleControl"
+import { gridBlocks, buildBossArena } from "./levelPatterns"
+import { layoutBlocks } from "./levelBuilder"
+import { LEVELS } from "./levels"
 
 /** Регрессия 26dc66b: знак surfaceAt для «convex» инвертировали «для симметрии»
  *  с чашей — все потребители (старт шара, прилипание, выталкивание, пилоны)
@@ -42,6 +45,46 @@ describe("Physics.surfaceAt — высота поверхности над гр�
         const rel = -1 + (2 * i) / 10
         expect(Physics.surfaceAt(60, rel, kind, 20)).toBeGreaterThanOrEqual(0)
       }
+    }
+  })
+})
+
+describe("генераторы уровней — верхняя HUD-зона", () => {
+  const top = 96
+
+  it("grid и layout держат верх блока ниже границы зоны с учётом ry", () => {
+    const pattern = LEVELS.find((level) => "rows" in level)
+    const layout = LEVELS.find((level) => "layout" in level)
+    if (!pattern || !("rows" in pattern) || !layout || !("layout" in layout)) {
+      throw new Error("Ожидались pattern и layout fixtures")
+    }
+
+    const generated = [
+      ...gridBlocks(pattern, 1200, 700, 1, top),
+      ...layoutBlocks(layout, 1200, 700, 1, top),
+    ]
+
+    expect(generated.length).toBeGreaterThan(0)
+    for (const block of generated) expect(block.y - block.ry).toBeGreaterThanOrEqual(top)
+  })
+
+  it("boss arena сохраняет босса, minions и bombs ниже HUD-зоны", () => {
+    const { boss, blocks } = buildBossArena(20, 3, 4, 1200, 700, top)
+    expect(boss.baseY - boss.r).toBeGreaterThanOrEqual(top)
+    for (const block of blocks) {
+      if (block.minionOrbit) {
+        expect(boss.baseY - block.minionOrbit.rad - block.ry).toBeGreaterThanOrEqual(top)
+      } else {
+        expect(block.y - block.ry).toBeGreaterThanOrEqual(top)
+      }
+    }
+  })
+
+  it("ограничивает орбиту миньонов при тесной boss arena", () => {
+    const { boss, blocks } = buildBossArena(20, 3, 0, 600, 300, 90)
+    for (const block of blocks) {
+      if (!block.minionOrbit) continue
+      expect(boss.baseY - block.minionOrbit.rad * 1.6 - block.ry).toBeGreaterThanOrEqual(90)
     }
   })
 })
@@ -328,7 +371,7 @@ describe("Physics — верхняя неигровая HUD-зона", () => {
     }
   }
 
-  it("шар отражается от границы зоны и не заходит выше неё", () => {
+  it.each(["portrait", "landscape"] as const)("шар отражается от границы зоны (%s)", () => {
     const world = makeTopWorld(150)
     const physics = new Physics(world)
     const ball = makeTopBall()
