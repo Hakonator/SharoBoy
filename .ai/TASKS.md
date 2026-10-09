@@ -182,9 +182,11 @@ Context:
 
 ### T-005: Базовый UI загрузчика/тестера карт (Этап A3)
 
-Status: ready
+Status: blocked
 Priority: high
 Assigned to: Luna
+
+Comment: Заблокировано Q-009: карточка разрешает `src/ui/App.tsx`, но реальный корневой React App находится в `src/App.tsx`; нужна синхронизация allowed_files/контракта.
 
 Описание:
 Создать простой React-компонент (Dev Sandbox) для загрузки карт из JSON. Компонент должен содержать текстовое поле для ввода JSON, кнопку "Проверить" (вызывает `validatePlayerMapSpec` из T-002) и кнопку "Играть" (конвертирует через `mapSpecToBlocks` из T-003 и запускает Game в новом режиме из T-004).
@@ -192,7 +194,7 @@ Assigned to: Luna
 Allowed files:
 
 - src/ui/MapTesterView.tsx
-- src/ui/App.tsx
+- src/App.tsx
 - src/game/mapSpec.ts (только добавление экспорта/типов если нужно)
 
 Forbidden files:
