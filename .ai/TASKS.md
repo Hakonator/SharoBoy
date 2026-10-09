@@ -133,3 +133,77 @@ Context:
 ### T-000: Инициализация проекта ✓
 
 Status: done
+
+### T-004: Интеграция режима "Пользовательская карта" в ядро игры (Этап A3)
+
+Status: ready
+Priority: high
+Assigned to: Luna
+
+Описание:
+Добавить новый игровой режим (например, `mode: "custom"` в `HudData`), который позволит запускать игру из загруженной карты. Нужно обновить логику `Game` (в частности обработку старта уровня и условия победы), чтобы при победе или поражении игра корректно возвращала игрока в UI тест-прогона (вместо перехода на следующий уровень кампании).
+
+Allowed files:
+
+- src/game/types.ts
+- src/game/game/game.ts
+- src/game/game/updateStep.ts
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: none (опирается на уже готовые T-001, T-003)
+
+Acceptance criteria:
+
+- [ ] Добавлен режим "custom" или аналогичный для кастомных карт
+- [ ] Механизм победы/поражения не крашит игру и не переходит в кампанию
+- [ ] `typecheck` и `lint` проходят без ошибок
+
+Test plan:
+Unit-тесты не обязательны, достаточно убедиться, что типы обновлены и логика не ломает существующие режимы `campaign` и `endless`.
+
+Verification commands:
+npm run typecheck
+npm run lint
+
+Context:
+Это подготовка движка к тест-прогонам (ROADMAP 13.4, Этап A3). Игра должна уметь переключаться в песочницу и корректно из неё выходить.
+
+### T-005: Базовый UI загрузчика/тестера карт (Этап A3)
+
+Status: ready
+Priority: high
+Assigned to: none
+
+Описание:
+Создать простой React-компонент (Dev Sandbox) для загрузки карт из JSON. Компонент должен содержать текстовое поле для ввода JSON, кнопку "Проверить" (вызывает `validatePlayerMapSpec` из T-002) и кнопку "Играть" (конвертирует через `mapSpecToBlocks` из T-003 и запускает Game в новом режиме из T-004).
+
+Allowed files:
+
+- src/ui/MapTesterView.tsx
+- src/ui/App.tsx
+- src/game/mapSpec.ts (только добавление экспорта/типов если нужно)
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: T-004
+
+Acceptance criteria:
+
+- [ ] UI принимает JSON карты
+- [ ] При ошибках валидации показывает их список (путь и сообщение)
+- [ ] При успехе запускает игру с этой картой
+- [ ] `typecheck` проходит
+
+Test plan:
+Проверить в браузере, вставив валидный JSON карты. Игра должна начаться с блоками, указанными в JSON.
+
+Verification commands:
+npm run typecheck
+npm run lint
