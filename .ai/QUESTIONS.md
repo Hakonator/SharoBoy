@@ -142,3 +142,31 @@ Options:
    обновить scope T-004 для интеграции переходов и старта карты.
 3. Уточнить иной конкретный контракт и разрешённые файлы, сохранив однокарточный
    объём T-004.
+
+### Q-006: Согласовать тип runtime mode для custom-run
+
+From: Luna
+Date: 2026-10-09
+Status: resolved (see AD-004 in DECISIONS.md)
+Related task: T-004
+
+Context:
+AD-004 требует устанавливать `Game.mode = "custom"`, но расширенный список
+`allowed_files` T-004 не включает `src/game/powers.ts`. Тип `PowersWorld.mode` в
+этом файле ограничен `"campaign" | "endless"`, а `makePowersHost` в
+`src/game/game/hosts.ts` возвращает `g.mode` напрямую. Добавление `"custom"` к
+`Game.mode` поэтому не компилируется без изменения типов PowersSystem и/или
+адаптации host, что выходит за разрешённый scope. Кроме того, карточка T-004 пока
+не обновила `allowed_files` по AD-004.
+
+Question:
+Как сохранить требуемый custom mode и совместимость контрактов PowersSystem?
+
+Options:
+
+1. Добавить `src/game/powers.ts` и `src/game/game/hosts.ts` в `allowed_files` T-004,
+   расширить режим PowersWorld и проверить поведение power drops в custom run.
+2. Оставить `Game.mode` в `campaign | endless`, добавить отдельный флаг/тип
+   `customRun` в Game/HUD и разрешить это отклонение от буквального `mode="custom"`
+   из AD-004.
+3. Другое точное решение с обновлённым контрактом и разрешёнными файлами.
