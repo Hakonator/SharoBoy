@@ -109,6 +109,7 @@ export function levelSpeed(g: Game) {
 
 export function levelDisplayName(g: Game) {
   if (g.mode === "endless") return g.waveSpec?.name ?? "ВОЛНА"
+  if (g.mode === "custom") return g.customWinCondition ? "ПОЛЬЗОВАТЕЛЬСКАЯ КАРТА" : "КАРТА"
   if (g.onBossNode) return "БОСС"
   if (g.activeSpec) return g.activeSpec.name
   return LEVELS[clamp(g.level - 1, 0, LEVELS.length - 1)].name

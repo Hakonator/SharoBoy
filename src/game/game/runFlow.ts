@@ -8,6 +8,9 @@ import { pushHud, saveTop, setBanner } from "./hudSync"
 import { buildLevel, buildWave, serveBall } from "./levelBuild"
 
 export function resetRun(g: Game) {
+  g.customWinCondition = null
+  g.customTargetBlocks = []
+  g.onCustomComplete = null
   g.bossSys.clear()
   g.boomQueue = []
   g.campaign = null
@@ -118,6 +121,10 @@ export function onLevelCleared(g: Game) {
   }
   g.flash = 1
   g.hitStop = Math.max(g.hitStop, 0.35)
+  if (g.mode === "custom") {
+    finishCustomRun(g, "won")
+    return
+  }
   if (g.mode === "endless") {
     g.score += 200 + g.wave * 50
     g.lives = Math.min(g.lives + 1, 5)
@@ -194,6 +201,10 @@ export function loseLife(g: Game) {
   g.prevLeftDown = false
   g.prevRightDown = false
   if (g.lives <= 0) {
+    if (g.mode === "custom") {
+      finishCustomRun(g, "over")
+      return
+    }
     g.phase = "over"
     g.input.releaseLock()
     applyTrack(g)
@@ -204,6 +215,13 @@ export function loseLife(g: Game) {
   }
   serveBall(g)
   pushHud(g)
+}
+
+function finishCustomRun(g: Game, result: "won" | "over") {
+  const onComplete = g.onCustomComplete
+  g.onCustomComplete = null
+  g.toMenu()
+  onComplete?.(result)
 }
 
 /** Попадание бомбы осьминога по ракетке — отнимает жизнь. */

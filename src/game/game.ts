@@ -17,6 +17,7 @@ import type { MinibossCreature } from "./types"
 import type { Ball, Block, Bubble, HudData, MouthBubble, PaddleShapeKind } from "./types"
 import type { PaddleState, Phase, PowerUp, Projectile, ScoreEntry, SparkHit } from "./types"
 import type { CampaignMap } from "./campaignMap"
+import type { PlayerMapSpec } from "./mapSpec"
 import type { LevelSpec } from "./levels"
 import type { MinibossKind } from "./minibosses"
 import { makeBossHost, makePowersHost } from "./game/hosts"
@@ -31,7 +32,7 @@ import {
   setNick,
   resizeHandler,
 } from "./game/lifecycle"
-import { startGame, startEndless, toMenu, togglePause } from "./game/modes"
+import { startGame, startEndless, startCustomMap, toMenu, togglePause } from "./game/modes"
 import {
   startLevelBattle,
   enterMapNode,
@@ -92,7 +93,10 @@ export class Game {
   runLivesLost = 0
   /** очередь открытых достижений до следующей отправки HUD */
   achQueue: string[] = []
-  mode: "campaign" | "endless" = "campaign"
+  mode: "campaign" | "endless" | "custom" = "campaign"
+  customWinCondition: PlayerMapSpec["winCondition"] | null = null
+  customTargetBlocks: Block[] = []
+  onCustomComplete: ((result: "won" | "over") => void) | null = null
   wave = 0
   waveSpec: { name: string; speed: number } | null = null
   /** Режим отладки: позволяет тестировать новые механики и контент. */
@@ -261,6 +265,9 @@ export class Game {
   }
   startEndless() {
     startEndless(this)
+  }
+  startCustomMap(spec: PlayerMapSpec, onComplete?: (result: "won" | "over") => void) {
+    startCustomMap(this, spec, onComplete)
   }
   toMenu() {
     toMenu(this)

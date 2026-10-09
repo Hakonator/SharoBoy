@@ -87,7 +87,7 @@ export function useLeaderboard(hud: HudData, nick: string, onNickChange: (v: str
   }, [hud.phase, hud.mode, hud.score, hud.wave, nick, submitState, period, screen, refreshTop])
 
   const handleTopSubmit = useCallback(async () => {
-    if (submitState === "sending" || submitState === "done") return
+    if (submitState === "sending" || submitState === "done" || hud.mode === "custom") return
     const check = validateNick(nick)
     if (!check.ok) {
       setSubmitState("error")

@@ -138,8 +138,12 @@ export function update(g: Game, dt: number) {
   updateMouthBubbles(g, dt)
   applyFishWake(g, dt)
 
+  const customTargetsCleared =
+    g.customWinCondition?.kind === "targets"
+      ? g.customTargetBlocks.every((block) => block.dead)
+      : g.blocks.length === 0
   if (
-    g.blocks.length === 0 &&
+    (g.mode === "custom" ? customTargetsCleared : g.blocks.length === 0) &&
     !g.bossSys.boss &&
     g.transition <= 0 &&
     g.phase === "playing" &&

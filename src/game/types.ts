@@ -22,7 +22,7 @@ export interface HudData {
   level: number
   levelCount: number
   levelName: string
-  mode: "campaign" | "endless"
+  mode: "campaign" | "endless" | "custom"
   wave: number
   combo: number
   blocksLeft: number

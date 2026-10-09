@@ -1,4 +1,6 @@
 import type { Game } from "../game"
+import type { PlayerMapSpec } from "../mapSpec"
+import { mapSpecToBlocks } from "../mapAdapter"
 
 import { applyTrack } from "./audioControls"
 import { startCampaignMap } from "./campaignFlow"
@@ -37,11 +39,48 @@ export function startEndless(g: Game) {
   pushHud(g)
 }
 
+/** Starts a single custom-map test run; completion is reported to its caller. */
+export function startCustomMap(
+  g: Game,
+  spec: PlayerMapSpec,
+  onComplete?: (result: "won" | "over") => void
+) {
+  g.sfx.ensure()
+  g.sfx.ui()
+  g.mode = "custom"
+  g.wave = 0
+  g.waveSpec = null
+  resetRun(g)
+  g.mode = "custom"
+  g.customWinCondition = spec.winCondition
+  g.onCustomComplete = onComplete ?? null
+  g.blocks = mapSpecToBlocks(spec)
+  g.customTargetBlocks =
+    spec.winCondition.kind === "targets"
+      ? spec.winCondition.targetIds.map(
+          (id) => g.blocks[spec.blocks.findIndex((block) => block.id === id)]
+        )
+      : []
+  g.blocksInitial = Math.max(1, g.blocks.length)
+  applyUpgrades(g)
+  g.level = 1
+  g.levelLostBall = false
+  serveBall(g)
+  g.phase = "playing"
+  applyTrack(g)
+  setBanner(g, spec.metadata.title)
+  pushHud(g)
+}
+
 export function toMenu(g: Game) {
   g.sfx.ui()
   g.input.releaseLock()
-  saveTop(g)
+  if (g.mode !== "custom") saveTop(g)
   g.phase = "menu"
+  g.mode = "campaign"
+  g.customWinCondition = null
+  g.customTargetBlocks = []
+  g.onCustomComplete = null
   g.campaign = null
   g.campaignMbSeen = {}
   g.minibossPity = 0

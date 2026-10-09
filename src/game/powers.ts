@@ -35,7 +35,7 @@ export interface PowersWorld {
   readonly boss: BossState | null
   readonly blocksInitial: number
   /** Текущий режим партии: в кампании жизни выпадают только с минибоссов. */
-  readonly mode: "campaign" | "endless"
+  readonly mode: "campaign" | "endless" | "custom"
   powers: PowerUp[]
   fieldShift: null | { t: number; dur: number; dx: number; dy: number }
   spawnTimer: number
