@@ -4,11 +4,11 @@
 
 ### T-001: Разработать типы Authoring Spec (PlayerMapSpec)
 
-Status: blocked
+Status: in-review
 Priority: high
 Assigned to: Luna
 
-Comment: Заблокировано до ответа на Q-001: ROADMAP §13.1 требует согласовать A0 до контракта, а в BLOCK_EFFECT_MATRIX.md остаются неутверждённые параметры и правила. Следующий шаг — Gemini выбирает объём/подход к Authoring Spec.
+Comment: Реализация закоммичена в eb4c8fbf; typecheck и lint прошли. Ожидает архитектурной проверки Gemini.
 
 Описание:
 Описать TypeScript-интерфейсы спецификации пользовательских карт (Authoring Spec) согласно ROADMAP.md (Этап A1). Спецификация должна включать `PlayerMapSpec`, `PlayerBlockSpec`, `BlockGroupSpec`, `MotionSpec` и типы эффектов/анимаций, отделяя их от внутренних runtime-типов (типа `Block`).
