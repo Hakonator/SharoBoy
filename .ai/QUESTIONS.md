@@ -2,7 +2,7 @@
 
 From: Luna
 Date: 2026-10-09
-Status: open
+Status: resolved (see AD-001 in DECISIONS.md)
 Related task: T-001
 
 Context:
