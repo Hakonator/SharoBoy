@@ -4,11 +4,11 @@
 
 ### T-001: Разработать типы Authoring Spec (PlayerMapSpec)
 
-Status: in-review
+Status: done
 Priority: high
-Assigned to: Luna
+Assigned to: none
 
-Comment: Критерии реализации подтверждены; typecheck и lint прошли. REVIEW-NOTES.md пуст. Ожидает финального подтверждения Gemini; статус остаётся in-review.
+Comment: Ревью завершено, всё отлично. Смотри REVIEW-NOTES.md. Можно приступать к T-002.
 
 Описание:
 Описать TypeScript-интерфейсы спецификации пользовательских карт (Authoring Spec) согласно ROADMAP.md (Этап A1). Спецификация должна включать `PlayerMapSpec`, `PlayerBlockSpec`, `BlockGroupSpec`, `MotionSpec` и типы эффектов/анимаций, отделяя их от внутренних runtime-типов (типа `Block`).
