@@ -260,4 +260,63 @@ Verification commands:
 npm run typecheck
 npm run lint
 
+### T-007: Магнитные блоки — пиктограмма магнита, полярность и скрытие зоны действия в игре
+
+Status: ready
+Priority: high
+Assigned to: luna
+
+Описание:
+Согласно AD-005:
+
+1. Сейчас в обычном геймплее (кампания, бесконечный режим, кастомные карты) магнитный блок всегда рисует большой пунктирный розовый круг радиуса действия, что засоряет экран. Этот контур должен отображаться только при включённом режиме хитбоксов/отладки (`showHitboxes` / F2) в `drawHitboxes` (или по отдельному флагу отладки), но не в штатном рендере блоков `drawPriorityMarks`.
+2. Текущая пиктограмма на теле блока представляет собой 2 невнятные параллельные линии. Заменить её на красивую, узнаваемую U-образную подкову магнита с двумя полюсными наконечниками.
+3. Добавить полярность магнита: притяжение (`attract`) и отталкивание (`repel`):
+   - Расширить `BlockSpecial.magnet` полем `mode?: "attract" | "repel"` (по умолчанию `"attract"`).
+   - В `src/game/physics/collide.ts` в `applyBlockMagnets` поддержать режим отталкивания: если `magnet.mode === "repel"` или сила отрицательная, вектор силы направлен от центра блока наружу (`dx/dy` с обратным знаком), мягко отталкивая шар.
+   - Отразить полярность в визуале: для притяжения классический розовый/красно-синий акцент, для отталкивания — бирюзовый/голубой.
+   - Поддержать эффект в `PlayerBlockEffect` (`src/game/mapSpec.ts`), валидаторе (`src/game/mapValidator.ts`) и адаптере (`src/game/mapAdapter.ts`).
+   - Обновить существующие unit-тесты (`blocks.test.ts`, `physics.test.ts`, `mapValidator.test.ts`, `mapAdapter.test.ts`), чтобы они проверяли как скрытие круга из стандартного рендера, так и обе полярности.
+
+Allowed files:
+
+- src/game/blockKinds.ts
+- src/game/render/blockKinds.ts
+- src/game/render/blocks.ts
+- src/game/render/debug.ts
+- src/game/render/blocks.test.ts
+- src/game/physics/collide.ts
+- src/game/physics.test.ts
+- src/game/mapSpec.ts
+- src/game/mapValidator.ts
+- src/game/mapValidator.test.ts
+- src/game/mapAdapter.ts
+- src/game/mapAdapter.test.ts
+- src/game/debugLevels.ts
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: none
+
+Acceptance criteria:
+
+- [ ] В обычном режиме игры (`showHitboxes === false`) пунктирный круг зоны магнита не рисуется
+- [ ] При `showHitboxes === true` (F2) зона действия магнита отображается
+- [ ] На самом блоке рисуется стилизованная пиктограмма магнита (U-образная подкова)
+- [ ] Поддерживаются режимы притяжения (`attract`) и отталкивания (`repel`) в физике шара
+- [ ] Визуальный телеграф пиктограммы различает притяжение и отталкивание
+- [ ] Спецификации карт (`mapSpec`), валидатор и адаптер поддерживают `magnet` с `mode`
+- [ ] Все тесты (`npm run test`), `typecheck` и `lint` проходят без ошибок
+
+Test plan:
+Проверить unit-тестами физику отталкивания и притяжения, рендер значка и отсутствие пунктирного круга в `drawBlocks`, запустить игру и убедиться визуально.
+
+Verification commands:
+npm run typecheck
+npm run lint
+npm run test
+
 \n
