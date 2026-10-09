@@ -257,7 +257,9 @@ export function applyBlockMagnets(g: PhysicsWorld, ball: Ball, dt: number) {
     if (distance <= 1 || distance >= range) continue
     const falloff = 1 - distance / range
     strongestFalloff = Math.max(strongestFalloff, falloff)
-    const acceleration = Math.max(0, magnet.force) * falloff
+    const repels = magnet.mode === "repel" || magnet.force < 0
+    const polarity = repels ? -1 : 1
+    const acceleration = Math.abs(magnet.force) * falloff * polarity
     magnetVx += (dx / distance) * acceleration
     magnetVy += (dy / distance) * acceleration
   }

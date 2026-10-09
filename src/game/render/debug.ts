@@ -32,6 +32,20 @@ export function drawHitboxes(ctx: CanvasRenderingContext2D, v: HitboxView): void
     ctx.ellipse(b.x, b.y, b.rx, b.ry, b.rot, 0, Math.PI * 2)
     ctx.fill()
     ctx.stroke()
+    const magnet = b.sp?.magnet
+    if (magnet && Number.isFinite(magnet.radius) && magnet.radius > 0) {
+      const repels = magnet.mode === "repel" || magnet.force < 0
+      ctx.save()
+      ctx.globalAlpha *= 0.72
+      ctx.strokeStyle = repels ? "rgba(54,230,220,0.95)" : "rgba(255,110,150,0.95)"
+      ctx.lineWidth = 1.8
+      ctx.setLineDash([7, 6])
+      ctx.beginPath()
+      ctx.arc(b.x, b.y, magnet.radius, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.setLineDash([])
+      ctx.restore()
+    }
   }
   for (const ball of v.balls) {
     ctx.beginPath()

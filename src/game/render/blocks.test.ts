@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import type { Block } from "../types"
 
 import { drawBlocks } from "./blocks"
+import { drawHitboxes } from "./debug"
 
 function block(hp: number): Block {
   return {
@@ -88,7 +89,7 @@ function recordHpSequence(hps: number[]) {
 }
 
 describe("drawBlocks", () => {
-  it("рисует отличительные оверлеи новых механик", () => {
+  it("рисует отличительные оверлеи без зоны магнитного поля в обычном режиме", () => {
     const arcs: number[] = []
     const dashes: number[][] = []
     const ctx = {
@@ -114,6 +115,7 @@ describe("drawBlocks", () => {
       moveTo() {},
       lineTo() {},
       closePath() {},
+      quadraticCurveTo() {},
       fill() {},
       stroke() {},
       createRadialGradient: () => ({ addColorStop() {} }),
@@ -129,8 +131,94 @@ describe("drawBlocks", () => {
     drawBlocks(ctx, [target], 0.2)
 
     expect(arcs.length).toBeGreaterThan(0)
+    expect(arcs).not.toContain(60)
+    expect(dashes).not.toContainEqual([7, 6])
+  })
+
+  it("показывает радиус магнита только в debug-хитбоксах", () => {
+    const arcs: number[] = []
+    const dashes: number[][] = []
+    const ctx = {
+      globalAlpha: 1,
+      lineWidth: 1,
+      strokeStyle: "",
+      fillStyle: "",
+      save() {},
+      restore() {},
+      beginPath() {},
+      ellipse() {},
+      arc(_x: number, _y: number, radius: number) {
+        arcs.push(radius)
+      },
+      rect() {},
+      fill() {},
+      stroke() {},
+      translate() {},
+      rotate() {},
+      setLineDash(value: number[]) {
+        dashes.push(value)
+      },
+    } as unknown as CanvasRenderingContext2D
+    const target = block(2)
+    target.sp = { magnet: { radius: 60, force: 400 } }
+
+    drawHitboxes(ctx, {
+      blocks: [target],
+      balls: [],
+      paddle: { x: 0, y: 0, w: 20, h: 10, vx: 0, baseW: 20, squash: 1 },
+      paddleRot: 0,
+      boss: null,
+      powers: [],
+      projectiles: [],
+    })
+
     expect(arcs).toContain(60)
     expect(dashes).toContainEqual([7, 6])
+  })
+
+  it.each([
+    ["attract", 400, "#ff536b", "#66c7ff"],
+    ["repel", 400, "#36e6dc", "#4d9dff"],
+  ] as const)("рисует U-образный магнит и полюса (%s)", (mode, force, north, south) => {
+    const strokes: unknown[] = []
+    const path: string[] = []
+    const ctx = {
+      globalAlpha: 1,
+      fillStyle: "",
+      strokeStyle: "",
+      lineWidth: 1,
+      lineCap: "butt",
+      lineJoin: "miter",
+      save() {},
+      restore() {},
+      translate() {},
+      rotate() {},
+      scale() {},
+      beginPath() {},
+      arc() {},
+      moveTo() {
+        path.push("move")
+      },
+      lineTo() {
+        path.push("line")
+      },
+      quadraticCurveTo() {
+        path.push("curve")
+      },
+      fill() {},
+      stroke() {
+        strokes.push(ctx.strokeStyle)
+      },
+      createRadialGradient: () => ({ addColorStop() {} }),
+    } as unknown as CanvasRenderingContext2D
+    const target = block(2)
+    target.sp = { magnet: { radius: 60, force, mode } }
+
+    drawBlocks(ctx, [target], 0)
+
+    expect(path).toContain("curve")
+    expect(strokes).toContain(north)
+    expect(strokes).toContain(south)
   })
 
   it("броня рисует внешние чёрные эллипсы и цветные разделители по числу зарядов", () => {

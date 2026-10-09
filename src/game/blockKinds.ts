@@ -13,8 +13,8 @@ export interface BlockSpecial {
   brittle?: { radius: number; damage: number }
   /** Цикл активной/неактивной физики. */
   phase?: { period: number; active: number; offset: number }
-  /** Мягкое притяжение шара за пределами хитбокса. */
-  magnet?: { radius: number; force: number }
+  /** Мягкое притяжение/отталкивание шара за пределами хитбокса. */
+  magnet?: { radius: number; force: number; mode?: "attract" | "repel" }
   /** Пульсация: масштаб rx/ry по синусоиде вокруг базовых размеров. */
   pulse?: { freq: number; ph: number; rx0: number; ry0: number }
   /** Пружинный: удар временно разгоняет шар. */

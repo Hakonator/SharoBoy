@@ -79,6 +79,18 @@ describe("mapSpecToBlocks", () => {
     })
   })
 
+  it("maps magnet polarity and uses runtime defaults for omitted values", () => {
+    const blocks = mapSpecToBlocks(
+      makeMap([
+        makeBlock({ effects: [{ kind: "magnet", mode: "repel", radius: 120, force: 500 }] }),
+        makeBlock({ id: "default-magnet", effects: [{ kind: "magnet" }] }),
+      ])
+    )
+
+    expect(blocks[0].sp?.magnet).toEqual({ radius: 120, force: 500, mode: "repel" })
+    expect(blocks[1].sp?.magnet).toEqual({ radius: 160, force: 2200 })
+  })
+
   it("intentionally ignores dynamic pulse, spring and cotton values per AD-003", () => {
     const baseline = makeMap([
       makeBlock({

@@ -247,29 +247,35 @@ export function drawPriorityMarks(ctx: Ctx, b: Block, x: number, y: number, time
     ctx.stroke()
   }
   if (sp.magnet) {
-    ctx.strokeStyle = "rgba(255,110,210,0.72)"
-    ctx.lineWidth = 2
+    const repels = sp.magnet.mode === "repel" || sp.magnet.force < 0
+    const north = repels ? "#36e6dc" : "#ff536b"
+    const south = repels ? "#4d9dff" : "#66c7ff"
+    const halfWidth = b.rx * 0.42
+    const top = -b.ry * 0.45
+    const bottom = b.ry * 0.35
+    ctx.lineWidth = Math.max(2, Math.min(b.rx, b.ry) * 0.13)
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+    ctx.strokeStyle = "#172536"
     ctx.beginPath()
-    ctx.moveTo(-b.rx * 0.4, -b.ry * 0.2)
-    ctx.lineTo(b.rx * 0.35, -b.ry * 0.2)
-    ctx.moveTo(-b.rx * 0.4, b.ry * 0.2)
-    ctx.lineTo(b.rx * 0.35, b.ry * 0.2)
+    ctx.moveTo(-halfWidth, top)
+    ctx.lineTo(-halfWidth, bottom)
+    ctx.quadraticCurveTo(0, b.ry * 0.85, halfWidth, bottom)
+    ctx.lineTo(halfWidth, top)
+    ctx.stroke()
+    ctx.lineWidth = Math.max(3, Math.min(b.rx, b.ry) * 0.19)
+    ctx.strokeStyle = north
+    ctx.beginPath()
+    ctx.moveTo(-halfWidth, top)
+    ctx.lineTo(-halfWidth, -b.ry * 0.12)
+    ctx.stroke()
+    ctx.strokeStyle = south
+    ctx.beginPath()
+    ctx.moveTo(halfWidth, top)
+    ctx.lineTo(halfWidth, -b.ry * 0.12)
     ctx.stroke()
   }
-  const magnet = sp.magnet
   ctx.restore()
-  if (magnet && Number.isFinite(magnet.radius) && magnet.radius > 0) {
-    ctx.save()
-    ctx.globalAlpha *= 0.62
-    ctx.strokeStyle = "rgba(255,110,210,0.9)"
-    ctx.lineWidth = 1.8
-    ctx.setLineDash([7, 6])
-    ctx.beginPath()
-    ctx.arc(x, y, magnet.radius, 0, Math.PI * 2)
-    ctx.stroke()
-    ctx.setLineDash([])
-    ctx.restore()
-  }
 }
 
 export function drawBrittleBlock(ctx: Ctx, b: Block, x: number, y: number, time: number) {

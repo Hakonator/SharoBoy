@@ -221,6 +221,15 @@ function validateEffect(
     case "armor":
       checkNumber(effect.amount, `${path}.amount`, { min: 1, max: 5 })
       break
+    case "magnet":
+      if (effect.radius !== undefined) {
+        checkNumber(effect.radius, `${path}.radius`, {
+          min: Number.MIN_VALUE,
+          max: Number.MAX_VALUE,
+        })
+      }
+      if (effect.force !== undefined) checkNumber(effect.force, `${path}.force`)
+      break
     case "pulse":
       checkNumber(effect.amplitude, `${path}.amplitude`, { min: 0.1, max: 2 })
       checkNumber(effect.frequency, `${path}.frequency`, { min: 0.1, max: 5 })

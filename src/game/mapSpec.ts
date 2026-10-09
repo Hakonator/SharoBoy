@@ -51,6 +51,7 @@ export interface PlayerBlockSpec {
 export type PlayerBlockEffect =
   | { kind: "normal" }
   | { kind: "armor"; amount: number }
+  | { kind: "magnet"; radius?: number; force?: number; mode?: "attract" | "repel" }
   | { kind: "pulse"; amplitude: number; frequency: number; phase?: number }
   | { kind: "spring"; speedMultiplier?: number; duration?: number }
   | { kind: "cotton"; speedMultiplier?: number; duration?: number }

@@ -212,6 +212,25 @@ describe("Physics — огненное ядро", () => {
     expect(block.hp).toBe(block.maxHp)
   })
 
+  it.each([
+    ["mode repel", { radius: 100, force: 500, mode: "repel" as const }],
+    ["negative force", { radius: 100, force: -500 }],
+  ])("магнит отталкивает шар (%s)", (_label, magnet) => {
+    const block = makeBlock(false)
+    block.sp = { magnet }
+    const { world, ball } = makeWorld(block, false)
+    ball.x = 275
+    ball.y = 100
+    ball.vx = 0
+    ball.vy = -ball.speed
+    ball.sinceHit = 0
+
+    for (let i = 0; i < 20; i++) new Physics(world).updateBall(ball, 0.016)
+
+    expect(ball.vx).toBeGreaterThan(ball.speed * 0.015)
+    expect(ball.vx).toBeLessThan(ball.speed * 0.35)
+  })
+
   it("отрицательная сила/радиус магнита не ускоряют мяч к блоку", () => {
     const block = makeBlock(false)
     block.sp = { magnet: { radius: 100, force: -500 } }

@@ -185,6 +185,37 @@ describe("validatePlayerMapSpec", () => {
     )
   })
 
+  it("accepts magnet modes and rejects non-positive or non-finite magnet ranges", () => {
+    const valid = makeMap({
+      blocks: [
+        {
+          ...makeMap().blocks[0],
+          effects: [{ kind: "magnet", radius: 80, force: -300, mode: "repel" }],
+        },
+      ],
+    })
+    const invalid = makeMap({
+      blocks: [
+        {
+          ...makeMap().blocks[0],
+          effects: [
+            { kind: "magnet", radius: 0, force: Number.NaN },
+            { kind: "magnet", radius: Number.POSITIVE_INFINITY },
+          ],
+        },
+      ],
+    })
+
+    expect(validatePlayerMapSpec(valid)).toEqual([])
+    expect(validatePlayerMapSpec(invalid).map((error) => error.path)).toEqual(
+      expect.arrayContaining([
+        "blocks[0].effects[0].radius",
+        "blocks[0].effects[0].force",
+        "blocks[0].effects[1].radius",
+      ])
+    )
+  })
+
   it("reports non-finite values and maps exceeding the block limit", () => {
     const template = makeMap().blocks[0]
     const map = makeMap({
