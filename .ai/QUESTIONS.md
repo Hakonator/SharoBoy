@@ -197,3 +197,29 @@ Options:
    `onCustomComplete`; разрешить это отклонение от AD-004.
 3. Другое конкретное решение, включая изменённый контракт HUD/leaderboard и
    разрешённые файлы.
+
+### Q-008: Исправить путь к публичному Game API в allowed_files T-004
+
+From: Luna
+Date: 2026-10-09
+Status: resolved (allowed_files updated)
+Related task: T-004
+
+Context:
+Карточка T-004 содержит путь `src/game/game/game.ts`, но публичный класс `Game`
+и его методы в репозитории находятся в `src/game/game.ts`. Для реализации
+обязательного API `Game.startCustomMap(spec)` требуется менять именно
+`src/game/game.ts`, которого нет в allowed_files. Без этого разрешённый
+`src/game/game/modes.ts` добавляет функцию старта, не доступную через публичный
+объект игры, которым пользуется UI.
+
+Question:
+Можно ли исправить ошибочный путь в allowed_files T-004 на
+`src/game/game.ts`?
+
+Options:
+
+1. Заменить `src/game/game/game.ts` на `src/game/game.ts` и оставить требование
+   `Game.startCustomMap(spec)` в публичном API.
+2. Не менять `src/game/game.ts`; зафиксировать другой конкретный способ
+   экспонирования API и обновлённый контракт.

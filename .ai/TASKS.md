@@ -146,7 +146,7 @@ Assigned to: Luna
 Allowed files:
 
 - src/game/types.ts
-- src/game/game/game.ts
+- src/game/game.ts
 - src/game/game/updateStep.ts
 - src/game/game/modes.ts
 - src/game/game/runFlow.ts
