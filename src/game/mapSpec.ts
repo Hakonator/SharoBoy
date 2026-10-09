@@ -35,10 +35,10 @@ export type PlayerBlockShape = "circle" | "ellipse"
 
 export interface PlayerBlockSpec {
   id: PlayerBlockId
-  /** Нормализованные координаты относительно игрового поля 1920×1080. */
+  /** Абсолютные мировые координаты; position — центр блока (поле 1920×1080). */
   position: { x: number; y: number }
   shape: PlayerBlockShape
-  /** Полный размер в координатах карты, а не runtime-полуоси. */
+  /** Полный размер в абсолютных мировых координатах, а не runtime-полуоси. */
   size: { width: number; height: number }
   rotation?: number
   hp: number
