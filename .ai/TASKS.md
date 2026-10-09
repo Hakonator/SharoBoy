@@ -319,4 +319,68 @@ npm run typecheck
 npm run lint
 npm run test
 
+### T-008: Единая верхняя HUD-зона во всех ориентациях (затемнение, отскок и исключение перекрытия блоков)
+
+Status: ready
+Priority: high
+Assigned to: luna
+
+Описание:
+Согласно AD-006:
+Сейчас неигровая HUD-зона с затемнением, пунктирной линией и физическим отскоком шара работает только на вертикальном экране (`g.h > g.w`). В альбомной ориентации (landscape/десктоп) `blockTop(g)` возвращал 0. Из-за этого:
+
+1. Блоки при генерации и мотивы спавнятся впритык к верхней кромке экрана и перекрываются плашками счёта, жизней, целей и кнопками громкости/паузы.
+2. Шар залетает под HUD, что ухудшает видимость игры.
+3. Визуальный стиль разнится между мобильной и десктопной версиями.
+
+Что требуется сделать:
+
+1. В `src/game/game/paddleControl.ts` обновить функцию `blockTop(g: Game)`:
+   - Она больше не должна возвращать `0` в альбомной ориентации (`g.cssH <= g.cssW`).
+   - Должна возвращать безопасную высоту HUD-зоны в мировых координатах для всех ориентаций: `Math.max(hudTopCss(g.cssW, g.cssH) / g.scale, g.h * 0.08)` (с защитой не выше 35% высоты мира).
+   - `blockSpawnTop(g)` согласовать с `blockTop(g)`.
+2. В `src/game/game/drawScene.ts`:
+   - В вызове `drawTopZone(ctx, w, blockTop(g), ...)` убрать условие `!inPlay || g.h <= g.w`. Затемнение и пунктирная линия должны рисоваться всегда во время игры (`!inPlay || blockTop(g) <= 0`).
+3. В `src/game/game/levelBuild.ts`:
+   - Убедиться, что при спавне уровней (`gridBlocks`, `layoutBlocks`, `buildBossArena`) передаётся актуальный `blockTop(g)`.
+4. В генераторах уровней (`src/game/levelPatterns.ts`, `src/game/levelBuilder.ts`):
+   - Убедиться, что верхние блоки с учётом их полурадиуса `ry` не пересекают границу `top`.
+5. Обновить затронутые unit-тесты (`blockMotion.test.ts`, `rotateLayout.test.ts`, `powers.test.ts`, `physics.test.ts` и др.), где ранее предполагалось `blockTop === 0` в ландшафте, приведя их в соответствие с новой архитектурой.
+
+Allowed files:
+
+- src/game/game/paddleControl.ts
+- src/game/game/drawScene.ts
+- src/game/game/levelBuild.ts
+- src/game/levelPatterns.ts
+- src/game/levelBuilder.ts
+- src/game/render/background.ts
+- src/game/game/blockMotion.test.ts
+- src/game/game/rotateLayout.test.ts
+- src/game/powers.test.ts
+- src/game/physics.test.ts
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: none
+
+Acceptance criteria:
+
+- [ ] `blockTop(g)` возвращает корректную высоту HUD-зоны как в ландшафте, так и в портрете
+- [ ] В альбомном режиме сверху видна пунктирная линия отскока и мягкое затемнение под плашками HUD
+- [ ] Шар отскакивает от линии HUD-зоны во всех режимах и ориентациях
+- [ ] Блоки больше не спавнятся под элементами интерфейса
+- [ ] Все тесты (`npm run test`), `typecheck` и `lint` проходят без ошибок
+
+Test plan:
+Запустить `npm run test`, проверить тесты физики отскока и генерации блоков, запустить локально игру и убедиться, что блоки расположены ниже HUD и шар отскакивает от пунктирной линии.
+
+Verification commands:
+npm run typecheck
+npm run lint
+npm run test
+
 \n
