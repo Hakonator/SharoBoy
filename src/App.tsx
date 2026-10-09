@@ -17,6 +17,8 @@ import { useDebugControls } from "./ui/useDebugControls"
 import { useLeaderboard } from "./ui/useLeaderboard"
 import { usePlayerStats } from "./ui/usePlayerStats"
 import { usePortrait } from "./ui/usePortrait"
+import { MapTesterView } from "./ui/MapTesterView"
+import type { PlayerMapSpec } from "./game/mapSpec"
 
 const INITIAL_HUD: HudData = {
   phase: "menu",
@@ -64,6 +66,8 @@ export default function App() {
   const gameRef = useRef<Game | null>(null)
   const [hud, setHud] = useState<HudData>(INITIAL_HUD)
   const [bootError, setBootError] = useState<string | null>(null)
+  const [showMapTester, setShowMapTester] = useState(false)
+  const [mapTesterJson, setMapTesterJson] = useState<string | undefined>()
 
   const onHud = useCallback((h: HudData) => setHud(h), [])
 
@@ -116,6 +120,11 @@ export default function App() {
 
   const g = () => gameRef.current
   const inGame = hud.phase === "playing" || hud.phase === "paused"
+  const startMapTest = (spec: PlayerMapSpec) => {
+    setMapTesterJson(JSON.stringify(spec, null, 2))
+    setShowMapTester(false)
+    g()?.startCustomMap(spec, () => setShowMapTester(true))
+  }
 
   const topSubmit = (
     <TopSubmit
@@ -165,33 +174,50 @@ export default function App() {
       )}
 
       {hud.phase === "menu" && (
-        <MenuScreen
-          hud={hud}
-          stats={stats}
-          nick={nick}
-          period={leaderboard.period}
-          screen={leaderboard.screen}
-          globalTop={leaderboard.globalTop}
-          globalTopEndless={leaderboard.globalTopEndless}
-          unlocked={unlocked}
-          topSubmit={topSubmit}
-          onNickChange={handleNickChange}
-          onPeriod={leaderboard.setPeriod}
-          onScreen={leaderboard.setScreen}
-          onCampaign={() => g()?.startGame()}
-          onEndless={() => g()?.startEndless()}
-          onBuyUpgrade={(id) => g()?.buyUpgrade(id)}
-          debug={debug.debug}
-          onToggleDebug={debug.handleToggleDebug}
-          debugBoss={debug.debugBoss}
-          onSelectDebugBoss={debug.handleSelectDebugBoss}
-          isDebugEffectActive={debug.handleIsDebugEffectActive}
-          onToggleDebugEffect={debug.handleToggleDebugEffect}
-          onDebugStartGame={debug.handleDebugStartGame}
-          onMute={() => g()?.toggleMute()}
-          onMusic={() => g()?.toggleMusic()}
-          onMusicVolume={(v) => g()?.setMusicVolume(v)}
-          onSfxVolume={(v) => g()?.setSfxVolume(v)}
+        <>
+          <MenuScreen
+            hud={hud}
+            stats={stats}
+            nick={nick}
+            period={leaderboard.period}
+            screen={leaderboard.screen}
+            globalTop={leaderboard.globalTop}
+            globalTopEndless={leaderboard.globalTopEndless}
+            unlocked={unlocked}
+            topSubmit={topSubmit}
+            onNickChange={handleNickChange}
+            onPeriod={leaderboard.setPeriod}
+            onScreen={leaderboard.setScreen}
+            onCampaign={() => g()?.startGame()}
+            onEndless={() => g()?.startEndless()}
+            onBuyUpgrade={(id) => g()?.buyUpgrade(id)}
+            debug={debug.debug}
+            onToggleDebug={debug.handleToggleDebug}
+            debugBoss={debug.debugBoss}
+            onSelectDebugBoss={debug.handleSelectDebugBoss}
+            isDebugEffectActive={debug.handleIsDebugEffectActive}
+            onToggleDebugEffect={debug.handleToggleDebugEffect}
+            onDebugStartGame={debug.handleDebugStartGame}
+            onMute={() => g()?.toggleMute()}
+            onMusic={() => g()?.toggleMusic()}
+            onMusicVolume={(v) => g()?.setMusicVolume(v)}
+            onSfxVolume={(v) => g()?.setSfxVolume(v)}
+          />
+          <button
+            className="absolute left-4 top-4 z-50 rounded-lg border border-cyan-neon/50 bg-deep/90 px-3 py-2 text-sm text-cyan-neon shadow-lg hover:bg-cyan-neon/10 sm:left-6 sm:top-6"
+            onClick={() => setShowMapTester(true)}
+            type="button"
+          >
+            Тестер карт
+          </button>
+        </>
+      )}
+
+      {showMapTester && hud.phase === "menu" && (
+        <MapTesterView
+          initialJson={mapTesterJson}
+          onClose={() => setShowMapTester(false)}
+          onPlay={startMapTest}
         />
       )}
 

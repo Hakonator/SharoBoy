@@ -1,6 +1,22 @@
 # Активный контекст (Active Context)
 
-## Последнее обновление (09.10.2026, T-004 завершена)
+## Последнее обновление (09.10.2026, T-005 завершена)
+
+- Gemini завершил on-place review T-004: APPROVED; отмечены custom start API,
+  target/all-block win conditions, завершение тестового забега и исключение
+  custom-score из leaderboard. Следующая задача T-005 назначена Luna.
+- T-005 заблокирована Q-009: карточка разрешает отсутствующий `src/ui/App.tsx`,
+  реальное приложение — `src/App.tsx`. Запрошено исправление allowed_files либо
+  альтернативный конкретный integration contract; код T-005 не изменялся.
+- Q-009 разрешён: allowed_files обновлён на `src/App.tsx`. Создан
+  `src/ui/MapTesterView.tsx`: editable JSON с примером карты, проверка формы,
+  валидация `PlayerMapSpec`, ошибки JSON и списка валидатора с путями, запуск
+  только валидной карты. `App.tsx` открывает Sandbox из меню, запускает
+  `Game.startCustomMap` и через callback возвращает тестера; JSON текущей карты
+  сохраняется для повторного прогона.
+- T-005 завершена. `npm run typecheck`, `npm run lint`, `npm run build` прошли;
+  полный `npm run test` прошёл со второго раза (39 файлов, 331 тест) после известного
+  timeout-флаки `campaignMap.test.ts` на первом запуске.
 
 - Реализован `src/game/mapValidator.ts`: проверка уникальности ID блоков/групп,
   согласованности членства в группах, целей победы и ссылок на блоки/портальные
