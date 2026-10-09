@@ -88,7 +88,7 @@ Context:
 ### T-003: Разработать адаптер карты в уровень
 
 Status: ready
-Priority: medium
+Priority: high
 Assigned to: Luna
 
 Описание:
