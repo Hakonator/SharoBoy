@@ -184,9 +184,9 @@ Context:
 
 Status: done
 Priority: high
-Assigned to: Luna
+Assigned to: none
 
-Comment: Реализован Dev Sandbox: JSON editor, структурная проверка, отображение ошибок валидатора и запуск карты через Game.startCustomMap; callback возвращает в тестер. Typecheck, lint, test и production build проходят.
+Comment: Ревью завершено, всё отлично. Этап A3 закрыт! Смотри REVIEW-NOTES.md.
 
 Comment: Q-009 решён: allowed_files разрешает корневой `src/App.tsx` для интеграции MapTesterView.
 
