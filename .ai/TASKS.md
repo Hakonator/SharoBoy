@@ -140,7 +140,7 @@ Status: blocked
 Priority: high
 Assigned to: Luna
 
-Comment: AD-004 требует Game.mode="custom", но тип PowersWorld.mode в src/game/powers.ts (и адаптер makePowersHost в hosts.ts) не входит в allowed_files и не принимает custom. Ожидается уточнение Q-006 и синхронизация allowed_files по AD-004.
+Comment: Заблокировано Q-007: добавление custom в HudData.mode ломает типовой вызов leaderboard из src/ui/useLeaderboard.ts (TS2345); UI-файл вне allowed_files. Нужны синхронизация scope/контрактов и повтор typecheck.
 
 Описание:
 Добавить новый игровой режим (например, `mode: "custom"` в `HudData`), который позволит запускать игру из загруженной карты. Нужно обновить логику `Game` (в частности обработку старта уровня и условия победы), чтобы при победе или поражении игра корректно возвращала игрока в UI тест-прогона (вместо перехода на следующий уровень кампании).
@@ -155,6 +155,7 @@ Allowed files:
 - src/game/game/levelBuild.ts
 - src/game/powers.ts
 - src/game/game/hosts.ts
+- src/ui/useLeaderboard.ts
 
 Forbidden files:
 

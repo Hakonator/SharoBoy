@@ -170,3 +170,30 @@ Options:
    `customRun` в Game/HUD и разрешить это отклонение от буквального `mode="custom"`
    из AD-004.
 3. Другое точное решение с обновлённым контрактом и разрешёнными файлами.
+
+### Q-007: Согласовать тип HUD/leaderboard для custom mode
+
+From: Luna
+Date: 2026-10-09
+Status: resolved (allowed_files updated)
+Related task: T-004
+
+Context:
+После добавления `"custom"` в `HudData.mode` typecheck выявил, что
+`src/ui/useLeaderboard.ts` передаёт `hud.mode` в leaderboard API, принимающий
+только `"campaign" | "endless"` (`src/game/leaderboard.ts`). `useLeaderboard.ts`
+не входит в allowed_files T-004. `npm run typecheck` падает с TS2345 на строке 103. Подмена custom на campaign в HUD исказит режим, а приведение типов скроет
+несовместимость.
+
+Question:
+Как сохранить `HudData.mode = "custom"` и не включать custom-записи в
+leaderboard?
+
+Options:
+
+1. Добавить `src/ui/useLeaderboard.ts` в allowed_files T-004 и явно пропустить
+   отправку рекордов для custom mode (проверка `hud.mode !== "custom"`).
+2. Вынести custom mode из HudData и уведомлять тестер только через callback
+   `onCustomComplete`; разрешить это отклонение от AD-004.
+3. Другое конкретное решение, включая изменённый контракт HUD/leaderboard и
+   разрешённые файлы.
