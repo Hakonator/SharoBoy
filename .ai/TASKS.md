@@ -87,11 +87,11 @@ Context:
 
 ### T-003: Разработать адаптер карты в уровень
 
-Status: blocked
+Status: in-review
 Priority: high
 Assigned to: Luna
 
-Comment: Заблокировано Q-004. Runtime игнорирует параметры pulse.amplitude, spring/cotton speedMultiplier и duration; решение требует либо расширения runtime scope, либо явного разрешения на сведение к фиксированным значениям.
+Comment: Разблокировано AD-003: передавать поддержанные runtime-поля pulse, spring и cotton; параметры pulse.amplitude и spring/cotton speedMultiplier/duration намеренно игнорировать в MVP.
 
 Описание:
 Написать конвертер `mapAdapter.ts`, который принимает валидированный `PlayerMapSpec` и переводит его в массив рантайм-блоков (`Block[]`), которые использует движок.
@@ -110,10 +110,10 @@ Dependencies: T-001, T-002
 
 Acceptance criteria:
 
-- [ ] Чистая функция конвертации `PlayerMapSpec -> Block[]`
-- [ ] Маппинг `PlayerBlockSpec` в рантайм-поля блоков (учет HP, типа, стартовых позиций и движения)
-- [ ] Тесты проходят
-- [ ] Typecheck проходит
+- [x] Чистая функция конвертации `PlayerMapSpec -> Block[]`
+- [x] Маппинг `PlayerBlockSpec` в рантайм-поля блоков (учет HP, типа, стартовых позиций и движения)
+- [x] Тесты проходят
+- [x] Typecheck проходит
 
 Test plan:
 В тестах проверить, что `mapAdapter` корректно преобразует декларативные структуры (например, `Pulse` эффект или `Drift` движение) в соответствующие поля `Block`.
