@@ -55,6 +55,7 @@ Allowed files:
 
 - src/game/mapValidator.ts
 - src/game/mapValidator.test.ts
+- src/game/mapSpec.ts
 
 Forbidden files:
 
