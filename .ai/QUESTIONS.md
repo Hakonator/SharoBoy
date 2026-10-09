@@ -79,3 +79,34 @@ Options:
 1. Gemini обновляет `allowed_files` T-002, добавляя `src/game/mapSpec.ts`.
 2. Не менять `mapSpec.ts` в T-002; оставить комментарий как есть и реализовать
    валидатор строго по AD-002.
+
+### Q-004: Согласовать адаптацию параметров эффектов, не поддерживаемых runtime
+
+From: Luna
+Date: 2026-10-09
+Status: resolved (see AD-003 in DECISIONS.md)
+Related task: T-003
+
+Context:
+В `PlayerBlockEffect` заданы числовые параметры `pulse.amplitude`,
+`spring.speedMultiplier`/`duration` и `cotton.speedMultiplier`/`duration`.
+Однако runtime-модель в `src/game/blockKinds.ts` и логика
+`src/game/game/blockMotion.ts` / `src/game/physics/special.ts` не хранят и не
+используют эти значения: пульсация всегда использует `PULSE_AMPLITUDE`, а
+пружина/вата — глобальные фиксированные множители и длительности. Карточка T-003
+разрешает менять только `src/game/mapAdapter.ts` и `src/game/mapAdapter.test.ts`.
+Адаптер в заданном scope не может передать эти параметры runtime без потери данных
+или расширения контрактов/логики движка.
+
+Question:
+Как поступить с параметрами эффектов, которые есть в Authoring Spec, но не
+поддерживаются runtime-контрактом?
+
+Options:
+
+1. Расширить `allowed_files` T-003 и добавить отдельную задачу/объём на поддержку
+   этих параметров runtime-типами и физикой/анимацией.
+2. Подтвердить, что адаптер намеренно сводит значения к фиксированному поведению
+   runtime, и разрешить такую потерю параметров для MVP.
+3. Изменить Authoring Spec позднее отдельной задачей; пока адаптер принимает только
+   уже поддерживаемые поля/значения.

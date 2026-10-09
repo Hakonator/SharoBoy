@@ -87,9 +87,11 @@ Context:
 
 ### T-003: Разработать адаптер карты в уровень
 
-Status: ready
+Status: blocked
 Priority: high
 Assigned to: Luna
+
+Comment: Заблокировано Q-004. Runtime игнорирует параметры pulse.amplitude, spring/cotton speedMultiplier и duration; решение требует либо расширения runtime scope, либо явного разрешения на сведение к фиксированным значениям.
 
 Описание:
 Написать конвертер `mapAdapter.ts`, который принимает валидированный `PlayerMapSpec` и переводит его в массив рантайм-блоков (`Block[]`), которые использует движок.
