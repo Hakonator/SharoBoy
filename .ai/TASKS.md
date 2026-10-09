@@ -87,9 +87,11 @@ Context:
 
 ### T-003: Разработать адаптер карты в уровень
 
-Status: in-review
+Status: done
 Priority: high
-Assigned to: Luna
+Assigned to: none
+
+Comment: Адаптер полностью готов и соответствует AD-003. Ревью пройдено. Этап структуры карт завершен.
 
 Comment: Разблокировано AD-003: передавать поддержанные runtime-поля pulse, spring и cotton; параметры pulse.amplitude и spring/cotton speedMultiplier/duration намеренно игнорировать в MVP.
 
