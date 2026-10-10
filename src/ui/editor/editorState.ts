@@ -11,6 +11,8 @@ export function createEditorState(map: PlayerMapSpec): EditorState {
   return {
     map: cloneMap(map),
     selectedBlockId: null,
+    selectedBlockIds: [],
+    clipboard: [],
     activeTool: "select",
     addPreset: { shape: "ellipse", size: { width: 64, height: 40 }, hp: 1 },
     gridSize: 32,
@@ -27,17 +29,20 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         ...state,
         map: cloneMap(action.map),
         selectedBlockId: null,
+        selectedBlockIds: [],
         history: action.preserveHistory ? state.history : { past: [], future: [] },
         isDirty: action.preserveHistory ? true : false,
       }
     case "SELECT_BLOCK":
-      return {
-        ...state,
-        selectedBlockId:
-          action.blockId && state.map.blocks.some((block) => block.id === action.blockId)
-            ? action.blockId
-            : null,
-      }
+      return setSelection(state, action.blockId ? [action.blockId] : [])
+    case "SELECT_BLOCKS":
+      return setSelection(state, action.blockIds)
+    case "TOGGLE_BLOCK_SELECTION": {
+      const selected = state.selectedBlockIds.includes(action.blockId)
+        ? state.selectedBlockIds.filter((id) => id !== action.blockId)
+        : [...state.selectedBlockIds, action.blockId]
+      return setSelection(state, selected)
+    }
     case "SET_TOOL":
       return { ...state, activeTool: action.tool }
     case "SET_ADD_PRESET":
@@ -76,7 +81,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           : { effects: preset.effects.map((effect) => ({ ...effect })) }),
         ...(preset.motion === undefined ? {} : { motion: { ...preset.motion } }),
       }
-      return updateMap(state, { ...state.map, blocks: [...state.map.blocks, block] }, id)
+      return updateMap(state, { ...state.map, blocks: [...state.map.blocks, block] }, [id])
     }
     case "UPDATE_BLOCK": {
       const index = state.map.blocks.findIndex((block) => block.id === action.blockId)
@@ -89,26 +94,52 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return updateMap(state, { ...state.map, blocks })
     }
     case "DELETE_BLOCK": {
-      const blockId = action.blockId ?? state.selectedBlockId
-      if (!blockId || !state.map.blocks.some((block) => block.id === blockId)) return state
-      const blocks = state.map.blocks.filter((block) => block.id !== blockId)
-      const groups = state.map.groups
-        ?.map((group) => ({ ...group, blockIds: group.blockIds.filter((id) => id !== blockId) }))
-        .filter((group) => group.blockIds.length > 0)
-      const winCondition =
-        state.map.winCondition.kind === "targets"
+      const ids = action.blockId ? [action.blockId] : state.selectedBlockIds
+      return deleteBlocks(state, ids)
+    }
+    case "DELETE_SELECTED_BLOCKS":
+      return deleteBlocks(state, state.selectedBlockIds)
+    case "MOVE_BLOCKS": {
+      const selectedIds = new Set(action.blockIds)
+      if (selectedIds.size === 0) return state
+      const delta = clampGroupDelta(
+        state.map.blocks.filter((block) => selectedIds.has(block.id)),
+        action.delta
+      )
+      const blocks = state.map.blocks.map((block) =>
+        selectedIds.has(block.id)
           ? {
-              ...state.map.winCondition,
-              targetIds: state.map.winCondition.targetIds.filter((id) => id !== blockId),
+              ...block,
+              position: clampPosition(
+                { x: block.position.x + delta.x, y: block.position.y + delta.y },
+                block.size.width,
+                block.size.height
+              ),
             }
-          : state.map.winCondition
-      const map: PlayerMapSpec = {
-        ...state.map,
-        blocks,
-        winCondition,
-        ...(groups ? { groups } : {}),
+          : block
+      )
+      return updateMap(state, { ...state.map, blocks })
+    }
+    case "COPY_SELECTED": {
+      const selected = new Set(state.selectedBlockIds)
+      return {
+        ...state,
+        clipboard: cloneBlocks(state.map.blocks.filter((block) => selected.has(block.id))),
       }
-      return updateMap(state, map, state.selectedBlockId === blockId ? null : state.selectedBlockId)
+    }
+    case "PASTE_CLIPBOARD": {
+      if (state.clipboard.length === 0) return state
+      const copied = state.clipboard.map((block) => ({
+        ...cloneBlocks([block])[0]!,
+        id: createBlockId({ ...state.map, blocks: [...state.map.blocks, ...state.clipboard] }),
+        position: clampPosition(
+          snapPosition({ x: block.position.x + 32, y: block.position.y + 32 }, state),
+          block.size.width,
+          block.size.height
+        ),
+      }))
+      const ids = copied.map((block) => block.id)
+      return updateMap(state, { ...state.map, blocks: [...state.map.blocks, ...copied] }, ids)
     }
     case "MOVE_BLOCK": {
       const block = state.map.blocks.find((item) => item.id === action.blockId)
@@ -146,6 +177,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         ...state,
         map: cloneMap(previous),
         selectedBlockId: null,
+        selectedBlockIds: [],
         history: {
           past: state.history.past.slice(0, -1),
           future: [cloneMap(state.map), ...state.history.future],
@@ -160,6 +192,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         ...state,
         map: cloneMap(next),
         selectedBlockId: null,
+        selectedBlockIds: [],
         history: {
           past: [...state.history.past, cloneMap(state.map)].slice(-HISTORY_LIMIT),
           future: state.history.future.slice(1),
@@ -197,18 +230,59 @@ export function loadEditorDraft(): PlayerMapSpec | null {
 function updateMap(
   state: EditorState,
   map: PlayerMapSpec,
-  selectedBlockId = state.selectedBlockId
+  selectedBlockIds: string[] = state.selectedBlockIds
 ): EditorState {
   return {
     ...state,
     map,
-    selectedBlockId,
+    selectedBlockIds,
+    selectedBlockId: selectedBlockIds[0] ?? null,
     history: {
       past: [...state.history.past, cloneMap(state.map)].slice(-HISTORY_LIMIT),
       future: [],
     },
     isDirty: true,
   }
+}
+
+function setSelection(state: EditorState, blockIds: string[]): EditorState {
+  const available = new Set(state.map.blocks.map((block) => block.id))
+  const selectedBlockIds = [...new Set(blockIds)].filter((id) => available.has(id))
+  return { ...state, selectedBlockIds, selectedBlockId: selectedBlockIds[0] ?? null }
+}
+
+function deleteBlocks(state: EditorState, blockIds: string[]): EditorState {
+  const ids = new Set(blockIds)
+  if (![...ids].some((id) => state.map.blocks.some((block) => block.id === id))) return state
+  const blocks = state.map.blocks.filter((block) => !ids.has(block.id))
+  const groups = state.map.groups
+    ?.map((group) => ({ ...group, blockIds: group.blockIds.filter((id) => !ids.has(id)) }))
+    .filter((group) => group.blockIds.length > 0)
+  const winCondition =
+    state.map.winCondition.kind === "targets"
+      ? {
+          ...state.map.winCondition,
+          targetIds: state.map.winCondition.targetIds.filter((id) => !ids.has(id)),
+        }
+      : state.map.winCondition
+  return updateMap(state, { ...state.map, blocks, winCondition, ...(groups ? { groups } : {}) }, [])
+}
+
+function clampGroupDelta(blocks: PlayerBlockSpec[], delta: { x: number; y: number }) {
+  if (blocks.length === 0) return { x: 0, y: 0 }
+  const minX = Math.max(...blocks.map((block) => block.size.width / 2 - block.position.x))
+  const maxX = Math.min(...blocks.map((block) => 1920 - block.size.width / 2 - block.position.x))
+  const minY = Math.max(
+    ...blocks.map((block) => HUD_ZONE_BOTTOM + block.size.height / 2 - block.position.y)
+  )
+  const maxY = Math.min(
+    ...blocks.map((block) => PADDLE_ZONE_TOP - block.size.height / 2 - block.position.y)
+  )
+  return { x: Math.max(minX, Math.min(maxX, delta.x)), y: Math.max(minY, Math.min(maxY, delta.y)) }
+}
+
+function cloneBlocks(blocks: PlayerBlockSpec[]): PlayerBlockSpec[] {
+  return structuredClone(blocks)
 }
 
 function snapPosition(position: { x: number; y: number }, state: EditorState) {

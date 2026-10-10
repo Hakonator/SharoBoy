@@ -146,6 +146,52 @@ describe("editorReducer", () => {
     })
     expect(state.map.blocks[2].position).toEqual({ x: 40, y: 840 })
   })
+
+  it("supports ordered multi-selection and toggle selection", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, { type: "SELECT_BLOCKS", blockIds: ["b", "missing", "a", "a"] })
+    expect(state.selectedBlockIds).toEqual(["b", "a"])
+    expect(state.selectedBlockId).toBe("b")
+    state = editorReducer(state, { type: "TOGGLE_BLOCK_SELECTION", blockId: "b" })
+    expect(state.selectedBlockIds).toEqual(["a"])
+    state = editorReducer(state, { type: "TOGGLE_BLOCK_SELECTION", blockId: "b" })
+    expect(state.selectedBlockIds).toEqual(["a", "b"])
+  })
+
+  it("moves selected blocks together with a common safe-clamped delta", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, {
+      type: "MOVE_BLOCKS",
+      blockIds: ["a", "b"],
+      delta: { x: 64, y: 900 },
+    })
+    expect(state.map.blocks.map((block) => block.position)).toEqual([
+      { x: 164, y: 865 },
+      { x: 264, y: 865 },
+    ])
+  })
+
+  it("copies and pastes selected blocks with unique ids and +32 offset", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, { type: "SELECT_BLOCKS", blockIds: ["a", "b"] })
+    state = editorReducer(state, { type: "COPY_SELECTED" })
+    state = editorReducer(state, { type: "PASTE_CLIPBOARD" })
+    expect(state.map.blocks).toHaveLength(4)
+    expect(state.map.blocks[2].position).toEqual({ x: 128, y: 155 })
+    expect(state.map.blocks[3].position).toEqual({ x: 224, y: 155 })
+    expect(new Set(state.map.blocks.map((block) => block.id)).size).toBe(4)
+    expect(state.selectedBlockIds).toEqual(state.map.blocks.slice(2).map((block) => block.id))
+  })
+
+  it("deletes all selected blocks and cleans group and win-condition references", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, { type: "SELECT_BLOCKS", blockIds: ["a", "b"] })
+    state = editorReducer(state, { type: "DELETE_SELECTED_BLOCKS" })
+    expect(state.map.blocks).toEqual([])
+    expect(state.map.groups).toEqual([])
+    expect(state.map.winCondition).toEqual({ kind: "targets", targetIds: [] })
+    expect(state.selectedBlockIds).toEqual([])
+  })
 })
 
 describe("editor draft storage", () => {

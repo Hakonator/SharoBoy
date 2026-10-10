@@ -4,9 +4,24 @@ import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapWinCondition } from "
 import type { EditorInspectorProps } from "./types"
 
 export function EditorInspector({ state, dispatch }: EditorInspectorProps) {
-  const block = state.map.blocks.find((item) => item.id === state.selectedBlockId)
+  const block =
+    state.selectedBlockIds.length === 1
+      ? state.map.blocks.find((item) => item.id === state.selectedBlockIds[0])
+      : state.map.blocks.find((item) => item.id === state.selectedBlockId)
   const updateBlock = (updates: Partial<PlayerBlockSpec>) => {
     if (block) dispatch({ type: "UPDATE_BLOCK", blockId: block.id, updates })
+  }
+
+  if (state.selectedBlockIds.length > 1) {
+    return (
+      <aside className="rounded-xl border border-line bg-deep/95 p-4 text-foam">
+        <h2 className="font-display text-lg text-cyan-neon">Множественный выбор</h2>
+        <p className="mt-2 text-sm text-dim">Выбрано блоков: {state.selectedBlockIds.length}</p>
+        <p className="mt-1 text-xs text-dim">
+          Перетаскивайте любой блок, чтобы переместить группу.
+        </p>
+      </aside>
+    )
   }
 
   if (!block) {

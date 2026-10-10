@@ -69,20 +69,29 @@ export function EditorView({ onClose, onTestRun }: EditorViewProps) {
       } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
         event.preventDefault()
         dispatch({ type: "REDO" })
-      } else if (event.key === "Delete" || event.key === "Backspace") {
-        if (state.selectedBlockId) {
+      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") {
+        if (state.selectedBlockIds.length > 0) {
           event.preventDefault()
-          dispatch({ type: "DELETE_BLOCK" })
+          dispatch({ type: "COPY_SELECTED" })
+        }
+      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v") {
+        event.preventDefault()
+        dispatch({ type: "PASTE_CLIPBOARD" })
+      } else if (event.key === "Delete" || event.key === "Backspace") {
+        if (state.selectedBlockIds.length > 0) {
+          event.preventDefault()
+          dispatch({ type: "DELETE_SELECTED_BLOCKS" })
         }
       } else if (event.key === "Escape") {
         if (showJson) setShowJson(false)
-        else if (state.selectedBlockId) dispatch({ type: "SELECT_BLOCK", blockId: null })
+        else if (state.selectedBlockIds.length > 0)
+          dispatch({ type: "SELECT_BLOCKS", blockIds: [] })
         else onClose()
       }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [onClose, showJson, state.selectedBlockId])
+  }, [onClose, showJson, state.selectedBlockIds])
 
   const testRun = () => {
     const errors = validatePlayerMapSpec(state.map)

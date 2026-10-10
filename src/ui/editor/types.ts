@@ -10,6 +10,8 @@ export interface EditorHistory {
 export interface EditorState {
   map: PlayerMapSpec
   selectedBlockId: string | null
+  selectedBlockIds: string[]
+  clipboard: PlayerBlockSpec[]
   activeTool: EditorTool
   addPreset: Partial<PlayerBlockSpec>
   gridSize: number
@@ -40,6 +42,8 @@ export interface EditorInspectorProps {
 export type EditorAction =
   | { type: "SET_MAP"; map: PlayerMapSpec; preserveHistory?: boolean }
   | { type: "SELECT_BLOCK"; blockId: string | null }
+  | { type: "SELECT_BLOCKS"; blockIds: string[] }
+  | { type: "TOGGLE_BLOCK_SELECTION"; blockId: string }
   | { type: "SET_TOOL"; tool: EditorTool }
   | { type: "SET_ADD_PRESET"; preset: Partial<PlayerBlockSpec> }
   | { type: "SET_GRID_SIZE"; gridSize: number }
@@ -47,12 +51,16 @@ export type EditorAction =
   | { type: "ADD_BLOCK"; block?: Partial<PlayerBlockSpec>; position: { x: number; y: number } }
   | { type: "UPDATE_BLOCK"; blockId: string; updates: Partial<PlayerBlockSpec> }
   | { type: "DELETE_BLOCK"; blockId?: string }
+  | { type: "DELETE_SELECTED_BLOCKS" }
   | {
       type: "MOVE_BLOCK"
       blockId: string
       position?: { x: number; y: number }
       delta?: { x: number; y: number }
     }
+  | { type: "MOVE_BLOCKS"; blockIds: string[]; delta: { x: number; y: number } }
+  | { type: "COPY_SELECTED" }
+  | { type: "PASTE_CLIPBOARD" }
   | {
       type: "UPDATE_METADATA"
       metadata?: Partial<PlayerMapSpec["metadata"]>

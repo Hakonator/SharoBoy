@@ -11,11 +11,12 @@ const WORLD_HEIGHT = 1080
 const HUD_BOTTOM = 140
 
 interface DragState {
-  blockId: string
+  kind: "move" | "marquee" | "resize" | "rotate"
+  blockIds: string[]
   startX: number
   startY: number
-  originalX: number
-  originalY: number
+  originals: PlayerBlockSpec[]
+  handle?: number
   moved: boolean
 }
 
@@ -25,6 +26,14 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
   const [dragPreview, setDragPreview] = useState<{
     block: PlayerBlockSpec
     position: { x: number; y: number }
+  } | null>(null)
+  const [marquee, setMarquee] = useState<{
+    start: { x: number; y: number }
+    end: { x: number; y: number }
+  } | null>(null)
+  const [groupPreview, setGroupPreview] = useState<{
+    blocks: PlayerBlockSpec[]
+    delta: { x: number; y: number }
   } | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
 
@@ -65,8 +74,25 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       drawBlock(context, dragPreview.block, false, 0.22)
       drawBlock(context, { ...dragPreview.block, position: dragPreview.position }, true, 0.76)
     }
+    if (groupPreview)
+      for (const block of groupPreview.blocks)
+        drawBlock(
+          context,
+          {
+            ...block,
+            position: {
+              x: block.position.x + groupPreview.delta.x,
+              y: block.position.y + groupPreview.delta.y,
+            },
+          },
+          true,
+          0.72
+        )
+    const selected = state.map.blocks.filter((block) => state.selectedBlockIds.includes(block.id))
+    if (selected.length === 1) drawTransformHandles(context, selected[0]!)
+    if (marquee) drawMarquee(context, marquee.start, marquee.end)
     context.restore()
-  }, [dragPreview, size, state])
+  }, [dragPreview, groupPreview, marquee, size, state])
 
   const toWorldPoint = useCallback(
     (event: { clientX: number; clientY: number; currentTarget: HTMLCanvasElement }) => {
@@ -89,6 +115,22 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     const point = toWorldPoint(event)
     if (!point || !isInsideWorld(point)) return
     event.currentTarget.setPointerCapture(event.pointerId)
+    const selected = state.map.blocks.filter((item) => state.selectedBlockIds.includes(item.id))
+    if (selected.length === 1) {
+      const handle = hitTestTransformHandle(selected[0]!, point)
+      if (handle) {
+        dragRef.current = {
+          kind: handle.kind,
+          blockIds: [selected[0]!.id],
+          originals: [selected[0]!],
+          startX: point.x,
+          startY: point.y,
+          handle: handle.index,
+          moved: false,
+        }
+        return
+      }
+    }
     const block = hitTest(state.map.blocks, point)
 
     if (state.activeTool === "add") {
@@ -99,58 +141,132 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       if (block) dispatch({ type: "DELETE_BLOCK", blockId: block.id })
       return
     }
-    dispatch({ type: "SELECT_BLOCK", blockId: block?.id ?? null })
-    if (block) {
+    if (!block) {
+      dispatch({ type: "SELECT_BLOCKS", blockIds: [] })
       dragRef.current = {
-        blockId: block.id,
+        kind: "marquee",
+        blockIds: [],
         startX: point.x,
         startY: point.y,
-        originalX: block.position.x,
-        originalY: block.position.y,
+        originals: [],
         moved: false,
       }
-      setDragPreview({ block, position: block.position })
+      setMarquee({ start: point, end: point })
+      return
     }
+    if (event.shiftKey || event.ctrlKey || event.metaKey) {
+      dispatch({ type: "TOGGLE_BLOCK_SELECTION", blockId: block.id })
+      return
+    }
+    const blockIds = state.selectedBlockIds.includes(block.id) ? state.selectedBlockIds : [block.id]
+    if (blockIds.length !== state.selectedBlockIds.length)
+      dispatch({ type: "SELECT_BLOCK", blockId: block.id })
+    const originals = state.map.blocks.filter((item) => blockIds.includes(item.id))
+    dragRef.current = {
+      kind: "move",
+      blockIds,
+      startX: point.x,
+      startY: point.y,
+      originals,
+      moved: false,
+    }
+    setGroupPreview({ blocks: originals, delta: { x: 0, y: 0 } })
   }
 
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const drag = dragRef.current
     const point = toWorldPoint(event)
-    if (!drag || !point) return
-    if (Math.hypot(point.x - drag.startX, point.y - drag.startY) > 2) drag.moved = true
-    const block = state.map.blocks.find((item) => item.id === drag.blockId)
-    if (!block) return
-    const raw = {
-      x: drag.originalX + point.x - drag.startX,
-      y: drag.originalY + point.y - drag.startY,
+    if (!point) return
+    if (!drag) {
+      const selected = state.map.blocks.filter((item) => state.selectedBlockIds.includes(item.id))
+      const handle = selected.length === 1 ? hitTestTransformHandle(selected[0]!, point) : null
+      event.currentTarget.style.cursor =
+        handle?.kind === "rotate" ? "grab" : handle ? "nwse-resize" : "default"
+      return
     }
+    if (Math.hypot(point.x - drag.startX, point.y - drag.startY) > 2) drag.moved = true
+    if (drag.kind === "marquee") {
+      setMarquee({ start: { x: drag.startX, y: drag.startY }, end: point })
+      return
+    }
+    const block = drag.originals[0]
+    if (!block) return
+    const raw = { x: point.x - drag.startX, y: point.y - drag.startY }
     const snapped = state.snapToGrid
       ? {
           x: Math.round(raw.x / state.gridSize) * state.gridSize,
           y: Math.round(raw.y / state.gridSize) * state.gridSize,
         }
       : raw
-    setDragPreview({
-      block,
-      position: clampCanvasPosition(snapped, block.size.width, block.size.height),
-    })
+    if (drag.kind === "move") {
+      const delta = clampGroupPreview(drag.originals, snapped)
+      setGroupPreview({ blocks: drag.originals, delta })
+    } else if (drag.kind === "resize") {
+      const handle = drag.handle ?? 2
+      const sx = handle === 0 || handle === 3 ? -1 : 1
+      const sy = handle === 0 || handle === 1 ? -1 : 1
+      let width = clampSize(block.size.width + raw.x * sx * 2)
+      let height = clampSize(block.size.height + raw.y * sy * 2)
+      if (block.shape === "circle") width = height = clampSize(Math.max(width, height))
+      setDragPreview({ block: { ...block, size: { width, height } }, position: block.position })
+    } else {
+      const from = Math.atan2(drag.startY - block.position.y, drag.startX - block.position.x)
+      const to = Math.atan2(point.y - block.position.y, point.x - block.position.x)
+      setDragPreview({
+        block: { ...block, rotation: (block.rotation ?? 0) + to - from },
+        position: block.position,
+      })
+    }
   }
 
   const finishDrag = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const drag = dragRef.current
     dragRef.current = null
     setDragPreview(null)
+    setGroupPreview(null)
+    setMarquee(null)
     if (!drag || !drag.moved) return
     const point = toWorldPoint(event)
     if (!point) return
-    dispatch({
-      type: "MOVE_BLOCK",
-      blockId: drag.blockId,
-      position: {
-        x: drag.originalX + point.x - drag.startX,
-        y: drag.originalY + point.y - drag.startY,
-      },
-    })
+    if (drag.kind === "marquee") {
+      dispatch({
+        type: "SELECT_BLOCKS",
+        blockIds: state.map.blocks
+          .filter((block) =>
+            intersectsBlock(normalizeRect({ x: drag.startX, y: drag.startY }, point), block)
+          )
+          .map((block) => block.id),
+      })
+    } else if (drag.kind === "move") {
+      const rawDelta = { x: point.x - drag.startX, y: point.y - drag.startY }
+      const delta = state.snapToGrid
+        ? {
+            x: Math.round(rawDelta.x / state.gridSize) * state.gridSize,
+            y: Math.round(rawDelta.y / state.gridSize) * state.gridSize,
+          }
+        : rawDelta
+      dispatch({ type: "MOVE_BLOCKS", blockIds: drag.blockIds, delta })
+    } else {
+      const block = drag.originals[0]
+      if (!block) return
+      if (drag.kind === "resize") {
+        const handle = drag.handle ?? 2
+        const sx = handle === 0 || handle === 3 ? -1 : 1
+        const sy = handle === 0 || handle === 1 ? -1 : 1
+        let width = clampSize(block.size.width + (point.x - drag.startX) * sx * 2)
+        let height = clampSize(block.size.height + (point.y - drag.startY) * sy * 2)
+        if (block.shape === "circle") width = height = clampSize(Math.max(width, height))
+        dispatch({ type: "UPDATE_BLOCK", blockId: block.id, updates: { size: { width, height } } })
+      } else {
+        const from = Math.atan2(drag.startY - block.position.y, drag.startX - block.position.x)
+        const to = Math.atan2(point.y - block.position.y, point.x - block.position.x)
+        dispatch({
+          type: "UPDATE_BLOCK",
+          blockId: block.id,
+          updates: { rotation: (block.rotation ?? 0) + to - from },
+        })
+      }
+    }
   }
 
   const onContextMenu = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -207,7 +323,7 @@ function drawWorld(context: CanvasRenderingContext2D, state: EditorState) {
   context.fillText("HUD / НЕИГРОВАЯ ЗОНА", 28, 44)
 
   for (const block of state.map.blocks) {
-    drawBlock(context, block, block.id === state.selectedBlockId)
+    drawBlock(context, block, state.selectedBlockIds.includes(block.id))
   }
   drawPaddleZone(context)
 }
@@ -254,6 +370,132 @@ function drawPaddleZone(context: CanvasRenderingContext2D) {
   context.font = "bold 24px sans-serif"
   context.fillText("ЗОНА РАКЕТКИ / НЕЛЬЗЯ СТАВИТЬ БЛОКИ", 28, PADDLE_ZONE_TOP + 44)
   context.restore()
+}
+
+function drawTransformHandles(context: CanvasRenderingContext2D, block: PlayerBlockSpec) {
+  const halfW = block.size.width / 2
+  const halfH = block.size.height / 2
+  const corners = [
+    [-halfW, -halfH],
+    [halfW, -halfH],
+    [halfW, halfH],
+    [-halfW, halfH],
+  ] as const
+  context.save()
+  context.translate(block.position.x, block.position.y)
+  context.rotate(block.rotation ?? 0)
+  context.strokeStyle = "#eaf7ff"
+  context.fillStyle = "#35e0ff"
+  context.lineWidth = 2
+  for (const [x, y] of corners) {
+    context.fillRect(x - 7, y - 7, 14, 14)
+    context.strokeRect(x - 7, y - 7, 14, 14)
+  }
+  context.beginPath()
+  context.moveTo(0, -halfH)
+  context.lineTo(0, -halfH - 28)
+  context.stroke()
+  context.beginPath()
+  context.arc(0, -halfH - 34, 8, 0, Math.PI * 2)
+  context.fillStyle = "#ffc94d"
+  context.fill()
+  context.stroke()
+  context.fillStyle = "#fff3d1"
+  context.font = "bold 18px sans-serif"
+  context.textAlign = "center"
+  context.fillText("↻", 0, -halfH - 29)
+  context.restore()
+}
+
+function drawMarquee(
+  context: CanvasRenderingContext2D,
+  start: { x: number; y: number },
+  end: { x: number; y: number }
+) {
+  const rect = normalizeRect(start, end)
+  context.save()
+  context.fillStyle = "rgba(53,224,255,0.12)"
+  context.strokeStyle = "#35e0ff"
+  context.lineWidth = 2
+  context.setLineDash([8, 5])
+  context.fillRect(rect.x, rect.y, rect.width, rect.height)
+  context.strokeRect(rect.x, rect.y, rect.width, rect.height)
+  context.restore()
+}
+
+function hitTestTransformHandle(
+  block: PlayerBlockSpec,
+  point: { x: number; y: number }
+): { kind: "resize" | "rotate"; index: number } | null {
+  const corners = blockCorners(block)
+  for (const [index, corner] of corners.entries()) {
+    if (Math.hypot(point.x - corner.x, point.y - corner.y) <= 14) return { kind: "resize", index }
+  }
+  const center = { x: block.position.x, y: block.position.y }
+  const angle = block.rotation ?? 0
+  const rotatePoint = {
+    x: center.x + (block.size.height / 2 + 34) * Math.sin(angle),
+    y: center.y - (block.size.height / 2 + 34) * Math.cos(angle),
+  }
+  return Math.hypot(point.x - rotatePoint.x, point.y - rotatePoint.y) <= 16
+    ? { kind: "rotate", index: -1 }
+    : null
+}
+
+function blockCorners(block: PlayerBlockSpec) {
+  const halfW = block.size.width / 2
+  const halfH = block.size.height / 2
+  const angle = block.rotation ?? 0
+  return [
+    [-halfW, -halfH],
+    [halfW, -halfH],
+    [halfW, halfH],
+    [-halfW, halfH],
+  ].map(([x, y]) => ({
+    x: block.position.x + x! * Math.cos(angle) - y! * Math.sin(angle),
+    y: block.position.y + x! * Math.sin(angle) + y! * Math.cos(angle),
+  }))
+}
+
+function normalizeRect(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    width: Math.abs(a.x - b.x),
+    height: Math.abs(a.y - b.y),
+  }
+}
+
+function intersectsBlock(rect: ReturnType<typeof normalizeRect>, block: PlayerBlockSpec) {
+  const corners = blockCorners(block)
+  const left = Math.min(...corners.map((corner) => corner.x))
+  const right = Math.max(...corners.map((corner) => corner.x))
+  const top = Math.min(...corners.map((corner) => corner.y))
+  const bottom = Math.max(...corners.map((corner) => corner.y))
+  return (
+    left <= rect.x + rect.width &&
+    right >= rect.x &&
+    top <= rect.y + rect.height &&
+    bottom >= rect.y
+  )
+}
+
+function clampGroupPreview(blocks: PlayerBlockSpec[], delta: { x: number; y: number }) {
+  const minX = Math.max(...blocks.map((block) => block.size.width / 2 - block.position.x))
+  const maxX = Math.min(
+    ...blocks.map((block) => WORLD_WIDTH - block.size.width / 2 - block.position.x)
+  )
+  const minY = Math.max(
+    ...blocks.map((block) => HUD_BOTTOM + block.size.height / 2 - block.position.y)
+  )
+  const maxY = Math.min(
+    ...blocks.map((block) => PADDLE_ZONE_TOP - block.size.height / 2 - block.position.y)
+  )
+  return { x: Math.max(minX, Math.min(maxX, delta.x)), y: Math.max(minY, Math.min(maxY, delta.y)) }
+}
+
+function clampSize(value: number) {
+  return Math.max(20, Math.min(100, value))
 }
 
 function drawBlock(
@@ -365,11 +607,4 @@ function hitTest(
 
 function isInsideWorld(point: { x: number; y: number }) {
   return point.x >= 0 && point.x <= WORLD_WIDTH && point.y >= 0 && point.y <= WORLD_HEIGHT
-}
-
-function clampCanvasPosition(position: { x: number; y: number }, width: number, height: number) {
-  return {
-    x: Math.max(width / 2, Math.min(WORLD_WIDTH - width / 2, position.x)),
-    y: Math.max(HUD_BOTTOM + height / 2, Math.min(PADDLE_ZONE_TOP - height / 2, position.y)),
-  }
 }
