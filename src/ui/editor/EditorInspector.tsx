@@ -199,7 +199,7 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
         min={-360}
         max={360}
         step={5}
-        value={((block.rotation ?? 0) * 180) / Math.PI}
+        value={Math.round(((block.rotation ?? 0) * 180) / Math.PI / 5) * 5}
         onChange={(degrees) => updateBlock({ rotation: (degrees * Math.PI) / 180 })}
       />
 
@@ -407,7 +407,7 @@ function NumberField({
           onChange={(event) => onChange(normalize(Number(event.target.value)))}
           step={step}
           type="number"
-          value={value}
+          value={normalize(value)}
         />
         <input
           aria-label={`${label} слайдер`}

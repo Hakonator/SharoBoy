@@ -845,7 +845,10 @@ function drawBlock(
   context.font = `bold ${Math.max(18, Math.min(32, ry * 0.8))}px sans-serif`
   context.textAlign = "center"
   context.textBaseline = "middle"
+  context.save()
+  context.rotate(-(block.rotation ?? 0))
   context.fillText(String(block.hp), 0, 0)
+  context.restore()
   drawEffectMarks(context, block.effects ?? [], rx, ry)
   context.restore()
 

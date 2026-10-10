@@ -99,6 +99,16 @@ describe("editorReducer", () => {
     ])
   })
 
+  it("normalizes floating-point rotation values to the nearest five degrees", () => {
+    const state = editorReducer(createEditorState(makeMap()), {
+      type: "UPDATE_BLOCK",
+      blockId: "a",
+      updates: { rotation: (59.999999999 * Math.PI) / 180 },
+    })
+
+    expect(state.map.blocks[0]!.rotation).toBeCloseTo((60 * Math.PI) / 180)
+  })
+
   it("updates metadata and selection/tool/grid settings without map history", () => {
     let state = createEditorState(makeMap())
     state = editorReducer(state, { type: "SELECT_BLOCK", blockId: "a" })
