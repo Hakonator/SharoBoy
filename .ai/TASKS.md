@@ -935,6 +935,8 @@ Acceptance criteria:
 - [x] В тулбаре редактора работают кнопки отключения музыки и переключения на следующий трек
 - [x] Все тесты (`npm run test`), `typecheck` и `lint` проходят без ошибок
 
+Comment: Ревью пройдено успешно: ввод пробела изолирован, ПКМ контекстное меню открывается корректно, активный инструмент подсвечивается ярким неоном, кнопка выхода из тест-прогона («⏹ В редактор») работает и по клику, и по Escape, плеер музыки в тулбаре переключает треки. Все 360 тестов, typecheck, lint и production build успешны.
+
 Comment: Guard global input для editable controls; ПКМ cyber context menu на block/empty canvas; явный neon active-tool style; early custom-map exit через HUD button/Escape; editor music mute/next-track controls и audio API. Lint/typecheck/full test прошли (40 файлов, 360 тестов); ручной браузерный прогон не выполнялся.
 
 Test plan:
