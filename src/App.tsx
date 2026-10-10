@@ -245,6 +245,7 @@ export default function App() {
           onNextMusicTrack={() => g()?.nextMusicTrack()}
           onTestRun={startEditorTest}
           onToggleMusic={() => g()?.toggleMusic()}
+          playerNick={nick}
         />
       )}
 
@@ -259,6 +260,7 @@ export default function App() {
           musicMuted={hud.musicMuted}
           onToggleMusic={() => g()?.toggleMusic()}
           onNextMusicTrack={() => g()?.nextMusicTrack()}
+          playerNick={nick}
         />
       )}
 

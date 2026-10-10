@@ -43,6 +43,7 @@ const DEFAULT_MAP: PlayerMapSpec = {
 interface EditorViewProps {
   onClose: () => void
   onTestRun: (map: PlayerMapSpec) => void
+  playerNick: string
   musicMuted: boolean
   onToggleMusic: () => void
   onNextMusicTrack: () => void
@@ -51,6 +52,7 @@ interface EditorViewProps {
 export function EditorView({
   onClose,
   onTestRun,
+  playerNick,
   musicMuted,
   onToggleMusic,
   onNextMusicTrack,
@@ -58,6 +60,13 @@ export function EditorView({
   const [state, dispatch] = useReducer(editorReducer, undefined, createInitialState)
   const [showJson, setShowJson] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
+  const author = playerNick.trim() || "не указано"
+
+  useEffect(() => {
+    if (state.map.metadata.author !== author) {
+      dispatch({ type: "UPDATE_METADATA", metadata: { author } })
+    }
+  }, [author, state.map.metadata.author])
 
   useEffect(() => {
     saveEditorDraft(state.map)
@@ -140,7 +149,7 @@ export function EditorView({
       )}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_19rem]">
         <EditorCanvas className="min-h-64" dispatch={dispatch} state={state} />
-        <EditorInspector dispatch={dispatch} state={state} />
+        <EditorInspector author={author} dispatch={dispatch} state={state} />
       </div>
       {showJson && (
         <EditorJsonModal

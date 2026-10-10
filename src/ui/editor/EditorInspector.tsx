@@ -3,7 +3,7 @@ import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapWinCondition } from "
 
 import type { EditorInspectorProps } from "./types"
 
-export function EditorInspector({ state, dispatch }: EditorInspectorProps) {
+export function EditorInspector({ state, dispatch, author }: EditorInspectorProps) {
   const block =
     state.selectedBlockIds.length === 1
       ? state.map.blocks.find((item) => item.id === state.selectedBlockIds[0])
@@ -40,12 +40,14 @@ export function EditorInspector({ state, dispatch }: EditorInspectorProps) {
         </Field>
         <Field label="Автор">
           <input
-            className={INPUT_CLASS}
-            value={state.map.metadata.author ?? ""}
-            onChange={(event) =>
-              dispatch({ type: "UPDATE_METADATA", metadata: { author: event.target.value } })
-            }
+            aria-describedby="editor-author-hint"
+            className="cursor-not-allowed rounded-lg border border-line bg-abyss/40 px-3 py-2 text-foam opacity-75 outline-none"
+            readOnly
+            value={author}
           />
+          <p id="editor-author-hint" className="mt-1 text-xs text-dim">
+            Берётся из имени игрока на главной странице
+          </p>
         </Field>
         <Field label="Описание">
           <textarea

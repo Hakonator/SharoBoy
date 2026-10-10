@@ -40,6 +40,7 @@ export interface EditorToolbarProps {
 export interface EditorInspectorProps {
   state: EditorState
   dispatch: (action: EditorAction) => void
+  author: string
 }
 
 export type EditorAction =

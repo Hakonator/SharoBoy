@@ -105,9 +105,13 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     context.save()
     context.translate(offsetX, offsetY)
     context.scale(scale, scale)
-    drawWorld(context, state)
+    const draggedBlockIds = new Set<string>()
+    if (groupPreview) {
+      for (const block of groupPreview.blocks) draggedBlockIds.add(block.id)
+    }
+    if (dragPreview) draggedBlockIds.add(dragPreview.block.id)
+    drawWorld(context, state, draggedBlockIds)
     if (dragPreview) {
-      drawBlock(context, dragPreview.block, false, 0.22)
       drawBlock(context, { ...dragPreview.block, position: dragPreview.position }, true, 0.76)
     }
     if (groupPreview)
@@ -527,7 +531,11 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
   )
 }
 
-function drawWorld(context: CanvasRenderingContext2D, state: EditorState) {
+function drawWorld(
+  context: CanvasRenderingContext2D,
+  state: EditorState,
+  draggedBlockIds: ReadonlySet<string>
+) {
   context.fillStyle = "#0b1b24"
   context.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
   drawGrid(context, state.gridSize, state.snapToGrid)
@@ -548,6 +556,7 @@ function drawWorld(context: CanvasRenderingContext2D, state: EditorState) {
   context.fillText("HUD / НЕИГРОВАЯ ЗОНА", 28, 44)
 
   for (const block of state.map.blocks) {
+    if (draggedBlockIds.has(block.id)) continue
     drawBlock(context, block, state.selectedBlockIds.includes(block.id))
   }
   drawPaddleZone(context)
@@ -810,6 +819,8 @@ function drawBlock(
   context.lineWidth = selected ? 5 : 2
   context.stroke()
 
+  drawArmorRings(context, block.effects ?? [], rx, ry, tier.base)
+
   context.fillStyle = "rgba(4, 18, 26, 0.78)"
   context.font = `bold ${Math.max(18, Math.min(32, ry * 0.8))}px sans-serif`
   context.textAlign = "center"
@@ -827,6 +838,36 @@ function drawBlock(
     context.lineWidth = 2
     context.strokeRect(-rx - 9, -ry - 9, rx * 2 + 18, ry * 2 + 18)
     context.restore()
+  }
+}
+
+function drawArmorRings(
+  context: CanvasRenderingContext2D,
+  effects: PlayerBlockEffect[],
+  rx: number,
+  ry: number,
+  tierColor: string
+) {
+  const armor = effects.find((effect) => effect.kind === "armor")
+  if (!armor || armor.amount <= 0) return
+
+  const amount = Math.floor(armor.amount)
+  const ringGap = Math.max(3.5, Math.min(rx, ry) * 0.1)
+  for (let i = 0; i < amount; i += 1) {
+    const offset = ringGap * (amount - i)
+    const ringRx = rx + offset
+    const ringRy = ry + offset
+    context.lineWidth = Math.max(3, Math.min(rx, ry) * 0.14)
+    context.strokeStyle = "#080808"
+    context.beginPath()
+    context.ellipse(0, 0, ringRx, ringRy, 0, 0, Math.PI * 2)
+    context.stroke()
+    if (i + 1 >= amount) continue
+    context.strokeStyle = tierColor
+    context.lineWidth = Math.max(1.2, Math.min(rx, ry) * 0.04)
+    context.beginPath()
+    context.ellipse(0, 0, ringRx - ringGap / 2, ringRy - ringGap / 2, 0, 0, Math.PI * 2)
+    context.stroke()
   }
 }
 
