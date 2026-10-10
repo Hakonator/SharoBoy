@@ -11,12 +11,15 @@ const WORLD_HEIGHT = 1080
 const HUD_BOTTOM = 140
 
 interface DragState {
-  kind: "move" | "marquee" | "resize" | "rotate"
+  kind: "move" | "marquee" | "resize" | "rotate" | "clone"
   blockIds: string[]
   startX: number
   startY: number
   originals: PlayerBlockSpec[]
   handle?: number
+  clonePositions?: { x: number; y: number }[]
+  source?: PlayerBlockSpec
+  limitReached?: boolean
   moved: boolean
 }
 
@@ -35,6 +38,9 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     blocks: PlayerBlockSpec[]
     delta: { x: number; y: number }
   } | null>(null)
+  const [clonePreview, setClonePreview] = useState<PlayerBlockSpec[]>([])
+  const [canvasNotice, setCanvasNotice] = useState<string | null>(null)
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
 
   useEffect(() => {
@@ -90,9 +96,23 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
         )
     const selected = state.map.blocks.filter((block) => state.selectedBlockIds.includes(block.id))
     if (selected.length === 1) drawTransformHandles(context, selected[0]!)
+    for (const block of clonePreview) drawBlock(context, block, false, 0.42)
     if (marquee) drawMarquee(context, marquee.start, marquee.end)
     context.restore()
-  }, [dragPreview, groupPreview, marquee, size, state])
+  }, [clonePreview, dragPreview, groupPreview, marquee, size, state])
+
+  useEffect(
+    () => () => {
+      if (noticeTimer.current) clearTimeout(noticeTimer.current)
+    },
+    []
+  )
+
+  const showNotice = useCallback((message: string) => {
+    setCanvasNotice(message)
+    if (noticeTimer.current) clearTimeout(noticeTimer.current)
+    noticeTimer.current = setTimeout(() => setCanvasNotice(null), 2600)
+  }, [])
 
   const toWorldPoint = useCallback(
     (event: { clientX: number; clientY: number; currentTarget: HTMLCanvasElement }) => {
@@ -117,6 +137,22 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     event.currentTarget.setPointerCapture(event.pointerId)
     const selected = state.map.blocks.filter((item) => state.selectedBlockIds.includes(item.id))
     if (selected.length === 1) {
+      if (isCloneHandle(selected[0]!, point)) {
+        if (selected[0]!.effects?.some((effect) => effect.kind === "portal")) {
+          showNotice("Блоки с порталами нельзя копировать протяжкой: порталы требуют парной связи.")
+          return
+        }
+        dragRef.current = {
+          kind: "clone",
+          blockIds: [selected[0]!.id],
+          originals: [selected[0]!],
+          source: selected[0]!,
+          startX: point.x,
+          startY: point.y,
+          moved: false,
+        }
+        return
+      }
       const handle = hitTestTransformHandle(selected[0]!, point)
       if (handle) {
         dragRef.current = {
@@ -181,12 +217,33 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       const selected = state.map.blocks.filter((item) => state.selectedBlockIds.includes(item.id))
       const handle = selected.length === 1 ? hitTestTransformHandle(selected[0]!, point) : null
       event.currentTarget.style.cursor =
-        handle?.kind === "rotate" ? "grab" : handle ? "nwse-resize" : "default"
+        selected.length === 1 && isCloneHandle(selected[0]!, point)
+          ? "copy"
+          : handle?.kind === "rotate"
+            ? "grab"
+            : handle
+              ? "nwse-resize"
+              : "default"
       return
     }
     if (Math.hypot(point.x - drag.startX, point.y - drag.startY) > 2) drag.moved = true
     if (drag.kind === "marquee") {
       setMarquee({ start: { x: drag.startX, y: drag.startY }, end: point })
+      return
+    }
+    if (drag.kind === "clone") {
+      const source = drag.source
+      if (!source) return
+      const sequence = createCloneSequence(source, point, state, drag.startX, drag.startY)
+      drag.clonePositions = sequence.positions
+      drag.limitReached = sequence.limitReached
+      setClonePreview(
+        sequence.positions.map((position, index) => ({
+          ...source,
+          id: `preview-${index}`,
+          position,
+        }))
+      )
       return
     }
     const block = drag.originals[0]
@@ -225,6 +282,7 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     setDragPreview(null)
     setGroupPreview(null)
     setMarquee(null)
+    setClonePreview([])
     if (!drag || !drag.moved) return
     const point = toWorldPoint(event)
     if (!point) return
@@ -237,6 +295,15 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
           )
           .map((block) => block.id),
       })
+    } else if (drag.kind === "clone") {
+      if (drag.clonePositions?.length) {
+        dispatch({
+          type: "CLONE_SEQUENCE",
+          blockId: drag.blockIds[0]!,
+          positions: drag.clonePositions,
+        })
+      }
+      if (drag.limitReached) showNotice("Достигнут лимит карты: не более 200 блоков.")
     } else if (drag.kind === "move") {
       const rawDelta = { x: point.x - drag.startX, y: point.y - drag.startY }
       const delta = state.snapToGrid
@@ -285,6 +352,14 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     <div
       className={`relative min-h-0 min-w-0 overflow-hidden rounded-xl border border-line bg-ink ${className}`}
     >
+      {canvasNotice && (
+        <div
+          className="pointer-events-none absolute inset-x-3 top-3 z-10 rounded-lg border border-amber-300/50 bg-amber-950/90 px-3 py-2 text-center text-sm text-amber-100 shadow-lg"
+          role="status"
+        >
+          {canvasNotice}
+        </div>
+      )}
       <canvas
         ref={canvasRef}
         aria-label="Холст редактора карт"
@@ -391,6 +466,19 @@ function drawTransformHandles(context: CanvasRenderingContext2D, block: PlayerBl
     context.fillRect(x - 7, y - 7, 14, 14)
     context.strokeRect(x - 7, y - 7, 14, 14)
   }
+  const cloneOffset = 18 / Math.SQRT2
+  context.beginPath()
+  context.arc(halfW + cloneOffset, halfH + cloneOffset, 10, 0, Math.PI * 2)
+  context.fillStyle = "#42ffb0"
+  context.fill()
+  context.strokeStyle = "#05241c"
+  context.lineWidth = 2
+  context.stroke()
+  context.fillStyle = "#05241c"
+  context.font = "bold 16px sans-serif"
+  context.textAlign = "center"
+  context.textBaseline = "middle"
+  context.fillText("+", halfW + cloneOffset, halfH + cloneOffset)
   context.beginPath()
   context.moveTo(0, -halfH)
   context.lineTo(0, -halfH - 28)
@@ -440,6 +528,21 @@ function hitTestTransformHandle(
   return Math.hypot(point.x - rotatePoint.x, point.y - rotatePoint.y) <= 16
     ? { kind: "rotate", index: -1 }
     : null
+}
+
+function isCloneHandle(block: PlayerBlockSpec, point: { x: number; y: number }) {
+  const angle = block.rotation ?? 0
+  const localX =
+    (point.x - block.position.x) * Math.cos(angle) + (point.y - block.position.y) * Math.sin(angle)
+  const localY =
+    -(point.x - block.position.x) * Math.sin(angle) + (point.y - block.position.y) * Math.cos(angle)
+  const offset = 18 / Math.SQRT2
+  return (
+    Math.hypot(
+      localX - (block.size.width / 2 + offset),
+      localY - (block.size.height / 2 + offset)
+    ) <= 13
+  )
 }
 
 function blockCorners(block: PlayerBlockSpec) {
@@ -496,6 +599,37 @@ function clampGroupPreview(blocks: PlayerBlockSpec[], delta: { x: number; y: num
 
 function clampSize(value: number) {
   return Math.max(20, Math.min(100, value))
+}
+
+const MAX_BLOCKS = 200
+
+function createCloneSequence(
+  source: PlayerBlockSpec,
+  point: { x: number; y: number },
+  state: EditorState,
+  startX: number,
+  startY: number
+) {
+  const dx = point.x - startX
+  const dy = point.y - startY
+  const horizontal = Math.abs(dx) >= Math.abs(dy)
+  const rawDistance = horizontal ? dx : dy
+  const stepSize = Math.max(state.gridSize, horizontal ? source.size.width : source.size.height)
+  const steps = Math.floor(Math.abs(rawDistance) / stepSize)
+  const freeSlots = Math.max(0, MAX_BLOCKS - state.map.blocks.length)
+  const positions: { x: number; y: number }[] = []
+  for (let step = 1; step <= Math.min(steps, freeSlots); step += 1) {
+    const position = {
+      x: source.position.x + (horizontal ? Math.sign(rawDistance) * step * stepSize : 0),
+      y: source.position.y + (!horizontal ? Math.sign(rawDistance) * step * stepSize : 0),
+    }
+    const halfW = source.size.width / 2
+    const halfH = source.size.height / 2
+    if (position.x - halfW < 0 || position.x + halfW > WORLD_WIDTH) continue
+    if (position.y - halfH < HUD_BOTTOM || position.y + halfH > PADDLE_ZONE_TOP) continue
+    positions.push(position)
+  }
+  return { positions, limitReached: steps > freeSlots }
 }
 
 function drawBlock(

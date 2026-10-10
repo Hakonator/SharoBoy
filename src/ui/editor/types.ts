@@ -61,6 +61,7 @@ export type EditorAction =
   | { type: "MOVE_BLOCKS"; blockIds: string[]; delta: { x: number; y: number } }
   | { type: "COPY_SELECTED" }
   | { type: "PASTE_CLIPBOARD" }
+  | { type: "CLONE_SEQUENCE"; blockId: string; positions: { x: number; y: number }[] }
   | {
       type: "UPDATE_METADATA"
       metadata?: Partial<PlayerMapSpec["metadata"]>

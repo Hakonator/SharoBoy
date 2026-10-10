@@ -6,6 +6,7 @@ import type { EditorAction, EditorState } from "./types"
 export const EDITOR_DRAFT_STORAGE_KEY = "sharoboy_custom_map_draft"
 const HISTORY_LIMIT = 30
 const HUD_ZONE_BOTTOM = 140
+const MAX_BLOCKS = 200
 
 export function createEditorState(map: PlayerMapSpec): EditorState {
   return {
@@ -140,6 +141,27 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       }))
       const ids = copied.map((block) => block.id)
       return updateMap(state, { ...state.map, blocks: [...state.map.blocks, ...copied] }, ids)
+    }
+    case "CLONE_SEQUENCE": {
+      const source = state.map.blocks.find((block) => block.id === action.blockId)
+      if (!source || source.effects?.some((effect) => effect.kind === "portal")) return state
+      const available = Math.max(0, MAX_BLOCKS - state.map.blocks.length)
+      const positions = action.positions
+        .slice(0, available)
+        .map((position) =>
+          clampPosition(snapPosition(position, state), source.size.width, source.size.height)
+        )
+      if (positions.length === 0) return state
+      const additions: PlayerBlockSpec[] = []
+      for (const position of positions) {
+        const mapWithCopies = { ...state.map, blocks: [...state.map.blocks, ...additions] }
+        additions.push({ ...cloneBlocks([source])[0]!, id: createBlockId(mapWithCopies), position })
+      }
+      return updateMap(
+        state,
+        { ...state.map, blocks: [...state.map.blocks, ...additions] },
+        additions.map((block) => block.id)
+      )
     }
     case "MOVE_BLOCK": {
       const block = state.map.blocks.find((item) => item.id === action.blockId)

@@ -192,6 +192,59 @@ describe("editorReducer", () => {
     expect(state.map.winCondition).toEqual({ kind: "targets", targetIds: [] })
     expect(state.selectedBlockIds).toEqual([])
   })
+
+  it("clones a sequence with unique ids, selection, and undo/redo history", () => {
+    const initial = createEditorState(makeMap())
+    const cloned = editorReducer(initial, {
+      type: "CLONE_SEQUENCE",
+      blockId: "a",
+      positions: [
+        { x: 300, y: 200 },
+        { x: 400, y: 200 },
+      ],
+    })
+    expect(cloned.map.blocks).toHaveLength(4)
+    expect(cloned.map.blocks.slice(2).map((block) => block.position)).toEqual([
+      { x: 288, y: 192 },
+      { x: 416, y: 192 },
+    ])
+    expect(new Set(cloned.map.blocks.map((block) => block.id)).size).toBe(4)
+    expect(cloned.selectedBlockIds).toEqual(cloned.map.blocks.slice(2).map((block) => block.id))
+    expect(editorReducer(cloned, { type: "UNDO" }).map).toEqual(initial.map)
+    expect(editorReducer(editorReducer(cloned, { type: "UNDO" }), { type: "REDO" }).map).toEqual(
+      cloned.map
+    )
+  })
+
+  it("rejects quick-cloning portals and caps clone sequence to 200 blocks", () => {
+    let state = createEditorState(makeMap())
+    state.map.blocks[0]!.effects = [{ kind: "portal", pairId: "pair" }]
+    const rejected = editorReducer(state, {
+      type: "CLONE_SEQUENCE",
+      blockId: "a",
+      positions: [{ x: 300, y: 200 }],
+    })
+    expect(rejected.map.blocks).toHaveLength(2)
+
+    const fullMap = makeMap()
+    fullMap.blocks = Array.from({ length: 199 }, (_, index) => ({
+      id: `block-${index}`,
+      position: { x: 100 + index, y: 200 },
+      shape: "ellipse" as const,
+      size: { width: 40, height: 30 },
+      hp: 1,
+    }))
+    state = createEditorState(fullMap)
+    const limited = editorReducer(state, {
+      type: "CLONE_SEQUENCE",
+      blockId: "block-0",
+      positions: [
+        { x: 300, y: 200 },
+        { x: 400, y: 200 },
+      ],
+    })
+    expect(limited.map.blocks).toHaveLength(200)
+  })
 })
 
 describe("editor draft storage", () => {
