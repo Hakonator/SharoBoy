@@ -1154,3 +1154,61 @@ Verification commands:
 npm run typecheck
 npm run lint
 npm run test
+
+### T-020: Унификация формы и инверсия цвета кнопок инструментов Toolbar
+
+Status: ready
+Priority: high
+Assigned to: luna
+
+Описание:
+Согласно AD-014 восстановить единообразную аркадную геометрию и поведение кнопок инструментов в `src/ui/editor/EditorToolbar.tsx`:
+
+1. **Единый базовый стиль `.btn-ghost` для кнопок выбора инструментов**:
+   - И активная, и неактивная кнопки выбора инструмента («Выбор», «Добавить блок», «Удалить») используют идентичный класс:
+     `btn-ghost flex items-center gap-2 px-3 py-2 text-xs`.
+   - Полностью исключить `rounded-lg`, фиксированную высоту `h-10` и сторонние веса шрифта (`font-semibold`/`font-black`), чтобы обе кнопки сохраняли оригинальный аркадный скошенный полигональный контур (`clip-path: polygon(...)`) и шрифт Russo One.
+
+2. **Инверсия цвета и заливка при выборе**:
+   - При `state.activeTool === tool.id` менять **только** заливку и инвертировать цвет шрифта:
+     ```tsx
+     style={
+       state.activeTool === tool.id
+         ? {
+             backgroundColor: "#35e0ff",
+             color: "#04121c",
+             borderColor: "#35e0ff",
+             boxShadow: "0 0 16px rgba(53, 224, 255, 0.7)",
+           }
+         : undefined
+     }
+     ```
+   - При деактивации кнопка возвращается к штатным цветам `.btn-ghost` без малейшего изменения формы, размеров или шрифта.
+
+Allowed files:
+
+- src/ui/editor/EditorToolbar.tsx
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: T-019
+
+Acceptance criteria:
+
+- [ ] Кнопки «Выбор», «Добавить блок», «Удалить» имеют одинаковую аркадную полигональную форму (`.btn-ghost`) во всех состояниях
+- [ ] При переключении инструмента не меняются размеры, форма и шрифт кнопок
+- [ ] У выбранного инструмента меняется только заливка (голубой `#35e0ff`) и инвертируется цвет шрифта (темный `#04121c`)
+- [ ] Все тесты (`npm run test`), `typecheck` и `lint` проходят без ошибок
+
+Test plan:
+
+1. Запустить `npm run test`, `npm run typecheck` и `npm run lint`.
+2. В браузере переключать инструменты в Toolbar и убедиться, что кнопки сохраняют аутентичный аркадный контур, не меняют размеры и шрифт, а меняют только заливку и цвет шрифта.
+
+Verification commands:
+npm run typecheck
+npm run lint
+npm run test
