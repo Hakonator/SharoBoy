@@ -18,6 +18,12 @@ export interface EditorState {
   isDirty: boolean
 }
 
+export interface EditorCanvasProps {
+  state: EditorState
+  dispatch: (action: EditorAction) => void
+  className?: string
+}
+
 export type EditorAction =
   | { type: "SET_MAP"; map: PlayerMapSpec; preserveHistory?: boolean }
   | { type: "SELECT_BLOCK"; blockId: string | null }
