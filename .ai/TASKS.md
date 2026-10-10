@@ -557,9 +557,9 @@ npm run lint
 
 ### T-012: Полноэкранный EditorView, модалка JSON и интеграция в игру
 
-Status: pending
-Priority: normal
-Assigned to: none
+Status: ready
+Priority: high
+Assigned to: luna
 
 Описание:
 Согласно AD-007:
