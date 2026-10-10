@@ -24,6 +24,19 @@ export interface EditorCanvasProps {
   className?: string
 }
 
+export interface EditorToolbarProps {
+  state: EditorState
+  dispatch: (action: EditorAction) => void
+  onImportExport: () => void
+  onTestRun: () => void
+  onClose: () => void
+}
+
+export interface EditorInspectorProps {
+  state: EditorState
+  dispatch: (action: EditorAction) => void
+}
+
 export type EditorAction =
   | { type: "SET_MAP"; map: PlayerMapSpec; preserveHistory?: boolean }
   | { type: "SELECT_BLOCK"; blockId: string | null }

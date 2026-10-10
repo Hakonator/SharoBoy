@@ -1,5 +1,13 @@
 # Активный контекст (Active Context)
 
+## Последнее обновление (10.10.2026, T-011 завершена)
+
+- Добавлены `EditorToolbar` (select/add/delete, undo/redo, snap/grid, clear, JSON/test/close callbacks)
+  и `EditorInspector` (HP/форма/размер/поворот, эффекты MVP, дублирование/удаление,
+  metadata, win condition/targets и сводная статистика). Поля немедленно посылают
+  reducer actions; typecheck, lint и полный Vitest (40 файлов, 350 тестов) прошли.
+- Следующий шаг — T-012, пока `pending/normal`; ожидает назначения архитектора.
+
 ## Последнее обновление (10.10.2026, T-010 завершена)
 
 - Добавлен `EditorCanvas`: поле 1920×1080 масштабируется под родительский контейнер,
