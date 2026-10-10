@@ -1,0 +1,20 @@
+{
+  "name": "ШАРОБОЙ — аркадный разбиватель шаров",
+  "short_name": "ШАРОБОЙ",
+  "description": "Аркада: разбивай шары и овалы ракеткой, собирай монеты, улучшай снаряжение и попади в мировой топ.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#04121c",
+  "theme_color": "#04121c",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "icon-64.png", "sizes": "64x64", "type": "image/png" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
