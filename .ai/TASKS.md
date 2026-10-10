@@ -452,8 +452,8 @@ npm run test -- src/ui/editor/editorState.test.ts
 ### T-010: Интерактивный Canvas редактора карт (EditorCanvas)
 
 Status: ready
-Priority: normal
-Assigned to: none
+Priority: high
+Assigned to: luna
 
 Описание:
 Согласно AD-007:
