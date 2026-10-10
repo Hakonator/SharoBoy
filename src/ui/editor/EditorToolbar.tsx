@@ -26,17 +26,14 @@ export function EditorToolbar({
           <button
             key={tool.id}
             aria-pressed={state.activeTool === tool.id}
-            className={
-              state.activeTool === tool.id
-                ? "flex h-10 items-center gap-2 rounded-lg border border-cyan-neon bg-cyan-neon px-3 py-2 text-xs font-semibold text-ink shadow-[0_0_12px_rgba(53,224,255,0.6)]"
-                : "btn-ghost flex h-10 items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-semibold"
-            }
+            className="btn-ghost flex items-center gap-2 px-3 py-2 text-xs"
             style={
               state.activeTool === tool.id
                 ? {
                     backgroundColor: "#35e0ff",
-                    color: "#07131b",
-                    boxShadow: "0 0 16px rgba(53,224,255,0.8)",
+                    color: "#04121c",
+                    borderColor: "#35e0ff",
+                    boxShadow: "0 0 16px rgba(53, 224, 255, 0.7)",
                   }
                 : undefined
             }
