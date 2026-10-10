@@ -19,6 +19,7 @@ import { usePlayerStats } from "./ui/usePlayerStats"
 import { usePortrait } from "./ui/usePortrait"
 import { MapTesterView } from "./ui/MapTesterView"
 import type { PlayerMapSpec } from "./game/mapSpec"
+import { EditorView } from "./ui/editor"
 
 const INITIAL_HUD: HudData = {
   phase: "menu",
@@ -67,6 +68,8 @@ export default function App() {
   const [hud, setHud] = useState<HudData>(INITIAL_HUD)
   const [bootError, setBootError] = useState<string | null>(null)
   const [showMapTester, setShowMapTester] = useState(false)
+  const [showEditor, setShowEditor] = useState(false)
+  const [editorMap, setEditorMap] = useState<PlayerMapSpec | null>(null)
   const [mapTesterJson, setMapTesterJson] = useState<string | undefined>()
 
   const onHud = useCallback((h: HudData) => setHud(h), [])
@@ -124,6 +127,12 @@ export default function App() {
     setMapTesterJson(JSON.stringify(spec, null, 2))
     setShowMapTester(false)
     g()?.startCustomMap(spec, () => setShowMapTester(true))
+  }
+
+  const startEditorTest = (spec: PlayerMapSpec) => {
+    setEditorMap(spec)
+    setShowEditor(false)
+    g()?.startCustomMap(spec, () => setShowEditor(true))
   }
 
   const topSubmit = (
@@ -210,6 +219,13 @@ export default function App() {
           >
             Тестер карт
           </button>
+          <button
+            className="absolute left-4 top-16 z-50 rounded-lg border border-mint/50 bg-deep/90 px-3 py-2 text-sm text-mint shadow-lg hover:bg-mint/10 sm:left-6 sm:top-20"
+            onClick={() => setShowEditor(true)}
+            type="button"
+          >
+            Редактор карт
+          </button>
         </>
       )}
 
@@ -218,6 +234,21 @@ export default function App() {
           initialJson={mapTesterJson}
           onClose={() => setShowMapTester(false)}
           onPlay={startMapTest}
+        />
+      )}
+
+      {showEditor && hud.phase === "menu" && (
+        <EditorView onClose={() => setShowEditor(false)} onTestRun={startEditorTest} />
+      )}
+
+      {editorMap && (hud.phase === "won" || hud.phase === "over") && showEditor && (
+        <EditorView
+          key={editorMap.id}
+          onClose={() => {
+            setShowEditor(false)
+            setEditorMap(null)
+          }}
+          onTestRun={startEditorTest}
         />
       )}
 

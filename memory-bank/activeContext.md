@@ -1,5 +1,16 @@
 # Активный контекст (Active Context)
 
+## Последнее обновление (10.10.2026, T-012 завершена)
+
+- Завершён редактор карт MVP: `EditorView` компонует Toolbar/Canvas/Inspector,
+  инициализирует карту из draft localStorage, автосохраняет, поддерживает Ctrl+Z,
+  Ctrl+Y/Ctrl+Shift+Z, Delete/Backspace и Escape. `EditorJsonModal` импортирует
+  и экспортирует JSON с проверкой формы/валидатором и отображением ошибок.
+- `App.tsx` открывает редактор из меню и запускает custom map; по callback победы/
+  поражения возвращает автора в редактор. Typecheck/lint, полный test
+  (40 файлов, 350 тестов) и production build прошли. Ручная браузерная проверка
+  не выполнялась; следующий шаг ожидает архитектора.
+
 ## Последнее обновление (10.10.2026, T-011 завершена)
 
 - Добавлены `EditorToolbar` (select/add/delete, undo/redo, snap/grid, clear, JSON/test/close callbacks)
