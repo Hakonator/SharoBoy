@@ -840,3 +840,107 @@ Verification commands:
 npm run typecheck
 npm run lint
 npm run test
+
+### T-016: Исправление багов редактора (Spacebar, ПКМ-меню, подсветка Toolbar, выход из тест-прогона, плеер музыки)
+
+Status: ready
+Priority: high
+Assigned to: luna
+
+Описание:
+Согласно AD-010 исправить 5 выявленных проблем в редакторе карт и игровом цикле:
+
+1. **Изоляция глобального Spacebar от текстовых полей ввода (`src/game/input.ts`)**:
+   - В `handleKeyDown` в начале метода проверять `event.target`:
+     ```ts
+     const target = e.target
+     if (
+       target instanceof HTMLElement &&
+       (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
+     ) {
+       return
+     }
+     ```
+   - Это предотвращает запуск кампании при нажатии пробела во время редактирования названия, автора или описания карты.
+
+2. **Контекстное меню по ПКМ (`src/ui/editor/EditorCanvas.tsx`)**:
+   - Заменить мгновенное удаление блока по ПКМ на вызов плавающего контекстного меню на холсте.
+   - Меню при клике на блоке:
+     - 📋 Дублировать (`Ctrl+C / Ctrl+V` или дубликат со смещением +32, +32)
+     - 🔄 Повернуть на 90°
+     - 🔘 Сменить форму (Круг / Эллипс)
+     - 🗑️ Удалить блок
+     - ✖ Закрыть
+   - Меню при клике на пустом месте:
+     - ➕ Добавить блок здесь
+     - 📋 Вставить из буфера (если есть скопированное)
+     - 🧹 Снять выделение
+     - ✖ Закрыть
+   - Меню стилизовано под общий аркадный кибер-дизайн (тёмный полупрозрачный фон, неоновые границы).
+   - Меню закрывается кликом вне его или клавишей Escape.
+
+3. **Яркая подсветка активного инструмента (`src/ui/editor/EditorToolbar.tsx`)**:
+   - У кнопки выбранного режима (`state.activeTool === tool.id`) НЕ использовать класс `.btn-ghost` (так как он перебивает фон и цвет текста).
+   - Применять яркий стиль: `rounded-lg border-2 border-cyan-neon bg-cyan-neon text-ink font-black shadow-[0_0_16px_rgba(53,224,255,0.8)]` с дублированием стилей в атрибуте `style` (`backgroundColor: "#35e0ff"`, `color: "#07131b"`, `boxShadow: "0 0 16px rgba(53,224,255,0.8)"`), гарантируя видимость подсветки в любом браузере.
+
+4. **Кнопка выхода из режима тест-прогона (`src/game/game/modes.ts`, `src/game/game.ts`, `src/ui/screens/hud.tsx`, `src/App.tsx`)**:
+   - В `src/game/game/modes.ts` экспортировать `stopCustomMap(g: Game)`:
+     ```ts
+     export function stopCustomMap(g: Game) {
+       const cb = g.onCustomComplete
+       toMenu(g)
+       cb?.("over")
+     }
+     ```
+   - В `Game.ts` добавить метод `stopCustomMap() { stopCustomMap(this) }`.
+   - В `src/ui/screens/hud.tsx`: если `hud.mode === "custom"`, отображать контрастную кнопку «⏹ В редактор» (вызывающую `onExitCustomMap`), а также перехватывать Escape для выхода.
+   - В `src/App.tsx` пробросить обработчик `onExitCustomMap={() => g()?.stopCustomMap()}` в `HudOverlay`.
+
+5. **Управление музыкой в редакторе (`src/game/audio/fileMusic.ts`, `src/game/audio.ts`, `src/game/game.ts`, `src/ui/editor/EditorToolbar.tsx`, `src/ui/editor/EditorView.tsx`, `src/App.tsx`)**:
+   - В `FileMusicPlayer` добавить метод `nextTrack() { this.play() }`.
+   - В `SFX` добавить метод `nextTrack()` (включает следующий трек с кроссфейдом).
+   - В `Game.ts` добавить метод `nextMusicTrack() { this.sfx.nextTrack(); pushHud(this) }`.
+   - В `EditorToolbar.tsx` добавить кнопки управления музыкой:
+     - Кнопка вкл/выкл музыки (`🎵` / `🔇`)
+     - Кнопка следующей композиции (`⏭`)
+   - Пробросить соответствующие вызовы из `App.tsx` через `EditorViewProps`.
+
+Allowed files:
+
+- src/game/input.ts
+- src/ui/editor/EditorCanvas.tsx
+- src/ui/editor/EditorToolbar.tsx
+- src/ui/editor/EditorView.tsx
+- src/ui/editor/types.ts
+- src/ui/screens/hud.tsx
+- src/App.tsx
+- src/game/game.ts
+- src/game/game/modes.ts
+- src/game/audio.ts
+- src/game/audio/fileMusic.ts
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: T-015
+
+Acceptance criteria:
+
+- [ ] Нажатие пробела при вводе текста в input/textarea не запускает кампанию и нормально печатает пробел
+- [ ] Клик ПКМ по блоку или полю открывает контекстное меню быстрых действий вместо моментального удаления
+- [ ] Активная кнопка инструмента в Toolbar отчётливо подсвечена неоновым акцентом и тенью
+- [ ] В режиме тест-прогона карты доступна кнопка возврата в редактор («⏹ В редактор»)
+- [ ] В тулбаре редактора работают кнопки отключения музыки и переключения на следующий трек
+- [ ] Все тесты (`npm run test`), `typecheck` и `lint` проходят без ошибок
+
+Test plan:
+
+1. Запустить `npm run test`, `npm run typecheck` и `npm run lint`.
+2. Проверить в браузере ввод пробела в описании, вызов контекстного меню ПКМ, подсветку кнопок, кнопку выхода из тест-прогона и переключение треков музыки.
+
+Verification commands:
+npm run typecheck
+npm run lint
+npm run test
