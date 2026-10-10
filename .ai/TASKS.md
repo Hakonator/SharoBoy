@@ -388,4 +388,215 @@ npm run typecheck
 npm run lint
 npm run test
 
+### T-009: Модели состояния и редьюсер редактора карт (State & Reducer)
+
+Status: ready
+Priority: high
+Assigned to: luna
+
+Описание:
+Согласно AD-007, заложить типизированное ядро состояния и чистые функции модификации карты (`editorState.ts`):
+
+1. Описать интерфейсы `EditorState` и действий `EditorAction` в `src/ui/editor/types.ts`:
+   - `map: PlayerMapSpec` (текущая редактируемая карта)
+   - `selectedBlockId: string | null`
+   - `activeTool: "select" | "add" | "delete"`
+   - `addPreset: Partial<PlayerBlockSpec>` (пресет добавляемого блока: форма, HP, размеры)
+   - `gridSize: number` (по умолчанию 32 или 40 мировых единиц)
+   - `snapToGrid: boolean` (по умолчанию true)
+   - `history: { past: PlayerMapSpec[]; future: PlayerMapSpec[] }` (стек undo/redo до 30 записей)
+   - `isDirty: boolean`
+2. Реализовать чистый редьюсер и экшены в `src/ui/editor/editorState.ts`:
+   - `SET_MAP`: установка карты (с очисткой или сохранением истории)
+   - `SELECT_BLOCK`: выбор блока по id (или сброс выбора)
+   - `SET_TOOL`: смена инструмента
+   - `ADD_BLOCK`: добавление нового блока (с авто-генерацией уникального id `b-timestamp-rand` и снаппингом к сетке)
+   - `UPDATE_BLOCK`: частичное обновление свойств существующего блока
+   - `DELETE_BLOCK`: удаление выбранного блока (и очистка ссылок на него)
+   - `MOVE_BLOCK`: перемещение блока на delta или в абсолютные координаты
+   - `UNDO` / `REDO`: переход по истории
+   - `UPDATE_METADATA`: редактирование названия/автора/winCondition карты
+3. Добавить сохранение/загрузку черновика карты из `localStorage` (`sharoboy_custom_map_draft`).
+4. Написать unit-тесты на редьюсер (`src/ui/editor/editorState.test.ts`), покрывающие: добавление блока, удаление, перемещение, ограничение стека undo/redo, корректный возврат назад и вперёд.
+
+Allowed files:
+
+- src/ui/editor/types.ts
+- src/ui/editor/editorState.ts
+- src/ui/editor/editorState.test.ts
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: none
+
+Acceptance criteria:
+
+- [ ] Созданы типы `EditorState`, `EditorAction`, `EditorTool`
+- [ ] Реализован чистый редьюсер всех операций с картой и историей (Undo/Redo)
+- [ ] Написаны unit-тесты, проверяющие все мутации и стек истории
+- [ ] `npm run typecheck`, `npm run lint` и `npm run test` проходят без ошибок
+
+Test plan:
+Unit-тесты в `editorState.test.ts`.
+
+Verification commands:
+npm run typecheck
+npm run lint
+npm run test -- src/ui/editor/editorState.test.ts
+
+### T-010: Интерактивный Canvas редактора карт (EditorCanvas)
+
+Status: pending
+Priority: normal
+Assigned to: none
+
+Описание:
+Согласно AD-007:
+Реализовать интерактивный холст `src/ui/editor/EditorCanvas.tsx`:
+
+1. Отображение игрового поля в эталонном соотношении 1920×1080 с масштабированием под контейнер.
+2. Отрисовка координатной сетки (шаг `gridSize`) с подсветкой привязки.
+3. Отрисовка верхней неигровой HUD-зоны (затемнение и пунктирная граница), чтобы автор видел границу.
+4. Отрисовка блоков из `map.blocks`:
+   - Отображение формы (круг/эллипс), правильных размеров и поворота.
+   - Цветовая заливка в соответствии с палитрой HP (`TIER[hp].base`).
+   - Иконки/метки эффектов (броня, пружина, вата, магнит-подкова с полярностью, портал).
+   - Выделение рамкой/свечением выбранного блока (`selectedBlockId`).
+5. Интерактивность мыши и тача:
+   - Клик по блоку в режиме `select` -> выбор блока.
+   - Drag-and-drop перемещение выбранного блока с привязкой к сетке (`snapToGrid`).
+   - Клик в режиме `add` -> создание блока в точке клика.
+   - Клик в режиме `delete` -> мгновенное удаление блока.
+
+Allowed files:
+
+- src/ui/editor/EditorCanvas.tsx
+- src/ui/editor/types.ts
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: T-009
+
+Acceptance criteria:
+
+- [ ] Холст масштабируется под экран с сохранением пропорций 1920×1080
+- [ ] Отображаются сетка, HUD-граница и блоки со всеми визуальными свойствами
+- [ ] Работает выделение, перемещение с привязкой, добавление и удаление по клику
+- [ ] `typecheck` и `lint` проходят без ошибок
+
+Test plan:
+Проверка компиляции и визуальный тест в браузере.
+
+Verification commands:
+npm run typecheck
+npm run lint
+
+### T-011: Панель инструментов и свойств (Toolbar & Inspector)
+
+Status: pending
+Priority: normal
+Assigned to: none
+
+Описание:
+Согласно AD-007:
+
+1. Создать `src/ui/editor/EditorToolbar.tsx`:
+   - Переключение инструментов: `Выбор`, `Добавить блок`, `Удалить`.
+   - Кнопки `Отменить (Undo)` и `Повторить (Redo)` с отображением активности (`disabled`, если стек пуст).
+   - Переключатель привязки к сетке и выбор шага сетки (16, 32, 64).
+   - Кнопки быстрого действия: "Очистить карту", "Импорт/Экспорт JSON", "Тест-прогон", "Закрыть".
+2. Создать `src/ui/editor/EditorInspector.tsx`:
+   - Если выбран блок:
+     - HP (кнопки или слайдер 1-8 с отображением цвета блока).
+     - Форма (`circle`, `ellipse`), ширина и высота, угол поворота.
+     - Переключатель эффектов: Броня (число 1-5), Пружина, Вата, Пульсация, Магнит (режим: Притяжение / Отталкивание, радиус, сила), Портал (id пары).
+     - Кнопка «Дублировать блок» и «Удалить блок».
+   - Если блок не выбран:
+     - Метаданные карты: Название, Автор, Описание.
+     - Условие победы `winCondition` (`all-destructible` или `targets`).
+     - Счётчик блоков и суммарного HP.
+
+Allowed files:
+
+- src/ui/editor/EditorToolbar.tsx
+- src/ui/editor/EditorInspector.tsx
+- src/ui/editor/types.ts
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: T-009
+
+Acceptance criteria:
+
+- [ ] Toolbar содержит все кнопки управления и индикаторы инструментов
+- [ ] Inspector позволяет редактировать любые параметры блока и карты
+- [ ] Изменения мгновенно применяются в стейт через редьюсер T-009
+- [ ] `typecheck` и `lint` проходят без ошибок
+
+Test plan:
+Проверка валидности типов и рендера компонентов.
+
+Verification commands:
+npm run typecheck
+npm run lint
+
+### T-012: Полноэкранный EditorView, модалка JSON и интеграция в игру
+
+Status: pending
+Priority: normal
+Assigned to: none
+
+Описание:
+Согласно AD-007:
+
+1. Создать `src/ui/editor/EditorJsonModal.tsx` для быстрого просмотра, копирования и вставки JSON карты с валидацией через `validatePlayerMapSpec`.
+2. Создать корневой `src/ui/editor/EditorView.tsx`:
+   - Объединяет `EditorToolbar`, `EditorCanvas`, `EditorInspector` и `EditorJsonModal`.
+   - Инициализирует редьюсер с сохранённым черновиком из `localStorage` (или дефолтной картой).
+   - Поддерживает горячие клавиши: `Ctrl+Z` (Undo), `Ctrl+Y` / `Ctrl+Shift+Z` (Redo), `Delete` / `Backspace` (удалить выбранный), `Escape` (снять выбор).
+3. Интегрировать в `src/App.tsx`:
+   - Заменить кнопку «Тестер карт» на «Редактор карт» (или добавить рядом).
+   - При клике «Тест-прогон» из редактора запускать `startCustomMap(map, onComplete)`, а после победы/поражения автоматически возвращать автора обратно в редактор с сохранением всех несохранённых правок.
+
+Allowed files:
+
+- src/ui/editor/EditorView.tsx
+- src/ui/editor/EditorJsonModal.tsx
+- src/ui/editor/index.ts
+- src/App.tsx
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: T-009, T-010, T-011
+
+Acceptance criteria:
+
+- [ ] Полноэкранный редактор открывается из главного меню
+- [ ] Работают шорткаты Ctrl+Z, Ctrl+Y, Delete, Escape
+- [ ] Запуск тест-прогона бесшовно стартует уровень и возвращает в редактор
+- [ ] Импорт и экспорт JSON работают с проверкой ошибок валидации
+- [ ] Черновик сохраняется при перезагрузке страницы в localStorage
+- [ ] Все тесты, `typecheck` и `lint` проходят без ошибок
+
+Test plan:
+Полный цикл проверок: unit-тесты, `npm run build`, запуск в браузере.
+
+Verification commands:
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+
 \n
