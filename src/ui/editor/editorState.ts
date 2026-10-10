@@ -326,7 +326,52 @@ function normalizeBlockUpdates(
   block: PlayerBlockSpec,
   updates: Partial<PlayerBlockSpec>
 ): Partial<PlayerBlockSpec> {
-  const next = { ...updates }
+  const next: Partial<PlayerBlockSpec> = {
+    ...updates,
+    ...(updates.position
+      ? { position: { x: Math.round(updates.position.x), y: Math.round(updates.position.y) } }
+      : {}),
+    ...(updates.size
+      ? { size: { width: Math.round(updates.size.width), height: Math.round(updates.size.height) } }
+      : {}),
+    ...(updates.hp === undefined ? {} : { hp: Math.round(updates.hp) }),
+    ...(updates.rotation === undefined
+      ? {}
+      : { rotation: (Math.round((updates.rotation * 180) / Math.PI / 5) * 5 * Math.PI) / 180 }),
+    ...(updates.effects
+      ? {
+          effects: updates.effects.map((effect) => {
+            if (effect.kind === "armor") return { ...effect, amount: Math.round(effect.amount) }
+            if (effect.kind === "magnet") {
+              return {
+                ...effect,
+                ...(effect.radius === undefined ? {} : { radius: Math.round(effect.radius) }),
+                ...(effect.force === undefined ? {} : { force: Math.round(effect.force) }),
+              }
+            }
+            if (effect.kind === "pulse") {
+              return {
+                ...effect,
+                amplitude: Math.round(effect.amplitude * 10) / 10,
+                frequency: Math.round(effect.frequency * 10) / 10,
+              }
+            }
+            if (effect.kind === "spring" || effect.kind === "cotton") {
+              return {
+                ...effect,
+                ...(effect.speedMultiplier === undefined
+                  ? {}
+                  : { speedMultiplier: Math.round(effect.speedMultiplier * 10) / 10 }),
+                ...(effect.duration === undefined
+                  ? {}
+                  : { duration: Math.round(effect.duration * 10) / 10 }),
+              }
+            }
+            return effect
+          }),
+        }
+      : {}),
+  }
   if (updates.shape === "circle" || (updates.shape === undefined && block.shape === "circle")) {
     const size = updates.size ?? block.size
     const side = Math.min(size.width, size.height)
@@ -334,7 +379,7 @@ function normalizeBlockUpdates(
   }
   if (updates.position || updates.size) {
     const size = next.size ?? block.size
-    next.position = clampPosition(updates.position ?? block.position, size.width, size.height)
+    next.position = clampPosition(next.position ?? block.position, size.width, size.height)
   }
   return next
 }

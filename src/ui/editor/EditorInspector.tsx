@@ -182,20 +182,6 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
             })
           }
         />
-        <input
-          aria-label="Ширина слайдер"
-          className="w-full accent-cyan-neon"
-          max={100}
-          min={20}
-          onChange={(event) => {
-            const width = Number(event.target.value)
-            updateBlock({
-              size: { width, height: block.shape === "circle" ? width : block.size.height },
-            })
-          }}
-          type="range"
-          value={block.size.width}
-        />
         <NumberField
           label="Высота"
           min={20}
@@ -207,39 +193,14 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
             })
           }
         />
-        <input
-          aria-label="Высота слайдер"
-          className="w-full accent-cyan-neon"
-          max={100}
-          min={20}
-          onChange={(event) => {
-            const height = Number(event.target.value)
-            updateBlock({
-              size: { width: block.shape === "circle" ? height : block.size.width, height },
-            })
-          }}
-          type="range"
-          value={block.size.height}
-        />
       </div>
       <NumberField
         label="Поворот (°)"
         min={-360}
         max={360}
-        step={1}
+        step={5}
         value={((block.rotation ?? 0) * 180) / Math.PI}
         onChange={(degrees) => updateBlock({ rotation: (degrees * Math.PI) / 180 })}
-      />
-      <input
-        aria-label="Поворот слайдер"
-        className="w-full accent-cyan-neon"
-        max={180}
-        min={-180}
-        onChange={(event) =>
-          updateBlock({ rotation: (Number(event.target.value) * Math.PI) / 180 })
-        }
-        type="range"
-        value={Math.max(-180, Math.min(180, ((block.rotation ?? 0) * 180) / Math.PI))}
       />
 
       <section className="space-y-3 border-t border-line pt-3">
@@ -431,17 +392,34 @@ function NumberField({
   value: number
   onChange: (value: number) => void
 }) {
+  const normalize = (raw: number) => {
+    const precision = step < 1 ? 1 : 0
+    const factor = 10 ** precision
+    return Math.max(min, Math.min(max, (Math.round(raw / step) * step * factor) / factor))
+  }
   return (
     <Field label={label}>
-      <input
-        className={INPUT_CLASS}
-        max={max}
-        min={min}
-        onChange={(event) => onChange(Number(event.target.value))}
-        step={step}
-        type="number"
-        value={value}
-      />
+      <div className="space-y-1.5">
+        <input
+          className={INPUT_CLASS}
+          max={max}
+          min={min}
+          onChange={(event) => onChange(normalize(Number(event.target.value)))}
+          step={step}
+          type="number"
+          value={value}
+        />
+        <input
+          aria-label={`${label} слайдер`}
+          className="w-full accent-cyan-neon"
+          max={max}
+          min={min}
+          onChange={(event) => onChange(normalize(Number(event.target.value)))}
+          step={step}
+          type="range"
+          value={Math.max(min, Math.min(max, value))}
+        />
+      </div>
     </Field>
   )
 }
@@ -491,15 +469,15 @@ function MagnetFields({
       </Field>
       <NumberField
         label="Радиус"
-        min={1}
-        max={1000}
+        min={50}
+        max={500}
         value={effect.radius ?? 240}
         onChange={(radius) => onChange({ ...effect, radius })}
       />
       <NumberField
         label="Сила"
-        min={-10000}
-        max={10000}
+        min={-5000}
+        max={5000}
         value={effect.force ?? 2200}
         onChange={(force) => onChange({ ...effect, force })}
       />

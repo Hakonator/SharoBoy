@@ -129,7 +129,26 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
           0.72
         )
     const selected = state.map.blocks.filter((block) => state.selectedBlockIds.includes(block.id))
-    if (selected.length === 1) drawTransformHandles(context, selected[0]!)
+    if (selected.length === 1) {
+      const selectedBlock = selected[0]!
+      const previewBlock = dragPreview
+        ? {
+            ...selectedBlock,
+            position: dragPreview.position,
+            size: dragPreview.block.size,
+            rotation: dragPreview.block.rotation,
+          }
+        : groupPreview
+          ? {
+              ...selectedBlock,
+              position: {
+                x: selectedBlock.position.x + groupPreview.delta.x,
+                y: selectedBlock.position.y + groupPreview.delta.y,
+              },
+            }
+          : selectedBlock
+      drawTransformHandles(context, previewBlock)
+    }
     for (const block of clonePreview) drawBlock(context, block, false, 0.42)
     if (marquee) drawMarquee(context, marquee.start, marquee.end)
     context.restore()
@@ -250,7 +269,7 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       return
     }
     const blockIds = state.selectedBlockIds.includes(block.id) ? state.selectedBlockIds : [block.id]
-    if (blockIds.length !== state.selectedBlockIds.length)
+    if (state.selectedBlockIds.length !== 1 || state.selectedBlockIds[0] !== block.id)
       dispatch({ type: "SELECT_BLOCK", blockId: block.id })
     const originals = state.map.blocks.filter((item) => blockIds.includes(item.id))
     dragRef.current = {
@@ -819,6 +838,7 @@ function drawBlock(
   context.lineWidth = selected ? 5 : 2
   context.stroke()
 
+  drawSpecialEffectVisuals(context, block.effects ?? [], rx, ry)
   drawArmorRings(context, block.effects ?? [], rx, ry, tier.base)
 
   context.fillStyle = "rgba(4, 18, 26, 0.78)"
@@ -838,6 +858,116 @@ function drawBlock(
     context.lineWidth = 2
     context.strokeRect(-rx - 9, -ry - 9, rx * 2 + 18, ry * 2 + 18)
     context.restore()
+  }
+}
+
+function drawSpecialEffectVisuals(
+  context: CanvasRenderingContext2D,
+  effects: PlayerBlockEffect[],
+  rx: number,
+  ry: number
+) {
+  const kinds = new Set(effects.map((effect) => effect.kind))
+  if (kinds.has("portal")) {
+    const gradient = context.createRadialGradient(-rx * 0.25, -ry * 0.3, 2, 0, 0, Math.max(rx, ry))
+    gradient.addColorStop(0, "#2a1244")
+    gradient.addColorStop(1, "#0b0518")
+    context.fillStyle = gradient
+    context.beginPath()
+    context.ellipse(0, 0, rx * 0.82, ry * 0.82, 0, 0, Math.PI * 2)
+    context.fill()
+    context.strokeStyle = "rgba(176,108,255,0.85)"
+    context.lineWidth = Math.max(2, Math.min(rx, ry) * 0.08)
+    for (let i = 0; i < 3; i += 1) {
+      context.beginPath()
+      context.ellipse(
+        0,
+        0,
+        rx * (0.45 + i * 0.16),
+        ry * (0.35 + i * 0.16),
+        i * 0.45,
+        0.2,
+        Math.PI * 1.55
+      )
+      context.stroke()
+    }
+  }
+  if (kinds.has("spring")) {
+    context.fillStyle = "rgba(255,201,77,0.9)"
+    context.beginPath()
+    context.ellipse(0, 0, rx * 0.88, ry * 0.8, 0, 0, Math.PI * 2)
+    context.fill()
+    context.strokeStyle = "rgba(92,55,0,0.85)"
+    context.lineWidth = Math.max(2, Math.min(rx, ry) * 0.06)
+    for (let i = -1; i <= 1; i += 1) {
+      context.beginPath()
+      context.moveTo(i * rx * 0.35 - rx * 0.12, -ry * 0.55)
+      context.quadraticCurveTo(i * rx * 0.35 + rx * 0.2, 0, i * rx * 0.35 - rx * 0.12, ry * 0.55)
+      context.stroke()
+    }
+  }
+  if (kinds.has("cotton")) {
+    context.fillStyle = "rgba(246,243,255,0.95)"
+    context.beginPath()
+    context.ellipse(0, 0, rx * 0.9, ry * 0.78, 0, 0, Math.PI * 2)
+    context.fill()
+    context.fillStyle = "rgba(255,255,255,0.55)"
+    context.beginPath()
+    context.ellipse(-rx * 0.25, -ry * 0.32, rx * 0.32, ry * 0.1, -0.18, 0, Math.PI * 2)
+    context.fill()
+    context.beginPath()
+    context.ellipse(rx * 0.28, ry * 0.25, rx * 0.24, ry * 0.08, 0.2, 0, Math.PI * 2)
+    context.fill()
+  }
+  const magnet = effects.find((effect) => effect.kind === "magnet")
+  if (magnet?.kind === "magnet") {
+    const repel = magnet.mode === "repel" || (magnet.force ?? 0) < 0
+    const north = repel ? "#36e6dc" : "#ff536b"
+    const south = repel ? "#4d9dff" : "#66c7ff"
+    const halfWidth = rx * 0.42
+    const top = -ry * 0.45
+    const bottom = ry * 0.35
+    context.lineCap = "round"
+    context.lineWidth = Math.max(2, Math.min(rx, ry) * 0.13)
+    context.strokeStyle = "#172536"
+    context.beginPath()
+    context.moveTo(-halfWidth, top)
+    context.lineTo(-halfWidth, bottom)
+    context.quadraticCurveTo(0, ry * 0.85, halfWidth, bottom)
+    context.lineTo(halfWidth, top)
+    context.stroke()
+    context.lineWidth = Math.max(3, Math.min(rx, ry) * 0.19)
+    context.strokeStyle = north
+    context.beginPath()
+    context.moveTo(-halfWidth, top)
+    context.lineTo(-halfWidth, -ry * 0.12)
+    context.stroke()
+    context.strokeStyle = south
+    context.beginPath()
+    context.moveTo(halfWidth, top)
+    context.lineTo(halfWidth, -ry * 0.12)
+    context.stroke()
+  }
+  if (kinds.has("pulse")) {
+    context.strokeStyle = "#7cf5ff"
+    context.lineWidth = Math.max(1.5, Math.min(rx, ry) * 0.05)
+    for (let i = 1; i <= 2; i += 1) {
+      context.beginPath()
+      context.ellipse(0, 0, rx * (0.3 + i * 0.22), ry * (0.3 + i * 0.22), 0, 0, Math.PI * 2)
+      context.stroke()
+    }
+  }
+  if (kinds.has("spin")) {
+    context.strokeStyle = "#e8fbff"
+    context.lineWidth = Math.max(2, Math.min(rx, ry) * 0.06)
+    context.beginPath()
+    context.arc(0, 0, Math.min(rx, ry) * 0.42, -0.4, Math.PI * 1.4)
+    context.stroke()
+    context.beginPath()
+    context.moveTo(rx * 0.35, -ry * 0.25)
+    context.lineTo(rx * 0.52, -ry * 0.32)
+    context.lineTo(rx * 0.45, -ry * 0.08)
+    context.stroke()
   }
 }
 

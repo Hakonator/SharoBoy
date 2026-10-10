@@ -70,6 +70,35 @@ describe("editorReducer", () => {
     expect(state.selectedBlockId).toBeNull()
   })
 
+  it("rounds geometry, rotation and numeric effect parameters", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, {
+      type: "UPDATE_BLOCK",
+      blockId: "a",
+      updates: {
+        position: { x: 101.8, y: 202.2 },
+        size: { width: 41.7, height: 30.4 },
+        hp: 2.6,
+        rotation: (12.8 * Math.PI) / 180,
+        effects: [
+          { kind: "armor", amount: 2.7 },
+          { kind: "pulse", amplitude: 0.56, frequency: 1.24 },
+          { kind: "magnet", radius: 120.8, force: -400.7 },
+        ],
+      },
+    })
+    const block = state.map.blocks[0]!
+    expect(block.position).toEqual({ x: 102, y: 202 })
+    expect(block.size).toEqual({ width: 42, height: 30 })
+    expect(block.hp).toBe(3)
+    expect(block.rotation).toBeCloseTo((15 * Math.PI) / 180)
+    expect(block.effects).toEqual([
+      { kind: "armor", amount: 3 },
+      { kind: "pulse", amplitude: 0.6, frequency: 1.2 },
+      { kind: "magnet", radius: 121, force: -401 },
+    ])
+  })
+
   it("updates metadata and selection/tool/grid settings without map history", () => {
     let state = createEditorState(makeMap())
     state = editorReducer(state, { type: "SELECT_BLOCK", blockId: "a" })

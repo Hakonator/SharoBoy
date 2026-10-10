@@ -28,8 +28,8 @@ export function EditorToolbar({
             aria-pressed={state.activeTool === tool.id}
             className={
               state.activeTool === tool.id
-                ? "flex items-center gap-2 rounded-lg border-2 border-cyan-neon bg-cyan-neon px-3 py-2 text-xs font-black text-ink shadow-[0_0_16px_rgba(53,224,255,0.8)]"
-                : "btn-ghost flex items-center gap-2 px-3 py-2 text-xs"
+                ? "flex h-10 items-center gap-2 rounded-lg border border-cyan-neon bg-cyan-neon px-3 py-2 text-xs font-semibold text-ink shadow-[0_0_12px_rgba(53,224,255,0.6)]"
+                : "btn-ghost flex h-10 items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-semibold"
             }
             style={
               state.activeTool === tool.id
