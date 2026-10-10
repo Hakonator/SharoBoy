@@ -1,0 +1,140 @@
+import { afterEach, describe, expect, it, vi } from "vitest"
+
+import type { PlayerMapSpec } from "../../game/mapSpec"
+
+import { createEditorState, editorReducer, loadEditorDraft, saveEditorDraft } from "./editorState"
+
+function makeMap(): PlayerMapSpec {
+  return {
+    version: 1,
+    id: "editor-test",
+    metadata: { title: "Test map" },
+    blocks: [
+      {
+        id: "a",
+        position: { x: 100, y: 100 },
+        shape: "ellipse",
+        size: { width: 40, height: 30 },
+        hp: 1,
+      },
+      {
+        id: "b",
+        position: { x: 200, y: 100 },
+        shape: "circle",
+        size: { width: 30, height: 30 },
+        hp: 2,
+      },
+    ],
+    groups: [{ id: "g", blockIds: ["a", "b"] }],
+    winCondition: { kind: "targets", targetIds: ["a", "b"] },
+  }
+}
+
+describe("editorReducer", () => {
+  it("adds a unique block at a snapped position and supports undo/redo", () => {
+    const initial = createEditorState(makeMap())
+    const added = editorReducer(initial, { type: "ADD_BLOCK", position: { x: 121, y: 141 } })
+    expect(added.map.blocks).toHaveLength(3)
+    expect(added.map.blocks[2].position).toEqual({ x: 128, y: 128 })
+    expect(added.map.blocks[2].id).toMatch(/^b-\d+-[a-z0-9]+$/)
+    expect(added.isDirty).toBe(true)
+    expect(editorReducer(added, { type: "UNDO" }).map).toEqual(initial.map)
+    expect(editorReducer(editorReducer(added, { type: "UNDO" }), { type: "REDO" }).map).toEqual(
+      added.map
+    )
+  })
+
+  it("applies the add preset and allows disabling grid snapping", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, { type: "SET_ADD_PRESET", preset: { hp: 5, shape: "circle" } })
+    state = editorReducer(state, { type: "SET_SNAP_TO_GRID", enabled: false })
+    state = editorReducer(state, { type: "ADD_BLOCK", position: { x: 121, y: 141 } })
+    expect(state.map.blocks[2]).toMatchObject({
+      hp: 5,
+      shape: "circle",
+      position: { x: 121, y: 141 },
+    })
+  })
+
+  it("updates, moves and deletes blocks while cleaning map references", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, { type: "UPDATE_BLOCK", blockId: "a", updates: { hp: 4 } })
+    expect(state.map.blocks[0].hp).toBe(4)
+    state = editorReducer(state, { type: "MOVE_BLOCK", blockId: "a", delta: { x: 64, y: 32 } })
+    expect(state.map.blocks[0].position).toEqual({ x: 160, y: 128 })
+    state = editorReducer(state, { type: "SELECT_BLOCK", blockId: "a" })
+    state = editorReducer(state, { type: "DELETE_BLOCK" })
+    expect(state.map.blocks.map((block) => block.id)).toEqual(["b"])
+    expect(state.map.groups).toEqual([{ id: "g", blockIds: ["b"] }])
+    expect(state.map.winCondition).toEqual({ kind: "targets", targetIds: ["b"] })
+    expect(state.selectedBlockId).toBeNull()
+  })
+
+  it("updates metadata and selection/tool/grid settings without map history", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, { type: "SELECT_BLOCK", blockId: "a" })
+    state = editorReducer(state, { type: "SET_TOOL", tool: "delete" })
+    state = editorReducer(state, { type: "SET_GRID_SIZE", gridSize: 64 })
+    state = editorReducer(state, { type: "UPDATE_METADATA", metadata: { title: "Changed" } })
+    expect(state).toMatchObject({ selectedBlockId: "a", activeTool: "delete", gridSize: 64 })
+    expect(state.map.metadata.title).toBe("Changed")
+    expect(state.history.past).toHaveLength(1)
+    expect(editorReducer(state, { type: "SET_GRID_SIZE", gridSize: 0 })).toBe(state)
+  })
+
+  it("caps undo history at 30 entries and clears redo after a new edit", () => {
+    let state = createEditorState(makeMap())
+    for (let hp = 2; hp <= 40; hp += 1) {
+      state = editorReducer(state, { type: "UPDATE_BLOCK", blockId: "a", updates: { hp } })
+    }
+    expect(state.history.past).toHaveLength(30)
+    state = editorReducer(state, { type: "UNDO" })
+    expect(state.history.future).toHaveLength(1)
+    state = editorReducer(state, { type: "UPDATE_BLOCK", blockId: "a", updates: { hp: 3 } })
+    expect(state.history.future).toHaveLength(0)
+  })
+
+  it("sets and resets map history according to SET_MAP options", () => {
+    const changed = editorReducer(createEditorState(makeMap()), {
+      type: "UPDATE_METADATA",
+      metadata: { title: "Changed" },
+    })
+    const fresh = editorReducer(changed, { type: "SET_MAP", map: makeMap() })
+    expect(fresh.history).toEqual({ past: [], future: [] })
+    expect(fresh.isDirty).toBe(false)
+    const preserved = editorReducer(changed, {
+      type: "SET_MAP",
+      map: makeMap(),
+      preserveHistory: true,
+    })
+    expect(preserved.history).toEqual(changed.history)
+    expect(preserved.isDirty).toBe(true)
+  })
+})
+
+describe("editor draft storage", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("saves and loads a valid map from localStorage", () => {
+    const storage = new Map<string, string>()
+    vi.stubGlobal("localStorage", {
+      setItem: (key: string, value: string) => storage.set(key, value),
+      getItem: (key: string) => storage.get(key) ?? null,
+    })
+    const map = makeMap()
+    expect(saveEditorDraft(map)).toBe(true)
+    expect(loadEditorDraft()).toEqual(map)
+  })
+
+  it("returns false/null when storage is unavailable or malformed", () => {
+    vi.stubGlobal("localStorage", undefined)
+    expect(saveEditorDraft(makeMap())).toBe(false)
+    expect(loadEditorDraft()).toBeNull()
+
+    const storage = new Map<string, string>([["sharoboy_custom_map_draft", "not json"]])
+    vi.stubGlobal("localStorage", { getItem: (key: string) => storage.get(key) ?? null })
+    expect(loadEditorDraft()).toBeNull()
+  })
+})

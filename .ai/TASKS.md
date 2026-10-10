@@ -390,7 +390,7 @@ npm run test
 
 ### T-009: Модели состояния и редьюсер редактора карт (State & Reducer)
 
-Status: ready
+Status: done
 Priority: high
 Assigned to: luna
 
@@ -434,10 +434,12 @@ Dependencies: none
 
 Acceptance criteria:
 
-- [ ] Созданы типы `EditorState`, `EditorAction`, `EditorTool`
-- [ ] Реализован чистый редьюсер всех операций с картой и историей (Undo/Redo)
-- [ ] Написаны unit-тесты, проверяющие все мутации и стек истории
-- [ ] `npm run typecheck`, `npm run lint` и `npm run test` проходят без ошибок
+- [x] Созданы типы `EditorState`, `EditorAction`, `EditorTool`
+- [x] Реализован чистый редьюсер всех операций с картой и историей (Undo/Redo)
+- [x] Написаны unit-тесты, проверяющие все мутации и стек истории
+- [x] `npm run typecheck`, `npm run lint` и `npm run test` проходят без ошибок
+
+Comment: Реализованы immutable reducer, undo/redo с лимитом 30, снаппинг, операции карты и безопасное localStorage-хранение. Проверки typecheck/lint и полный Vitest (40 файлов, 350 тестов) прошли.
 
 Test plan:
 Unit-тесты в `editorState.test.ts`.
@@ -449,7 +451,7 @@ npm run test -- src/ui/editor/editorState.test.ts
 
 ### T-010: Интерактивный Canvas редактора карт (EditorCanvas)
 
-Status: pending
+Status: ready
 Priority: normal
 Assigned to: none
 
