@@ -12,6 +12,9 @@ export function EditorToolbar({
   onImportExport,
   onTestRun,
   onClose,
+  musicMuted,
+  onToggleMusic,
+  onNextMusicTrack,
 }: EditorToolbarProps) {
   const canUndo = state.history.past.length > 0
   const canRedo = state.history.future.length > 0
@@ -23,7 +26,20 @@ export function EditorToolbar({
           <button
             key={tool.id}
             aria-pressed={state.activeTool === tool.id}
-            className={`btn-ghost flex items-center gap-2 px-3 py-2 text-xs ${state.activeTool === tool.id ? "border border-cyan-neon bg-cyan-neon text-ink shadow-[0_0_12px_rgba(86,231,255,0.6)] ring-2 ring-cyan-neon/40 font-bold" : ""}`}
+            className={
+              state.activeTool === tool.id
+                ? "flex items-center gap-2 rounded-lg border-2 border-cyan-neon bg-cyan-neon px-3 py-2 text-xs font-black text-ink shadow-[0_0_16px_rgba(53,224,255,0.8)]"
+                : "btn-ghost flex items-center gap-2 px-3 py-2 text-xs"
+            }
+            style={
+              state.activeTool === tool.id
+                ? {
+                    backgroundColor: "#35e0ff",
+                    color: "#07131b",
+                    boxShadow: "0 0 16px rgba(53,224,255,0.8)",
+                  }
+                : undefined
+            }
             onClick={() => dispatch({ type: "SET_TOOL", tool: tool.id })}
             title={tool.label}
             type="button"
@@ -113,6 +129,16 @@ export function EditorToolbar({
         title="Импорт / экспорт JSON"
       >
         JSON
+      </ToolbarButton>
+      <ToolbarButton
+        label={musicMuted ? "Включить музыку" : "Выключить музыку"}
+        onClick={onToggleMusic}
+        title={musicMuted ? "Включить музыку" : "Выключить музыку"}
+      >
+        {musicMuted ? "🔇" : "🎵"}
+      </ToolbarButton>
+      <ToolbarButton label="Следующий трек" onClick={onNextMusicTrack} title="Следующая композиция">
+        ⏭
       </ToolbarButton>
       <button className="btn-arcade px-4 py-2 text-xs" onClick={onTestRun} type="button">
         ▶ Тест-прогон

@@ -1,5 +1,17 @@
 # Активный контекст (Active Context)
 
+## Последнее обновление (10.10.2026, T-016 завершена)
+
+- Global keyboard input игнорирует editable elements. ПКМ на Canvas открывает
+  cyber context menu для блока/пустого места; есть дублирование, rotate, shape,
+  delete, add, paste, deselect, dismiss, outside-click и Escape.
+- Активный Toolbar tool отделён от `btn-ghost` и имеет явный neon/in-line style.
+  Custom-map test run завершается через HUD-кнопку «⏹ В редактор» или Escape;
+  `stopCustomMap` вызывает callback возврата. Editor toolbar управляет mute и
+  next-track; file/SFX/Game audio API обновлены. Проверки lint/typecheck/full test
+  прошли (40 файлов, 360 тестов); ручной браузерный прогон не выполнялся.
+  Следующий шаг — указание архитектора.
+
 ## Последнее обновление (10.10.2026, T-015 завершена)
 
 - Добавлен отдельный quick-clone `+` handle около нижнего правого угла (resize

@@ -171,6 +171,7 @@ export default function App() {
         onSfxVolume={(v) => g()?.setSfxVolume(v)}
         debug={debug.debug}
         onDebugSkipLevel={() => g()?.debugSkipLevel()}
+        onExitCustomMap={() => g()?.stopCustomMap()}
       />
 
       {hud.phase === "map" && (
@@ -238,7 +239,13 @@ export default function App() {
       )}
 
       {showEditor && hud.phase === "menu" && (
-        <EditorView onClose={() => setShowEditor(false)} onTestRun={startEditorTest} />
+        <EditorView
+          musicMuted={hud.musicMuted}
+          onClose={() => setShowEditor(false)}
+          onNextMusicTrack={() => g()?.nextMusicTrack()}
+          onTestRun={startEditorTest}
+          onToggleMusic={() => g()?.toggleMusic()}
+        />
       )}
 
       {editorMap && (hud.phase === "won" || hud.phase === "over") && showEditor && (
@@ -249,6 +256,9 @@ export default function App() {
             setEditorMap(null)
           }}
           onTestRun={startEditorTest}
+          musicMuted={hud.musicMuted}
+          onToggleMusic={() => g()?.toggleMusic()}
+          onNextMusicTrack={() => g()?.nextMusicTrack()}
         />
       )}
 

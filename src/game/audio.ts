@@ -96,6 +96,19 @@ export class SFX {
     }
   }
 
+  /** Переключить файловую композицию; встроенный секвенсор начинает новый трек. */
+  nextTrack() {
+    if (this.musicMuted || !this.musicOn) return
+    if (this.fileMode) {
+      this.filePlayer.nextTrack()
+      return
+    }
+    this.musicStep = 0
+    this.nextBeat = this.ctx ? this.ctx.currentTime + 0.05 : 0
+    this.stopMusicTimer()
+    this.scheduleMusic()
+  }
+
   /** Громкость MP3-трека с учётом ползунка музыки. */
   private fileVolume(): number {
     return MUSIC_VOLUME * this.musicVolume

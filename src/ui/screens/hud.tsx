@@ -24,6 +24,7 @@ export function HudOverlay({
   onSfxVolume,
   debug,
   onDebugSkipLevel,
+  onExitCustomMap,
 }: {
   hud: HudData
   inGame: boolean
@@ -41,6 +42,7 @@ export function HudOverlay({
   debug: boolean
   /** Мгновенно завершить уровень через debug API. */
   onDebugSkipLevel: () => void
+  onExitCustomMap: () => void
 }) {
   const [skipArmed, setSkipArmed] = useState(false)
   const skipTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -58,6 +60,17 @@ export function HudOverlay({
       setSkipArmed(false)
     }
   }, [canSkipLevel])
+  useEffect(() => {
+    if (hud.mode !== "custom" || (hud.phase !== "playing" && hud.phase !== "paused")) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        onExitCustomMap()
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [hud.mode, hud.phase, onExitCustomMap])
   const cancelSkip = () => {
     if (skipTimer.current !== null) clearTimeout(skipTimer.current)
     skipTimer.current = null
@@ -319,6 +332,16 @@ export function HudOverlay({
             </div>
           )}
         </div>
+      )}
+
+      {hud.mode === "custom" && (hud.phase === "playing" || hud.phase === "paused") && (
+        <button
+          className="absolute bottom-4 right-4 z-40 rounded-lg border-2 border-punch bg-abyss/95 px-4 py-2 font-display text-sm font-black text-foam shadow-[0_0_16px_rgba(255,83,112,0.65)] hover:bg-punch hover:text-abyss"
+          onClick={onExitCustomMap}
+          type="button"
+        >
+          ⏹ В редактор
+        </button>
       )}
 
       {hud.banner && inGame && (

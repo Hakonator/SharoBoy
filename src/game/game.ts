@@ -32,7 +32,14 @@ import {
   setNick,
   resizeHandler,
 } from "./game/lifecycle"
-import { startGame, startEndless, startCustomMap, toMenu, togglePause } from "./game/modes"
+import {
+  startGame,
+  startEndless,
+  startCustomMap,
+  stopCustomMap,
+  toMenu,
+  togglePause,
+} from "./game/modes"
 import {
   startLevelBattle,
   enterMapNode,
@@ -54,6 +61,7 @@ import {
   debugSkipLevel,
 } from "./game/debug"
 import { setMusicVolume, setSfxVolume, toggleMute, toggleMusic } from "./game/audioControls"
+import { pushHud } from "./game/hudSync"
 import { launch } from "./game/runFlow"
 import { FPS_LS_KEY } from "./game/debug"
 import { update, gameLoop } from "./game/updateStep"
@@ -269,6 +277,9 @@ export class Game {
   startCustomMap(spec: PlayerMapSpec, onComplete?: (result: "won" | "over") => void) {
     startCustomMap(this, spec, onComplete)
   }
+  stopCustomMap() {
+    stopCustomMap(this)
+  }
   toMenu() {
     toMenu(this)
   }
@@ -280,6 +291,11 @@ export class Game {
   }
   toggleMusic() {
     toggleMusic(this)
+  }
+  nextMusicTrack() {
+    this.sfx.ensure()
+    this.sfx.nextTrack()
+    pushHud(this)
   }
   toggleFps(): boolean {
     return toggleFps(this)

@@ -32,6 +32,9 @@ export interface EditorToolbarProps {
   onImportExport: () => void
   onTestRun: () => void
   onClose: () => void
+  musicMuted: boolean
+  onToggleMusic: () => void
+  onNextMusicTrack: () => void
 }
 
 export interface EditorInspectorProps {

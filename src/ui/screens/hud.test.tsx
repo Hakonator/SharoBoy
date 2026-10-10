@@ -59,6 +59,7 @@ function renderHud(phase: HudData["phase"], debug: boolean) {
       onSfxVolume={() => {}}
       debug={debug}
       onDebugSkipLevel={() => {}}
+      onExitCustomMap={() => {}}
     />
   )
 }

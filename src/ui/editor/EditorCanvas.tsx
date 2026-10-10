@@ -23,6 +23,34 @@ interface DragState {
   moved: boolean
 }
 
+interface CanvasContextMenu {
+  x: number
+  y: number
+  point: { x: number; y: number }
+  blockId: string | null
+}
+
+function ContextMenuButton({
+  children,
+  onClick,
+  danger = false,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  danger?: boolean
+}) {
+  return (
+    <button
+      className={`rounded-lg px-3 py-2 text-left text-xs transition-colors hover:bg-cyan-neon/15 ${danger ? "text-punch hover:bg-punch/15" : "text-foam"}`}
+      onClick={onClick}
+      role="menuitem"
+      type="button"
+    >
+      {children}
+    </button>
+  )
+}
+
 export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const dragRef = useRef<DragState | null>(null)
@@ -41,6 +69,8 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
   const [clonePreview, setClonePreview] = useState<PlayerBlockSpec[]>([])
   const [canvasNotice, setCanvasNotice] = useState<string | null>(null)
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
+  const [contextMenu, setContextMenu] = useState<CanvasContextMenu | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
 
   useEffect(() => {
@@ -113,6 +143,27 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     if (noticeTimer.current) clearTimeout(noticeTimer.current)
     noticeTimer.current = setTimeout(() => setCanvasNotice(null), 2600)
   }, [])
+
+  useEffect(() => {
+    if (!contextMenu) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !contextMenuRef.current?.contains(event.target)) {
+        setContextMenu(null)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        setContextMenu(null)
+      }
+    }
+    window.addEventListener("pointerdown", onPointerDown)
+    window.addEventListener("keydown", onKeyDown)
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown)
+      window.removeEventListener("keydown", onKeyDown)
+    }
+  }, [contextMenu])
 
   const toWorldPoint = useCallback(
     (event: { clientX: number; clientY: number; currentTarget: HTMLCanvasElement }) => {
@@ -340,12 +391,15 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     event.preventDefault()
     const point = toWorldPoint(event)
     const block = point && isInsideWorld(point) ? hitTest(state.map.blocks, point) : undefined
-    if (block) {
-      dispatch({ type: "DELETE_BLOCK", blockId: block.id })
-    } else {
-      dispatch({ type: "SELECT_BLOCK", blockId: null })
-      dispatch({ type: "SET_TOOL", tool: "select" })
-    }
+    const bounds = event.currentTarget.parentElement?.getBoundingClientRect()
+    if (!bounds) return
+    if (block) dispatch({ type: "SELECT_BLOCK", blockId: block.id })
+    setContextMenu({
+      x: Math.min(event.clientX - bounds.left, bounds.width - 220),
+      y: Math.min(event.clientY - bounds.top, bounds.height - 220),
+      point: point ?? { x: 0, y: 0 },
+      blockId: block?.id ?? null,
+    })
   }
 
   return (
@@ -358,6 +412,102 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
           role="status"
         >
           {canvasNotice}
+        </div>
+      )}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          onPointerDown={(event) => event.stopPropagation()}
+          className="absolute z-20 flex min-w-52 flex-col gap-1 rounded-xl border border-cyan-neon/70 bg-deep/95 p-2 text-foam shadow-[0_0_20px_rgba(53,224,255,0.35)] backdrop-blur"
+          role="menu"
+          style={{ left: Math.max(4, contextMenu.x), top: Math.max(4, contextMenu.y) }}
+        >
+          {contextMenu.blockId ? (
+            <>
+              <ContextMenuButton
+                onClick={() => {
+                  dispatch({ type: "SELECT_BLOCK", blockId: contextMenu.blockId })
+                  dispatch({ type: "COPY_SELECTED" })
+                  dispatch({ type: "PASTE_CLIPBOARD" })
+                  setContextMenu(null)
+                }}
+              >
+                📋 Дублировать
+              </ContextMenuButton>
+              <ContextMenuButton
+                onClick={() => {
+                  const block = state.map.blocks.find((item) => item.id === contextMenu.blockId)
+                  if (block)
+                    dispatch({
+                      type: "UPDATE_BLOCK",
+                      blockId: block.id,
+                      updates: { rotation: (block.rotation ?? 0) + Math.PI / 2 },
+                    })
+                  setContextMenu(null)
+                }}
+              >
+                🔄 Повернуть на 90°
+              </ContextMenuButton>
+              <ContextMenuButton
+                onClick={() => {
+                  const block = state.map.blocks.find((item) => item.id === contextMenu.blockId)
+                  if (block)
+                    dispatch({
+                      type: "UPDATE_BLOCK",
+                      blockId: block.id,
+                      updates: { shape: block.shape === "circle" ? "ellipse" : "circle" },
+                    })
+                  setContextMenu(null)
+                }}
+              >
+                🔘 Сменить форму (
+                {state.map.blocks.find((item) => item.id === contextMenu.blockId)?.shape ===
+                "circle"
+                  ? "Эллипс"
+                  : "Круг"}
+                )
+              </ContextMenuButton>
+              <ContextMenuButton
+                danger
+                onClick={() => {
+                  dispatch({ type: "DELETE_BLOCK", blockId: contextMenu.blockId! })
+                  setContextMenu(null)
+                }}
+              >
+                🗑️ Удалить блок
+              </ContextMenuButton>
+            </>
+          ) : (
+            <>
+              <ContextMenuButton
+                onClick={() => {
+                  dispatch({ type: "ADD_BLOCK", position: contextMenu.point })
+                  setContextMenu(null)
+                }}
+              >
+                ➕ Добавить блок здесь
+              </ContextMenuButton>
+              {state.clipboard.length > 0 && (
+                <ContextMenuButton
+                  onClick={() => {
+                    dispatch({ type: "PASTE_CLIPBOARD" })
+                    setContextMenu(null)
+                  }}
+                >
+                  📋 Вставить из буфера
+                </ContextMenuButton>
+              )}
+              <ContextMenuButton
+                onClick={() => {
+                  dispatch({ type: "SELECT_BLOCKS", blockIds: [] })
+                  setContextMenu(null)
+                }}
+              >
+                🧹 Снять выделение
+              </ContextMenuButton>
+            </>
+          )}
+          <ContextMenuButton onClick={() => setContextMenu(null)}>✖ Закрыть</ContextMenuButton>
         </div>
       )}
       <canvas

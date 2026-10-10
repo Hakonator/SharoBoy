@@ -140,6 +140,16 @@ export class InputController {
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
+    const target = e.target
+    if (
+      target !== null &&
+      typeof target === "object" &&
+      "tagName" in target &&
+      (("isContentEditable" in target && target.isContentEditable === true) ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(String(target.tagName)))
+    ) {
+      return
+    }
     const c = e.code
     if (c === "ArrowLeft" || c === "KeyA") this.keys.left = true
     if (c === "ArrowRight" || c === "KeyD") this.keys.right = true

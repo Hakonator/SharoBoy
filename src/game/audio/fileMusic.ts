@@ -104,6 +104,11 @@ export class FileMusicPlayer {
     this.fadeAudio(a, this.getVolume())
   }
 
+  /** Перейти к следующему случайному треку с тем же плавным кроссфейдом. */
+  nextTrack() {
+    if (this.shouldPlay()) this.play()
+  }
+
   /** Плавно меняет громкость элемента за MUSIC_FADE_MS. */
   private fadeAudio(a: HTMLAudioElement, target: number, done?: () => void) {
     const runningId = this.fades.get(a)

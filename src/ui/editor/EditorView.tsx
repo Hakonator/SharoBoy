@@ -43,9 +43,18 @@ const DEFAULT_MAP: PlayerMapSpec = {
 interface EditorViewProps {
   onClose: () => void
   onTestRun: (map: PlayerMapSpec) => void
+  musicMuted: boolean
+  onToggleMusic: () => void
+  onNextMusicTrack: () => void
 }
 
-export function EditorView({ onClose, onTestRun }: EditorViewProps) {
+export function EditorView({
+  onClose,
+  onTestRun,
+  musicMuted,
+  onToggleMusic,
+  onNextMusicTrack,
+}: EditorViewProps) {
   const [state, dispatch] = useReducer(editorReducer, undefined, createInitialState)
   const [showJson, setShowJson] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
@@ -113,8 +122,11 @@ export function EditorView({ onClose, onTestRun }: EditorViewProps) {
     <section className="absolute inset-0 z-50 flex flex-col gap-3 overflow-hidden bg-abyss p-3 text-foam sm:p-5">
       <EditorToolbar
         dispatch={dispatch}
+        musicMuted={musicMuted}
+        onNextMusicTrack={onNextMusicTrack}
         onClose={onClose}
         onImportExport={() => setShowJson(true)}
+        onToggleMusic={onToggleMusic}
         onTestRun={testRun}
         state={state}
       />

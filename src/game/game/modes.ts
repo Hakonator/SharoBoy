@@ -107,6 +107,14 @@ export function toMenu(g: Game) {
   pushHud(g)
 }
 
+/** Завершить тест пользовательской карты и сообщить вызывающей стороне о выходе. */
+export function stopCustomMap(g: Game) {
+  if (g.mode !== "custom") return
+  const callback = g.onCustomComplete
+  toMenu(g)
+  callback?.("over")
+}
+
 export function togglePause(g: Game) {
   if (g.phase === "playing") {
     g.phase = "paused"
