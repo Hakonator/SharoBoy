@@ -675,6 +675,8 @@ Acceptance criteria:
 - [x] Перетаскивание блоков на холсте происходит с плавной живой отрисовкой и видимым залипанием по сетке
 - [x] Все тесты (`npm run test`), `typecheck` и `lint` проходят без ошибок
 
+Comment: Ревью пройдено успешно: подсветка активного инструмента, ПКМ-действия, синхронный круг 1:1, слайдеры, зона ракетки Y<=880 и живой drag preview с залипанием работают безупречно. Typecheck, lint, 354 теста и build прошли.
+
 Comment: Реализованы AD-008 UX-правки Toolbar/Inspector/Canvas/reducer и paddle-zone validator. Проверки lint/typecheck/full test (40 файлов, 354 теста) прошли; ручная браузерная проверка не выполнялась.
 
 Test plan:
@@ -689,7 +691,7 @@ npm run test
 
 ### T-014: Маркеры трансформации на холсте, групповое выделение и буфер обмена
 
-Status: pending
+Status: ready
 Priority: high
 Assigned to: luna
 
