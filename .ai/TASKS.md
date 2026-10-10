@@ -503,9 +503,9 @@ npm run lint
 
 ### T-011: Панель инструментов и свойств (Toolbar & Inspector)
 
-Status: pending
-Priority: normal
-Assigned to: none
+Status: ready
+Priority: high
+Assigned to: luna
 
 Описание:
 Согласно AD-007:
