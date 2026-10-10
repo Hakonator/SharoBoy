@@ -23,7 +23,7 @@ export function EditorToolbar({
           <button
             key={tool.id}
             aria-pressed={state.activeTool === tool.id}
-            className={`btn-ghost flex items-center gap-2 px-3 py-2 text-xs ${state.activeTool === tool.id ? "bg-cyan-neon/20 text-foam" : ""}`}
+            className={`btn-ghost flex items-center gap-2 px-3 py-2 text-xs ${state.activeTool === tool.id ? "border border-cyan-neon bg-cyan-neon text-ink shadow-[0_0_12px_rgba(86,231,255,0.6)] ring-2 ring-cyan-neon/40 font-bold" : ""}`}
             onClick={() => dispatch({ type: "SET_TOOL", tool: tool.id })}
             title={tool.label}
             type="button"

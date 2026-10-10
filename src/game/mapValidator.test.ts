@@ -37,7 +37,7 @@ describe("validatePlayerMapSpec", () => {
         },
         {
           id: "portal-b",
-          position: { x: 1910, y: 1070 },
+          position: { x: 1910, y: 870 },
           shape: "circle",
           size: { width: 20, height: 20 },
           hp: 1,
@@ -50,6 +50,20 @@ describe("validatePlayerMapSpec", () => {
     map.blocks[0].groupId = "group-1"
 
     expect(validatePlayerMapSpec(map)).toEqual([])
+  })
+
+  it("rejects blocks entering the paddle zone below Y=880", () => {
+    const block = makeMap().blocks[0]
+    const map = makeMap({
+      blocks: [{ ...block, position: { x: 100, y: 860 }, size: { width: 40, height: 50 } }],
+    })
+    expect(validatePlayerMapSpec(map)).toContainEqual(
+      expect.objectContaining({
+        path: "blocks[0].position",
+        code: "OUT_OF_BOUNDS",
+        message: expect.stringContaining("зону ракетки"),
+      })
+    )
   })
 
   it("reports duplicate block and group IDs with paths", () => {

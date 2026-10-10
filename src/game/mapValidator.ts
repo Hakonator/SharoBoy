@@ -21,6 +21,7 @@ export interface MapValidationError {
 const MAP_WIDTH = 1920
 const MAP_HEIGHT = 1080
 const MAX_BLOCKS = 200
+export const PADDLE_ZONE_TOP = 880
 
 interface NumericRange {
   min: number
@@ -86,12 +87,15 @@ export function validatePlayerMapSpec(spec: PlayerMapSpec): MapValidationError[]
         block.position.x - halfWidth < 0 ||
         block.position.x + halfWidth > MAP_WIDTH ||
         block.position.y - halfHeight < 0 ||
-        block.position.y + halfHeight > MAP_HEIGHT
+        block.position.y + halfHeight > MAP_HEIGHT ||
+        block.position.y + halfHeight > PADDLE_ZONE_TOP
       ) {
         addError(
           `${path}.position`,
           "OUT_OF_BOUNDS",
-          "Блок целиком должен находиться внутри поля 1920×1080."
+          block.position.y + halfHeight > PADDLE_ZONE_TOP
+            ? "Блок заходит в зону ракетки (ниже Y = 880)."
+            : "Блок целиком должен находиться внутри поля 1920×1080."
         )
       }
     }

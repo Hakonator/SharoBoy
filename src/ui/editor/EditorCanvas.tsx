@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import { TIER } from "../../game/palette"
+import { PADDLE_ZONE_TOP } from "../../game/mapValidator"
 import type { PlayerBlockEffect, PlayerBlockSpec } from "../../game/mapSpec"
 
 import type { EditorCanvasProps, EditorState } from "./types"
@@ -21,6 +22,10 @@ interface DragState {
 export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const dragRef = useRef<DragState | null>(null)
+  const [dragPreview, setDragPreview] = useState<{
+    block: PlayerBlockSpec
+    position: { x: number; y: number }
+  } | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
 
   useEffect(() => {
@@ -56,21 +61,28 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     context.translate(offsetX, offsetY)
     context.scale(scale, scale)
     drawWorld(context, state)
-    context.restore()
-  }, [size, state])
-
-  const toWorldPoint = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current
-    if (!canvas) return null
-    const rect = canvas.getBoundingClientRect()
-    const scale = Math.min(rect.width / WORLD_WIDTH, rect.height / WORLD_HEIGHT)
-    const offsetX = (rect.width - WORLD_WIDTH * scale) / 2
-    const offsetY = (rect.height - WORLD_HEIGHT * scale) / 2
-    return {
-      x: (event.clientX - rect.left - offsetX) / scale,
-      y: (event.clientY - rect.top - offsetY) / scale,
+    if (dragPreview) {
+      drawBlock(context, dragPreview.block, false, 0.22)
+      drawBlock(context, { ...dragPreview.block, position: dragPreview.position }, true, 0.76)
     }
-  }, [])
+    context.restore()
+  }, [dragPreview, size, state])
+
+  const toWorldPoint = useCallback(
+    (event: { clientX: number; clientY: number; currentTarget: HTMLCanvasElement }) => {
+      const canvas = canvasRef.current
+      if (!canvas) return null
+      const rect = canvas.getBoundingClientRect()
+      const scale = Math.min(rect.width / WORLD_WIDTH, rect.height / WORLD_HEIGHT)
+      const offsetX = (rect.width - WORLD_WIDTH * scale) / 2
+      const offsetY = (rect.height - WORLD_HEIGHT * scale) / 2
+      return {
+        x: (event.clientX - rect.left - offsetX) / scale,
+        y: (event.clientY - rect.top - offsetY) / scale,
+      }
+    },
+    []
+  )
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (event.button !== 0) return
@@ -97,6 +109,7 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
         originalY: block.position.y,
         moved: false,
       }
+      setDragPreview({ block, position: block.position })
     }
   }
 
@@ -105,14 +118,31 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     const point = toWorldPoint(event)
     if (!drag || !point) return
     if (Math.hypot(point.x - drag.startX, point.y - drag.startY) > 2) drag.moved = true
+    const block = state.map.blocks.find((item) => item.id === drag.blockId)
+    if (!block) return
+    const raw = {
+      x: drag.originalX + point.x - drag.startX,
+      y: drag.originalY + point.y - drag.startY,
+    }
+    const snapped = state.snapToGrid
+      ? {
+          x: Math.round(raw.x / state.gridSize) * state.gridSize,
+          y: Math.round(raw.y / state.gridSize) * state.gridSize,
+        }
+      : raw
+    setDragPreview({
+      block,
+      position: clampCanvasPosition(snapped, block.size.width, block.size.height),
+    })
   }
 
   const finishDrag = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const drag = dragRef.current
     dragRef.current = null
+    setDragPreview(null)
     if (!drag || !drag.moved) return
     const point = toWorldPoint(event)
-    if (!point || !isInsideWorld(point)) return
+    if (!point) return
     dispatch({
       type: "MOVE_BLOCK",
       blockId: drag.blockId,
@@ -121,6 +151,18 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
         y: drag.originalY + point.y - drag.startY,
       },
     })
+  }
+
+  const onContextMenu = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    event.preventDefault()
+    const point = toWorldPoint(event)
+    const block = point && isInsideWorld(point) ? hitTest(state.map.blocks, point) : undefined
+    if (block) {
+      dispatch({ type: "DELETE_BLOCK", blockId: block.id })
+    } else {
+      dispatch({ type: "SELECT_BLOCK", blockId: null })
+      dispatch({ type: "SET_TOOL", tool: "select" })
+    }
   }
 
   return (
@@ -135,6 +177,7 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
         onPointerMove={onPointerMove}
         onPointerUp={finishDrag}
         onPointerCancel={finishDrag}
+        onContextMenu={onContextMenu}
       />
       <span className="pointer-events-none absolute bottom-2 right-3 rounded bg-ink/80 px-2 py-1 font-mono text-xs text-dim">
         1920 × 1080
@@ -166,6 +209,7 @@ function drawWorld(context: CanvasRenderingContext2D, state: EditorState) {
   for (const block of state.map.blocks) {
     drawBlock(context, block, block.id === state.selectedBlockId)
   }
+  drawPaddleZone(context)
 }
 
 function drawGrid(context: CanvasRenderingContext2D, gridSize: number, snapToGrid: boolean) {
@@ -194,9 +238,33 @@ function drawGrid(context: CanvasRenderingContext2D, gridSize: number, snapToGri
   context.restore()
 }
 
-function drawBlock(context: CanvasRenderingContext2D, block: PlayerBlockSpec, selected: boolean) {
+function drawPaddleZone(context: CanvasRenderingContext2D) {
+  context.fillStyle = "rgba(255, 83, 71, 0.16)"
+  context.fillRect(0, PADDLE_ZONE_TOP, WORLD_WIDTH, WORLD_HEIGHT - PADDLE_ZONE_TOP)
+  context.save()
+  context.setLineDash([12, 10])
+  context.strokeStyle = "#ff6a5c"
+  context.lineWidth = 4
+  context.beginPath()
+  context.moveTo(0, PADDLE_ZONE_TOP)
+  context.lineTo(WORLD_WIDTH, PADDLE_ZONE_TOP)
+  context.stroke()
+  context.setLineDash([])
+  context.fillStyle = "#ffd9d4"
+  context.font = "bold 24px sans-serif"
+  context.fillText("ЗОНА РАКЕТКИ / НЕЛЬЗЯ СТАВИТЬ БЛОКИ", 28, PADDLE_ZONE_TOP + 44)
+  context.restore()
+}
+
+function drawBlock(
+  context: CanvasRenderingContext2D,
+  block: PlayerBlockSpec,
+  selected: boolean,
+  alpha = 1
+) {
   const tier = TIER[Math.min(3, Math.max(1, Math.round(block.hp))) as 1 | 2 | 3]
   context.save()
+  context.globalAlpha *= alpha
   context.translate(block.position.x, block.position.y)
   context.rotate(block.rotation ?? 0)
   const rx = block.size.width / 2
@@ -297,4 +365,11 @@ function hitTest(
 
 function isInsideWorld(point: { x: number; y: number }) {
   return point.x >= 0 && point.x <= WORLD_WIDTH && point.y >= 0 && point.y <= WORLD_HEIGHT
+}
+
+function clampCanvasPosition(position: { x: number; y: number }, width: number, height: number) {
+  return {
+    x: Math.max(width / 2, Math.min(WORLD_WIDTH - width / 2, position.x)),
+    y: Math.max(HUD_BOTTOM + height / 2, Math.min(PADDLE_ZONE_TOP - height / 2, position.y)),
+  }
 }

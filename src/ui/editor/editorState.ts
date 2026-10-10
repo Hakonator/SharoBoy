@@ -1,9 +1,11 @@
 import type { PlayerBlockSpec, PlayerMapSpec } from "../../game/mapSpec"
+import { PADDLE_ZONE_TOP } from "../../game/mapValidator"
 
 import type { EditorAction, EditorState } from "./types"
 
 export const EDITOR_DRAFT_STORAGE_KEY = "sharoboy_custom_map_draft"
 const HISTORY_LIMIT = 30
+const HUD_ZONE_BOTTOM = 140
 
 export function createEditorState(map: PlayerMapSpec): EditorState {
   return {
@@ -48,15 +50,25 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return { ...state, snapToGrid: action.enabled }
     case "ADD_BLOCK": {
       const preset = { ...state.addPreset, ...action.block }
+      const presetSize = preset.size ? { ...preset.size } : { width: 64, height: 40 }
+      if (preset.shape === "circle") {
+        const side = Math.min(presetSize.width, presetSize.height)
+        presetSize.width = side
+        presetSize.height = side
+      }
       const id =
         preset.id && !state.map.blocks.some((block) => block.id === preset.id)
           ? preset.id
           : createBlockId(state.map)
       const block: PlayerBlockSpec = {
         id,
-        position: snapPosition(action.position, state),
+        position: clampPosition(
+          snapPosition(action.position, state),
+          presetSize.width,
+          presetSize.height
+        ),
         shape: preset.shape ?? "ellipse",
-        size: preset.size ? { ...preset.size } : { width: 64, height: 40 },
+        size: presetSize,
         hp: preset.hp ?? 1,
         ...(preset.rotation === undefined ? {} : { rotation: preset.rotation }),
         ...(preset.effects === undefined
@@ -70,7 +82,9 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       const index = state.map.blocks.findIndex((block) => block.id === action.blockId)
       if (index < 0) return state
       const blocks = state.map.blocks.map((block) =>
-        block.id === action.blockId ? mergeBlock(block, action.updates) : block
+        block.id === action.blockId
+          ? mergeBlock(block, normalizeBlockUpdates(block, action.updates))
+          : block
       )
       return updateMap(state, { ...state.map, blocks })
     }
@@ -106,7 +120,13 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return editorReducer(state, {
         type: "UPDATE_BLOCK",
         blockId: action.blockId,
-        updates: { position: snapPosition(position, state) },
+        updates: {
+          position: clampPosition(
+            snapPosition(position, state),
+            block.size.width,
+            block.size.height
+          ),
+        },
       })
     }
     case "UPDATE_METADATA": {
@@ -197,6 +217,30 @@ function snapPosition(position: { x: number; y: number }, state: EditorState) {
     x: Math.round(position.x / state.gridSize) * state.gridSize,
     y: Math.round(position.y / state.gridSize) * state.gridSize,
   }
+}
+
+function clampPosition(position: { x: number; y: number }, width: number, height: number) {
+  return {
+    x: Math.max(width / 2, Math.min(1920 - width / 2, position.x)),
+    y: Math.max(HUD_ZONE_BOTTOM + height / 2, Math.min(PADDLE_ZONE_TOP - height / 2, position.y)),
+  }
+}
+
+function normalizeBlockUpdates(
+  block: PlayerBlockSpec,
+  updates: Partial<PlayerBlockSpec>
+): Partial<PlayerBlockSpec> {
+  const next = { ...updates }
+  if (updates.shape === "circle" || (updates.shape === undefined && block.shape === "circle")) {
+    const size = updates.size ?? block.size
+    const side = Math.min(size.width, size.height)
+    next.size = { width: side, height: side }
+  }
+  if (updates.position || updates.size) {
+    const size = next.size ?? block.size
+    next.position = clampPosition(updates.position ?? block.position, size.width, size.height)
+  }
+  return next
 }
 
 function createBlockId(map: PlayerMapSpec): string {

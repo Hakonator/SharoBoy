@@ -35,7 +35,7 @@ describe("editorReducer", () => {
     const initial = createEditorState(makeMap())
     const added = editorReducer(initial, { type: "ADD_BLOCK", position: { x: 121, y: 141 } })
     expect(added.map.blocks).toHaveLength(3)
-    expect(added.map.blocks[2].position).toEqual({ x: 128, y: 128 })
+    expect(added.map.blocks[2].position).toEqual({ x: 128, y: 160 })
     expect(added.map.blocks[2].id).toMatch(/^b-\d+-[a-z0-9]+$/)
     expect(added.isDirty).toBe(true)
     expect(editorReducer(added, { type: "UNDO" }).map).toEqual(initial.map)
@@ -52,7 +52,7 @@ describe("editorReducer", () => {
     expect(state.map.blocks[2]).toMatchObject({
       hp: 5,
       shape: "circle",
-      position: { x: 121, y: 141 },
+      position: { x: 121, y: 160 },
     })
   })
 
@@ -61,7 +61,7 @@ describe("editorReducer", () => {
     state = editorReducer(state, { type: "UPDATE_BLOCK", blockId: "a", updates: { hp: 4 } })
     expect(state.map.blocks[0].hp).toBe(4)
     state = editorReducer(state, { type: "MOVE_BLOCK", blockId: "a", delta: { x: 64, y: 32 } })
-    expect(state.map.blocks[0].position).toEqual({ x: 160, y: 128 })
+    expect(state.map.blocks[0].position).toEqual({ x: 160, y: 155 })
     state = editorReducer(state, { type: "SELECT_BLOCK", blockId: "a" })
     state = editorReducer(state, { type: "DELETE_BLOCK" })
     expect(state.map.blocks.map((block) => block.id)).toEqual(["b"])
@@ -109,6 +109,42 @@ describe("editorReducer", () => {
     })
     expect(preserved.history).toEqual(changed.history)
     expect(preserved.isDirty).toBe(true)
+  })
+
+  it("keeps circles square and clamps blocks outside the playable editor area", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, {
+      type: "UPDATE_BLOCK",
+      blockId: "a",
+      updates: { shape: "circle", size: { width: 92, height: 48 }, position: { x: 20, y: 1050 } },
+    })
+    expect(state.map.blocks[0].size).toEqual({ width: 48, height: 48 })
+    expect(state.map.blocks[0].position).toEqual({ x: 24, y: 856 })
+    state = editorReducer(state, {
+      type: "MOVE_BLOCK",
+      blockId: "a",
+      position: { x: 2000, y: 1000 },
+    })
+    expect(state.map.blocks[0].position).toEqual({ x: 1896, y: 856 })
+  })
+
+  it("normalizes circle presets when adding blocks", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, {
+      type: "SET_ADD_PRESET",
+      preset: { shape: "circle", size: { width: 80, height: 40 } },
+    })
+    state = editorReducer(state, { type: "ADD_BLOCK", position: { x: 300, y: 300 } })
+    expect(state.map.blocks[2].size).toEqual({ width: 40, height: 40 })
+  })
+
+  it("clamps added blocks below the HUD and above the paddle zone", () => {
+    const state = editorReducer(createEditorState(makeMap()), {
+      type: "ADD_BLOCK",
+      position: { x: -50, y: 1050 },
+      block: { size: { width: 80, height: 80 } },
+    })
+    expect(state.map.blocks[2].position).toEqual({ x: 40, y: 840 })
   })
 })
 

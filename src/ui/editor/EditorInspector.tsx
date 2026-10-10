@@ -135,7 +135,17 @@ export function EditorInspector({ state, dispatch }: EditorInspectorProps) {
         <select
           className={INPUT_CLASS}
           onChange={(event) =>
-            updateBlock({ shape: event.target.value as PlayerBlockSpec["shape"] })
+            updateBlock({
+              shape: event.target.value as PlayerBlockSpec["shape"],
+              ...(event.target.value === "circle"
+                ? {
+                    size: {
+                      width: Math.min(block.size.width, block.size.height),
+                      height: Math.min(block.size.width, block.size.height),
+                    },
+                  }
+                : {}),
+            })
           }
           value={block.shape}
         >
@@ -149,14 +159,50 @@ export function EditorInspector({ state, dispatch }: EditorInspectorProps) {
           min={20}
           max={100}
           value={block.size.width}
-          onChange={(width) => updateBlock({ size: { ...block.size, width } })}
+          onChange={(width) =>
+            updateBlock({
+              size: { width, height: block.shape === "circle" ? width : block.size.height },
+            })
+          }
+        />
+        <input
+          aria-label="Ширина слайдер"
+          className="w-full accent-cyan-neon"
+          max={100}
+          min={20}
+          onChange={(event) => {
+            const width = Number(event.target.value)
+            updateBlock({
+              size: { width, height: block.shape === "circle" ? width : block.size.height },
+            })
+          }}
+          type="range"
+          value={block.size.width}
         />
         <NumberField
           label="Высота"
           min={20}
           max={100}
           value={block.size.height}
-          onChange={(height) => updateBlock({ size: { ...block.size, height } })}
+          onChange={(height) =>
+            updateBlock({
+              size: { width: block.shape === "circle" ? height : block.size.width, height },
+            })
+          }
+        />
+        <input
+          aria-label="Высота слайдер"
+          className="w-full accent-cyan-neon"
+          max={100}
+          min={20}
+          onChange={(event) => {
+            const height = Number(event.target.value)
+            updateBlock({
+              size: { width: block.shape === "circle" ? height : block.size.width, height },
+            })
+          }}
+          type="range"
+          value={block.size.height}
         />
       </div>
       <NumberField
@@ -166,6 +212,17 @@ export function EditorInspector({ state, dispatch }: EditorInspectorProps) {
         step={1}
         value={((block.rotation ?? 0) * 180) / Math.PI}
         onChange={(degrees) => updateBlock({ rotation: (degrees * Math.PI) / 180 })}
+      />
+      <input
+        aria-label="Поворот слайдер"
+        className="w-full accent-cyan-neon"
+        max={180}
+        min={-180}
+        onChange={(event) =>
+          updateBlock({ rotation: (Number(event.target.value) * Math.PI) / 180 })
+        }
+        type="range"
+        value={Math.max(-180, Math.min(180, ((block.rotation ?? 0) * 180) / Math.PI))}
       />
 
       <section className="space-y-3 border-t border-line pt-3">
