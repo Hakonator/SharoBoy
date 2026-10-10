@@ -755,6 +755,8 @@ Acceptance criteria:
 - [x] Delete / Backspace удаляет всю группу выделенных блоков
 - [x] Все тесты (`npm run test`), `typecheck` и `lint` проходят без ошибок
 
+Comment: Ревью пройдено успешно: интерактивные угловые маркеры ресайза, рукоятка вращения, рамочное выделение (marquee), плавное перемещение группы с ограничением safe-zone, буфер обмена Ctrl+C/V и групповое удаление работают отлично. Проверки typecheck, lint, 358 тестов и production build успешны.
+
 Comment: Добавлено ordered multi-selection, marquee, resize/rotate handles, clamped group drag, reducer clipboard и горячие клавиши. Проверки lint/typecheck/full test (40 файлов, 358 тестов) прошли; ручная браузерная проверка не выполнялась.
 
 Test plan:
