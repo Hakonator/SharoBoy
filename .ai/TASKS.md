@@ -948,3 +948,68 @@ Verification commands:
 npm run typecheck
 npm run lint
 npm run test
+
+### T-017: Кольца брони на блоках, чистое перетаскивание и защита поля автора
+
+Status: ready
+Priority: high
+Assigned to: luna
+
+Описание:
+Согласно AD-011 реализовать три улучшения редактора карт:
+
+1. **Отрисовка колец брони как в игровом режиме (`src/ui/editor/EditorCanvas.tsx`)**:
+   - В функции `drawBlock` при наличии эффекта брони (`effects.find(e => e.kind === "armor")`) отрисовывать концентрические кольца брони ровно по той же формуле и визуалу, что и в `src/game/render/blockKinds.ts`:
+     - `ringGap = Math.max(3.5, Math.min(rx, ry) * 0.1)`
+     - Цикл по уровням брони (`i = 0` до `amount`) с обводкой `#080808` толщиной `Math.max(3, Math.min(rx, ry) * 0.14)` и цветными эллиптическими разделителями цвета тира блока (`TIER[tier].base`).
+   - Кольца масштабируются и поворачиваются вместе с блоком (для круга — круглые, для эллипса — эллиптические).
+
+2. **Скрытие исходного положения при перетаскивании (`src/ui/editor/EditorCanvas.tsx`)**:
+   - Во время перетаскивания (одиночного блока через `dragPreview` или группы через `groupPreview`):
+     - В `drawWorld` исключать из отрисовки блоки, находящиеся в процессе перемещения (`draggedBlockIds`).
+     - Полностью удалить фоновый призрак со старого места (убрать `drawBlock(context, dragPreview.block, false, 0.22)`).
+     - Отображать только перемещаемые превью-блоки на их актуальных координатах с привязкой к сетке.
+
+3. **Синхронизация и защита поля «Автор» (`src/App.tsx`, `src/ui/editor/EditorView.tsx`, `src/ui/editor/EditorInspector.tsx`, `src/ui/editor/types.ts`)**:
+   - В `App.tsx` передавать текущее имя игрока `playerNick={nick}` в `EditorView`.
+   - В `EditorView.tsx`:
+     - Синхронизировать метаданные карты: `author = playerNick?.trim() ? playerNick.trim() : "не указано"`.
+   - В `EditorInspector.tsx`:
+     - Отображать вычисленное имя автора.
+     - Заблокировать поле для ручного ввода (`readOnly`, `disabled`, неактивный стиль `bg-abyss/40 opacity-75 cursor-not-allowed`).
+     - Добавить поясняющую подсказку: _«Берётся из имени игрока на главной странице»_.
+
+Allowed files:
+
+- src/ui/editor/EditorCanvas.tsx
+- src/ui/editor/EditorInspector.tsx
+- src/ui/editor/EditorView.tsx
+- src/ui/editor/types.ts
+- src/App.tsx
+- src/ui/editor/editorState.ts
+- src/ui/editor/editorState.test.ts
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: T-016
+
+Acceptance criteria:
+
+- [ ] Блоки с броней в редакторе отображают внешние концентрические защитные кольца в соответствии с игровым стилем
+- [ ] Во время перетаскивания блока или группы исходное статичное положение блока полностью скрывается
+- [ ] В поле «Автор» автоматически подставляется имя игрока из главной страницы (или «не указано», если имя не задано)
+- [ ] Поле «Автор» в редакторе заблокировано для ручного редактирования
+- [ ] Все тесты (`npm run test`), `typecheck` и `lint` проходят без ошибок
+
+Test plan:
+
+1. Запустить `npm run test`, `npm run typecheck` и `npm run lint`.
+2. Проверить в браузере визуализацию брони кольцами, перетаскивание без старого призрака и отображение поля автора.
+
+Verification commands:
+npm run typecheck
+npm run lint
+npm run test
