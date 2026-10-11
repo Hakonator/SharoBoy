@@ -127,7 +127,7 @@ jobs:
         run: npm run lint:check --if-present
       - name: Тесты (beta)
         working-directory: beta-src
-        run: npm run test --if-present
+        run: npx vitest run --no-file-parallelism
       - name: Проверка типов (beta)
         working-directory: beta-src
         run: npm run typecheck --if-present
