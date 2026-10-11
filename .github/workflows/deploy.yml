@@ -127,6 +127,9 @@ jobs:
         run: npm run lint:check --if-present
       - name: Тесты (beta)
         working-directory: beta-src
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npx vitest run --no-file-parallelism
       - name: Проверка типов (beta)
         working-directory: beta-src

@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
+vi.mock("../config", async () => {
+  const actual = await vi.importActual<Record<string, unknown>>("../config")
+  return {
+    ...actual,
+    SUPABASE_URL: "https://test.supabase.co",
+    SUPABASE_ANON_KEY: "test-anon-key",
+    LEADERBOARD_ENABLED: true,
+  }
+})
+
 import {
   fetchApprovedMaps,
   getVoterId,
