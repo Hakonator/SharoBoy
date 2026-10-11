@@ -1441,3 +1441,72 @@ Verification commands:
 npm run typecheck
 npm run lint
 npm run test
+
+### T-024: Админ-панель модерации кастомных карт (Этап M4)
+
+Status: ready
+Priority: high
+Assigned to: luna
+
+Описание:
+Согласно AD-015 реализовать закрытый интерфейс модерации пользовательских карт для администратора:
+
+1. **Клиентский API модерации (`src/game/adminMapsApi.ts`)**:
+   - `adminLogin(password: string): Promise<string>` — отправляет запрос на `/functions/v1/admin-maps/login`, сохраняет полученный JWT токен в памяти/`sessionStorage` и возвращает его.
+   - `fetchPendingMaps(token: string): Promise<CustomMapRecord[]>` — отправляет `GET` на `/functions/v1/admin-maps?status=pending` с заголовком `X-Admin-Token`.
+   - `approveMap(token: string, mapId: string): Promise<void>` — отправляет `POST` на `/functions/v1/admin-maps/${mapId}/approve`.
+   - `rejectMap(token: string, mapId: string, reason: string): Promise<void>` — отправляет `POST` на `/functions/v1/admin-maps/${mapId}/reject` с телом `{ reason }`.
+   - `adminLogout(): void` — сброс сессии.
+
+2. **Компонент Админ-панели (`src/ui/screens/AdminPanel.tsx`)**:
+   - **Экран авторизации**: если админ не авторизован — форма ввода пароля с валидацией, индикацией ошибки при неверном пароле и кнопкой отмены (возврат в меню).
+   - **Экран модерации**:
+     - Список карт со статусом `pending` (название, автор, дата, описание, количество блоков, тип условия победы).
+     - **Интерактивный предпросмотр**: отображение поля уровня через `EditorCanvas` в режиме `readOnly` (или масштабированный холст с блоками).
+     - **Тест-драйв**: кнопка «Протестировать карту», запускающая уровень через `Game.startCustomMap` с возвратом в админку.
+     - **Кнопка «Одобрить»**: публикует карту в общий каталог (`approved`).
+     - **Кнопка «Отклонить»**: открывает модалку/поле ввода причины отклонения (например: «Мат в названии», «Непроходимый уровень», «Слишком мало блоков») и переводит в `rejected`.
+     - Кнопка «Выйти» (logout) и «Назад в меню».
+
+3. **Интеграция в приложение (`src/App.tsx`, `src/ui/screens/menu.tsx`)**:
+   - Кнопка входа в панель модератора (скрытая или аккуратная ссылка/кнопка 🛡️ в футере меню/настройках).
+   - Поддержка переключения на экран `admin` и возврата в меню/каталог.
+
+4. **Тесты**:
+   - Написать unit/UI-тесты для `adminMapsApi.test.ts` и `AdminPanel.test.tsx`.
+
+Allowed files:
+
+- src/game/adminMapsApi.ts
+- src/game/adminMapsApi.test.ts
+- src/ui/screens/AdminPanel.tsx
+- src/ui/screens/AdminPanel.test.tsx
+- src/ui/screens/menu.tsx
+- src/App.tsx
+- src/ui/screens/types.ts
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+- src/game/physics/*
+
+Dependencies: T-023
+
+Acceptance criteria:
+
+- [ ] Модуль `adminMapsApi.ts` покрыт тестами и корректно взаимодействует с Edge Function `admin-maps`
+- [ ] Форма авторизации запрашивает пароль, получает токен сессии и обрабатывает неверный ввод
+- [ ] В админ-панели выводится очередь карт на модерации с возможностью предпросмотра и тест-драйва
+- [ ] Карты успешно одобряются (переходят в `approved`) и отклоняются с указанием причины
+- [ ] Все тесты (`npm run test`), `typecheck` и `lint` проходят без ошибок
+
+Test plan:
+
+1. Запустить `npm run test`, `npm run typecheck` и `npm run lint`.
+2. Проверить в тестах авторизацию админа, список карт и вызовы approve/reject.
+
+Verification commands:
+npm run typecheck
+npm run lint
+npm run test
