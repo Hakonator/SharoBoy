@@ -1,5 +1,10 @@
 import type { EditorToolbarProps, EditorTool } from "./types"
 
+type PublishToolbarProps = EditorToolbarProps & {
+  onPublish: () => void
+  publishingEnabled: boolean
+}
+
 const TOOLS: { id: EditorTool; label: string; icon: string }[] = [
   { id: "select", label: "Выбор", icon: "↖" },
   { id: "add", label: "Добавить блок", icon: "+" },
@@ -15,7 +20,9 @@ export function EditorToolbar({
   musicMuted,
   onToggleMusic,
   onNextMusicTrack,
-}: EditorToolbarProps) {
+  onPublish,
+  publishingEnabled,
+}: PublishToolbarProps) {
   const canUndo = state.history.past.length > 0
   const canRedo = state.history.future.length > 0
 
@@ -137,6 +144,19 @@ export function EditorToolbar({
       <ToolbarButton label="Следующий трек" onClick={onNextMusicTrack} title="Следующая композиция">
         ⏭
       </ToolbarButton>
+      <button
+        className="btn-ghost px-4 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={!publishingEnabled}
+        onClick={onPublish}
+        title={
+          publishingEnabled
+            ? "Отправить карту на модерацию"
+            : "Сначала настройте подключение Supabase"
+        }
+        type="button"
+      >
+        🚀 Опубликовать
+      </button>
       <button className="btn-arcade px-4 py-2 text-xs" onClick={onTestRun} type="button">
         ▶ Тест-прогон
       </button>

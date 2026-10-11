@@ -1297,10 +1297,79 @@ Acceptance criteria:
 
 Comment: Реализованы миграция custom maps/votes с RLS, безопасные RPC-инкременты, публичная Edge Function `maps` для публикации, каталога, лайков и запусков, а также `admin-maps` с HMAC-SHA256 токенами на 4 часа и approve/reject. Typecheck, lint, полный test (42 файла, 366 тестов) и целевые тесты Edge Functions прошли.
 
+Verification commands:
+npm run test
+
+### T-022: Клиентское API кастомных карт и диалог публикации в Редакторе Карт (Этап M2)
+
+Status: done
+Priority: high
+Assigned to: luna
+
+Описание:
+Согласно AD-015 реализовать клиентский сервис работы с кастомными картами и интегрировать возможность отправки созданной карты на модерацию прямо из Редактора Карт:
+
+1. **Клиентский API-модуль кастомных карт (`src/game/customMapsApi.ts`)**:
+   - `publishCustomMap(payload: { title: string; description?: string; author_nick: string; spec: PlayerMapSpec })`: отправляет `POST` на `/functions/v1/maps`. Возвращает созданную запись или ошибку.
+   - `fetchApprovedMaps(params?: { sort?: 'popular' | 'newest'; search?: string; limit?: number; offset?: number })`: отправляет `GET` на `/functions/v1/maps`.
+   - `voteMap(mapId: string, voterId: string)`: отправляет `POST` на `/functions/v1/maps/${mapId}/vote`.
+   - `recordMapPlay(mapId: string)`: отправляет `POST` на `/functions/v1/maps/${mapId}/play`.
+   - Генерация стабильного анонимного `voterId` игрока в `localStorage` (если ещё не создан).
+   - Обработка сетевых ошибок, статусов ответов и понятные сообщения об ошибках на русском языке.
+
+2. **Диалог публикации в Редакторе Карт (`src/ui/editor/EditorPublishModal.tsx`)**:
+   - Модальное окно, открываемое по кнопке «Опубликовать» в тулбаре редактора.
+   - Поля ввода:
+     - **Название карты** (2–60 символов, обязательное).
+     - **Описание карты** (до 300 символов, опциональное).
+     - **Автор** (read-only, автоматически берётся из ника игрока / метаданных карты).
+   - Интеграция с `validateMapSpec`: перед отправкой карта валидируется на клиенте. Если есть ошибки (нет разрушаемых блоков, блоки в запретной зоне ракетки и т.д.), отображается понятный список ошибок с запретом отправки.
+   - Индикация процесса отправки («Отправка на модерацию...»).
+   - Успешный результат: красивое подтверждение «Карта отправлена на модерацию! Она появится в общем каталоге после проверки администратором».
+
+3. **Интеграция в `EditorToolbar.tsx` и `EditorView.tsx`**:
+   - Добавить кнопку «Опубликовать» (с иконкой 🚀 / стилем `.btn-arcade` или `.btn-ghost`) в `EditorToolbar.tsx`.
+   - Связать состояние открытия модалки в `EditorView.tsx`.
+   - Если Supabase не подключен (`!LEADERBOARD_ENABLED`), показывать подсказку о необходимости настройки подключения.
+
+4. **Тесты**:
+   - Написать юнит-тесты для `customMapsApi` в `src/game/customMapsApi.test.ts` с mock-ответами `fetch`.
+
+Allowed files:
+
+- src/config.ts
+- src/game/customMapsApi.ts
+- src/game/customMapsApi.test.ts
+- src/ui/editor/EditorPublishModal.tsx
+- src/ui/editor/EditorToolbar.tsx
+- src/ui/editor/EditorView.tsx
+- src/ui/editor/index.ts
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+- src/game/physics/*
+
+Dependencies: T-021
+
+Acceptance criteria:
+
+- [x] Модуль `customMapsApi.ts` типизирован и корректно взаимодействует с Edge Function `maps`
+- [x] Модалка публикации валидирует карту через `validateMapSpec` и блокирует публикацию невалидных карт
+- [x] Ник автора синхронизируется и защищён от ручного редактирования
+- [x] Ошибки profanity и длины названия информативно выводятся пользователю
+- [x] Кнопка «Опубликовать» гармонично встроена в `EditorToolbar`
+- [x] Тесты `customMapsApi.test.ts` проходят, typecheck и lint чистые
+
+Comment: Реализованы клиентский API custom maps с таймаутами, обработкой HTTP/сетевых ошибок и стабильным anonymous voter ID; EditorPublishModal валидирует карту, название, описание и profanity; кнопка публикации интегрирована в EditorToolbar и блокируется без Supabase. Полный suite: 43 файла, 370 тестов.
+
 Test plan:
 
-1. Запустить юнит-тесты функций с помощью vitest или deno test.
-2. Проверить синтаксис SQL-миграции.
+1. Запустить `npm run test`, `npm run typecheck` и `npm run lint`.
+2. Проверить в юнит-тестах успешную публикацию, обработку ошибок валидации и сетевых ошибок.
 
 Verification commands:
+npm run typecheck
+npm run lint
 npm run test

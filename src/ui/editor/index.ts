@@ -3,6 +3,7 @@ export { EditorCanvas } from "./EditorCanvas"
 export { EditorInspector } from "./EditorInspector"
 export { EditorToolbar } from "./EditorToolbar"
 export { EditorJsonModal } from "./EditorJsonModal"
+export { EditorPublishModal } from "./EditorPublishModal"
 export { editorReducer, createEditorState, loadEditorDraft, saveEditorDraft } from "./editorState"
 export type {
   EditorAction,

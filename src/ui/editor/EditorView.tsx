@@ -1,11 +1,13 @@
 import { useEffect, useReducer, useState } from "react"
 
+import { LEADERBOARD_ENABLED } from "../../config"
 import type { PlayerMapSpec } from "../../game/mapSpec"
 import { validatePlayerMapSpec } from "../../game/mapValidator"
 
 import { EditorCanvas } from "./EditorCanvas"
 import { EditorInspector } from "./EditorInspector"
 import { EditorJsonModal } from "./EditorJsonModal"
+import { EditorPublishModal } from "./EditorPublishModal"
 import { createEditorState, editorReducer, loadEditorDraft, saveEditorDraft } from "./editorState"
 import { EditorToolbar } from "./EditorToolbar"
 import type { EditorState } from "./types"
@@ -59,6 +61,7 @@ export function EditorView({
 }: EditorViewProps) {
   const [state, dispatch] = useReducer(editorReducer, undefined, createInitialState)
   const [showJson, setShowJson] = useState(false)
+  const [showPublish, setShowPublish] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
   const author = playerNick.trim() || "не указано"
 
@@ -137,6 +140,8 @@ export function EditorView({
         onImportExport={() => setShowJson(true)}
         onToggleMusic={onToggleMusic}
         onTestRun={testRun}
+        onPublish={() => setShowPublish(true)}
+        publishingEnabled={LEADERBOARD_ENABLED}
         state={state}
       />
       {runError && (
@@ -161,6 +166,9 @@ export function EditorView({
             setShowJson(false)
           }}
         />
+      )}
+      {showPublish && LEADERBOARD_ENABLED && (
+        <EditorPublishModal author={author} map={state.map} onClose={() => setShowPublish(false)} />
       )}
     </section>
   )
