@@ -72,8 +72,10 @@ jobs:
             echo "::error::Не удалось определить project-ref: задайте project_id в supabase/config.toml."
             exit 1
           fi
-          echo "Деплой Edge Function «scores» в проект $REF…"
+          echo "Деплой Edge Functions «scores», «maps», «admin-maps» в проект $REF…"
           supabase functions deploy scores --project-ref "$REF"
+          supabase functions deploy maps --project-ref "$REF"
+          supabase functions deploy admin-maps --project-ref "$REF"
 
   # --- Миграции: применение к боевой базе при изменениях в supabase/migrations ---
   # Прямой хост db.<ref>.supabase.co — IPv6-only, поэтому подключаемся через

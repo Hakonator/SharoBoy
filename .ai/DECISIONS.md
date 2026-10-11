@@ -381,3 +381,53 @@
    - Активное состояние: `backgroundColor: "#35e0ff"`, `color: "#04121c"`, `borderColor: "#35e0ff"`, `boxShadow: "0 0 16px rgba(53, 224, 255, 0.7)"`.
    - Неактивное состояние: штатный полупрозрачный фон `.btn-ghost` с неоновым циановым текстом.
 4. Это гарантирует 100% идентичность формы, шрифта и размеров кнопки при переключении.
+
+## AD-015: Архитектура экосистемы пользовательских карт: публикация, модерация, авторизация и каталог
+
+**Дата:** 2026-10-11
+**Статус:** Принято
+**Контекст:**
+После завершения визуального редактора карт (A4+) требуется полноценный цикл жизни кастомных уровней: отправка на публикацию из редактора, безопасная модерация администратором с защищённой авторизацией, и каталог проверенных карт сообщества с рейтингом/лайками и возможностью запуска в один клик.
+
+**Решение:**
+
+1. **База данных PostgreSQL (Supabase миграция):**
+   - Таблица `public.sharoboy_custom_maps`:
+     - `id uuid primary key default gen_random_uuid()`
+     - `title text not null` (длина 2..60, без мата)
+     - `description text default ''` (длина до 300)
+     - `author_nick text not null` (валидируется profanity)
+     - `spec_json jsonb not null` (валидная спецификация `CustomMapSpec`)
+     - `status text not null default 'pending'` (`pending` | `approved` | `rejected`)
+     - `reject_reason text default null`
+     - `likes_count integer not null default 0`
+     - `plays_count integer not null default 0`
+     - `created_at timestamptz not null default now()`
+     - `updated_at timestamptz not null default now()`
+   - Таблица `public.sharoboy_map_votes`:
+     - `id bigint generated always as identity primary key`
+     - `map_id uuid references public.sharoboy_custom_maps(id) on delete cascade`
+     - `voter_id text not null` (клиентский хэш-идентификатор для предотвращения накрутки)
+     - `created_at timestamptz not null default now()`
+     - Уникальный индекс `(map_id, voter_id)`
+   - **RLS**:
+     - Чтение `public.sharoboy_custom_maps` открыто для всех (`anon`, `authenticated`) ТОЛЬКО со статусом `status = 'approved'`.
+     - Запись и смена статусов запрещены напрямую из клиента и осуществляются исключительно через серверные Edge Functions (`service_role`).
+
+2. **Supabase Edge Functions:**
+   - `maps` — публичное API для игроков:
+     - `POST /maps`: отправка карты на модерацию (проверка ника/названия через profanity, валидация спеки через `validateMapSpec`, запись в базу со статусом `pending`).
+     - `GET /maps?sort=popular|newest&search=...&limit=20`: получение одобренных карт с пагинацией и поиском.
+     - `POST /maps/:id/vote`: добавление лайка (проверка на повторный голос).
+     - `POST /maps/:id/play`: инкремент счетчика сыгранных раз.
+   - `admin-maps` — защищённое API для модератора:
+     - Вход и сессии: валидация секретного мастер-ключа администратора `ADMIN_SECRET_KEY` и выдача подписанного HMAC-SHA256 JWT токена со сроком жизни (4 часа).
+     - Все методы модерации требуют заголовок `X-Admin-Token`:
+       - `GET /admin-maps?status=pending|approved|rejected`: получение полного списка карт на модерацию.
+       - `POST /admin-maps/:id/approve`: перевод в статус `approved`.
+       - `POST /admin-maps/:id/reject`: перевод в статус `rejected` с причиной.
+
+3. **Интеграция с клиентом (UI / UX):**
+   - **Редактор карт:** кнопка «Опубликовать» в Toolbar с диалогом названия/описания, валидацией карты и уведомлением о передаче на модерацию.
+   - **Каталог сообщества:** экран «Карты сообщества» с вкладками «Популярные», «Новые», строкой поиска, карточками уровней, кнопкой ❤️ (лайк) и кнопкой «Играть» (запуск через `Game.startCustomMap`).
+   - **Панель модерации:** вход по паролю, просмотр очереди `pending`, визуальное превью карты через `EditorCanvas` (read-only), кнопка быстрого тест-драйва и кнопки вердикта («Одобрить» / «Отклонить»).

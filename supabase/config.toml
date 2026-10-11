@@ -22,3 +22,12 @@ port = 54325
 # verify_jwt = true — вызовы требуют JWT (anon-ключ в качестве JWT).
 # Секреты задаются через: supabase secrets set SCORE_SECRET=…
 verify_jwt = true
+
+[functions.maps]
+# verify_jwt = true — публичные вызовы используют anon-ключ клиента.
+verify_jwt = true
+
+[functions.admin-maps]
+# verify_jwt = false — авторизация через собственный пароль/токен админа X-Admin-Token
+verify_jwt = false
+
