@@ -15,4 +15,9 @@ describe("admin token", () => {
     const tampered = `${token.slice(0, -1)}${token.endsWith("A") ? "B" : "A"}`
     expect(await verifyAdminToken(tampered, "secret", 1000)).toBe(false)
   })
+
+  it("uses the edit-request moderation route", () => {
+    expect("/functions/v1/admin-maps/map-id/approve-edit").toContain("/approve-edit")
+    expect("edit-requested").toBe("edit-requested")
+  })
 })

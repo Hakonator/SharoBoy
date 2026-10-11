@@ -4,7 +4,9 @@ import {
   fetchApprovedMaps,
   getVoterId,
   publishCustomMap,
+  requestMapEdit,
   recordMapPlay,
+  updateMapSpec,
   voteMap,
 } from "./customMapsApi"
 import type { PlayerMapSpec } from "./mapSpec"
@@ -43,7 +45,14 @@ describe("customMapsApi", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/functions/v1/maps"),
-      expect.objectContaining({ method: "POST", body: expect.stringContaining('"spec_json"') })
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"spec_json"'),
+      })
+    )
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toHaveProperty(
+      "map_uid",
+      "test-map"
     )
   })
 
@@ -82,5 +91,17 @@ describe("customMapsApi", () => {
     })
     expect(getVoterId()).toBe(getVoterId())
     expect(storage.size).toBe(1)
+  })
+
+  it("supports edit requests and approved spec updates", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ map: { id: "map-1" } })))
+    vi.stubGlobal("fetch", fetchMock)
+    await requestMapEdit("map-1", "Игрок", "Исправить расстановку")
+    await expect(updateMapSpec("map-1", map)).resolves.toMatchObject({ id: "map-1" })
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/map-1/request-edit")
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "PUT" })
   })
 })

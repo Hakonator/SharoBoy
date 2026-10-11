@@ -5,6 +5,8 @@ import {
   adminLogin,
   adminLogout,
   approveMap,
+  approveMapEdit,
+  fetchEditRequests,
   fetchPendingMaps,
   getAdminToken,
   rejectMap,
@@ -54,6 +56,8 @@ export function AdminPanel({ onBack, onTestRun }: AdminPanelProps) {
   const [token, setToken] = useState<string | null>(getAdminToken)
   const [password, setPassword] = useState("")
   const [maps, setMaps] = useState<CustomMapRecord[]>([])
+  const [editRequests, setEditRequests] = useState<CustomMapRecord[]>([])
+  const [view, setView] = useState<"pending" | "edits">("pending")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [reason, setReason] = useState("")
@@ -66,7 +70,9 @@ export function AdminPanel({ onBack, onTestRun }: AdminPanelProps) {
     setError(null)
     try {
       const next = await fetchPendingMaps(currentToken)
+      const edits = await fetchEditRequests(currentToken)
       setMaps(next)
+      setEditRequests(edits)
       setSelectedId((current) =>
         next.some((map) => map.id === current) ? current : (next[0]?.id ?? null)
       )
@@ -78,6 +84,20 @@ export function AdminPanel({ onBack, onTestRun }: AdminPanelProps) {
       setLoading(false)
     }
   }, [])
+
+  const approveEdit = async (map: CustomMapRecord) => {
+    if (!token) return
+    setBusy(true)
+    setError(null)
+    try {
+      await approveMapEdit(token, map.id)
+      await load(token)
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Не удалось одобрить редактирование.")
+    } finally {
+      setBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (token) void load(token)
@@ -190,7 +210,53 @@ export function AdminPanel({ onBack, onTestRun }: AdminPanelProps) {
                 {error}
               </p>
             )}
-            {loading ? (
+            <div className="mb-4 flex gap-2">
+              <button
+                className={`btn-ghost px-4 py-2 text-sm ${view === "pending" ? "text-gold" : ""}`}
+                onClick={() => setView("pending")}
+                type="button"
+              >
+                Очередь карт ({maps.length})
+              </button>
+              <button
+                className={`btn-ghost px-4 py-2 text-sm ${view === "edits" ? "text-gold" : ""}`}
+                onClick={() => setView("edits")}
+                type="button"
+              >
+                Запросы на редактирование ({editRequests.length})
+              </button>
+            </div>
+            {view === "edits" ? (
+              editRequests.length === 0 ? (
+                <p className="rounded-xl border border-line bg-deep/80 p-8 text-center text-dim">
+                  Запросов на редактирование нет.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {editRequests.map((map) => (
+                    <article className="rounded-xl border border-line bg-deep/90 p-4" key={map.id}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h2 className="font-display text-xl text-foam">{map.title}</h2>
+                          <p className="text-sm text-cyan-neon">Автор: {map.author_nick}</p>
+                        </div>
+                        <button
+                          className="btn-arcade px-4 py-2 text-sm"
+                          disabled={busy}
+                          onClick={() => void approveEdit(map)}
+                          type="button"
+                        >
+                          ✓ Одобрить редактирование
+                        </button>
+                      </div>
+                      <p className="mt-3 rounded border border-gold/30 bg-gold/10 p-3 text-sm text-gold">
+                        Причина: {map.edit_request_reason || "не указана"}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              )
+            ) : loading ? (
               <p className="py-10 text-center text-dim">Загрузка очереди…</p>
             ) : maps.length === 0 ? (
               <p className="rounded-xl border border-line bg-deep/80 p-8 text-center text-dim">

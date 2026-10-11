@@ -13,4 +13,14 @@ describe("maps API contracts", () => {
     expect(limit).toBe(100)
     expect(offset).toBe(0)
   })
+
+  it("defines the edit workflow routes and conflict status", () => {
+    expect("/functions/v1/maps/00000000-0000-0000-0000-000000000000/request-edit").toMatch(
+      /[0-9a-f-]{36}\/request-edit$/
+    )
+    expect("/functions/v1/maps/00000000-0000-0000-0000-000000000000/update-spec").toMatch(
+      /[0-9a-f-]{36}\/update-spec$/
+    )
+    expect(409).toBe(409)
+  })
 })

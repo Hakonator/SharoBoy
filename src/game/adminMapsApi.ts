@@ -65,12 +65,28 @@ export async function fetchPendingMaps(token: string): Promise<CustomMapRecord[]
   return Array.isArray(data.maps) ? (data.maps as CustomMapRecord[]) : []
 }
 
+export async function fetchEditRequests(token: string): Promise<CustomMapRecord[]> {
+  const response = await request("?status=edit-requested", { headers: { "X-Admin-Token": token } })
+  if (!response.ok)
+    throw new Error(await message(response, "Не удалось загрузить запросы на редактирование"))
+  const data = (await response.json()) as { maps?: unknown }
+  return Array.isArray(data.maps) ? (data.maps as CustomMapRecord[]) : []
+}
+
 export async function approveMap(token: string, mapId: string): Promise<void> {
   const response = await request(`/${encodeURIComponent(mapId)}/approve`, {
     method: "POST",
     headers: { "X-Admin-Token": token },
   })
   if (!response.ok) throw new Error(await message(response, "Не удалось одобрить карту"))
+}
+
+export async function approveMapEdit(token: string, mapId: string): Promise<void> {
+  const response = await request(`/${encodeURIComponent(mapId)}/approve-edit`, {
+    method: "POST",
+    headers: { "X-Admin-Token": token },
+  })
+  if (!response.ok) throw new Error(await message(response, "Не удалось одобрить редактирование"))
 }
 
 export async function rejectMap(token: string, mapId: string, reason: string): Promise<void> {

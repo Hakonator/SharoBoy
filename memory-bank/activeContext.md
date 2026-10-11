@@ -1,5 +1,20 @@
 # Активный контекст (Active Context)
 
+## Последнее обновление (11.10.2026, T-025 завершена)
+
+- Добавлена миграция `20250101000009_map_edit_workflow.sql`: `map_uid`,
+  `edit_status`, `edit_request_reason`, индексы и защита pending-дубликатов.
+- Edge Functions получили анти-спам публикации, `request-edit`/`update-spec` для
+  автора и `approve-edit` плюс очередь edit-запросов для администратора.
+- Клиентские API расширены методами request/update и approve-edit. В каталоге
+  автор может запросить изменение своей approved-карты; админка показывает причины
+  и позволяет одобрить запрос.
+- EditorPublishModal использует стабильный project UID, блокирует повторную
+  публикацию pending-карты, показывает approved-edit статус, принимает JSON и
+  отправляет обновление с сохранением статистики likes/plays.
+- Проверки прошли: `npm run lint`, `npm run typecheck`, `npm run test` — 46 файлов,
+  380 тестов. Следующий шаг — ревью Gemini.
+
 ## Последнее обновление (11.10.2026, T-024 завершена)
 
 - Добавлен `src/game/adminMapsApi.ts`: login через `admin-maps/login`, хранение

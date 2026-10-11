@@ -44,7 +44,7 @@ async function login(req: Request, secret: string): Promise<Response> {
   return json({ token: await createAdminToken(secret), expires_in: 4 * 60 * 60 })
 }
 
-function idFrom(path: string, action: "approve" | "reject"): string | null {
+function idFrom(path: string, action: "approve" | "reject" | "approve-edit"): string | null {
   const match = path.match(new RegExp(`^/([^/]+)/${action}$`))
   return match?.[1] && /^[0-9a-f-]{36}$/i.test(match[1]) ? match[1] : null
 }
@@ -63,11 +63,13 @@ async function handle(req: Request): Promise<Response> {
     return json({ error: "Требуется действительная админ-сессия" }, 401)
   if (req.method === "GET" && (path === "" || path === "/")) {
     const status = url.searchParams.get("status") ?? "pending"
-    if (!["pending", "approved", "rejected"].includes(status))
+    if (!["pending", "approved", "rejected", "edit-requested"].includes(status))
       return json({ error: "Некорректный статус" }, 400)
     const query = new URLSearchParams({
       select: "*",
-      status: `eq.${status}`,
+      ...(status === "edit-requested"
+        ? { edit_status: "eq.requested", status: "eq.approved" }
+        : { status: `eq.${status}` }),
       order: "created_at.desc",
     })
     const res = await fetch(`${e.url}/rest/v1/sharoboy_custom_maps?${query}`, { headers: h(e.key) })
@@ -75,8 +77,23 @@ async function handle(req: Request): Promise<Response> {
   }
   const approve = idFrom(path, "approve")
   const reject = idFrom(path, "reject")
-  if (req.method !== "POST" || (!approve && !reject))
+  const approveEdit = idFrom(path, "approve-edit")
+  if (req.method !== "POST" || (!approve && !reject && !approveEdit))
     return json({ error: "Маршрут не найден" }, 404)
+  if (approveEdit) {
+    const res = await fetch(
+      `${e.url}/rest/v1/sharoboy_custom_maps?id=eq.${approveEdit}&status=eq.approved&edit_status=eq.requested`,
+      {
+        method: "PATCH",
+        headers: { ...h(e.key), Prefer: "return=representation" },
+        body: JSON.stringify({ edit_status: "approved" }),
+      }
+    )
+    if (!res.ok) return json({ error: "Не удалось одобрить редактирование" }, 502)
+    const rows = (await res.json()) as unknown[]
+    if (rows.length === 0) return json({ error: "Запрос на редактирование не найден" }, 409)
+    return json({ map: rows[0] })
+  }
   const id = approve ?? reject
   const data = reject ? await parsed(req) : null
   const reason = reject

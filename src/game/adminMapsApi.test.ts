@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { adminLogin, adminLogout, approveMap, fetchPendingMaps, rejectMap } from "./adminMapsApi"
+import {
+  adminLogin,
+  adminLogout,
+  approveMap,
+  approveMapEdit,
+  fetchEditRequests,
+  fetchPendingMaps,
+  rejectMap,
+} from "./adminMapsApi"
 
 const response = (body: unknown, ok = true, status = 200) =>
   ({
@@ -44,6 +52,14 @@ describe("admin maps API", () => {
       method: "POST",
       body: JSON.stringify({ reject_reason: "Непроходимый уровень" }),
     })
+  })
+
+  it("loads edit requests and approves an edit", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(response({ maps: [] }))
+    await expect(fetchEditRequests("token")).resolves.toEqual([])
+    await approveMapEdit("token", "map-id")
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("status=edit-requested")
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("/map-id/approve-edit")
   })
 
   it("reports server errors and rejects an empty reason", async () => {

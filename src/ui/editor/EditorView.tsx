@@ -168,7 +168,12 @@ export function EditorView({
         />
       )}
       {showPublish && LEADERBOARD_ENABLED && (
-        <EditorPublishModal author={author} map={state.map} onClose={() => setShowPublish(false)} />
+        <EditorPublishModal
+          author={author}
+          map={state.map}
+          onClose={() => setShowPublish(false)}
+          onImportMap={(map) => dispatch({ type: "SET_MAP", map, preserveHistory: true })}
+        />
       )}
     </section>
   )

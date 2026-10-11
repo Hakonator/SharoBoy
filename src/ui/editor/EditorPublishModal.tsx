@@ -1,6 +1,6 @@
 import { useState } from "react"
 
-import { publishCustomMap } from "../../game/customMapsApi"
+import { publishCustomMap, updateMapSpec, type CustomMapRecord } from "../../game/customMapsApi"
 import type { PlayerMapSpec } from "../../game/mapSpec"
 import { containsProfanity } from "../../game/profanity"
 import { validatePlayerMapSpec, type MapValidationError } from "../../game/mapValidator"
@@ -9,14 +9,71 @@ interface EditorPublishModalProps {
   map: PlayerMapSpec
   author: string
   onClose: () => void
+  onImportMap: (map: PlayerMapSpec) => void
 }
 
-export function EditorPublishModal({ map, author, onClose }: EditorPublishModalProps) {
+const PUBLISHED_MAPS_KEY = "sharoboy-published-map-records"
+const PROJECT_UIDS_KEY = "sharoboy-map-project-uids"
+
+function projectUid(projectId: string): string {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(PROJECT_UIDS_KEY) ?? "{}")
+    const records =
+      value && typeof value === "object" && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : {}
+    if (typeof records[projectId] === "string" && records[projectId]) return records[projectId]
+    const generated =
+      globalThis.crypto?.randomUUID?.() ??
+      `map-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    localStorage.setItem(PROJECT_UIDS_KEY, JSON.stringify({ ...records, [projectId]: generated }))
+    return generated
+  } catch {
+    return projectId
+  }
+}
+
+function loadRecord(mapUid: string): CustomMapRecord | null {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(PUBLISHED_MAPS_KEY) ?? "null")
+    if (!Array.isArray(value)) return null
+    const record = value.find(
+      (item): item is CustomMapRecord =>
+        typeof item === "object" &&
+        item !== null &&
+        (item as { map_uid?: unknown }).map_uid === mapUid
+    )
+    return record ?? null
+  } catch {
+    return null
+  }
+}
+
+function saveRecord(record: CustomMapRecord): void {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(PUBLISHED_MAPS_KEY) ?? "[]")
+    const records = Array.isArray(value)
+      ? value.filter((item) => typeof item === "object" && item !== null)
+      : []
+    const next = records.filter(
+      (item) => (item as { map_uid?: unknown }).map_uid !== record.map_uid
+    )
+    localStorage.setItem(PUBLISHED_MAPS_KEY, JSON.stringify([...next, record]))
+  } catch {
+    /* Local persistence is optional. */
+  }
+}
+
+export function EditorPublishModal({ map, author, onClose, onImportMap }: EditorPublishModalProps) {
   const [title, setTitle] = useState(map.metadata.title)
   const [description, setDescription] = useState(map.metadata.description ?? "")
   const [errors, setErrors] = useState<MapValidationError[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [json, setJson] = useState("")
+  const [showJson, setShowJson] = useState(false)
+  const mapUid = projectUid(map.id)
+  const [record, setRecord] = useState<CustomMapRecord | null>(() => loadRecord(mapUid))
 
   const submit = async () => {
     setErrors([])
@@ -42,14 +99,22 @@ export function EditorPublishModal({ map, author, onClose }: EditorPublishModalP
     }
     setSubmitting(true)
     try {
-      await publishCustomMap({
-        title: cleanTitle,
-        description: cleanDescription,
-        author_nick: author,
-        spec: map,
-      })
+      const updated =
+        record?.edit_status === "approved"
+          ? await updateMapSpec(record.id, map)
+          : await publishCustomMap({
+              title: cleanTitle,
+              description: cleanDescription,
+              author_nick: author,
+              map_uid: mapUid,
+              spec: map,
+            })
+      setRecord(updated)
+      saveRecord(updated)
       setMessage(
-        "Карта отправлена на модерацию! Она появится в общем каталоге после проверки администратором."
+        record?.edit_status === "approved"
+          ? "Обновление отправлено и опубликовано с сохранением статистики."
+          : "Карта отправлена на модерацию! Повторная отправка этой карты заблокирована."
       )
     } catch (error) {
       setMessage(
@@ -57,6 +122,25 @@ export function EditorPublishModal({ map, author, onClose }: EditorPublishModalP
       )
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const importJson = () => {
+    try {
+      const parsed: unknown = JSON.parse(json)
+      const candidate = parsed as PlayerMapSpec
+      const errors = validatePlayerMapSpec(candidate)
+      if (errors.length > 0) {
+        setErrors(errors)
+        return
+      }
+      if (typeof parsed === "object" && parsed !== null) {
+        onImportMap(candidate)
+        setMessage("JSON проверен. Нажмите отправку, чтобы сохранить изменения.")
+        setErrors([])
+      }
+    } catch {
+      setMessage("Некорректный JSON карты.")
     }
   }
 
@@ -72,7 +156,7 @@ export function EditorPublishModal({ map, author, onClose }: EditorPublishModalP
           <div>
             <p className="hud-label">COMMUNITY MAPS</p>
             <h2 className="font-display text-xl text-cyan-neon" id="editor-publish-title">
-              Опубликовать карту
+              {record?.edit_status === "approved" ? "Обновить карту" : "Опубликовать карту"}
             </h2>
           </div>
           <button
@@ -121,6 +205,22 @@ export function EditorPublishModal({ map, author, onClose }: EditorPublishModalP
             {message}
           </p>
         )}
+        {record?.status === "pending" && (
+          <p
+            className="rounded-lg border border-gold/40 bg-gold/10 p-3 text-sm text-gold"
+            role="status"
+          >
+            ⏳ На проверке — повторная отправка заблокирована.
+          </p>
+        )}
+        {record?.edit_status === "approved" && (
+          <p
+            className="rounded-lg border border-mint/40 bg-mint/10 p-3 text-sm text-mint"
+            role="status"
+          >
+            🟢 Одобрено для внесения изменений
+          </p>
+        )}
         {errors.length > 0 && (
           <ul
             aria-label="Ошибки валидации карты"
@@ -137,7 +237,17 @@ export function EditorPublishModal({ map, author, onClose }: EditorPublishModalP
         <footer className="flex justify-end gap-2">
           <button
             className="btn-ghost px-4 py-2 text-sm"
-            disabled={submitting}
+            onClick={() => {
+              setShowJson((value) => !value)
+              setJson(JSON.stringify(map, null, 2))
+            }}
+            type="button"
+          >
+            {showJson ? "Скрыть JSON" : "Вставить готовый JSON"}
+          </button>
+          <button
+            className="btn-ghost px-4 py-2 text-sm"
+            disabled={submitting || record?.status === "pending"}
             onClick={onClose}
             type="button"
           >
@@ -149,9 +259,25 @@ export function EditorPublishModal({ map, author, onClose }: EditorPublishModalP
             onClick={() => void submit()}
             type="button"
           >
-            {submitting ? "Отправка на модерацию..." : "🚀 Отправить"}
+            {submitting
+              ? "Отправка..."
+              : record?.edit_status === "approved"
+                ? "🚀 Отправить обновление"
+                : "🚀 Отправить"}
           </button>
         </footer>
+        {showJson && (
+          <div className="space-y-2 rounded-lg border border-line bg-abyss p-3">
+            <textarea
+              className="min-h-40 w-full border border-line bg-deep p-2 font-mono text-xs text-foam outline-none"
+              onChange={(event) => setJson(event.target.value)}
+              value={json}
+            />
+            <button className="btn-ghost px-3 py-2 text-sm" onClick={importJson} type="button">
+              Проверить и подставить JSON
+            </button>
+          </div>
+        )}
       </section>
     </div>
   )

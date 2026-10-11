@@ -10,6 +10,9 @@ export interface CustomMapRecord {
   spec_json: PlayerMapSpec
   status?: "pending" | "approved" | "rejected"
   reject_reason?: string | null
+  map_uid?: string | null
+  edit_status?: "none" | "requested" | "approved"
+  edit_request_reason?: string | null
   likes_count: number
   plays_count: number
   created_at: string
@@ -20,6 +23,7 @@ export interface PublishCustomMapPayload {
   description?: string
   author_nick: string
   spec: PlayerMapSpec
+  map_uid?: string
 }
 
 export interface ApprovedMapsParams {
@@ -73,12 +77,40 @@ export async function publishCustomMap(payload: PublishCustomMapPayload): Promis
       description: payload.description ?? "",
       author_nick: payload.author_nick,
       spec_json: payload.spec,
+      map_uid: payload.map_uid ?? payload.spec.id,
     }),
   })
   if (!response.ok)
     throw new Error(await errorMessage(response, "Не удалось отправить карту на модерацию"))
   const data = (await response.json()) as { map?: CustomMapRecord }
   if (!data.map) throw new Error("Сервер не вернул опубликованную карту.")
+  return data.map
+}
+
+export async function requestMapEdit(
+  mapId: string,
+  authorNick: string,
+  reason: string
+): Promise<void> {
+  if (!LEADERBOARD_ENABLED) throw unavailable()
+  const response = await request(`/${encodeURIComponent(mapId)}/request-edit`, {
+    method: "POST",
+    body: JSON.stringify({ author_nick: authorNick, reason: reason.trim() }),
+  })
+  if (!response.ok)
+    throw new Error(await errorMessage(response, "Не удалось запросить редактирование"))
+}
+
+export async function updateMapSpec(mapId: string, spec: PlayerMapSpec): Promise<CustomMapRecord> {
+  if (!LEADERBOARD_ENABLED) throw unavailable()
+  const response = await request(`/${encodeURIComponent(mapId)}/update-spec`, {
+    method: "PUT",
+    body: JSON.stringify({ spec_json: spec }),
+  })
+  if (!response.ok)
+    throw new Error(await errorMessage(response, "Не удалось отправить обновление карты"))
+  const data = (await response.json()) as { map?: CustomMapRecord }
+  if (!data.map) throw new Error("Сервер не вернул обновлённую карту.")
   return data.map
 }
 

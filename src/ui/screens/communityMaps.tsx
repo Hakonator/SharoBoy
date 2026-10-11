@@ -4,6 +4,7 @@ import { LEADERBOARD_ENABLED } from "../../config"
 import {
   fetchApprovedMaps,
   getVoterId,
+  requestMapEdit,
   voteMap,
   type CustomMapRecord,
 } from "../../game/customMapsApi"
@@ -12,6 +13,7 @@ import type { PlayerMapSpec } from "../../game/mapSpec"
 type CommunityMapsSort = "popular" | "newest"
 
 const LIKED_MAPS_KEY = "sharoboy-liked-community-maps"
+const NICK_KEY = "sharoboy-nick"
 
 export interface CommunityMapsProps {
   onBack: () => void
@@ -50,6 +52,13 @@ function saveLikedMaps(ids: Set<string>): void {
 }
 
 export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
+  const [currentNick] = useState(() => {
+    try {
+      return localStorage.getItem(NICK_KEY) ?? ""
+    } catch {
+      return ""
+    }
+  })
   const [sort, setSort] = useState<CommunityMapsSort>("popular")
   const [search, setSearch] = useState("")
   const [maps, setMaps] = useState<CustomMapRecord[]>([])
@@ -57,6 +66,9 @@ export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [likingId, setLikingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editReason, setEditReason] = useState("")
+  const [requestingEdit, setRequestingEdit] = useState(false)
 
   const loadMaps = useCallback(async () => {
     if (!LEADERBOARD_ENABLED) return
@@ -93,6 +105,43 @@ export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
       setError(reason instanceof Error ? reason.message : "Не удалось поставить лайк.")
     } finally {
       setLikingId(null)
+    }
+  }
+
+  const requestEdit = async (map: CustomMapRecord) => {
+    if (!editReason.trim()) return
+    setRequestingEdit(true)
+    setError(null)
+    try {
+      await requestMapEdit(map.id, currentNick.trim(), editReason)
+      try {
+        const key = "sharoboy-published-map-records"
+        const stored: unknown = JSON.parse(localStorage.getItem(key) ?? "[]")
+        const records = Array.isArray(stored)
+          ? stored.filter((item) => typeof item === "object" && item !== null)
+          : []
+        const mapUid = map.map_uid ?? map.spec_json.id
+        const next = records.filter((item) => (item as { map_uid?: unknown }).map_uid !== mapUid)
+        localStorage.setItem(
+          key,
+          JSON.stringify([...next, { ...map, map_uid: mapUid, edit_status: "requested" }])
+        )
+      } catch {
+        /* The catalog remains usable when local persistence is unavailable. */
+      }
+      setMaps((current) =>
+        current.map((item) =>
+          item.id === map.id
+            ? { ...item, edit_status: "requested", edit_request_reason: editReason.trim() }
+            : item
+        )
+      )
+      setEditingId(null)
+      setEditReason("")
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось запросить редактирование.")
+    } finally {
+      setRequestingEdit(false)
     }
   }
 
@@ -213,6 +262,16 @@ export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
                       >
                         ❤️ {map.likes_count}
                       </button>
+                      {map.author_nick === currentNick.trim() &&
+                        map.edit_status !== "requested" && (
+                          <button
+                            className="btn-ghost flex-1 px-3 py-2 text-sm"
+                            onClick={() => setEditingId(map.id)}
+                            type="button"
+                          >
+                            ✎ Запросить изменение
+                          </button>
+                        )}
                       <button
                         className="btn-arcade flex-1 px-3 py-2 text-sm"
                         onClick={() => onPlay(map.spec_json)}
@@ -221,6 +280,25 @@ export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
                         ▶ Играть
                       </button>
                     </div>
+                    {editingId === map.id && (
+                      <div className="mt-3 space-y-2 border-t border-line pt-3">
+                        <textarea
+                          className="min-h-16 w-full rounded border border-line bg-abyss p-2 text-xs text-foam outline-none focus:border-cyan-neon"
+                          maxLength={300}
+                          onChange={(event) => setEditReason(event.target.value)}
+                          placeholder="Что нужно исправить?"
+                          value={editReason}
+                        />
+                        <button
+                          className="btn-arcade w-full px-3 py-2 text-xs"
+                          disabled={requestingEdit || editReason.trim().length < 3}
+                          onClick={() => void requestEdit(map)}
+                          type="button"
+                        >
+                          {requestingEdit ? "Отправка…" : "Отправить запрос"}
+                        </button>
+                      </div>
+                    )}
                   </article>
                 ))}
               </div>
