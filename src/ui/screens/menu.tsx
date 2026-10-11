@@ -27,6 +27,7 @@ export function MenuScreen({
   onScreen,
   onCampaign,
   onEndless,
+  onCommunityMaps,
   onBuyUpgrade,
   debug,
   onToggleDebug,
@@ -54,6 +55,7 @@ export function MenuScreen({
   onScreen: (s: ScreenFilter) => void
   onCampaign: () => void
   onEndless: () => void
+  onCommunityMaps: () => void
   onBuyUpgrade: (id: string) => void
   /** Режим отладки включён. */
   debug: boolean
@@ -110,6 +112,13 @@ export function MenuScreen({
           <div className="mt-6 flex flex-wrap items-center gap-4">
             <button className="btn-arcade px-8 py-4 text-lg sm:text-xl" onClick={onCampaign}>
               Кампания
+            </button>
+            <button
+              className="btn-ghost px-6 py-4 font-display text-base sm:text-lg"
+              onClick={onCommunityMaps}
+              type="button"
+            >
+              🗺 Карты сообщества
             </button>
             <button
               className="btn-ghost px-6 py-4 font-display text-base sm:text-lg"

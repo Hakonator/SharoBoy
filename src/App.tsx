@@ -12,6 +12,7 @@ import {
   WinScreen,
   TopSubmit,
 } from "./ui/screens"
+import { CommunityMaps } from "./ui/screens/communityMaps"
 import { useAchToasts } from "./ui/useAchToasts"
 import { useDebugControls } from "./ui/useDebugControls"
 import { useLeaderboard } from "./ui/useLeaderboard"
@@ -71,6 +72,7 @@ export default function App() {
   const [showEditor, setShowEditor] = useState(false)
   const [editorMap, setEditorMap] = useState<PlayerMapSpec | null>(null)
   const [mapTesterJson, setMapTesterJson] = useState<string | undefined>()
+  const [showCommunityMaps, setShowCommunityMaps] = useState(false)
 
   const onHud = useCallback((h: HudData) => setHud(h), [])
 
@@ -133,6 +135,11 @@ export default function App() {
     setEditorMap(spec)
     setShowEditor(false)
     g()?.startCustomMap(spec, () => setShowEditor(true))
+  }
+
+  const startCommunityMap = (spec: PlayerMapSpec) => {
+    setShowCommunityMaps(false)
+    g()?.startCustomMap(spec, () => setShowCommunityMaps(true))
   }
 
   const topSubmit = (
@@ -200,6 +207,7 @@ export default function App() {
             onScreen={leaderboard.setScreen}
             onCampaign={() => g()?.startGame()}
             onEndless={() => g()?.startEndless()}
+            onCommunityMaps={() => setShowCommunityMaps(true)}
             onBuyUpgrade={(id) => g()?.buyUpgrade(id)}
             debug={debug.debug}
             onToggleDebug={debug.handleToggleDebug}
@@ -228,6 +236,10 @@ export default function App() {
             Редактор карт
           </button>
         </>
+      )}
+
+      {showCommunityMaps && hud.phase === "menu" && (
+        <CommunityMaps onBack={() => setShowCommunityMaps(false)} onPlay={startCommunityMap} />
       )}
 
       {showMapTester && hud.phase === "menu" && (
