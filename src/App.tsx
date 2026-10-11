@@ -13,6 +13,7 @@ import {
   TopSubmit,
 } from "./ui/screens"
 import { CommunityMaps } from "./ui/screens/communityMaps"
+import { AdminPanel } from "./ui/screens/AdminPanel"
 import { useAchToasts } from "./ui/useAchToasts"
 import { useDebugControls } from "./ui/useDebugControls"
 import { useLeaderboard } from "./ui/useLeaderboard"
@@ -73,6 +74,7 @@ export default function App() {
   const [editorMap, setEditorMap] = useState<PlayerMapSpec | null>(null)
   const [mapTesterJson, setMapTesterJson] = useState<string | undefined>()
   const [showCommunityMaps, setShowCommunityMaps] = useState(false)
+  const [showAdminPanel, setShowAdminPanel] = useState(false)
 
   const onHud = useCallback((h: HudData) => setHud(h), [])
 
@@ -142,6 +144,11 @@ export default function App() {
     g()?.startCustomMap(spec, () => setShowCommunityMaps(true))
   }
 
+  const startAdminMap = (spec: PlayerMapSpec) => {
+    setShowAdminPanel(false)
+    g()?.startCustomMap(spec, () => setShowAdminPanel(true))
+  }
+
   const topSubmit = (
     <TopSubmit
       show={
@@ -208,6 +215,7 @@ export default function App() {
             onCampaign={() => g()?.startGame()}
             onEndless={() => g()?.startEndless()}
             onCommunityMaps={() => setShowCommunityMaps(true)}
+            onAdmin={() => setShowAdminPanel(true)}
             onBuyUpgrade={(id) => g()?.buyUpgrade(id)}
             debug={debug.debug}
             onToggleDebug={debug.handleToggleDebug}
@@ -240,6 +248,10 @@ export default function App() {
 
       {showCommunityMaps && hud.phase === "menu" && (
         <CommunityMaps onBack={() => setShowCommunityMaps(false)} onPlay={startCommunityMap} />
+      )}
+
+      {showAdminPanel && hud.phase === "menu" && (
+        <AdminPanel onBack={() => setShowAdminPanel(false)} onTestRun={startAdminMap} />
       )}
 
       {showMapTester && hud.phase === "menu" && (

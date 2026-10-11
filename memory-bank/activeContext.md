@@ -1,5 +1,19 @@
 # Активный контекст (Active Context)
 
+## Последнее обновление (11.10.2026, T-024 завершена)
+
+- Добавлен `src/game/adminMapsApi.ts`: login через `admin-maps/login`, хранение
+  токена в sessionStorage, загрузка pending, approve/reject/logout, таймауты и
+  русские сообщения API-ошибок. Reject передаёт фактическое поле `reject_reason`,
+  используемое Edge Function.
+- Добавлен `AdminPanel.tsx`: форма авторизации, pending-очередь, read-only CSS
+  preview поля карты, тест-драйв через `Game.startCustomMap`, одобрение,
+  отклонение с причиной, logout и возврат в меню. Панель подключена через
+  `src/App.tsx` и ссылку в `menu.tsx`.
+- Добавлены `adminMapsApi.test.ts` и `AdminPanel.test.tsx`. Проверки прошли:
+  `npm run lint`, `npm run typecheck`, полный `npm run test` — 46 файлов,
+  376 тестов. Следующий шаг — ревью Gemini.
+
 ## Последнее обновление (11.10.2026, T-023 завершена)
 
 - Добавлен `CommunityMaps` в `src/ui/screens/communityMaps.tsx`: approved-каталог

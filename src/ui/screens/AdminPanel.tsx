@@ -1,0 +1,304 @@
+import { useCallback, useEffect, useState } from "react"
+
+import type { CustomMapRecord } from "../../game/customMapsApi"
+import {
+  adminLogin,
+  adminLogout,
+  approveMap,
+  fetchPendingMaps,
+  getAdminToken,
+  rejectMap,
+} from "../../game/adminMapsApi"
+import type { PlayerMapSpec } from "../../game/mapSpec"
+
+export interface AdminPanelProps {
+  onBack: () => void
+  onTestRun: (map: PlayerMapSpec) => void
+}
+
+export function formatAdminDate(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? "дата неизвестна" : date.toLocaleDateString("ru-RU")
+}
+
+function Preview({ map }: { map: CustomMapRecord }) {
+  return (
+    <div
+      className="relative aspect-video w-full overflow-hidden border border-line bg-[#07131b]"
+      aria-label="Предпросмотр карты"
+    >
+      {map.spec_json.blocks.map((block) => {
+        const width = Math.max(1, (block.size.width / 1920) * 100)
+        const height = Math.max(1, (block.size.height / 1080) * 100)
+        return (
+          <span
+            className={`absolute border border-cyan-neon/80 bg-cyan-neon/35 ${block.shape === "circle" ? "rounded-full" : "rounded-[35%]"}`}
+            key={block.id}
+            style={{
+              height: `${height}%`,
+              left: `${(block.position.x / 1920) * 100}%`,
+              top: `${(block.position.y / 1080) * 100}%`,
+              transform: `translate(-50%, -50%) rotate(${block.rotation ?? 0}deg)`,
+              width: `${width}%`,
+            }}
+            title={`${block.id}: HP ${block.hp}`}
+          />
+        )
+      })}
+      <span className="absolute bottom-1 left-2 text-[10px] text-dim">1920 × 1080 · read-only</span>
+    </div>
+  )
+}
+
+export function AdminPanel({ onBack, onTestRun }: AdminPanelProps) {
+  const [token, setToken] = useState<string | null>(getAdminToken)
+  const [password, setPassword] = useState("")
+  const [maps, setMaps] = useState<CustomMapRecord[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [reason, setReason] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async (currentToken: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const next = await fetchPendingMaps(currentToken)
+      setMaps(next)
+      setSelectedId((current) =>
+        next.some((map) => map.id === current) ? current : (next[0]?.id ?? null)
+      )
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Не удалось загрузить очередь.")
+      setToken(null)
+      adminLogout()
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (token) void load(token)
+  }, [load, token])
+
+  const login = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      const nextToken = await adminLogin(password)
+      setPassword("")
+      setToken(nextToken)
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Неверный пароль.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const decide = async (map: CustomMapRecord, decision: "approve" | "reject") => {
+    if (!token) return
+    setBusy(true)
+    setError(null)
+    try {
+      if (decision === "approve") await approveMap(token, map.id)
+      else {
+        if (!reason.trim()) {
+          setError("Укажите причину отклонения.")
+          return
+        }
+        await rejectMap(token, map.id, reason)
+      }
+      setReason("")
+      setRejectingId(null)
+      await load(token)
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Не удалось изменить статус карты.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const selected = maps.find((map) => map.id === selectedId) ?? null
+
+  return (
+    <section className="absolute inset-0 z-50 overflow-y-auto bg-abyss p-4 text-foam sm:p-8">
+      <div className="mx-auto max-w-6xl">
+        <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="hud-label">MODERATION</p>
+            <h1 className="font-display text-3xl text-gold sm:text-5xl">Панель модерации</h1>
+          </div>
+          <div className="flex gap-2">
+            {token && (
+              <button
+                className="btn-ghost px-4 py-2"
+                disabled={busy}
+                onClick={() => {
+                  adminLogout()
+                  setToken(null)
+                  setMaps([])
+                }}
+                type="button"
+              >
+                Выйти
+              </button>
+            )}
+            <button className="btn-ghost px-4 py-2" onClick={onBack} type="button">
+              ← В меню
+            </button>
+          </div>
+        </header>
+
+        {!token ? (
+          <form
+            className="mx-auto max-w-sm rounded-xl border border-line bg-deep/90 p-6"
+            onSubmit={(event) => void login(event)}
+          >
+            <h2 className="font-display text-xl text-foam">Вход администратора</h2>
+            <p className="mt-2 text-sm text-dim">Секретный пароль хранится только на сервере.</p>
+            <input
+              autoFocus
+              className="mt-5 w-full border border-line bg-abyss px-3 py-3 text-foam outline-none focus:border-gold"
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Пароль"
+              type="password"
+              value={password}
+            />
+            {error && (
+              <p className="mt-3 text-sm text-punch" role="alert">
+                {error}
+              </p>
+            )}
+            <button
+              className="btn-arcade mt-5 w-full px-4 py-3"
+              disabled={busy || !password}
+              type="submit"
+            >
+              {busy ? "Проверка…" : "Войти"}
+            </button>
+          </form>
+        ) : (
+          <>
+            {error && (
+              <p
+                className="mb-4 rounded border border-punch/50 bg-punch/10 p-3 text-sm text-punch"
+                role="alert"
+              >
+                {error}
+              </p>
+            )}
+            {loading ? (
+              <p className="py-10 text-center text-dim">Загрузка очереди…</p>
+            ) : maps.length === 0 ? (
+              <p className="rounded-xl border border-line bg-deep/80 p-8 text-center text-dim">
+                Очередь модерации пуста.
+              </p>
+            ) : (
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
+                <div className="space-y-2">
+                  {maps.map((map) => (
+                    <button
+                      className={`w-full rounded-lg border p-3 text-left ${map.id === selectedId ? "border-gold bg-gold/10" : "border-line bg-deep/80"}`}
+                      key={map.id}
+                      onClick={() => setSelectedId(map.id)}
+                      type="button"
+                    >
+                      <div className="flex justify-between gap-2">
+                        <strong className="truncate font-display">{map.title}</strong>
+                        <span className="text-xs text-dim">{formatAdminDate(map.created_at)}</span>
+                      </div>
+                      <div className="mt-1 text-xs text-cyan-neon">
+                        {map.author_nick} · {map.spec_json.blocks.length} блоков
+                      </div>
+                      <p className="mt-1 truncate text-xs text-dim">
+                        {map.description || "Без описания"}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+                {selected && (
+                  <article className="rounded-xl border border-line bg-deep/90 p-4">
+                    <div className="mb-3 flex flex-wrap justify-between gap-2">
+                      <div>
+                        <h2 className="font-display text-2xl text-foam">{selected.title}</h2>
+                        <p className="text-sm text-cyan-neon">
+                          Автор: {selected.author_nick} · {formatAdminDate(selected.created_at)}
+                        </p>
+                      </div>
+                      <span className="text-xs text-dim">pending</span>
+                    </div>
+                    <p className="mb-4 text-sm text-dim">
+                      {selected.description || "Без описания"}
+                    </p>
+                    <Preview map={selected} />
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        className="btn-ghost px-4 py-2"
+                        disabled={busy}
+                        onClick={() => onTestRun(selected.spec_json)}
+                        type="button"
+                      >
+                        ▶ Протестировать карту
+                      </button>
+                      <button
+                        className="btn-arcade px-4 py-2"
+                        disabled={busy}
+                        onClick={() => void decide(selected, "approve")}
+                        type="button"
+                      >
+                        ✓ Одобрить
+                      </button>
+                      <button
+                        className="btn-ghost px-4 py-2 text-punch"
+                        disabled={busy}
+                        onClick={() => setRejectingId(selected.id)}
+                        type="button"
+                      >
+                        ✕ Отклонить
+                      </button>
+                    </div>
+                    {rejectingId === selected.id && (
+                      <div className="mt-4 border-t border-line pt-4">
+                        <label className="hud-label" htmlFor="reject-reason">
+                          Причина отклонения
+                        </label>
+                        <textarea
+                          className="mt-2 min-h-20 w-full border border-line bg-abyss p-3 text-sm text-foam outline-none focus:border-punch"
+                          id="reject-reason"
+                          maxLength={300}
+                          onChange={(event) => setReason(event.target.value)}
+                          placeholder="Например: непроходимый уровень"
+                          value={reason}
+                        />
+                        <div className="mt-2 flex justify-end gap-2">
+                          <button
+                            className="btn-ghost px-3 py-2"
+                            onClick={() => setRejectingId(null)}
+                            type="button"
+                          >
+                            Отмена
+                          </button>
+                          <button
+                            className="btn-ghost px-3 py-2 text-punch"
+                            disabled={busy || !reason.trim()}
+                            onClick={() => void decide(selected, "reject")}
+                            type="button"
+                          >
+                            Подтвердить отклонение
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </section>
+  )
+}

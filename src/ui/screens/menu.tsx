@@ -28,6 +28,7 @@ export function MenuScreen({
   onCampaign,
   onEndless,
   onCommunityMaps,
+  onAdmin,
   onBuyUpgrade,
   debug,
   onToggleDebug,
@@ -56,6 +57,7 @@ export function MenuScreen({
   onCampaign: () => void
   onEndless: () => void
   onCommunityMaps: () => void
+  onAdmin: () => void
   onBuyUpgrade: (id: string) => void
   /** Режим отладки включён. */
   debug: boolean
@@ -135,6 +137,13 @@ export function MenuScreen({
               </div>
             )}
           </div>
+          <button
+            className="mt-4 text-xs text-dim underline decoration-line underline-offset-4 hover:text-gold"
+            onClick={onAdmin}
+            type="button"
+          >
+            🛡️ Панель модерации
+          </button>
 
           {/* Ник доступен всегда — он подписывает и локальные рекорды,
               и отправку в мировой топ (не зависит от подключения Supabase). */}
