@@ -146,14 +146,18 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS })
   const e = env()
   if (e instanceof Response) return e
-  const path = new URL(req.url).pathname.replace(/^\/functions\/v1\/maps/, "") || "/"
-  if (req.method === "GET" && path === "/") return listMaps(req, e)
-  if (req.method === "POST" && path === "/") return postMap(req, e)
+  const url = new URL(req.url)
+  // В Supabase Edge Functions pathname может быть как "/functions/v1/maps", так и "/maps" или просто "/"
+  const cleanPath = url.pathname.replace(/^\/functions\/v1\/maps/, "").replace(/^\/maps/, "") || "/"
+  const path = cleanPath.endsWith("/") && cleanPath.length > 1 ? cleanPath.slice(0, -1) : cleanPath
+
+  if (req.method === "GET" && (path === "" || path === "/")) return listMaps(req, e)
+  if (req.method === "POST" && (path === "" || path === "/")) return postMap(req, e)
   if (req.method === "POST") {
     const vote = mapId(path, "vote")
     const play = mapId(path, "play")
     if (vote) return increment(req, e, vote, "vote")
     if (play) return increment(req, e, play, "play")
   }
-  return json({ error: "Маршрут не найден" }, 404)
+  return json({ error: "Маршрут не найден", received_path: url.pathname }, 404)
 })

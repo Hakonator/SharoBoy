@@ -53,12 +53,15 @@ async function handle(req: Request): Promise<Response> {
   const e = env()
   if (e instanceof Response) return e
   const url = new URL(req.url)
-  const path = url.pathname.replace(/^\/functions\/v1\/admin-maps/, "") || "/"
+  const cleanPath =
+    url.pathname.replace(/^\/functions\/v1\/admin-maps/, "").replace(/^\/admin-maps/, "") || "/"
+  const path = cleanPath.endsWith("/") && cleanPath.length > 1 ? cleanPath.slice(0, -1) : cleanPath
+
   if (req.method === "POST" && path === "/login") return login(req, e.secret)
   const token = req.headers.get("X-Admin-Token")
   if (!token || !(await verifyAdminToken(token, e.secret)))
     return json({ error: "Требуется действительная админ-сессия" }, 401)
-  if (req.method === "GET" && path === "/") {
+  if (req.method === "GET" && (path === "" || path === "/")) {
     const status = url.searchParams.get("status") ?? "pending"
     if (!["pending", "approved", "rejected"].includes(status))
       return json({ error: "Некорректный статус" }, 400)
