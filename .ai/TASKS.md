@@ -1216,3 +1216,91 @@ Verification commands:
 npm run typecheck
 npm run lint
 npm run test
+
+### T-021: Backend Supabase: миграции БД для кастомных карт и Edge Functions модерации/публикации
+
+Status: done
+Priority: high
+Assigned to: luna
+
+Описание:
+Согласно AD-015 реализовать серверную часть экосистемы кастомных карт в Supabase:
+
+1. **SQL-миграция БД (`supabase/migrations/20250101000008_create_custom_maps.sql`)**:
+   - Создать таблицу `public.sharoboy_custom_maps` с полями:
+     - `id uuid primary key default gen_random_uuid()`
+     - `title text not null`
+     - `description text default ''`
+     - `author_nick text not null`
+     - `spec_json jsonb not null`
+     - `status text not null default 'pending'` (`pending`, `approved`, `rejected`)
+     - `reject_reason text default null`
+     - `likes_count integer not null default 0`
+     - `plays_count integer not null default 0`
+     - `created_at timestamptz not null default now()`
+     - `updated_at timestamptz not null default now()`
+   - Создать таблицу `public.sharoboy_map_votes`:
+     - `id bigint generated always as identity primary key`
+     - `map_id uuid not null references public.sharoboy_custom_maps(id) on delete cascade`
+     - `voter_id text not null`
+     - `created_at timestamptz not null default now()`
+     - `unique (map_id, voter_id)`
+   - Настроить RLS:
+     - `public.sharoboy_custom_maps`: чтение разрешено для `anon` и `authenticated` ТОЛЬКО для `status = 'approved'`. Прямые `insert`, `update`, `delete` запрещены (выполняются только через Edge Functions от имени `service_role`).
+     - `public.sharoboy_map_votes`: чтение/запись закрыты, управляются через Edge Functions.
+   - Создать полезные индексы для выборок (по `status`, `likes_count desc`, `created_at desc`).
+
+2. **Edge Function `maps` (`supabase/functions/maps/index.ts`)**:
+   - `OPTIONS`: CORS preflight.
+   - `POST /functions/v1/maps`: отправка карты пользователем:
+     - Валидация ника и названия на длину и мат (используя `validateNick` / регулярные проверки).
+     - Валидация структуры `spec_json` (проверка наличия необходимых полей `blocks`, `winCondition`).
+     - Сохранение записи в `sharoboy_custom_maps` со статусом `pending`.
+   - `GET /functions/v1/maps`: получение одобренных карт (`status = 'approved'`):
+     - Параметры: `sort` (`popular` | `newest`), `search` (по title/author), `limit` (по умолчанию 20), `offset`.
+   - `POST /functions/v1/maps/:id/vote`: постановка лайка с защитой от дублей по `voter_id`.
+   - `POST /functions/v1/maps/:id/play`: атомарный инкремент `plays_count`.
+
+3. **Edge Function `admin-maps` (`supabase/functions/admin-maps/index.ts`)**:
+   - `POST /functions/v1/admin-maps/login`:
+     - Сверка входящего пароля с секретом `ADMIN_SECRET_KEY` (или `SCORE_SECRET` в качестве fallback).
+     - Генерация подписанного HMAC-SHA256 токена со сроком жизни 4 часа (`exp`).
+   - Все остальные запросы проверяют заголовок `X-Admin-Token` на валидность HMAC подписи и expiration:
+     - `GET /functions/v1/admin-maps?status=pending`: получение списка карт для модерации.
+     - `POST /functions/v1/admin-maps/:id/approve`: перевод карты в `status = 'approved'`.
+     - `POST /functions/v1/admin-maps/:id/reject`: перевод карты в `status = 'rejected'` с сохранением `reject_reason`.
+
+4. **Тесты**:
+   - Создать модульные тесты для хэширования/валидации токенов и логики API в `supabase/functions/maps/maps.test.ts` и `supabase/functions/admin-maps/admin.test.ts`.
+
+Allowed files:
+
+- supabase/migrations/20250101000008_create_custom_maps.sql
+- supabase/functions/maps/*
+- supabase/functions/admin-maps/*
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+- src/*
+
+Dependencies: none
+
+Acceptance criteria:
+
+- [x] SQL-миграция корректно объявляет таблицы, ограничения, индексы и RLS-политики
+- [x] Edge Function `maps` обрабатывает публикацию со статусом pending, каталог approved-карт, лайки и счетчик запусков
+- [x] Edge Function `admin-maps` предоставляет защищённую авторизацию по токену и функции одобрения/отклонения
+- [x] Тесты для функций в Supabase написаны и успешно выполняются
+- [x] Код строго типизирован и не содержит уязвимостей (SQL injection, auth bypass)
+
+Comment: Реализованы миграция custom maps/votes с RLS, безопасные RPC-инкременты, публичная Edge Function `maps` для публикации, каталога, лайков и запусков, а также `admin-maps` с HMAC-SHA256 токенами на 4 часа и approve/reject. Typecheck, lint, полный test (42 файла, 366 тестов) и целевые тесты Edge Functions прошли.
+
+Test plan:
+
+1. Запустить юнит-тесты функций с помощью vitest или deno test.
+2. Проверить синтаксис SQL-миграции.
+
+Verification commands:
+npm run test
