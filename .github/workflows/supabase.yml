@@ -39,19 +39,9 @@ jobs:
       - name: Изменилась ли функция в этом пуше?
         id: changes
         run: |
-          CHANGED=true
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
-            : # Ручной запуск или первый пуш в ветку — деплоим всегда
-          elif DIFF=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/functions 2>/dev/null); then
-            if [ -z "$DIFF" ]; then
-              CHANGED=false
-            fi
-          else
-            # before может не попасть в историю (например, после force push) —
-            # тогда перестраховываемся и деплоим функцию, а не роняем job.
-            echo "::warning::Не удалось сравнить коммиты — считаем функцию изменённой."
-          fi
-          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+          # Всегда деплоим Edge Functions при изменениях в beta/main,
+          # чтобы гарантировать синхронность всех трёх функций (scores, maps, admin-maps)
+          echo "changed=true" >> "$GITHUB_OUTPUT"
       - name: Установка Supabase CLI
         if: steps.changes.outputs.changed == 'true'
         uses: supabase/setup-cli@v1

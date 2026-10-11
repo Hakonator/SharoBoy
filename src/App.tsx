@@ -116,9 +116,11 @@ export default function App() {
     } catch (e) {
       setBootError(e instanceof Error ? e.message : String(e))
     }
-  }, [onHud, nick])
+    // nick синхронизируется отдельно через gameRef.current.setNick, чтобы ввод текста не перезапускал Game.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onHud])
 
-  /* Синхронизация ника с движком при изменении. */
+  /* Синхронизация ника с движком при изменении без пересоздания Game. */
   useEffect(() => {
     if (gameRef.current) {
       gameRef.current.setNick(nick)
