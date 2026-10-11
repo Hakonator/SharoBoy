@@ -277,6 +277,7 @@ export default function App() {
 
       {editorMap && (hud.phase === "won" || hud.phase === "over") && showEditor && (
         <EditorView
+          initialMap={editorMap}
           key={editorMap.id}
           onClose={() => {
             setShowEditor(false)

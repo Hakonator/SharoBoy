@@ -1,0 +1,300 @@
+import { useState } from "react"
+
+import type { CustomMapRecord } from "../../game/customMapsApi"
+import type { PlayerMapSpec } from "../../game/mapSpec"
+
+import {
+  createDefaultMap,
+  deleteLocalMap,
+  loadRecordForMap,
+  projectUidForMap,
+  type LocalMapEntry,
+} from "./localMapsStorage"
+
+interface EditorMapsModalProps {
+  currentMapId: string
+  maps: LocalMapEntry[]
+  onClose: () => void
+  onSelectMap: (map: PlayerMapSpec) => void
+  onCreateMap: (map: PlayerMapSpec) => void
+  onDeleteMap: (id: string) => void
+}
+
+export function formatLocalDate(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return "недавно"
+    return d.toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  } catch {
+    return "недавно"
+  }
+}
+
+interface StatusBadgeProps {
+  record: CustomMapRecord | null
+}
+
+export function MapStatusBadge({ record }: StatusBadgeProps) {
+  if (!record) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-dim/30 bg-abyss/80 px-2 py-0.5 text-xs text-dim">
+        Черновик
+      </span>
+    )
+  }
+
+  if (record.edit_status === "approved") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-md border border-mint/60 bg-mint/15 px-2 py-0.5 text-xs font-medium text-mint"
+        title="Модератор одобрил редактирование. Откройте карту и опубликуйте обновлённую версию"
+      >
+        🟢 Изменение согласовано
+      </span>
+    )
+  }
+
+  if (record.edit_status === "requested") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-md border border-gold/60 bg-gold/15 px-2 py-0.5 text-xs font-medium text-gold"
+        title="Запрос на внесение изменений ожидает решения модератора"
+      >
+        ⏳ Согласование правок
+      </span>
+    )
+  }
+
+  if (record.status === "approved") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-md border border-cyan-neon/60 bg-cyan-neon/15 px-2 py-0.5 text-xs font-medium text-cyan-neon"
+        title="Карта одобрена и опубликована в каталоге сообщества"
+      >
+        ✓ Принята
+      </span>
+    )
+  }
+
+  if (record.status === "rejected") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-md border border-punch/60 bg-punch/15 px-2 py-0.5 text-xs font-medium text-punch"
+        title={record.reject_reason ? `Причина: ${record.reject_reason}` : "Отклонена модератором"}
+      >
+        ✕ Отклонена
+      </span>
+    )
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-md border border-gold/60 bg-gold/15 px-2 py-0.5 text-xs font-medium text-gold"
+      title="Карта находится на проверке у модератора"
+    >
+      ⏳ На проверке
+    </span>
+  )
+}
+
+export function EditorMapsModal({
+  currentMapId,
+  maps,
+  onClose,
+  onSelectMap,
+  onCreateMap,
+  onDeleteMap,
+}: EditorMapsModalProps) {
+  const [newTitle, setNewTitle] = useState("")
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  const handleCreate = () => {
+    const title = newTitle.trim() || "Новая карта"
+    const newMap = createDefaultMap(
+      `map-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      title
+    )
+    onCreateMap(newMap)
+    setNewTitle("")
+    setShowCreateForm(false)
+  }
+
+  const handleDelete = (id: string) => {
+    deleteLocalMap(id)
+    onDeleteMap(id)
+    setConfirmDeleteId(null)
+  }
+
+  return (
+    <div
+      aria-label="Мои карты"
+      aria-modal="true"
+      className="absolute inset-0 z-[70] flex items-center justify-center bg-black/75 p-3 sm:p-6"
+      role="dialog"
+    >
+      <section className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl border border-line bg-deep text-foam shadow-2xl">
+        <header className="flex items-center justify-between border-b border-line p-4 sm:p-5">
+          <div>
+            <p className="hud-label">LOCAL STORAGE</p>
+            <h2 className="font-display text-xl text-cyan-neon sm:text-2xl">Мои карты</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="btn-arcade px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm"
+              onClick={() => setShowCreateForm(true)}
+              type="button"
+            >
+              + Создать новую
+            </button>
+            <button
+              aria-label="Закрыть"
+              className="btn-ghost px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm"
+              onClick={onClose}
+              type="button"
+            >
+              ✕
+            </button>
+          </div>
+        </header>
+
+        {showCreateForm && (
+          <div className="border-b border-line bg-abyss/80 p-4">
+            <h3 className="mb-2 font-display text-sm text-cyan-neon">Создание новой карты</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                autoFocus
+                className="min-w-48 flex-1 rounded-lg border border-line bg-deep px-3 py-2 text-sm text-foam outline-none focus:border-cyan-neon"
+                maxLength={60}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreate()
+                  if (e.key === "Escape") setShowCreateForm(false)
+                }}
+                placeholder="Название карты"
+                value={newTitle}
+              />
+              <button className="btn-arcade px-4 py-2 text-xs" onClick={handleCreate} type="button">
+                Создать
+              </button>
+              <button
+                className="btn-ghost px-3 py-2 text-xs"
+                onClick={() => setShowCreateForm(false)}
+                type="button"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+          {maps.length === 0 ? (
+            <div className="py-12 text-center text-dim">
+              <p className="text-base">У вас пока нет сохранённых карт.</p>
+              <p className="mt-1 text-xs">Создайте новую карту или начните рисовать в редакторе.</p>
+            </div>
+          ) : (
+            <ul className="space-y-3" role="list">
+              {maps.map((entry) => {
+                const isCurrent = entry.id === currentMapId
+                const mapUid = projectUidForMap(entry.id)
+                const record = loadRecordForMap(mapUid)
+
+                return (
+                  <li
+                    className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
+                      isCurrent
+                        ? "border-cyan-neon bg-cyan-neon/10 shadow-lg shadow-cyan-neon/10"
+                        : "border-line bg-abyss/60 hover:border-line/80 hover:bg-abyss"
+                    }`}
+                    key={entry.id}
+                  >
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate font-display text-base text-foam sm:text-lg">
+                          {entry.title || "Без названия"}
+                        </h3>
+                        {isCurrent && (
+                          <span className="rounded bg-cyan-neon/20 px-2 py-0.5 text-2xs font-semibold text-cyan-neon">
+                            Открыта сейчас
+                          </span>
+                        )}
+                        <MapStatusBadge record={record} />
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-dim">
+                        <span>Блоков: {entry.spec.blocks.length}</span>
+                        <span>Изменена: {formatLocalDate(entry.updatedAt)}</span>
+                        {record?.reject_reason && record.status === "rejected" && (
+                          <span className="text-punch">Причина отказа: {record.reject_reason}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2 pt-2 sm:pt-0">
+                      <button
+                        className={`px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm ${
+                          isCurrent ? "btn-ghost" : "btn-arcade"
+                        }`}
+                        onClick={() => {
+                          onSelectMap(entry.spec)
+                          onClose()
+                        }}
+                        type="button"
+                      >
+                        {isCurrent ? "Продолжить" : "Редактировать"}
+                      </button>
+
+                      {confirmDeleteId === entry.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            className="rounded-lg bg-punch px-2.5 py-1 text-xs font-semibold text-foam hover:bg-punch/80"
+                            onClick={() => handleDelete(entry.id)}
+                            type="button"
+                          >
+                            Да, удалить
+                          </button>
+                          <button
+                            className="btn-ghost px-2 py-1 text-xs"
+                            onClick={() => setConfirmDeleteId(null)}
+                            type="button"
+                          >
+                            Отмена
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          aria-label={`Удалить карту ${entry.title}`}
+                          className="btn-ghost px-2.5 py-1.5 text-xs text-dim hover:border-punch/50 hover:text-punch"
+                          onClick={() => setConfirmDeleteId(entry.id)}
+                          title="Удалить карту"
+                          type="button"
+                        >
+                          🗑
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+
+        <footer className="flex items-center justify-between border-t border-line bg-abyss/40 p-4 text-xs text-dim">
+          <span>Всего карт: {maps.length}</span>
+          <button className="btn-ghost px-4 py-1.5 text-xs" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </footer>
+      </section>
+    </div>
+  )
+}

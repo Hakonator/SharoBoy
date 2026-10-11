@@ -7,40 +7,20 @@ import { validatePlayerMapSpec } from "../../game/mapValidator"
 import { EditorCanvas } from "./EditorCanvas"
 import { EditorInspector } from "./EditorInspector"
 import { EditorJsonModal } from "./EditorJsonModal"
+import { EditorMapsModal } from "./EditorMapsModal"
 import { EditorPublishModal } from "./EditorPublishModal"
-import { createEditorState, editorReducer, loadEditorDraft, saveEditorDraft } from "./editorState"
+import { createEditorState, editorReducer, saveEditorDraft } from "./editorState"
 import { EditorToolbar } from "./EditorToolbar"
+import {
+  createDefaultMap,
+  deleteLocalMap,
+  getCurrentLocalMapId,
+  loadLocalMaps,
+  saveLocalMap,
+  setCurrentLocalMapId,
+  type LocalMapEntry,
+} from "./localMapsStorage"
 import type { EditorState } from "./types"
-
-const DEFAULT_MAP: PlayerMapSpec = {
-  version: 1,
-  id: "custom-map",
-  metadata: { title: "Новая карта" },
-  blocks: [
-    {
-      id: "block-1",
-      position: { x: 960, y: 300 },
-      shape: "ellipse",
-      size: { width: 80, height: 44 },
-      hp: 1,
-    },
-    {
-      id: "block-2",
-      position: { x: 860, y: 380 },
-      shape: "circle",
-      size: { width: 52, height: 52 },
-      hp: 2,
-    },
-    {
-      id: "block-3",
-      position: { x: 1060, y: 380 },
-      shape: "ellipse",
-      size: { width: 72, height: 42 },
-      hp: 3,
-    },
-  ],
-  winCondition: { kind: "all-destructible" },
-}
 
 interface EditorViewProps {
   onClose: () => void
@@ -49,6 +29,7 @@ interface EditorViewProps {
   musicMuted: boolean
   onToggleMusic: () => void
   onNextMusicTrack: () => void
+  initialMap?: PlayerMapSpec | null
 }
 
 export function EditorView({
@@ -58,10 +39,15 @@ export function EditorView({
   musicMuted,
   onToggleMusic,
   onNextMusicTrack,
+  initialMap,
 }: EditorViewProps) {
-  const [state, dispatch] = useReducer(editorReducer, undefined, createInitialState)
+  const [localMaps, setLocalMaps] = useState<LocalMapEntry[]>(() => loadLocalMaps())
+  const [state, dispatch] = useReducer(editorReducer, undefined, () =>
+    createInitialState(initialMap)
+  )
   const [showJson, setShowJson] = useState(false)
   const [showPublish, setShowPublish] = useState(false)
+  const [showMapsModal, setShowMapsModal] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
   const author = playerNick.trim() || "не указано"
 
@@ -73,6 +59,9 @@ export function EditorView({
 
   useEffect(() => {
     saveEditorDraft(state.map)
+    const updated = saveLocalMap(state.map)
+    setLocalMaps(updated)
+    setCurrentLocalMapId(state.map.id)
     if (state.isDirty) dispatch({ type: "MARK_SAVED" })
   }, [state.map, state.isDirty])
 
@@ -104,7 +93,9 @@ export function EditorView({
           dispatch({ type: "DELETE_SELECTED_BLOCKS" })
         }
       } else if (event.key === "Escape") {
-        if (showJson) setShowJson(false)
+        if (showMapsModal) setShowMapsModal(false)
+        else if (showPublish) setShowPublish(false)
+        else if (showJson) setShowJson(false)
         else if (state.selectedBlockIds.length > 0)
           dispatch({ type: "SELECT_BLOCKS", blockIds: [] })
         else onClose()
@@ -112,7 +103,7 @@ export function EditorView({
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [onClose, showJson, state.selectedBlockIds])
+  }, [onClose, showJson, showMapsModal, showPublish, state.selectedBlockIds])
 
   const testRun = () => {
     const errors = validatePlayerMapSpec(state.map)
@@ -130,17 +121,41 @@ export function EditorView({
     onTestRun(state.map)
   }
 
+  const handleSelectMap = (map: PlayerMapSpec) => {
+    dispatch({ type: "SET_MAP", map, preserveHistory: false })
+    setCurrentLocalMapId(map.id)
+    saveEditorDraft(map)
+  }
+
+  const handleCreateMap = (map: PlayerMapSpec) => {
+    const updated = saveLocalMap(map)
+    setLocalMaps(updated)
+    setCurrentLocalMapId(map.id)
+    saveEditorDraft(map)
+    dispatch({ type: "SET_MAP", map, preserveHistory: false })
+  }
+
+  const handleDeleteMap = (id: string) => {
+    const updated = deleteLocalMap(id)
+    setLocalMaps(updated)
+    if (state.map.id === id) {
+      const fallback = updated[0]?.spec ?? createDefaultMap()
+      handleSelectMap(fallback)
+    }
+  }
+
   return (
     <section className="absolute inset-0 z-50 flex flex-col gap-3 overflow-hidden bg-abyss p-3 text-foam sm:p-5">
       <EditorToolbar
         dispatch={dispatch}
         musicMuted={musicMuted}
-        onNextMusicTrack={onNextMusicTrack}
         onClose={onClose}
         onImportExport={() => setShowJson(true)}
-        onToggleMusic={onToggleMusic}
-        onTestRun={testRun}
+        onNextMusicTrack={onNextMusicTrack}
+        onOpenMaps={() => setShowMapsModal(true)}
         onPublish={() => setShowPublish(true)}
+        onTestRun={testRun}
+        onToggleMusic={onToggleMusic}
         publishingEnabled={LEADERBOARD_ENABLED}
         state={state}
       />
@@ -175,10 +190,32 @@ export function EditorView({
           onImportMap={(map) => dispatch({ type: "SET_MAP", map, preserveHistory: true })}
         />
       )}
+      {showMapsModal && (
+        <EditorMapsModal
+          currentMapId={state.map.id}
+          maps={localMaps}
+          onClose={() => setShowMapsModal(false)}
+          onCreateMap={handleCreateMap}
+          onDeleteMap={handleDeleteMap}
+          onSelectMap={handleSelectMap}
+        />
+      )}
     </section>
   )
 }
 
-function createInitialState(): EditorState {
-  return createEditorState(loadEditorDraft() ?? DEFAULT_MAP)
+function createInitialState(initialMap?: PlayerMapSpec | null): EditorState {
+  if (initialMap) return createEditorState(initialMap)
+  const localMaps = loadLocalMaps()
+  const currentId = getCurrentLocalMapId()
+  if (currentId) {
+    const existing = localMaps.find((m) => m.id === currentId)
+    if (existing) return createEditorState(existing.spec)
+  }
+  if (localMaps.length > 0 && localMaps[0]?.spec) {
+    return createEditorState(localMaps[0].spec)
+  }
+  const defaultMap = createDefaultMap()
+  saveLocalMap(defaultMap)
+  return createEditorState(defaultMap)
 }

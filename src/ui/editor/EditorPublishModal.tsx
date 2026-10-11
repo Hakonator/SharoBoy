@@ -12,57 +12,7 @@ interface EditorPublishModalProps {
   onImportMap: (map: PlayerMapSpec) => void
 }
 
-const PUBLISHED_MAPS_KEY = "sharoboy-published-map-records"
-const PROJECT_UIDS_KEY = "sharoboy-map-project-uids"
-
-function projectUid(projectId: string): string {
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem(PROJECT_UIDS_KEY) ?? "{}")
-    const records =
-      value && typeof value === "object" && !Array.isArray(value)
-        ? (value as Record<string, unknown>)
-        : {}
-    if (typeof records[projectId] === "string" && records[projectId]) return records[projectId]
-    const generated =
-      globalThis.crypto?.randomUUID?.() ??
-      `map-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    localStorage.setItem(PROJECT_UIDS_KEY, JSON.stringify({ ...records, [projectId]: generated }))
-    return generated
-  } catch {
-    return projectId
-  }
-}
-
-function loadRecord(mapUid: string): CustomMapRecord | null {
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem(PUBLISHED_MAPS_KEY) ?? "null")
-    if (!Array.isArray(value)) return null
-    const record = value.find(
-      (item): item is CustomMapRecord =>
-        typeof item === "object" &&
-        item !== null &&
-        (item as { map_uid?: unknown }).map_uid === mapUid
-    )
-    return record ?? null
-  } catch {
-    return null
-  }
-}
-
-function saveRecord(record: CustomMapRecord): void {
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem(PUBLISHED_MAPS_KEY) ?? "[]")
-    const records = Array.isArray(value)
-      ? value.filter((item) => typeof item === "object" && item !== null)
-      : []
-    const next = records.filter(
-      (item) => (item as { map_uid?: unknown }).map_uid !== record.map_uid
-    )
-    localStorage.setItem(PUBLISHED_MAPS_KEY, JSON.stringify([...next, record]))
-  } catch {
-    /* Local persistence is optional. */
-  }
-}
+import { loadRecordForMap, projectUidForMap, savePublishedRecord } from "./localMapsStorage"
 
 export function EditorPublishModal({ map, author, onClose, onImportMap }: EditorPublishModalProps) {
   const [title, setTitle] = useState(map.metadata.title)
@@ -72,8 +22,8 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
   const [submitting, setSubmitting] = useState(false)
   const [json, setJson] = useState("")
   const [showJson, setShowJson] = useState(false)
-  const mapUid = projectUid(map.id)
-  const [record, setRecord] = useState<CustomMapRecord | null>(() => loadRecord(mapUid))
+  const mapUid = projectUidForMap(map.id)
+  const [record, setRecord] = useState<CustomMapRecord | null>(() => loadRecordForMap(mapUid))
 
   const submit = async () => {
     setErrors([])
@@ -110,7 +60,7 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
               spec: map,
             })
       setRecord(updated)
-      saveRecord(updated)
+      savePublishedRecord(updated)
       setMessage(
         record?.edit_status === "approved"
           ? "Обновление отправлено и опубликовано с сохранением статистики."
@@ -211,6 +161,22 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
             role="status"
           >
             ⏳ На проверке — повторная отправка заблокирована.
+          </p>
+        )}
+        {record?.status === "approved" && record?.edit_status !== "approved" && (
+          <p
+            className="rounded-lg border border-cyan-neon/40 bg-cyan-neon/10 p-3 text-sm text-cyan-neon"
+            role="status"
+          >
+            ✓ Карта опубликована в каталоге сообщества.
+          </p>
+        )}
+        {record?.status === "rejected" && (
+          <p
+            className="rounded-lg border border-punch/40 bg-punch/10 p-3 text-sm text-punch"
+            role="status"
+          >
+            ✕ Отклонена модератором{record.reject_reason ? `: ${record.reject_reason}` : ""}
           </p>
         )}
         {record?.edit_status === "approved" && (

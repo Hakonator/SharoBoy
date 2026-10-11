@@ -17,6 +17,7 @@ export function EditorToolbar({
   onImportExport,
   onTestRun,
   onClose,
+  onOpenMaps,
   musicMuted,
   onToggleMusic,
   onNextMusicTrack,
@@ -127,6 +128,15 @@ export function EditorToolbar({
       >
         Очистить
       </ToolbarButton>
+      {onOpenMaps && (
+        <ToolbarButton
+          label="Мои карты"
+          onClick={onOpenMaps}
+          title="Локальный каталог карт: переключение, создание, статусы"
+        >
+          📁 Мои карты
+        </ToolbarButton>
+      )}
       <ToolbarButton
         label="Импорт / экспорт JSON"
         onClick={onImportExport}
