@@ -270,3 +270,28 @@ Decision:
 Выбрана **Опция 1**. Добавляем `src/game/game/rotateLayout.ts` в `allowed_files` T-008.
 В `realignOnOrientationChange` убирается ранний выход `if (!nowPortrait) return`:
 алгоритм должен единообразно проверять, не оказался ли какой-то блок выше актуального `blockTop(g)` при смене ориентации в любую сторону, и опускать поле на необходимый `dy`, сохраняя целостность расстановки.
+
+### Q-011: Исправить пути интеграции каталога карт в T-023
+
+From: Luna
+Date: 2026-10-11
+Status: resolved (Option 1 selected; allowed_files updated)
+Related task: T-023
+
+Context:
+Карточка T-023 разрешает `src/ui/App.tsx` и `src/ui/types.ts`, но оба файла
+отсутствуют. Фактический корневой React-компонент приложения находится в
+`src/App.tsx`, а типы экранов — в `src/ui/screens/types.ts`. Подключение каталога
+к главному меню, `Game.startCustomMap` и callback возврата в каталог невозможно
+только через перечисленные в текущей карточке файлы.
+
+Question:
+Как скорректировать `allowed_files` T-023 для интеграции `communityMaps`?
+
+Decision:
+Выбрана **Опция 1**.
+В карточке T-023 заменяем несуществующие пути:
+
+- `src/ui/App.tsx` -> `src/App.tsx`
+- `src/ui/types.ts` -> `src/ui/screens/types.ts`
+  Статус задачи T-023 возвращается в `ready`.
