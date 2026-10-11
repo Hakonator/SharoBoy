@@ -1512,3 +1512,91 @@ Verification commands:
 npm run typecheck
 npm run lint
 npm run test
+
+### T-025: Защита от дублей карт и воркфлоу внесения изменений (Этап M5)
+
+Status: ready
+Priority: high
+Assigned to: luna
+
+Описание:
+Согласно AD-017 реализовать защиту от дублирования карт на модерации и сквозной воркфлоу обновления опубликованных карт:
+
+1. **SQL-миграция (`supabase/migrations/20250101000009_map_edit_workflow.sql`)**:
+   - Добавить в таблицу `public.sharoboy_custom_maps`:
+     - `map_uid text` (клиентский уникальный идентификатор проекта карты).
+     - `edit_status text not null default 'none' check (edit_status in ('none', 'requested', 'approved'))`.
+     - `edit_request_reason text default null`.
+   - Индекс для предотвращения спама дубликатов с одинаковым названием от одного автора или одинаковым `map_uid` в статусе `pending`.
+
+2. **Обновление Edge Functions (`maps` и `admin-maps`)**:
+   - `POST /functions/v1/maps`:
+     - Проверка на существующую карту с тем же названием/автором в статусе `pending` (возвращать 409: «Карта с таким названием уже находится на проверке у модератора»).
+     - Запись `map_uid` при публикации.
+   - `POST /functions/v1/maps/:id/request-edit`:
+     - Запрос автора на редактирование опубликованной карты (`status = 'approved'`). Записывает `edit_status = 'requested'` и `edit_request_reason`.
+   - `POST /functions/v1/admin-maps/:id/approve-edit`:
+     - Модератор подтверждает возможность внесения изменений (`edit_status = 'approved'`).
+   - `PUT /functions/v1/maps/:id/update-spec`:
+     - Отправка обновлённого `spec_json` для карты в статусе `edit_status = 'approved'`. Сохраняет `likes_count` и `plays_count`, обновляет `spec_json` и переводит `edit_status` обратно в `'none'`.
+
+3. **Обновление интерфейсов в игре**:
+   - **`src/ui/editor/EditorPublishModal.tsx` & `EditorView.tsx`**:
+     - Блокировка повторной отправки одной и той же карты (состояние «На проверке»).
+     - Индикация статуса карты: если для карты модератором одобрено редактирование — отображать плашку **«🟢 Одобрено для внесения изменений»**.
+     - Возможность подставить готовый JSON карты (кнопка в модалке / импорт JSON прямо в редактируемый проект).
+     - Кнопка «Отправить обновление» вместо первичной публикации, если обновляется существующая карта.
+   - **`src/ui/screens/communityMaps.tsx`**:
+     - Для карт, автором которых является текущий игрок (`author_nick === currentNick`), показывать кнопку «Запросить изменение» с вводом причины.
+   - **`src/ui/screens/AdminPanel.tsx`**:
+     - Вкладка / секция модератора «Запросы на редактирование» с отображением причины и кнопкой «Одобрить редактирование».
+
+4. **Тесты**:
+   - Обновить юнит-тесты в `supabase/functions/maps/maps.test.ts`, `customMapsApi.test.ts`, `adminMapsApi.test.ts` и UI-тесты.
+
+Allowed files:
+Существующие файлы (модификация):
+
+- supabase/functions/maps/index.ts
+- supabase/functions/maps/maps.test.ts
+- supabase/functions/admin-maps/index.ts
+- supabase/functions/admin-maps/admin.test.ts
+- src/game/customMapsApi.ts
+- src/game/customMapsApi.test.ts
+- src/game/adminMapsApi.ts
+- src/game/adminMapsApi.test.ts
+- src/ui/editor/EditorPublishModal.tsx
+- src/ui/editor/EditorView.tsx
+- src/ui/screens/communityMaps.tsx
+- src/ui/screens/AdminPanel.tsx
+
+Новые файлы (создание):
+
+- supabase/migrations/20250101000009_map_edit_workflow.sql
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+- src/game/physics/*
+
+Dependencies: T-024
+
+Acceptance criteria:
+
+- [ ] Сервер отклоняет повторную отправку карты с тем же названием/UID от того же автора на модерацию (409)
+- [ ] Автор опубликованной карты может подать запрос на исправление с указанием причины
+- [ ] В админ-панели модератор видит запросы на изменение и может их одобрить
+- [ ] При одобрении правок в редакторе выводится статус «Одобрено для внесения изменений» и возможность обновить спеку (в т.ч. через вставку JSON)
+- [ ] Обновление сохраняет ID, статистику лайков и запусков карты
+- [ ] Все тесты (`npm run test`), `typecheck` и `lint` проходят без ошибок
+
+Test plan:
+
+1. Запустить `npm run test`, `npm run typecheck` и `npm run lint`.
+2. Проверить в тестах отсечку дубликатов и жизненный цикл запроса на изменение.
+
+Verification commands:
+npm run typecheck
+npm run lint
+npm run test
