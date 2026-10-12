@@ -12,6 +12,7 @@ vi.mock("../config", async () => {
 
 import {
   fetchApprovedMaps,
+  fetchMapStatus,
   getVoterId,
   publishCustomMap,
   requestMapEdit,
@@ -103,15 +104,46 @@ describe("customMapsApi", () => {
     expect(storage.size).toBe(1)
   })
 
-  it("supports edit requests and approved spec updates", async () => {
+  it("supports edit requests and approved spec updates with title and description", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true })))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ map: { id: "map-1" } })))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ map: { id: "map-1", title: "Новый заголовок" } }))
+      )
     vi.stubGlobal("fetch", fetchMock)
     await requestMapEdit("map-1", "Игрок", "Исправить расстановку")
-    await expect(updateMapSpec("map-1", map)).resolves.toMatchObject({ id: "map-1" })
+    await expect(
+      updateMapSpec("map-1", {
+        spec: map,
+        title: "Новый заголовок",
+        description: "Новое описание",
+      })
+    ).resolves.toMatchObject({ id: "map-1", title: "Новый заголовок" })
     expect(fetchMock.mock.calls[0]?.[0]).toContain("/map-1/request-edit")
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "PUT" })
+    const body = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))
+    expect(body).toMatchObject({
+      title: "Новый заголовок",
+      description: "Новое описание",
+    })
+  })
+
+  it("fetches map status by map_uid or id", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          map: { id: "map-1", status: "approved", edit_status: "approved" },
+        })
+      )
+    )
+    vi.stubGlobal("fetch", fetchMock)
+    const result = await fetchMapStatus({ mapUid: "uid-123" })
+    expect(result).toMatchObject({
+      id: "map-1",
+      status: "approved",
+      edit_status: "approved",
+    })
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/status?map_uid=uid-123")
   })
 })

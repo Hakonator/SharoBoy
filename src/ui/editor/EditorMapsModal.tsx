@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
-import type { CustomMapRecord } from "../../game/customMapsApi"
+import { fetchMapStatus, type CustomMapRecord } from "../../game/customMapsApi"
 import type { PlayerMapSpec } from "../../game/mapSpec"
 
 import {
@@ -8,8 +8,10 @@ import {
   deleteLocalMap,
   loadRecordForMap,
   projectUidForMap,
+  savePublishedRecord,
   type LocalMapEntry,
 } from "./localMapsStorage"
+import { MapThumbnail } from "./MapThumbnail"
 
 interface EditorMapsModalProps {
   currentMapId: string
@@ -114,6 +116,22 @@ export function EditorMapsModal({
   const [newTitle, setNewTitle] = useState("")
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [remoteRecords, setRemoteRecords] = useState<Record<string, CustomMapRecord>>({})
+
+  useEffect(() => {
+    let active = true
+    for (const entry of maps) {
+      const uid = projectUidForMap(entry.id)
+      void fetchMapStatus({ mapUid: uid }).then((remote) => {
+        if (!active || !remote) return
+        savePublishedRecord(remote)
+        setRemoteRecords((prev) => ({ ...prev, [uid]: remote }))
+      })
+    }
+    return () => {
+      active = false
+    }
+  }, [maps])
 
   const handleCreate = () => {
     const title = newTitle.trim() || "Новая карта"
@@ -205,7 +223,7 @@ export function EditorMapsModal({
               {maps.map((entry) => {
                 const isCurrent = entry.id === currentMapId
                 const mapUid = projectUidForMap(entry.id)
-                const record = loadRecordForMap(mapUid)
+                const record = remoteRecords[mapUid] ?? loadRecordForMap(mapUid)
 
                 return (
                   <li
@@ -216,25 +234,34 @@ export function EditorMapsModal({
                     }`}
                     key={entry.id}
                   >
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate font-display text-base text-foam sm:text-lg">
-                          {entry.title || "Без названия"}
-                        </h3>
-                        {isCurrent && (
-                          <span className="rounded bg-cyan-neon/20 px-2 py-0.5 text-2xs font-semibold text-cyan-neon">
-                            Открыта сейчас
-                          </span>
-                        )}
-                        <MapStatusBadge record={record} />
-                      </div>
+                    <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
+                      <MapThumbnail
+                        alt={`Миниатюра ${entry.title}`}
+                        className="h-16 w-28 shrink-0 rounded-lg sm:h-20 sm:w-36"
+                        spec={entry.spec}
+                      />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="truncate font-display text-base text-foam sm:text-lg">
+                            {entry.title || "Без названия"}
+                          </h3>
+                          {isCurrent && (
+                            <span className="rounded bg-cyan-neon/20 px-2 py-0.5 text-2xs font-semibold text-cyan-neon">
+                              Открыта сейчас
+                            </span>
+                          )}
+                          <MapStatusBadge record={record} />
+                        </div>
 
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-dim">
-                        <span>Блоков: {entry.spec.blocks.length}</span>
-                        <span>Изменена: {formatLocalDate(entry.updatedAt)}</span>
-                        {record?.reject_reason && record.status === "rejected" && (
-                          <span className="text-punch">Причина отказа: {record.reject_reason}</span>
-                        )}
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-dim">
+                          <span>Блоков: {entry.spec.blocks.length}</span>
+                          <span>Изменена: {formatLocalDate(entry.updatedAt)}</span>
+                          {record?.reject_reason && record.status === "rejected" && (
+                            <span className="text-punch">
+                              Причина отказа: {record.reject_reason}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 

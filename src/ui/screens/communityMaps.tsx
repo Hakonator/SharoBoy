@@ -9,6 +9,8 @@ import {
   type CustomMapRecord,
 } from "../../game/customMapsApi"
 import type { PlayerMapSpec } from "../../game/mapSpec"
+import { savePublishedRecord } from "../editor/localMapsStorage"
+import { MapThumbnail } from "../editor/MapThumbnail"
 
 type CommunityMapsSort = "popular" | "newest"
 
@@ -114,21 +116,12 @@ export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
     setError(null)
     try {
       await requestMapEdit(map.id, currentNick.trim(), editReason)
-      try {
-        const key = "sharoboy-published-map-records"
-        const stored: unknown = JSON.parse(localStorage.getItem(key) ?? "[]")
-        const records = Array.isArray(stored)
-          ? stored.filter((item) => typeof item === "object" && item !== null)
-          : []
-        const mapUid = map.map_uid ?? map.spec_json.id
-        const next = records.filter((item) => (item as { map_uid?: unknown }).map_uid !== mapUid)
-        localStorage.setItem(
-          key,
-          JSON.stringify([...next, { ...map, map_uid: mapUid, edit_status: "requested" }])
-        )
-      } catch {
-        /* The catalog remains usable when local persistence is unavailable. */
-      }
+      savePublishedRecord({
+        ...map,
+        map_uid: map.map_uid ?? map.spec_json.id,
+        edit_status: "requested",
+        edit_request_reason: editReason.trim(),
+      })
       setMaps((current) =>
         current.map((item) =>
           item.id === map.id
@@ -238,6 +231,11 @@ export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
                       </span>
                     </div>
                     <p className="mb-2 text-xs text-cyan-neon">Автор: {map.author_nick}</p>
+                    <MapThumbnail
+                      alt={`Миниатюра ${map.title}`}
+                      className="mb-3 w-full"
+                      spec={map.spec_json}
+                    />
                     <p className="mb-4 min-h-10 text-sm text-dim">
                       {map.description || "Без описания"}
                     </p>

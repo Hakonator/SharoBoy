@@ -101,17 +101,52 @@ export async function requestMapEdit(
     throw new Error(await errorMessage(response, "Не удалось запросить редактирование"))
 }
 
-export async function updateMapSpec(mapId: string, spec: PlayerMapSpec): Promise<CustomMapRecord> {
+export interface UpdateMapSpecPayload {
+  spec: PlayerMapSpec
+  title?: string
+  description?: string
+}
+
+export interface FetchMapStatusParams {
+  mapUid?: string
+  id?: string
+}
+
+export async function updateMapSpec(
+  mapId: string,
+  payload: PlayerMapSpec | UpdateMapSpecPayload
+): Promise<CustomMapRecord> {
   if (!LEADERBOARD_ENABLED) throw unavailable()
+  const spec = "spec" in payload ? payload.spec : payload
+  const title = "title" in payload ? payload.title : undefined
+  const description = "description" in payload ? payload.description : undefined
   const response = await request(`/${encodeURIComponent(mapId)}/update-spec`, {
     method: "PUT",
-    body: JSON.stringify({ spec_json: spec }),
+    body: JSON.stringify({
+      spec_json: spec,
+      title,
+      description,
+    }),
   })
   if (!response.ok)
     throw new Error(await errorMessage(response, "Не удалось отправить обновление карты"))
   const data = (await response.json()) as { map?: CustomMapRecord }
   if (!data.map) throw new Error("Сервер не вернул обновлённую карту.")
   return data.map
+}
+
+export async function fetchMapStatus(
+  params: FetchMapStatusParams
+): Promise<CustomMapRecord | null> {
+  if (!LEADERBOARD_ENABLED) return null
+  const query = new URLSearchParams()
+  if (params.mapUid) query.set("map_uid", params.mapUid)
+  if (params.id) query.set("id", params.id)
+  if (query.size === 0) return null
+  const response = await request(`/status?${query}`)
+  if (!response.ok) return null
+  const data = (await response.json().catch(() => null)) as { map?: CustomMapRecord | null } | null
+  return data?.map ?? null
 }
 
 export async function fetchApprovedMaps(

@@ -1,6 +1,11 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
-import { publishCustomMap, updateMapSpec, type CustomMapRecord } from "../../game/customMapsApi"
+import {
+  fetchMapStatus,
+  publishCustomMap,
+  updateMapSpec,
+  type CustomMapRecord,
+} from "../../game/customMapsApi"
 import type { PlayerMapSpec } from "../../game/mapSpec"
 import { containsProfanity } from "../../game/profanity"
 import { validatePlayerMapSpec, type MapValidationError } from "../../game/mapValidator"
@@ -13,6 +18,7 @@ interface EditorPublishModalProps {
 }
 
 import { loadRecordForMap, projectUidForMap, savePublishedRecord } from "./localMapsStorage"
+import { MapThumbnail } from "./MapThumbnail"
 
 export function EditorPublishModal({ map, author, onClose, onImportMap }: EditorPublishModalProps) {
   const [title, setTitle] = useState(map.metadata.title)
@@ -24,6 +30,18 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
   const [showJson, setShowJson] = useState(false)
   const mapUid = projectUidForMap(map.id)
   const [record, setRecord] = useState<CustomMapRecord | null>(() => loadRecordForMap(mapUid))
+
+  useEffect(() => {
+    let active = true
+    void fetchMapStatus({ mapUid }).then((remote) => {
+      if (!active || !remote) return
+      setRecord(remote)
+      savePublishedRecord(remote)
+    })
+    return () => {
+      active = false
+    }
+  }, [mapUid])
 
   const submit = async () => {
     setErrors([])
@@ -51,7 +69,11 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
     try {
       const updated =
         record?.edit_status === "approved"
-          ? await updateMapSpec(record.id, map)
+          ? await updateMapSpec(record.id, {
+              spec: map,
+              title: cleanTitle,
+              description: cleanDescription,
+            })
           : await publishCustomMap({
               title: cleanTitle,
               description: cleanDescription,
@@ -118,6 +140,7 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
             Закрыть
           </button>
         </header>
+        <MapThumbnail className="h-28 w-full rounded-xl sm:h-36" spec={map} />
         <label className="block space-y-1 text-sm">
           <span>Название карты</span>
           <input

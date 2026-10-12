@@ -12,6 +12,17 @@ const CORS = {
 }
 const MAX_SPEC_BYTES = 1_000_000
 
+interface CustomMapRecord {
+  id: string
+  title: string
+  description: string
+  author_nick: string
+  spec_json: unknown
+  status: "pending" | "approved" | "rejected"
+  map_uid?: string | null
+  edit_status?: "none" | "requested" | "approved"
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -55,33 +66,48 @@ function mapId(
   return match?.[1] && /^[0-9a-f-]{36}$/i.test(match[1]) ? match[1] : null
 }
 
+async function existingMapRecord(
+  e: { url: string; key: string },
+  author: string,
+  title: string,
+  mapUid: string
+): Promise<CustomMapRecord | null> {
+  const byUid = new URLSearchParams({
+    select: "*",
+    map_uid: `eq.${mapUid}`,
+  })
+  const byTitle = new URLSearchParams({
+    select: "*",
+    author_nick: `eq.${author}`,
+    title: `eq.${title}`,
+  })
+  const [uidResponse, titleResponse] = await Promise.all([
+    fetch(`${e.url}/rest/v1/sharoboy_custom_maps?${byUid}`, { headers: headers(e.key) }),
+    fetch(`${e.url}/rest/v1/sharoboy_custom_maps?${byTitle}`, { headers: headers(e.key) }),
+  ])
+  if (!uidResponse.ok && !titleResponse.ok) return null
+  const [uidRows, titleRows] = (await Promise.all([
+    uidResponse.ok ? uidResponse.json() : [],
+    titleResponse.ok ? titleResponse.json() : [],
+  ])) as unknown[][]
+  const allRows = [...uidRows, ...titleRows].filter(
+    (item): item is CustomMapRecord => typeof item === "object" && item !== null
+  )
+  const active = allRows.find((r) => r.status === "approved" || r.status === "pending")
+  return active ?? allRows[0] ?? null
+}
+
 async function duplicatePending(
   e: { url: string; key: string },
   author: string,
   title: string,
   mapUid: string
 ): Promise<boolean> {
-  const byTitle = new URLSearchParams({
-    select: "id",
-    status: "eq.pending",
-    author_nick: `eq.${author}`,
-    title: `eq.${title}`,
-  })
-  const byUid = new URLSearchParams({
-    select: "id",
-    status: "eq.pending",
-    map_uid: `eq.${mapUid}`,
-  })
-  const [titleResponse, uidResponse] = await Promise.all([
-    fetch(`${e.url}/rest/v1/sharoboy_custom_maps?${byTitle}`, { headers: headers(e.key) }),
-    fetch(`${e.url}/rest/v1/sharoboy_custom_maps?${byUid}`, { headers: headers(e.key) }),
-  ])
-  if (!titleResponse.ok || !uidResponse.ok) return false
-  const [titleRows, uidRows] = (await Promise.all([
-    titleResponse.json(),
-    uidResponse.json(),
-  ])) as unknown[][]
-  return titleRows.length > 0 || uidRows.length > 0
+  const existing = await existingMapRecord(e, author, title, mapUid)
+  if (!existing) return false
+  if (existing.status === "pending") return true
+  if (existing.status === "approved") return true
+  return false
 }
 
 async function postMap(req: Request, e: { url: string; key: string }): Promise<Response> {
@@ -100,8 +126,19 @@ async function postMap(req: Request, e: { url: string; key: string }): Promise<R
     return json({ error: "Некорректная спецификация карты" }, 400)
   if (mapUid.length < 1 || mapUid.length > 200)
     return json({ error: "Некорректный идентификатор карты" }, 400)
-  if (await duplicatePending(e, nick.nick, title, mapUid))
-    return json({ error: "Карта с таким названием уже находится на проверке у модератора" }, 409)
+  const existing = await existingMapRecord(e, nick.nick, title, mapUid)
+  if (existing) {
+    if (existing.status === "pending")
+      return json({ error: "Карта уже находится на проверке у модератора" }, 409)
+    if (existing.status === "approved")
+      return json(
+        {
+          error:
+            "Эта карта уже опубликована. Запросите согласование изменений в каталоге карт сообщества.",
+        },
+        409
+      )
+  }
   const res = await fetch(`${e.url}/rest/v1/sharoboy_custom_maps`, {
     method: "POST",
     headers: { ...headers(e.key), Prefer: "return=representation" },
@@ -150,14 +187,29 @@ async function updateSpec(
 ): Promise<Response> {
   const data = await body(req)
   const spec = data?.spec_json
+  const title = typeof data?.title === "string" ? data.title.trim() : ""
+  const description = typeof data?.description === "string" ? data.description.trim() : ""
   if (!validSpec(spec) || JSON.stringify(spec).length > MAX_SPEC_BYTES)
     return json({ error: "Некорректная спецификация карты" }, 400)
+
+  const patchBody: Record<string, unknown> = {
+    spec_json: spec,
+    edit_status: "none",
+    edit_request_reason: null,
+  }
+  if (title.length >= 2 && title.length <= 60 && !containsProfanity(title)) {
+    patchBody.title = title
+  }
+  if (description.length <= 300) {
+    patchBody.description = description
+  }
+
   const res = await fetch(
     `${e.url}/rest/v1/sharoboy_custom_maps?id=eq.${id}&status=eq.approved&edit_status=eq.approved`,
     {
       method: "PATCH",
       headers: { ...headers(e.key), Prefer: "return=representation" },
-      body: JSON.stringify({ spec_json: spec, edit_status: "none", edit_request_reason: null }),
+      body: JSON.stringify(patchBody),
     }
   )
   if (!res.ok) return json({ error: "Не удалось обновить карту" }, 502)
@@ -194,6 +246,27 @@ async function listMaps(req: Request, e: { url: string; key: string }): Promise<
   })
   if (!res.ok) return json({ error: "Каталог недоступен" }, 502)
   return json({ maps: await res.json() })
+}
+
+async function getMapStatus(req: Request, e: { url: string; key: string }): Promise<Response> {
+  const q = new URL(req.url).searchParams
+  const mapUid = q.get("map_uid")?.trim()
+  const id = q.get("id")?.trim()
+  if (!mapUid && !id) return json({ error: "Не указан map_uid или id" }, 400)
+
+  const rest = new URLSearchParams({ select: "*" })
+  if (mapUid) rest.set("map_uid", `eq.${mapUid}`)
+  else if (id) rest.set("id", `eq.${id}`)
+
+  const res = await fetch(
+    `${e.url}/rest/v1/sharoboy_custom_maps?${rest}&order=created_at.desc&limit=1`,
+    {
+      headers: headers(e.key),
+    }
+  )
+  if (!res.ok) return json({ error: "Не удалось получить статус карты" }, 502)
+  const rows = (await res.json()) as CustomMapRecord[]
+  return json({ map: rows[0] ?? null })
 }
 
 async function increment(
@@ -237,7 +310,10 @@ Deno.serve(async (req) => {
   const cleanPath = url.pathname.replace(/^\/functions\/v1\/maps/, "").replace(/^\/maps/, "") || "/"
   const path = cleanPath.endsWith("/") && cleanPath.length > 1 ? cleanPath.slice(0, -1) : cleanPath
 
-  if (req.method === "GET" && (path === "" || path === "/")) return listMaps(req, e)
+  if (req.method === "GET") {
+    if (path === "" || path === "/") return listMaps(req, e)
+    if (path === "/status") return getMapStatus(req, e)
+  }
   if (req.method === "POST" && (path === "" || path === "/")) return postMap(req, e)
   if (req.method === "PUT") {
     const update = mapId(path, "update-spec")

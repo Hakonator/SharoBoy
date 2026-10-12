@@ -12,6 +12,7 @@ import {
   rejectMap,
 } from "../../game/adminMapsApi"
 import type { PlayerMapSpec } from "../../game/mapSpec"
+import { MapThumbnail } from "../editor/MapThumbnail"
 
 export interface AdminPanelProps {
   onBack: () => void
@@ -24,32 +25,7 @@ export function formatAdminDate(value: string): string {
 }
 
 function Preview({ map }: { map: CustomMapRecord }) {
-  return (
-    <div
-      className="relative aspect-video w-full overflow-hidden border border-line bg-[#07131b]"
-      aria-label="Предпросмотр карты"
-    >
-      {map.spec_json.blocks.map((block) => {
-        const width = Math.max(1, (block.size.width / 1920) * 100)
-        const height = Math.max(1, (block.size.height / 1080) * 100)
-        return (
-          <span
-            className={`absolute border border-cyan-neon/80 bg-cyan-neon/35 ${block.shape === "circle" ? "rounded-full" : "rounded-[35%]"}`}
-            key={block.id}
-            style={{
-              height: `${height}%`,
-              left: `${(block.position.x / 1920) * 100}%`,
-              top: `${(block.position.y / 1080) * 100}%`,
-              transform: `translate(-50%, -50%) rotate(${block.rotation ?? 0}deg)`,
-              width: `${width}%`,
-            }}
-            title={`${block.id}: HP ${block.hp}`}
-          />
-        )
-      })}
-      <span className="absolute bottom-1 left-2 text-[10px] text-dim">1920 × 1080 · read-only</span>
-    </div>
-  )
+  return <MapThumbnail alt="Предпросмотр карты" className="w-full" spec={map.spec_json} />
 }
 
 export function AdminPanel({ onBack, onTestRun }: AdminPanelProps) {
