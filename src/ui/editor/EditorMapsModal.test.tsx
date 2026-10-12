@@ -156,7 +156,7 @@ describe("EditorMapsModal and MapStatusBadge", () => {
       edit_status: "requested",
     }
     expect(renderToStaticMarkup(<MapStatusBadge record={editRequestedRecord} />)).toContain(
-      "Согласование правок"
+      "Изменения на проверке"
     )
   })
 
@@ -186,6 +186,42 @@ describe("EditorMapsModal and MapStatusBadge", () => {
     expect(html).toContain("Первая карта")
     expect(html).toContain("Открыта сейчас")
     expect(html).toContain("Продолжить")
+  })
+
+  it("renders request edit button for approved maps", () => {
+    savePublishedRecord({
+      id: "published-1",
+      title: "Одобренная карта",
+      description: "Тест",
+      author_nick: "Hakonator",
+      spec_json: mockMap,
+      status: "approved",
+      edit_status: "none",
+      map_uid: projectUidForMap("test-map-1"),
+      likes_count: 5,
+      plays_count: 10,
+      created_at: new Date().toISOString(),
+    })
+    const entries: LocalMapEntry[] = [
+      {
+        id: "test-map-1",
+        title: "Одобренная карта",
+        createdAt: "2026-10-11T12:00:00Z",
+        updatedAt: "2026-10-11T12:00:00Z",
+        spec: mockMap,
+      },
+    ]
+    const html = renderToStaticMarkup(
+      <EditorMapsModal
+        currentMapId="other"
+        maps={entries}
+        onClose={() => {}}
+        onCreateMap={() => {}}
+        onDeleteMap={() => {}}
+        onSelectMap={() => {}}
+      />
+    )
+    expect(html).toContain("✎ Запросить изменение")
   })
 
   it("formats dates gracefully", () => {

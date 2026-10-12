@@ -89,6 +89,17 @@ export async function approveMapEdit(token: string, mapId: string): Promise<void
   if (!response.ok) throw new Error(await message(response, "Не удалось одобрить редактирование"))
 }
 
+export async function rejectMapEdit(token: string, mapId: string, reason: string): Promise<void> {
+  const trimmed = reason.trim()
+  if (!trimmed) throw new Error("Укажите причину отклонения.")
+  const response = await request(`/${encodeURIComponent(mapId)}/reject-edit`, {
+    method: "POST",
+    headers: { "X-Admin-Token": token },
+    body: JSON.stringify({ reason: trimmed }),
+  })
+  if (!response.ok) throw new Error(await message(response, "Не удалось отклонить редактирование"))
+}
+
 export async function rejectMap(token: string, mapId: string, reason: string): Promise<void> {
   const trimmed = reason.trim()
   if (!trimmed) throw new Error("Укажите причину отклонения.")

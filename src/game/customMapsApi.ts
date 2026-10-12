@@ -87,15 +87,34 @@ export async function publishCustomMap(payload: PublishCustomMapPayload): Promis
   return data.map
 }
 
+export interface RequestMapEditPayload {
+  author_nick: string
+  reason: string
+  spec?: PlayerMapSpec
+  title?: string
+  description?: string
+}
+
 export async function requestMapEdit(
   mapId: string,
-  authorNick: string,
-  reason: string
+  authorNickOrPayload: string | RequestMapEditPayload,
+  optionalReason?: string
 ): Promise<void> {
   if (!LEADERBOARD_ENABLED) throw unavailable()
+  const payload: RequestMapEditPayload =
+    typeof authorNickOrPayload === "string"
+      ? { author_nick: authorNickOrPayload, reason: optionalReason ?? "" }
+      : authorNickOrPayload
+
   const response = await request(`/${encodeURIComponent(mapId)}/request-edit`, {
     method: "POST",
-    body: JSON.stringify({ author_nick: authorNick, reason: reason.trim() }),
+    body: JSON.stringify({
+      author_nick: payload.author_nick,
+      reason: payload.reason.trim(),
+      spec: payload.spec,
+      title: payload.title,
+      description: payload.description,
+    }),
   })
   if (!response.ok)
     throw new Error(await errorMessage(response, "Не удалось запросить редактирование"))

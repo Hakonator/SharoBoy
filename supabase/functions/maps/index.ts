@@ -164,14 +164,30 @@ async function requestEdit(
   const data = await body(req)
   const author = typeof data?.author_nick === "string" ? data.author_nick.trim() : ""
   const reason = typeof data?.reason === "string" ? data.reason.trim() : ""
-  if (!author || reason.length < 3 || reason.length > 300)
-    return json({ error: "Укажите причину редактирования" }, 400)
+  if (!author || reason.length < 3)
+    return json({ error: "Укажите причину редактирования (от 3 символов)" }, 400)
+
+  let storedReason = reason
+  if (data?.spec) {
+    if (!validSpec(data.spec) || JSON.stringify(data.spec).length > MAX_SPEC_BYTES)
+      return json({ error: "Некорректная спецификация карты" }, 400)
+    storedReason = JSON.stringify({
+      __isEditProposal: true,
+      comment: reason,
+      spec: data.spec,
+      title: typeof data.title === "string" ? data.title.trim() : undefined,
+      description: typeof data.description === "string" ? data.description.trim() : undefined,
+    })
+  } else if (reason.length > 300) {
+    return json({ error: "Причина редактирования не может быть длиннее 300 символов" }, 400)
+  }
+
   const res = await fetch(
     `${e.url}/rest/v1/sharoboy_custom_maps?id=eq.${id}&status=eq.approved&author_nick=eq.${author}&edit_status=eq.none`,
     {
       method: "PATCH",
       headers: { ...headers(e.key), Prefer: "return=representation" },
-      body: JSON.stringify({ edit_status: "requested", edit_request_reason: reason }),
+      body: JSON.stringify({ edit_status: "requested", edit_request_reason: storedReason }),
     }
   )
   if (!res.ok) return json({ error: "Не удалось запросить редактирование" }, 502)

@@ -16,8 +16,9 @@ describe("admin token", () => {
     expect(await verifyAdminToken(tampered, "secret", 1000)).toBe(false)
   })
 
-  it("uses the edit-request moderation route", () => {
+  it("uses the edit-request moderation routes", () => {
     expect("/functions/v1/admin-maps/map-id/approve-edit").toContain("/approve-edit")
+    expect("/functions/v1/admin-maps/map-id/reject-edit").toContain("/reject-edit")
     expect("edit-requested").toBe("edit-requested")
   })
 })

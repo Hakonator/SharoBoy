@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import {
   fetchMapStatus,
   publishCustomMap,
+  requestMapEdit,
   updateMapSpec,
   type CustomMapRecord,
 } from "../../game/customMapsApi"
@@ -23,6 +24,7 @@ import { MapThumbnail } from "./MapThumbnail"
 export function EditorPublishModal({ map, author, onClose, onImportMap }: EditorPublishModalProps) {
   const [title, setTitle] = useState(map.metadata.title)
   const [description, setDescription] = useState(map.metadata.description ?? "")
+  const [editComment, setEditComment] = useState("")
   const [errors, setErrors] = useState<MapValidationError[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -65,29 +67,54 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
       setMessage("Описание карты не может быть длиннее 300 символов.")
       return
     }
+
+    const isApprovedMap = record?.status === "approved"
+    if (isApprovedMap && record?.edit_status !== "approved") {
+      if (editComment.trim().length < 3) {
+        setMessage("Опишите, что было изменено в карте (от 3 символов).")
+        return
+      }
+    }
+
     setSubmitting(true)
     try {
-      const updated =
-        record?.edit_status === "approved"
-          ? await updateMapSpec(record.id, {
-              spec: map,
-              title: cleanTitle,
-              description: cleanDescription,
-            })
-          : await publishCustomMap({
-              title: cleanTitle,
-              description: cleanDescription,
-              author_nick: author,
-              map_uid: mapUid,
-              spec: map,
-            })
-      setRecord(updated)
-      savePublishedRecord(updated)
-      setMessage(
-        record?.edit_status === "approved"
-          ? "Обновление отправлено и опубликовано с сохранением статистики."
-          : "Карта отправлена на модерацию! Повторная отправка этой карты заблокирована."
-      )
+      if (record?.edit_status === "approved") {
+        const updated = await updateMapSpec(record.id, {
+          spec: map,
+          title: cleanTitle,
+          description: cleanDescription,
+        })
+        setRecord(updated)
+        savePublishedRecord(updated)
+        setMessage("Обновление отправлено и опубликовано с сохранением статистики.")
+      } else if (isApprovedMap) {
+        await requestMapEdit(record.id, {
+          author_nick: author,
+          reason: editComment.trim(),
+          spec: map,
+          title: cleanTitle,
+          description: cleanDescription,
+        })
+        const updatedRecord: CustomMapRecord = {
+          ...record,
+          edit_status: "requested",
+          edit_request_reason: editComment.trim(),
+        }
+        setRecord(updatedRecord)
+        savePublishedRecord(updatedRecord)
+        setMessage("Изменения отправлены модератору на проверку!")
+      } else {
+        const published = await publishCustomMap({
+          title: cleanTitle,
+          description: cleanDescription,
+          author_nick: author,
+          map_uid: mapUid,
+          spec: map,
+        })
+        setRecord(published)
+        savePublishedRecord(published)
+        setMessage("Карта отправлена на модерацию! Повторная отправка этой карты заблокирована.")
+      }
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Не удалось отправить карту на модерацию."
@@ -128,7 +155,11 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
           <div>
             <p className="hud-label">COMMUNITY MAPS</p>
             <h2 className="font-display text-xl text-cyan-neon" id="editor-publish-title">
-              {record?.edit_status === "approved" ? "Обновить карту" : "Опубликовать карту"}
+              {record?.edit_status === "approved"
+                ? "Обновить карту"
+                : record?.status === "approved"
+                  ? "Отправить изменения на модерацию"
+                  : "Опубликовать карту"}
             </h2>
           </div>
           <button
@@ -161,6 +192,19 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
             value={description}
           />
         </label>
+        {record?.status === "approved" && record?.edit_status !== "approved" && (
+          <label className="block space-y-1 text-sm">
+            <span className="text-gold">Что изменено (комментарий для модератора)</span>
+            <textarea
+              aria-label="Комментарий для модератора"
+              className="min-h-20 w-full resize-y rounded-lg border border-gold/50 bg-abyss px-3 py-2 text-foam outline-none focus:border-gold"
+              maxLength={300}
+              onChange={(event) => setEditComment(event.target.value)}
+              placeholder="Например: исправил проходимость, изменил расположение блоков"
+              value={editComment}
+            />
+          </label>
+        )}
         <label className="block space-y-1 text-sm text-dim">
           <span>Автор</span>
           <input
@@ -186,14 +230,25 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
             ⏳ На проверке — повторная отправка заблокирована.
           </p>
         )}
-        {record?.status === "approved" && record?.edit_status !== "approved" && (
+        {record?.status === "approved" && record?.edit_status === "requested" && (
           <p
-            className="rounded-lg border border-cyan-neon/40 bg-cyan-neon/10 p-3 text-sm text-cyan-neon"
+            className="rounded-lg border border-gold/40 bg-gold/10 p-3 text-sm text-gold"
             role="status"
           >
-            ✓ Карта опубликована в каталоге сообщества.
+            ⏳ Изменения находятся на проверке у модератора.
           </p>
         )}
+        {record?.status === "approved" &&
+          record?.edit_status !== "requested" &&
+          record?.edit_status !== "approved" && (
+            <p
+              className="rounded-lg border border-cyan-neon/40 bg-cyan-neon/10 p-3 text-sm text-cyan-neon"
+              role="status"
+            >
+              ✓ Карта опубликована. Внесите изменения и отправьте их на проверку модератору с
+              сохранением статистики.
+            </p>
+          )}
         {record?.status === "rejected" && (
           <p
             className="rounded-lg border border-punch/40 bg-punch/10 p-3 text-sm text-punch"
@@ -244,7 +299,9 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
           </button>
           <button
             className="btn-arcade px-5 py-2 text-sm"
-            disabled={submitting}
+            disabled={
+              submitting || record?.status === "pending" || record?.edit_status === "requested"
+            }
             onClick={() => void submit()}
             type="button"
           >
@@ -252,7 +309,9 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
               ? "Отправка..."
               : record?.edit_status === "approved"
                 ? "🚀 Отправить обновление"
-                : "🚀 Отправить"}
+                : record?.status === "approved"
+                  ? "🚀 Отправить изменения на проверку"
+                  : "🚀 Отправить"}
           </button>
         </footer>
         {showJson && (

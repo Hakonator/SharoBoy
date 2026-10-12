@@ -10,7 +10,9 @@ import {
   fetchPendingMaps,
   getAdminToken,
   rejectMap,
+  rejectMapEdit,
 } from "../../game/adminMapsApi"
+import { parseEditProposal } from "../../game/mapEditProposal"
 import type { PlayerMapSpec } from "../../game/mapSpec"
 import { MapThumbnail } from "../editor/MapThumbnail"
 
@@ -36,7 +38,9 @@ export function AdminPanel({ onBack, onTestRun }: AdminPanelProps) {
   const [view, setView] = useState<"pending" | "edits">("pending")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [rejectingEditId, setRejectingEditId] = useState<string | null>(null)
   const [reason, setReason] = useState("")
+  const [editRejectReason, setEditRejectReason] = useState("")
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -70,6 +74,26 @@ export function AdminPanel({ onBack, onTestRun }: AdminPanelProps) {
       await load(token)
     } catch (value) {
       setError(value instanceof Error ? value.message : "Не удалось одобрить редактирование.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const rejectEdit = async (map: CustomMapRecord) => {
+    if (!token) return
+    if (!editRejectReason.trim()) {
+      setError("Укажите причину отклонения изменений.")
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await rejectMapEdit(token, map.id, editRejectReason.trim())
+      setRejectingEditId(null)
+      setEditRejectReason("")
+      await load(token)
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Не удалось отклонить изменения.")
     } finally {
       setBusy(false)
     }
@@ -208,28 +232,124 @@ export function AdminPanel({ onBack, onTestRun }: AdminPanelProps) {
                   Запросов на редактирование нет.
                 </p>
               ) : (
-                <div className="space-y-3">
-                  {editRequests.map((map) => (
-                    <article className="rounded-xl border border-line bg-deep/90 p-4" key={map.id}>
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <h2 className="font-display text-xl text-foam">{map.title}</h2>
-                          <p className="text-sm text-cyan-neon">Автор: {map.author_nick}</p>
+                <div className="space-y-4">
+                  {editRequests.map((map) => {
+                    const proposal = parseEditProposal(map.edit_request_reason, map.spec_json)
+                    const targetSpec = proposal.spec ?? map.spec_json
+                    const hasNewTitle = Boolean(proposal.title && proposal.title !== map.title)
+                    const hasNewDesc = Boolean(
+                      proposal.description && proposal.description !== map.description
+                    )
+
+                    return (
+                      <article
+                        className="space-y-4 rounded-xl border border-line bg-deep/90 p-5 shadow-lg"
+                        key={map.id}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h2 className="font-display text-xl text-foam">
+                                {hasNewTitle ? proposal.title : map.title}
+                              </h2>
+                              {hasNewTitle && (
+                                <span className="text-xs text-dim line-through">{map.title}</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-cyan-neon">Автор: {map.author_nick}</p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              className="btn-ghost px-4 py-2 text-sm"
+                              disabled={busy}
+                              onClick={() => onTestRun(targetSpec)}
+                              type="button"
+                            >
+                              ▶ Протестировать изменённую карту
+                            </button>
+                            <button
+                              className="btn-arcade px-4 py-2 text-sm"
+                              disabled={busy}
+                              onClick={() => void approveEdit(map)}
+                              type="button"
+                            >
+                              ✓ Принять изменения
+                            </button>
+                            <button
+                              className="btn-ghost px-4 py-2 text-sm text-punch"
+                              disabled={busy}
+                              onClick={() => setRejectingEditId(map.id)}
+                              type="button"
+                            >
+                              ✕ Отклонить
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          className="btn-arcade px-4 py-2 text-sm"
-                          disabled={busy}
-                          onClick={() => void approveEdit(map)}
-                          type="button"
-                        >
-                          ✓ Одобрить редактирование
-                        </button>
-                      </div>
-                      <p className="mt-3 rounded border border-gold/30 bg-gold/10 p-3 text-sm text-gold">
-                        Причина: {map.edit_request_reason || "не указана"}
-                      </p>
-                    </article>
-                  ))}
+
+                        <p className="rounded border border-gold/30 bg-gold/10 p-3 text-sm text-gold">
+                          <strong>Комментарий автора:</strong> {proposal.comment || "не указан"}
+                        </p>
+
+                        {(hasNewDesc || map.description) && (
+                          <p className="text-sm text-dim">
+                            <strong>Описание:</strong>{" "}
+                            {hasNewDesc ? proposal.description : map.description}
+                          </p>
+                        )}
+
+                        <div>
+                          <div className="mb-2 flex items-center justify-between text-xs text-dim">
+                            <span>Визуальный предпросмотр новой версии</span>
+                            <span>
+                              Блоков: {targetSpec.blocks.length} (было {map.spec_json.blocks.length}
+                              )
+                            </span>
+                          </div>
+                          <MapThumbnail
+                            alt={`Новая версия карты ${map.title}`}
+                            className="max-h-64 w-full"
+                            spec={targetSpec}
+                          />
+                        </div>
+
+                        {rejectingEditId === map.id && (
+                          <div className="border-t border-line pt-4">
+                            <label className="hud-label" htmlFor={`reject-edit-${map.id}`}>
+                              Причина отклонения изменений
+                            </label>
+                            <textarea
+                              className="mt-2 min-h-20 w-full border border-line bg-abyss p-3 text-sm text-foam outline-none focus:border-punch"
+                              id={`reject-edit-${map.id}`}
+                              maxLength={300}
+                              onChange={(event) => setEditRejectReason(event.target.value)}
+                              placeholder="Например: нарушена проходимость или баланс"
+                              value={editRejectReason}
+                            />
+                            <div className="mt-2 flex justify-end gap-2">
+                              <button
+                                className="btn-ghost px-3 py-1.5 text-xs"
+                                onClick={() => {
+                                  setRejectingEditId(null)
+                                  setEditRejectReason("")
+                                }}
+                                type="button"
+                              >
+                                Отмена
+                              </button>
+                              <button
+                                className="btn-ghost px-3 py-1.5 text-xs text-punch"
+                                disabled={busy || !editRejectReason.trim()}
+                                onClick={() => void rejectEdit(map)}
+                                type="button"
+                              >
+                                Подтвердить отклонение
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </article>
+                    )
+                  })}
                 </div>
               )
             ) : loading ? (

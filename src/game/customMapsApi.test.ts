@@ -112,7 +112,13 @@ describe("customMapsApi", () => {
         new Response(JSON.stringify({ map: { id: "map-1", title: "Новый заголовок" } }))
       )
     vi.stubGlobal("fetch", fetchMock)
-    await requestMapEdit("map-1", "Игрок", "Исправить расстановку")
+    await requestMapEdit("map-1", {
+      author_nick: "Игрок",
+      reason: "Исправить расстановку",
+      spec: map,
+      title: "Новый заголовок",
+      description: "Новое описание",
+    })
     await expect(
       updateMapSpec("map-1", {
         spec: map,
@@ -121,6 +127,14 @@ describe("customMapsApi", () => {
       })
     ).resolves.toMatchObject({ id: "map-1", title: "Новый заголовок" })
     expect(fetchMock.mock.calls[0]?.[0]).toContain("/map-1/request-edit")
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "POST" })
+    const editBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
+    expect(editBody).toMatchObject({
+      author_nick: "Игрок",
+      reason: "Исправить расстановку",
+      title: "Новый заголовок",
+      description: "Новое описание",
+    })
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "PUT" })
     const body = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))
     expect(body).toMatchObject({

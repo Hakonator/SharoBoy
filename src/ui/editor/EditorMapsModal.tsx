@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 
-import { fetchMapStatus, type CustomMapRecord } from "../../game/customMapsApi"
+import { fetchMapStatus, requestMapEdit, type CustomMapRecord } from "../../game/customMapsApi"
 import type { PlayerMapSpec } from "../../game/mapSpec"
 
 import {
@@ -66,9 +66,9 @@ export function MapStatusBadge({ record }: StatusBadgeProps) {
     return (
       <span
         className="inline-flex items-center gap-1 rounded-md border border-gold/60 bg-gold/15 px-2 py-0.5 text-xs font-medium text-gold"
-        title="Запрос на внесение изменений ожидает решения модератора"
+        title="Изменения карты находятся на проверке у модератора"
       >
-        ⏳ Согласование правок
+        ⏳ Изменения на проверке
       </span>
     )
   }
@@ -117,6 +117,10 @@ export function EditorMapsModal({
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [remoteRecords, setRemoteRecords] = useState<Record<string, CustomMapRecord>>({})
+  const [requestEditMapEntry, setRequestEditMapEntry] = useState<LocalMapEntry | null>(null)
+  const [editReasonText, setEditReasonText] = useState("")
+  const [submittingEdit, setSubmittingEdit] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -132,6 +136,37 @@ export function EditorMapsModal({
       active = false
     }
   }, [maps])
+
+  const handleSendEditRequest = async () => {
+    if (!requestEditMapEntry) return
+    const uid = projectUidForMap(requestEditMapEntry.id)
+    const rec = remoteRecords[uid] ?? loadRecordForMap(uid)
+    if (!rec) return
+    setSubmittingEdit(true)
+    setEditError(null)
+    try {
+      await requestMapEdit(rec.id, {
+        author_nick: rec.author_nick,
+        reason: editReasonText.trim(),
+        spec: requestEditMapEntry.spec,
+        title: requestEditMapEntry.title,
+        description: rec.description,
+      })
+      const updated: CustomMapRecord = {
+        ...rec,
+        edit_status: "requested",
+        edit_request_reason: editReasonText.trim(),
+      }
+      savePublishedRecord(updated)
+      setRemoteRecords((prev) => ({ ...prev, [uid]: updated }))
+      setRequestEditMapEntry(null)
+      setEditReasonText("")
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "Не удалось отправить запрос")
+    } finally {
+      setSubmittingEdit(false)
+    }
+  }
 
   const handleCreate = () => {
     const title = newTitle.trim() || "Новая карта"
@@ -261,11 +296,30 @@ export function EditorMapsModal({
                               Причина отказа: {record.reject_reason}
                             </span>
                           )}
+                          {record?.edit_request_reason &&
+                            record.edit_status === "none" &&
+                            record.edit_request_reason.startsWith("Отклонено:") && (
+                              <span className="text-punch">{record.edit_request_reason}</span>
+                            )}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2 pt-2 sm:pt-0">
+                      {record?.status === "approved" && record?.edit_status !== "requested" && (
+                        <button
+                          className="btn-ghost px-2.5 py-1.5 text-xs text-gold sm:px-3 sm:py-2"
+                          onClick={() => {
+                            setRequestEditMapEntry(entry)
+                            setEditReasonText("")
+                            setEditError(null)
+                          }}
+                          title="Запросить изменение опубликованной карты"
+                          type="button"
+                        >
+                          ✎ Запросить изменение
+                        </button>
+                      )}
                       <button
                         className={`px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm ${
                           isCurrent ? "btn-ghost" : "btn-arcade"
@@ -314,6 +368,71 @@ export function EditorMapsModal({
             </ul>
           )}
         </div>
+
+        {requestEditMapEntry && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4">
+            <div className="w-full max-w-md space-y-4 rounded-xl border border-line bg-deep p-5 text-foam shadow-2xl">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-display text-lg text-gold">Запрос изменения карты</h3>
+                  <p className="text-xs text-dim">«{requestEditMapEntry.title}»</p>
+                </div>
+                <button
+                  className="btn-ghost px-2 py-1 text-xs"
+                  onClick={() => {
+                    setRequestEditMapEntry(null)
+                    setEditReasonText("")
+                    setEditError(null)
+                  }}
+                  type="button"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <MapThumbnail className="h-28 w-full" spec={requestEditMapEntry.spec} />
+
+              <label className="block space-y-1 text-xs">
+                <span>Что вы хотите изменить (комментарий для модератора)</span>
+                <textarea
+                  className="min-h-20 w-full resize-y rounded-lg border border-line bg-abyss p-2.5 text-sm text-foam outline-none focus:border-gold"
+                  maxLength={300}
+                  onChange={(e) => setEditReasonText(e.target.value)}
+                  placeholder="Например: исправил застревание шара, изменил расстановку блоков"
+                  value={editReasonText}
+                />
+              </label>
+
+              {editError && (
+                <p className="rounded border border-punch/50 bg-punch/10 p-2 text-xs text-punch">
+                  {editError}
+                </p>
+              )}
+
+              <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-end">
+                <button
+                  className="btn-ghost px-3 py-2 text-xs"
+                  onClick={() => {
+                    onSelectMap(requestEditMapEntry.spec)
+                    setRequestEditMapEntry(null)
+                    onClose()
+                  }}
+                  type="button"
+                >
+                  Перейти в редактор
+                </button>
+                <button
+                  className="btn-arcade px-4 py-2 text-xs"
+                  disabled={submittingEdit || editReasonText.trim().length < 3}
+                  onClick={() => void handleSendEditRequest()}
+                  type="button"
+                >
+                  {submittingEdit ? "Отправка..." : "Отправить на проверку"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <footer className="flex items-center justify-between border-t border-line bg-abyss/40 p-4 text-xs text-dim">
           <span>Всего карт: {maps.length}</span>

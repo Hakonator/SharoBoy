@@ -18,6 +18,7 @@ import {
   fetchEditRequests,
   fetchPendingMaps,
   rejectMap,
+  rejectMapEdit,
 } from "./adminMapsApi"
 
 const response = (body: unknown, ok = true, status = 200) =>
@@ -64,12 +65,18 @@ describe("admin maps API", () => {
     })
   })
 
-  it("loads edit requests and approves an edit", async () => {
+  it("loads edit requests and approves or rejects an edit", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(response({ maps: [] }))
     await expect(fetchEditRequests("token")).resolves.toEqual([])
     await approveMapEdit("token", "map-id")
+    await rejectMapEdit("token", "map-id", "Нарушен баланс")
     expect(fetchMock.mock.calls[0]?.[0]).toContain("status=edit-requested")
     expect(fetchMock.mock.calls[1]?.[0]).toContain("/map-id/approve-edit")
+    expect(fetchMock.mock.calls[2]?.[0]).toContain("/map-id/reject-edit")
+    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ reason: "Нарушен баланс" }),
+    })
   })
 
   it("reports server errors and rejects an empty reason", async () => {

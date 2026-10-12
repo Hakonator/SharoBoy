@@ -44,7 +44,10 @@ async function login(req: Request, secret: string): Promise<Response> {
   return json({ token: await createAdminToken(secret), expires_in: 4 * 60 * 60 })
 }
 
-function idFrom(path: string, action: "approve" | "reject" | "approve-edit"): string | null {
+function idFrom(
+  path: string,
+  action: "approve" | "reject" | "approve-edit" | "reject-edit"
+): string | null {
   const match = path.match(new RegExp(`^/([^/]+)/${action}$`))
   return match?.[1] && /^[0-9a-f-]{36}$/i.test(match[1]) ? match[1] : null
 }
@@ -78,18 +81,71 @@ async function handle(req: Request): Promise<Response> {
   const approve = idFrom(path, "approve")
   const reject = idFrom(path, "reject")
   const approveEdit = idFrom(path, "approve-edit")
-  if (req.method !== "POST" || (!approve && !reject && !approveEdit))
+  const rejectEdit = idFrom(path, "reject-edit")
+  if (req.method !== "POST" || (!approve && !reject && !approveEdit && !rejectEdit))
     return json({ error: "Маршрут не найден" }, 404)
   if (approveEdit) {
+    const getRes = await fetch(
+      `${e.url}/rest/v1/sharoboy_custom_maps?id=eq.${approveEdit}&status=eq.approved&edit_status=eq.requested`,
+      { headers: h(e.key) }
+    )
+    if (!getRes.ok) return json({ error: "Не удалось получить карту" }, 502)
+    const currentRows = (await getRes.json()) as Record<string, unknown>[]
+    if (currentRows.length === 0) return json({ error: "Запрос на редактирование не найден" }, 409)
+    const current = currentRows[0]
+
+    let patchBody: Record<string, unknown> = {
+      edit_status: "none",
+      edit_request_reason: null,
+      updated_at: new Date().toISOString(),
+    }
+    const rawReason =
+      typeof current?.edit_request_reason === "string" ? current.edit_request_reason : ""
+    try {
+      const parsedReason = JSON.parse(rawReason)
+      if (parsedReason && typeof parsedReason === "object" && parsedReason.__isEditProposal) {
+        if (parsedReason.spec) patchBody.spec_json = parsedReason.spec
+        if (typeof parsedReason.title === "string" && parsedReason.title.trim()) {
+          patchBody.title = parsedReason.title.trim()
+        }
+        if (typeof parsedReason.description === "string") {
+          patchBody.description = parsedReason.description.trim()
+        }
+      } else {
+        patchBody = { edit_status: "approved" }
+      }
+    } catch {
+      patchBody = { edit_status: "approved" }
+    }
+
     const res = await fetch(
       `${e.url}/rest/v1/sharoboy_custom_maps?id=eq.${approveEdit}&status=eq.approved&edit_status=eq.requested`,
       {
         method: "PATCH",
         headers: { ...h(e.key), Prefer: "return=representation" },
-        body: JSON.stringify({ edit_status: "approved" }),
+        body: JSON.stringify(patchBody),
       }
     )
     if (!res.ok) return json({ error: "Не удалось одобрить редактирование" }, 502)
+    const rows = (await res.json()) as unknown[]
+    if (rows.length === 0) return json({ error: "Запрос на редактирование не найден" }, 409)
+    return json({ map: rows[0] })
+  }
+  if (rejectEdit) {
+    const data = await parsed(req)
+    const reason = typeof data?.reason === "string" ? data.reason.trim() : "Отклонено модератором"
+    const res = await fetch(
+      `${e.url}/rest/v1/sharoboy_custom_maps?id=eq.${rejectEdit}&status=eq.approved&edit_status=eq.requested`,
+      {
+        method: "PATCH",
+        headers: { ...h(e.key), Prefer: "return=representation" },
+        body: JSON.stringify({
+          edit_status: "none",
+          edit_request_reason: `Отклонено: ${reason}`,
+        }),
+      }
+    )
+    if (!res.ok) return json({ error: "Не удалось отклонить изменения" }, 502)
     const rows = (await res.json()) as unknown[]
     if (rows.length === 0) return json({ error: "Запрос на редактирование не найден" }, 409)
     return json({ map: rows[0] })
