@@ -1,4 +1,5 @@
-import { containsProfanity, validateNick } from "../scores/profanity.ts"
+import { validateNick } from "../scores/profanity.ts"
+import { isTitleCollision, validateMapTitle } from "./titleValidator.ts"
 
 declare const Deno: {
   env: { get(key: string): string | undefined }
@@ -110,15 +111,39 @@ async function duplicatePending(
   return false
 }
 
+async function checkTitleCollision(
+  e: { url: string; key: string },
+  newTitle: string,
+  excludeId?: string
+): Promise<string | null> {
+  const activeRes = await fetch(
+    `${e.url}/rest/v1/sharoboy_custom_maps?select=id,title,status&status=in.(pending,approved)`,
+    { headers: headers(e.key) }
+  )
+  if (!activeRes.ok) return null
+  const maps = (await activeRes.json()) as CustomMapRecord[]
+  const collision = maps.find(
+    (m) => (!excludeId || m.id !== excludeId) && isTitleCollision(m.title, newTitle)
+  )
+  if (collision) {
+    return `Карта с похожим названием «${collision.title}» уже существует в каталоге. Придумайте уникальное название.`
+  }
+  return null
+}
+
 async function postMap(req: Request, e: { url: string; key: string }): Promise<Response> {
   const data = await body(req)
-  const title = typeof data?.title === "string" ? data.title.trim() : ""
+  const rawTitle = typeof data?.title === "string" ? data.title : ""
+  const titleValidation = validateMapTitle(rawTitle)
+  if (!titleValidation.ok) {
+    return json({ error: titleValidation.error ?? "Некорректное название" }, 400)
+  }
+  const title = titleValidation.title
   const description = typeof data?.description === "string" ? data.description.trim() : ""
   const author = typeof data?.author_nick === "string" ? data.author_nick : ""
   const spec = data?.spec_json
   const mapUid = typeof data?.map_uid === "string" ? data.map_uid.trim() : ""
-  if (title.length < 2 || title.length > 60 || /[\u0000]/u.test(title) || containsProfanity(title))
-    return json({ error: "Некорректное название" }, 400)
+
   if (description.length > 300) return json({ error: "Описание слишком длинное" }, 400)
   const nick = validateNick(author)
   if (!nick.ok) return json({ error: nick.error ?? "Некорректный ник" }, 400)
@@ -126,6 +151,7 @@ async function postMap(req: Request, e: { url: string; key: string }): Promise<R
     return json({ error: "Некорректная спецификация карты" }, 400)
   if (mapUid.length < 1 || mapUid.length > 200)
     return json({ error: "Некорректный идентификатор карты" }, 400)
+
   const existing = await existingMapRecord(e, nick.nick, title, mapUid)
   if (existing) {
     if (existing.status === "pending")
@@ -133,12 +159,17 @@ async function postMap(req: Request, e: { url: string; key: string }): Promise<R
     if (existing.status === "approved")
       return json(
         {
-          error:
-            "Эта карта уже опубликована. Запросите согласование изменений в каталоге карт сообщества.",
+          error: "Эта карта уже опубликована. Запросите согласование изменений в «Мои карты».",
         },
         409
       )
   }
+
+  const collisionError = await checkTitleCollision(e, title)
+  if (collisionError) {
+    return json({ error: collisionError }, 409)
+  }
+
   const res = await fetch(`${e.url}/rest/v1/sharoboy_custom_maps`, {
     method: "POST",
     headers: { ...headers(e.key), Prefer: "return=representation" },
@@ -171,11 +202,23 @@ async function requestEdit(
   if (data?.spec) {
     if (!validSpec(data.spec) || JSON.stringify(data.spec).length > MAX_SPEC_BYTES)
       return json({ error: "Некорректная спецификация карты" }, 400)
+    let validatedProposalTitle: string | undefined
+    if (typeof data.title === "string" && data.title.trim()) {
+      const titleValidation = validateMapTitle(data.title)
+      if (!titleValidation.ok) {
+        return json({ error: titleValidation.error ?? "Некорректное название карты" }, 400)
+      }
+      const collisionError = await checkTitleCollision(e, titleValidation.title, id)
+      if (collisionError) {
+        return json({ error: collisionError }, 409)
+      }
+      validatedProposalTitle = titleValidation.title
+    }
     storedReason = JSON.stringify({
       __isEditProposal: true,
       comment: reason,
       spec: data.spec,
-      title: typeof data.title === "string" ? data.title.trim() : undefined,
+      title: validatedProposalTitle,
       description: typeof data.description === "string" ? data.description.trim() : undefined,
     })
   } else if (reason.length > 300) {
@@ -203,7 +246,7 @@ async function updateSpec(
 ): Promise<Response> {
   const data = await body(req)
   const spec = data?.spec_json
-  const title = typeof data?.title === "string" ? data.title.trim() : ""
+  const rawTitle = typeof data?.title === "string" ? data.title : ""
   const description = typeof data?.description === "string" ? data.description.trim() : ""
   if (!validSpec(spec) || JSON.stringify(spec).length > MAX_SPEC_BYTES)
     return json({ error: "Некорректная спецификация карты" }, 400)
@@ -213,8 +256,16 @@ async function updateSpec(
     edit_status: "none",
     edit_request_reason: null,
   }
-  if (title.length >= 2 && title.length <= 60 && !containsProfanity(title)) {
-    patchBody.title = title
+  if (rawTitle.trim()) {
+    const titleValidation = validateMapTitle(rawTitle)
+    if (!titleValidation.ok) {
+      return json({ error: titleValidation.error ?? "Некорректное название карты" }, 400)
+    }
+    const collisionError = await checkTitleCollision(e, titleValidation.title, id)
+    if (collisionError) {
+      return json({ error: collisionError }, 409)
+    }
+    patchBody.title = titleValidation.title
   }
   if (description.length <= 300) {
     patchBody.description = description

@@ -249,7 +249,15 @@ export default function App() {
       )}
 
       {showCommunityMaps && hud.phase === "menu" && (
-        <CommunityMaps onBack={() => setShowCommunityMaps(false)} onPlay={startCommunityMap} />
+        <CommunityMaps
+          onBack={() => setShowCommunityMaps(false)}
+          onEditCopy={(copiedSpec) => {
+            setEditorMap(copiedSpec)
+            setShowCommunityMaps(false)
+            setShowEditor(true)
+          }}
+          onPlay={startCommunityMap}
+        />
       )}
 
       {showAdminPanel && hud.phase === "menu" && (
@@ -266,8 +274,13 @@ export default function App() {
 
       {showEditor && hud.phase === "menu" && (
         <EditorView
+          initialMap={editorMap}
+          key={editorMap?.id}
           musicMuted={hud.musicMuted}
-          onClose={() => setShowEditor(false)}
+          onClose={() => {
+            setShowEditor(false)
+            setEditorMap(null)
+          }}
           onNextMusicTrack={() => g()?.nextMusicTrack()}
           onTestRun={startEditorTest}
           onToggleMusic={() => g()?.toggleMusic()}

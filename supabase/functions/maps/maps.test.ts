@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
 
+import { isTitleCollision, validateMapTitle } from "./titleValidator.ts"
+
 describe("maps API contracts", () => {
   it("uses UUID routes for map actions", () => {
     expect("/functions/v1/maps/00000000-0000-0000-0000-000000000000/vote").toMatch(
@@ -22,5 +24,18 @@ describe("maps API contracts", () => {
       /[0-9a-f-]{36}\/update-spec$/
     )
     expect(409).toBe(409)
+  })
+
+  it("validates map title single-script rule and character boundaries", () => {
+    expect(validateMapTitle("Арена Битвы").ok).toBe(true)
+    expect(validateMapTitle("Arena of Battle").ok).toBe(true)
+    // Смешивание кириллицы и латиницы блокируется
+    expect(validateMapTitle("Арена Battle").ok).toBe(false)
+    expect(validateMapTitle("Aрена").ok).toBe(false)
+  })
+
+  it("detects title collisions between existing and new map names", () => {
+    expect(isTitleCollision("Супер Карта", "суперкарта")).toBe(true)
+    expect(isTitleCollision("Стадион", "Стадион (копия)")).toBe(false)
   })
 })

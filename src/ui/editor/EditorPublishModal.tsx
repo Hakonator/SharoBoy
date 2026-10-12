@@ -8,7 +8,7 @@ import {
   type CustomMapRecord,
 } from "../../game/customMapsApi"
 import type { PlayerMapSpec } from "../../game/mapSpec"
-import { containsProfanity } from "../../game/profanity"
+import { validateMapTitle } from "../../game/mapTitleValidator"
 import { validatePlayerMapSpec, type MapValidationError } from "../../game/mapValidator"
 
 interface EditorPublishModalProps {
@@ -55,12 +55,9 @@ export function EditorPublishModal({ map, author, onClose, onImportMap }: Editor
       setErrors(validationErrors)
       return
     }
-    if (cleanTitle.length < 2 || cleanTitle.length > 60) {
-      setMessage("Название карты должно содержать от 2 до 60 символов.")
-      return
-    }
-    if (containsProfanity(cleanTitle)) {
-      setMessage("Название содержит недопустимые выражения. Выберите другое название.")
+    const titleValidation = validateMapTitle(cleanTitle)
+    if (!titleValidation.ok) {
+      setMessage(titleValidation.error ?? "Некорректное название карты.")
       return
     }
     if (cleanDescription.length > 300) {

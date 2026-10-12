@@ -4,22 +4,21 @@ import { LEADERBOARD_ENABLED } from "../../config"
 import {
   fetchApprovedMaps,
   getVoterId,
-  requestMapEdit,
   voteMap,
   type CustomMapRecord,
 } from "../../game/customMapsApi"
 import type { PlayerMapSpec } from "../../game/mapSpec"
-import { savePublishedRecord } from "../editor/localMapsStorage"
+import { saveLocalMap, setCurrentLocalMapId } from "../editor/localMapsStorage"
 import { MapThumbnail } from "../editor/MapThumbnail"
 
 type CommunityMapsSort = "popular" | "newest"
 
 const LIKED_MAPS_KEY = "sharoboy-liked-community-maps"
-const NICK_KEY = "sharoboy-nick"
 
 export interface CommunityMapsProps {
   onBack: () => void
   onPlay: (spec: PlayerMapSpec) => void
+  onEditCopy?: (spec: PlayerMapSpec) => void
 }
 
 export function formatMapDate(value: string): string {
@@ -53,14 +52,7 @@ function saveLikedMaps(ids: Set<string>): void {
   }
 }
 
-export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
-  const [currentNick] = useState(() => {
-    try {
-      return localStorage.getItem(NICK_KEY) ?? ""
-    } catch {
-      return ""
-    }
-  })
+export function CommunityMaps({ onBack, onPlay, onEditCopy }: CommunityMapsProps) {
   const [sort, setSort] = useState<CommunityMapsSort>("popular")
   const [search, setSearch] = useState("")
   const [maps, setMaps] = useState<CustomMapRecord[]>([])
@@ -68,9 +60,7 @@ export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [likingId, setLikingId] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editReason, setEditReason] = useState("")
-  const [requestingEdit, setRequestingEdit] = useState(false)
+  const [copiedNotice, setCopiedNotice] = useState<string | null>(null)
 
   const loadMaps = useCallback(async () => {
     if (!LEADERBOARD_ENABLED) return
@@ -110,31 +100,25 @@ export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
     }
   }
 
-  const requestEdit = async (map: CustomMapRecord) => {
-    if (!editReason.trim()) return
-    setRequestingEdit(true)
-    setError(null)
-    try {
-      await requestMapEdit(map.id, currentNick.trim(), editReason)
-      savePublishedRecord({
-        ...map,
-        map_uid: map.map_uid ?? map.spec_json.id,
-        edit_status: "requested",
-        edit_request_reason: editReason.trim(),
-      })
-      setMaps((current) =>
-        current.map((item) =>
-          item.id === map.id
-            ? { ...item, edit_status: "requested", edit_request_reason: editReason.trim() }
-            : item
-        )
-      )
-      setEditingId(null)
-      setEditReason("")
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось запросить редактирование.")
-    } finally {
-      setRequestingEdit(false)
+  const handleCopyMap = (map: CustomMapRecord) => {
+    const newId = `map-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    const baseTitle = map.spec_json.metadata.title || map.title
+    const copyTitle = `${baseTitle} (копия)`.slice(0, 60)
+    const clonedSpec: PlayerMapSpec = {
+      ...map.spec_json,
+      id: newId,
+      metadata: {
+        ...map.spec_json.metadata,
+        title: copyTitle,
+      },
+    }
+    saveLocalMap(clonedSpec)
+    setCurrentLocalMapId(newId)
+    if (onEditCopy) {
+      onEditCopy(clonedSpec)
+    } else {
+      setCopiedNotice(`Копия «${copyTitle}» добавлена в ваши карты!`)
+      setTimeout(() => setCopiedNotice(null), 4000)
     }
   }
 
@@ -204,6 +188,21 @@ export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
                 </button>
               </div>
             )}
+            {copiedNotice && (
+              <div
+                className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-mint/50 bg-mint/10 p-3 text-sm text-mint"
+                role="status"
+              >
+                <span>{copiedNotice}</span>
+                <button
+                  className="btn-ghost px-2 py-1 text-xs"
+                  onClick={() => setCopiedNotice(null)}
+                  type="button"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
             {loading && (
               <p className="py-10 text-center text-dim" role="status">
                 Загрузка карт…
@@ -253,23 +252,22 @@ export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
                     <div className="mt-auto flex gap-2">
                       <button
                         aria-label={`Лайк карте ${map.title}`}
-                        className={`btn-ghost flex-1 px-3 py-2 text-sm ${likedMaps.has(map.id) ? "text-punch" : ""}`}
+                        className={`btn-ghost px-3 py-2 text-sm ${likedMaps.has(map.id) ? "text-punch" : ""}`}
                         disabled={likedMaps.has(map.id) || likingId === map.id}
                         onClick={() => void like(map)}
                         type="button"
                       >
                         ❤️ {map.likes_count}
                       </button>
-                      {map.author_nick === currentNick.trim() &&
-                        map.edit_status !== "requested" && (
-                          <button
-                            className="btn-ghost flex-1 px-3 py-2 text-sm"
-                            onClick={() => setEditingId(map.id)}
-                            type="button"
-                          >
-                            ✎ Запросить изменение
-                          </button>
-                        )}
+                      <button
+                        aria-label={`Создать копию карты ${map.title} в редакторе`}
+                        className="btn-ghost flex-1 px-3 py-2 text-sm text-cyan-neon hover:bg-cyan-neon/10"
+                        onClick={() => handleCopyMap(map)}
+                        title="Создать копию в ваших картах и открыть в редакторе"
+                        type="button"
+                      >
+                        📋 В редактор
+                      </button>
                       <button
                         className="btn-arcade flex-1 px-3 py-2 text-sm"
                         onClick={() => onPlay(map.spec_json)}
@@ -278,25 +276,6 @@ export function CommunityMaps({ onBack, onPlay }: CommunityMapsProps) {
                         ▶ Играть
                       </button>
                     </div>
-                    {editingId === map.id && (
-                      <div className="mt-3 space-y-2 border-t border-line pt-3">
-                        <textarea
-                          className="min-h-16 w-full rounded border border-line bg-abyss p-2 text-xs text-foam outline-none focus:border-cyan-neon"
-                          maxLength={300}
-                          onChange={(event) => setEditReason(event.target.value)}
-                          placeholder="Что нужно исправить?"
-                          value={editReason}
-                        />
-                        <button
-                          className="btn-arcade w-full px-3 py-2 text-xs"
-                          disabled={requestingEdit || editReason.trim().length < 3}
-                          onClick={() => void requestEdit(map)}
-                          type="button"
-                        >
-                          {requestingEdit ? "Отправка…" : "Отправить запрос"}
-                        </button>
-                      </div>
-                    )}
                   </article>
                 ))}
               </div>
