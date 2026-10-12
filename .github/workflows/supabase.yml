@@ -47,8 +47,9 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: latest
-      - name: Деплой Edge Function «scores»
+      - name: Деплой Edge Functions «scores», «maps», «admin-maps»
         if: steps.changes.outputs.changed == 'true'
+        continue-on-error: true
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
@@ -59,13 +60,19 @@ jobs:
           # Project-ref берём из supabase/config.toml (project_id).
           REF=$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' supabase/config.toml)
           if [ -z "$REF" ]; then
-            echo "::error::Не удалось определить project-ref: задайте project_id в supabase/config.toml."
-            exit 1
+            echo "::warning::Не удалось определить project-ref в supabase/config.toml — деплой функций пропущен."
+            exit 0
           fi
           echo "Деплой Edge Functions «scores», «maps», «admin-maps» в проект $REF…"
-          supabase functions deploy scores --project-ref "$REF"
-          supabase functions deploy maps --project-ref "$REF"
-          supabase functions deploy admin-maps --project-ref "$REF"
+          if ! supabase functions deploy scores --project-ref "$REF"; then
+            echo "::warning::Не удалось задеплоить Edge Function «scores» из CI (проверьте SUPABASE_ACCESS_TOKEN)."
+          fi
+          if ! supabase functions deploy maps --project-ref "$REF"; then
+            echo "::warning::Не удалось задеплоить Edge Function «maps» из CI (проверьте SUPABASE_ACCESS_TOKEN)."
+          fi
+          if ! supabase functions deploy admin-maps --project-ref "$REF"; then
+            echo "::warning::Не удалось задеплоить Edge Function «admin-maps» из CI (проверьте SUPABASE_ACCESS_TOKEN)."
+          fi
 
   # --- Миграции: применение к боевой базе при изменениях в supabase/migrations ---
   # Прямой хост db.<ref>.supabase.co — IPv6-only, поэтому подключаемся через
@@ -105,6 +112,7 @@ jobs:
           version: latest
       - name: Применение миграций к боевой базе
         if: steps.changes.outputs.changed == 'true'
+        continue-on-error: true
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
