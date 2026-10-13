@@ -72,7 +72,6 @@ import { launch } from "./game/runFlow"
 import { FPS_LS_KEY } from "./game/debug"
 import { update, gameLoop } from "./game/updateStep"
 import { draw } from "./game/drawScene"
-import { PostFxPipeline } from "./render/postFx"
 
 export { UPGRADES_ENABLED, UPGRADE_DEFS } from "./upgrades"
 export type { Block, HudData, Phase, PowerType, ScoreEntry } from "./types"
@@ -81,8 +80,6 @@ export { FPS_LS_KEY } from "./game/debug"
 export class Game {
   canvas: HTMLCanvasElement
   ctx: CanvasRenderingContext2D
-  glCanvas: HTMLCanvasElement | null = null
-  postFx: PostFxPipeline | null = null
   onHud: (h: HudData) => void
   raf = 0
   last = 0
@@ -246,10 +243,6 @@ export class Game {
     this.unsubSettings = subscribeSettings((s) => {
       this.settings = s
       this.fx.maxParticles = particleLimitForQuality(s.graphicsQuality)
-      if (this.glCanvas) {
-        this.glCanvas.style.display =
-          s.graphicsQuality === "eco" || !this.postFx?.isSupported ? "none" : "block"
-      }
     })
     this.input = createInput(this, canvas)
     this.bossSys = new BossSystem(makeBossHost(this))

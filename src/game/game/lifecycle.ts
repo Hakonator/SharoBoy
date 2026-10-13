@@ -3,7 +3,6 @@ import { InputController } from "../input"
 import { clamp, rand, lsGet } from "../utils"
 import { computeScale } from "../viewport"
 import type { ScoreEntry } from "../types"
-import { PostFxPipeline } from "../render/postFx"
 
 import { toggleMusic, toggleMute } from "./audioControls"
 import { enterNextNodeOnAction } from "./campaignFlow"
@@ -25,24 +24,6 @@ import { launch } from "./runFlow"
 export function attach(g: Game) {
   g.handleResize()
   window.addEventListener("resize", g.handleResize)
-  if (typeof document !== "undefined" && g.canvas.parentElement) {
-    try {
-      const glCanvas = document.createElement("canvas")
-      glCanvas.className = "absolute inset-0 h-full w-full pointer-events-none"
-      glCanvas.style.position = "absolute"
-      glCanvas.style.inset = "0"
-      glCanvas.style.width = "100%"
-      glCanvas.style.height = "100%"
-      glCanvas.style.pointerEvents = "none"
-      glCanvas.style.display = g.settings.graphicsQuality === "eco" ? "none" : "block"
-      g.canvas.parentElement.insertBefore(glCanvas, g.canvas.nextSibling)
-      g.glCanvas = glCanvas
-      g.postFx = new PostFxPipeline(glCanvas)
-    } catch {
-      g.glCanvas = null
-      g.postFx = null
-    }
-  }
   g.input.attach()
   for (let i = 0; i < 26; i++) {
     g.bubbles.push({
@@ -69,10 +50,6 @@ export function destroy(g: Game) {
   g.destroyed = true
   cancelAnimationFrame(g.raf)
   window.removeEventListener("resize", g.handleResize)
-  g.postFx?.destroy()
-  g.postFx = null
-  g.glCanvas?.remove()
-  g.glCanvas = null
   g.input.destroy()
   // Движок уничтожен (например, пересоздание в dev-режиме) — музыка не должна
   // остаться играть «вторым» экземпляром.
@@ -102,12 +79,6 @@ export function resizeHandler(g: Game) {
   // devicePixelRatio != 1 (масштаб ОС 125%/150%, Retina) вылезает за экран.
   g.canvas.style.width = `${cssW}px`
   g.canvas.style.height = `${cssH}px`
-  if (g.glCanvas) {
-    g.glCanvas.width = g.canvas.width
-    g.glCanvas.height = g.canvas.height
-    g.glCanvas.style.width = `${cssW}px`
-    g.glCanvas.style.height = `${cssH}px`
-  }
   g.paddle.baseW = clamp(g.w * 0.18, 110, 200) * g.paddleWidthMult
   g.paddle.y = g.h - paddleBottomOffset(g)
   g.paddle.x = clamp(g.paddle.x, g.paddle.w / 2 + 4, g.w - g.paddle.w / 2 - 4)

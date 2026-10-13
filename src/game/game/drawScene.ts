@@ -1,5 +1,4 @@
 import { BUILD_VERSION, DEBUG_TOOLS } from "../../config"
-import { calcChroma } from "../render/postFx"
 import { gradient } from "../render/gradCache"
 import type { Game } from "../game"
 import {
@@ -167,17 +166,5 @@ export function draw(g: Game) {
   if (DEBUG_TOOLS) {
     drawDebugFlags(ctx, w, h, g.slowMotion, g.invincible, Math.max(9, Math.round(11 / g.scale)))
     drawBuildVersion(ctx, w, h, BUILD_VERSION, Math.max(8, Math.round(10 / g.scale)))
-  }
-
-  // WebGL шейдерный пост-процессинг: хроматическая аберрация, bloom и scanlines
-  if (g.postFx?.isSupported && g.settings.graphicsQuality !== "eco" && g.glCanvas) {
-    g.glCanvas.style.display = "block"
-    g.postFx.render(g.canvas, {
-      time: g.time,
-      chroma: calcChroma(g),
-      quality: g.settings.graphicsQuality,
-    })
-  } else if (g.glCanvas) {
-    g.glCanvas.style.display = "none"
   }
 }
