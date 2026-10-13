@@ -216,12 +216,12 @@ export function MenuScreen({
 
             {/* Единая карточка с табами */}
             <div className="flex flex-col overflow-hidden rounded-xl border border-line/60 bg-deep/80 shadow-2xl backdrop-blur-md">
-              {/* Навигационная панель табов: всегда в одну строку, не переносится и не прыгает */}
-              <div className="flex items-center gap-1.5 border-b border-line/50 bg-abyss/85 p-2 sm:p-2.5 overflow-x-auto">
+              {/* Навигационная панель табов: переносится без горизонтального ползунка */}
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-line/50 bg-abyss/85 p-2 sm:p-2.5">
                 <button
                   type="button"
                   onClick={() => setActiveTab("upgrades")}
-                  className={`shrink-0 relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-display text-xs transition sm:text-sm ${
+                  className={`relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-display text-xs transition sm:text-sm ${
                     activeTab === "upgrades"
                       ? "bg-gold/20 text-gold ring-1 ring-gold/50 shadow-[0_0_10px_rgba(255,201,77,0.25)] font-bold"
                       : "bg-deep/50 text-dim hover:text-foam hover:bg-deep/90"
@@ -239,7 +239,7 @@ export function MenuScreen({
                 <button
                   type="button"
                   onClick={() => setActiveTab("records")}
-                  className={`shrink-0 relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-display text-xs transition sm:text-sm ${
+                  className={`relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-display text-xs transition sm:text-sm ${
                     activeTab === "records"
                       ? "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-400/50 shadow-[0_0_10px_rgba(0,240,255,0.25)] font-bold"
                       : "bg-deep/50 text-dim hover:text-foam hover:bg-deep/90"
@@ -251,7 +251,7 @@ export function MenuScreen({
                 <button
                   type="button"
                   onClick={() => setActiveTab("achievements")}
-                  className={`shrink-0 relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-display text-xs transition sm:text-sm ${
+                  className={`relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-display text-xs transition sm:text-sm ${
                     activeTab === "achievements"
                       ? "bg-purple-500/20 text-purple-200 ring-1 ring-purple-400/50 shadow-[0_0_10px_rgba(168,85,247,0.25)] font-bold"
                       : "bg-deep/50 text-dim hover:text-foam hover:bg-deep/90"
@@ -266,7 +266,7 @@ export function MenuScreen({
                 <button
                   type="button"
                   onClick={() => setActiveTab("guide")}
-                  className={`shrink-0 relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-display text-xs transition sm:text-sm ${
+                  className={`relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-display text-xs transition sm:text-sm ${
                     activeTab === "guide"
                       ? "bg-mint/20 text-mint ring-1 ring-mint/50 shadow-[0_0_10px_rgba(0,255,163,0.25)] font-bold"
                       : "bg-deep/50 text-dim hover:text-foam hover:bg-deep/90"
@@ -279,7 +279,7 @@ export function MenuScreen({
                   <button
                     type="button"
                     onClick={() => setActiveTab("debug")}
-                    className={`shrink-0 relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-display text-xs transition sm:text-sm ${
+                    className={`relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-display text-xs transition sm:text-sm ${
                       activeTab === "debug"
                         ? "bg-amber-500/20 text-amber-200 ring-1 ring-amber-400/50 shadow-[0_0_10px_rgba(245,158,11,0.25)] font-bold"
                         : "bg-deep/50 text-dim hover:text-foam hover:bg-deep/90"
@@ -293,8 +293,8 @@ export function MenuScreen({
                 )}
               </div>
 
-              {/* Содержимое активного таба: фиксированная высота исключает прыжки при смене раздела */}
-              <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 h-[360px] sm:h-[400px] md:h-[450px]">
+              {/* Содержимое активного таба: вертикальный слайдер в неоновом стиле игры */}
+              <div className="arcade-scrollbar flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 pr-2 sm:pr-2.5 h-[360px] sm:h-[400px] md:h-[450px]">
                 {activeTab === "upgrades" && <MenuUpgrades hud={hud} onBuyUpgrade={onBuyUpgrade} />}
 
                 {activeTab === "records" && (

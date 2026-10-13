@@ -273,3 +273,35 @@ canvas {
     transparent 10px 20px
   );
 }
+
+/* Игровой вертикальный скроллбар (слайдер в неоновом стиле игры) */
+.arcade-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(53, 224, 255, 0.5) rgba(6, 24, 34, 0.7);
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.arcade-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.arcade-scrollbar::-webkit-scrollbar-track {
+  background: rgba(6, 24, 34, 0.7);
+  border-radius: 4px;
+  border: 1px solid rgba(29, 74, 97, 0.4);
+}
+
+.arcade-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #35e0ff 0%, #12b8d8 100%);
+  border-radius: 4px;
+  box-shadow: 0 0 6px rgba(53, 224, 255, 0.5);
+  border: 1px solid rgba(157, 242, 255, 0.5);
+}
+
+.arcade-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #7cf5ff 0%, #35e0ff 100%);
+  box-shadow: 0 0 10px rgba(53, 224, 255, 0.8);
+}
