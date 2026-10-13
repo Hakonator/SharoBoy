@@ -34,6 +34,21 @@ describe("Effects", () => {
     }
   })
 
+  it("shatter создаёт смесь осколков и искр с поддержкой угла удара", () => {
+    const fx = new Effects()
+    fx.shatter(50, 60, "#00ffcc", 10, 150, Math.PI / 2)
+    expect(fx.particles).toHaveLength(10)
+    const shards = fx.particles.filter((p) => p.shape === "shard")
+    const sparks = fx.particles.filter((p) => p.shape !== "shard")
+    expect(shards.length).toBeGreaterThan(0)
+    expect(sparks.length).toBeGreaterThan(0)
+    for (const sh of shards) {
+      expect(sh.shape).toBe("shard")
+      expect(sh.vr).toBeDefined()
+      expect(sh.rot).toBeDefined()
+    }
+  })
+
   it("burst не добавляет частицы при переполнении пула", () => {
     const fx = new Effects()
     for (let i = 0; i < 421; i++) fx.particles.push(dummyParticle())

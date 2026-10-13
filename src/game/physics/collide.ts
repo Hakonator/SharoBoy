@@ -97,6 +97,7 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
   ball.sinceHit = 0
   p.squash = 1
   g.combo = 0
+  if (Math.abs(rel) > 0.65) g.hitStop = Math.max(g.hitStop, 0.015)
   g.sfx.paddle(Math.abs(rel), paddlePan)
   g.fx.burst(ball.x, ball.y - ball.r, "#7cf5ff", 6, 130)
   g.pushHud()
@@ -146,6 +147,7 @@ export function collidePaddleShape(
   ball.sinceHit = 0
   p.squash = 1
   g.combo = 0
+  if (Math.abs(rel) > 0.65) g.hitStop = Math.max(g.hitStop, 0.015)
   const paddlePan = clamp((ball.x / g.w) * 2 - 1, -0.85, 0.85)
   g.sfx.paddle(Math.abs(rel), paddlePan)
 }
@@ -188,7 +190,13 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
     if (fire && !b.isMiniboss && !(g.frostActive() && !b.frozen)) {
       // обычные блоки огонь прожигает насквозь (без отскока)
       g.sfx.burn(blockPan)
-      damageBlock(g, b, g.debugBallDamage * FIREBALL_DAMAGE_MULT)
+      damageBlock(
+        g,
+        b,
+        g.debugBallDamage * FIREBALL_DAMAGE_MULT,
+        true,
+        Math.atan2(ball.vy, ball.vx)
+      )
       continue
     }
     // морозный мяч: живой блок и соседи замораживаются вместо урона,
@@ -222,7 +230,8 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
       ball.vx -= 2 * dot * wnx
       ball.vy -= 2 * dot * wny
     }
-    damageBlock(g, b, g.debugBallDamage * (fire ? FIREBALL_DAMAGE_MULT : 1))
+    const impactAngle = Math.atan2(wny, wnx)
+    damageBlock(g, b, g.debugBallDamage * (fire ? FIREBALL_DAMAGE_MULT : 1), true, impactAngle)
     // электрошар: обычный урон уже нанесён, искры цепочкой перескакивают
     // по соседним блокам (звенья бьют по расписанию из очереди); сам блок
     // удара исключён — свой урон он уже получил

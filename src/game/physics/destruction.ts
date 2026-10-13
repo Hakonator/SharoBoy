@@ -12,8 +12,30 @@ export function comboMult(g: PhysicsWorld): number {
   return 1 + Math.min(g.combo, 20) * 0.1
 }
 
+function emitBlockShatter(
+  g: PhysicsWorld,
+  x: number,
+  y: number,
+  color: string,
+  count: number,
+  speed: number,
+  impactAngle?: number
+) {
+  if (typeof g.fx.shatter === "function") {
+    g.fx.shatter(x, y, color, count, speed, impactAngle)
+  } else {
+    g.fx.burst(x, y, color, count, speed)
+  }
+}
+
 /** Урон блоку; при разрушении — очки, эффекты, дроп бонуса, «матрёшка». */
-export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1, allowBrittle = true) {
+export function damageBlock(
+  g: PhysicsWorld,
+  b: Block,
+  dmg = 1,
+  allowBrittle = true,
+  impactAngle?: number
+) {
   if (b.dead) return
   dmg = Number.isFinite(dmg) ? Math.max(0, dmg) : 0
   // Блоки минибосса неразрушаемы: урон идёт в пул HP его существа.
@@ -33,7 +55,8 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1, allowBrittle = t
     const pan = clamp((b.x / g.w) * 2 - 1, -0.85, 0.85)
     if (dmg <= 0) {
       g.sfx.brick(b.tier, pan, g.combo)
-      g.fx.burst(b.x, b.y, "#bfeaff", 5, 130)
+      g.fx.burst(b.x, b.y, "#bfeaff", 6, 140)
+      g.hitStop = Math.max(g.hitStop, 0.015)
       g.pushHud()
       return
     }
@@ -51,10 +74,10 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1, allowBrittle = t
   const pan = clamp((b.x / g.w) * 2 - 1, -0.85, 0.85)
   if (b.hp > 0) {
     g.sfx.brick(b.tier, pan, g.combo)
-    g.fx.burst(b.x, b.y, TIER[b.tier].base, 5, 130)
+    emitBlockShatter(g, b.x, b.y, TIER[b.tier].base, 6, 140, impactAngle)
     g.combo++
     g.addScore(10 * comboMult(g), b.x, b.y, "#9fd6ea", 12)
-    if (b.tier === 3) g.hitStop = Math.max(g.hitStop, 0.03)
+    g.hitStop = Math.max(g.hitStop, 0.014 + (b.tier === 3 ? 0.02 : 0))
     g.pushHud()
     return
   }
@@ -65,7 +88,8 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1, allowBrittle = t
     b.sp.rotDir ??= 1
     b.sp.rotVel = b.sp.rotDir * SPIN_MAX
     g.sfx.brick(b.tier, pan, g.combo)
-    g.fx.burst(b.x, b.y, TIER[b.tier].base, 5, 130)
+    emitBlockShatter(g, b.x, b.y, TIER[b.tier].base, 6, 140, impactAngle)
+    g.hitStop = Math.max(g.hitStop, 0.015)
     g.pushHud()
     return
   }
@@ -117,22 +141,31 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1, allowBrittle = t
     g.fx.iceShatter(b.x, b.y)
   } else {
     g.sfx.destroy(b.tier, pan, g.combo)
-    g.fx.burst(b.x, b.y, TIER[b.tier].base, 10 + b.tier * 4, 190 + b.tier * 40)
+    emitBlockShatter(
+      g,
+      b.x,
+      b.y,
+      TIER[b.tier].base,
+      12 + b.tier * 4,
+      190 + b.tier * 40,
+      impactAngle
+    )
   }
   g.fx.rings.push({
     x: b.x,
     y: b.y,
     r: 6,
-    maxR: 40 + b.tier * 18,
-    color: "rgba(234,247,255,0.7)",
+    maxR: 44 + b.tier * 20,
+    color: "rgba(234,247,255,0.75)",
     t: 0,
   })
   g.shake = Math.min(g.shake + b.tier, 9)
-  if (b.tier === 3) g.hitStop = Math.max(g.hitStop, 0.05)
+  g.hitStop = Math.max(g.hitStop, 0.018 + b.tier * 0.012)
 
   // вехи серии
   if (g.combo === 5 || g.combo === 10 || g.combo === 15) {
     const word = g.combo === 5 ? "ГОРЯЧО!" : g.combo === 10 ? "НЕУДЕРЖИМО!" : "БЕЗУМИЕ!"
+    g.hitStop = Math.max(g.hitStop, 0.065)
     g.fx.popups.push({
       x: g.w / 2,
       y: g.h * 0.3,
@@ -145,8 +178,8 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1, allowBrittle = t
       x: g.w / 2,
       y: g.h * 0.3,
       r: 10,
-      maxR: 150,
-      color: "rgba(255,201,77,0.6)",
+      maxR: 160,
+      color: "rgba(255,201,77,0.75)",
       t: 0,
     })
     g.sfx.levelClear()

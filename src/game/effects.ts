@@ -37,6 +37,52 @@ export class Effects {
     }
   }
 
+  /**
+   * Разрушение блока: сочный микс треугольных крутящихся осколков (shard)
+   * и круглых искр. Если передан impactAngle, осколки разлетаются направленным
+   * веером в сторону удара, усиливая физическую отдачу.
+   */
+  shatter(x: number, y: number, color: string, count: number, speed: number, impactAngle?: number) {
+    if (this.particles.length > this.maxParticles) return
+    const shardCount = Math.max(3, Math.floor(count * 0.55))
+    const sparkCount = count - shardCount
+
+    for (let i = 0; i < shardCount; i++) {
+      const a = impactAngle !== undefined ? impactAngle + rand(-1.1, 1.1) : rand(0, Math.PI * 2)
+      const v = rand(speed * 0.45, speed * 1.15)
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * v,
+        vy: Math.sin(a) * v - rand(20, 70),
+        life: rand(0.4, 0.8),
+        maxLife: 0.8,
+        size: rand(3, 6.5),
+        color,
+        grav: 380,
+        shape: "shard",
+        rot: rand(0, Math.PI * 2),
+        vr: rand(-10, 10),
+      })
+    }
+
+    for (let i = 0; i < sparkCount; i++) {
+      const a = impactAngle !== undefined ? impactAngle + rand(-1.4, 1.4) : rand(0, Math.PI * 2)
+      const v = rand(speed * 0.3, speed * 0.85)
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * v,
+        vy: Math.sin(a) * v,
+        life: rand(0.25, 0.55),
+        maxLife: 0.55,
+        size: rand(1.5, 3.5),
+        color: i % 2 === 0 ? color : "#ffffff",
+        grav: 280,
+      })
+    }
+  }
+
   /** Раскалывание льда: веер осколков-треугольников + мелкая ледяная пыль. */
   iceShatter(x: number, y: number) {
     if (this.particles.length > this.maxParticles) return

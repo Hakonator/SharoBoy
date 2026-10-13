@@ -8,7 +8,9 @@ export function drawRings(ctx: Ctx, rings: Ring[]) {
     const a = clamp(1 - r.t, 0, 1)
     ctx.globalAlpha = a
     ctx.beginPath()
-    ctx.arc(r.x, r.y, r.r + r.t * r.maxR, 0, Math.PI * 2)
+    // Нелинейное расширение ударной волны: быстрый взрывной фронт с замедлением на излёте
+    const ease = 1 - (1 - r.t) * (1 - r.t)
+    ctx.arc(r.x, r.y, r.r + ease * r.maxR, 0, Math.PI * 2)
     ctx.strokeStyle = r.color
     ctx.lineWidth = 3 * a + 1
     ctx.stroke()
@@ -25,18 +27,27 @@ export function drawParticles(ctx: Ctx, particles: Particle[]) {
     ctx.globalAlpha = a
     ctx.fillStyle = p.color
     if (p.shape === "shard") {
-      // осколок: неровный треугольник с собственным вращением (лёд)
+      // осколок: неровный треугольник с вращением; рисуем прямо в мировых координатах
+      // без вызовов ctx.save/translate/rotate, что в разы быстрее и не сдвигает стек матриц
       const s = p.size * (0.55 + 0.45 * a)
-      ctx.save()
-      ctx.translate(p.x, p.y)
-      ctx.rotate(p.rot ?? 0)
+      const rot = p.rot ?? 0
+      const c = Math.cos(rot)
+      const sn = Math.sin(rot)
+      // v1 = (0, -s)
+      const x1 = p.x + s * sn
+      const y1 = p.y - s * c
+      // v2 = (0.6s, 0.7s)
+      const x2 = p.x + s * 0.6 * c - s * 0.7 * sn
+      const y2 = p.y + s * 0.6 * sn + s * 0.7 * c
+      // v3 = (-0.5s, 0.55s)
+      const x3 = p.x + -s * 0.5 * c - s * 0.55 * sn
+      const y3 = p.y + -s * 0.5 * sn + s * 0.55 * c
       ctx.beginPath()
-      ctx.moveTo(0, -s)
-      ctx.lineTo(s * 0.6, s * 0.7)
-      ctx.lineTo(-s * 0.5, s * 0.55)
+      ctx.moveTo(x1, y1)
+      ctx.lineTo(x2, y2)
+      ctx.lineTo(x3, y3)
       ctx.closePath()
       ctx.fill()
-      ctx.restore()
       continue
     }
     ctx.beginPath()
