@@ -7,17 +7,20 @@ import { MenuSection, screenTag } from "./shared"
 /** Короткая метка категории экрана для списка мирового топа «Все». */
 
 /** Локальные рекорды: кампания и бесконечный режим (из localStorage). */
-export function MenuRecords({ hud }: { hud: HudData }) {
-  if (hud.top.length === 0 && hud.topEndless.length === 0) return null
-  return (
-    <MenuSection
-      title="📈 Рекорды"
-      badge={hud.best > 0 ? hud.best.toLocaleString("ru-RU") : undefined}
-    >
+/** Локальные рекорды: кампания и бесконечный режим (из localStorage). */
+export function MenuRecords({ hud, asSection = false }: { hud: HudData; asSection?: boolean }) {
+  if (hud.top.length === 0 && hud.topEndless.length === 0) {
+    return asSection ? null : (
+      <div className="text-xs text-dim">Рекордов пока нет — сыграйте партию!</div>
+    )
+  }
+
+  const content = (
+    <div className="space-y-3">
       {hud.top.length > 0 && (
-        <div className="mb-3">
-          <div className="hud-label mb-2">Кампания</div>
-          <ol className="space-y-1.5">
+        <div className="mb-2">
+          <div className="hud-label mb-1.5">Кампания</div>
+          <ol className="space-y-1">
             {hud.top.map((s, i) => (
               <li key={`${s.score}-${i}`} className="flex items-center font-display text-sm">
                 <span
@@ -43,8 +46,8 @@ export function MenuRecords({ hud }: { hud: HudData }) {
       )}
       {hud.topEndless.length > 0 && (
         <div>
-          <div className="hud-label mb-2">Бесконечный</div>
-          <ol className="space-y-1.5">
+          <div className="hud-label mb-1.5">Бесконечный</div>
+          <ol className="space-y-1">
             {hud.topEndless.map((s, i) => (
               <li key={`e-${s.score}-${i}`} className="flex items-center font-display text-sm">
                 <span
@@ -68,8 +71,21 @@ export function MenuRecords({ hud }: { hud: HudData }) {
           </ol>
         </div>
       )}
-    </MenuSection>
+    </div>
   )
+
+  if (asSection) {
+    return (
+      <MenuSection
+        title="📈 Рекорды"
+        badge={hud.best > 0 ? hud.best.toLocaleString("ru-RU") : undefined}
+      >
+        {content}
+      </MenuSection>
+    )
+  }
+
+  return content
 }
 
 /** Мировой топ: фильтры экрана и периода, два списка (кампания/бесконечный). */
@@ -80,6 +96,7 @@ export function MenuGlobalTop({
   globalTopEndless,
   onPeriod,
   onScreen,
+  asSection = false,
 }: {
   period: LeadPeriod
   screen: ScreenFilter
@@ -87,10 +104,11 @@ export function MenuGlobalTop({
   globalTopEndless: GlobalScore[]
   onPeriod: (p: LeadPeriod) => void
   onScreen: (s: ScreenFilter) => void
+  asSection?: boolean
 }) {
   if (!LEADERBOARD_ENABLED) return null
-  return (
-    <MenuSection title="🌍 Мировой топ">
+  const content = (
+    <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <span className="hud-label">Экран</span>
         <div className="flex flex-wrap gap-1">
@@ -202,6 +220,12 @@ export function MenuGlobalTop({
       {globalTop.length === 0 && globalTopEndless.length === 0 && (
         <div className="text-xs text-dim">Записей пока нет — сыграйте партию и попадите в топ!</div>
       )}
-    </MenuSection>
+    </div>
   )
+
+  if (asSection) {
+    return <MenuSection title="🌍 Мировой топ">{content}</MenuSection>
+  }
+
+  return content
 }
