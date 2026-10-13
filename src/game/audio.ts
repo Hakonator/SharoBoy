@@ -1,4 +1,5 @@
-import { lsGet, lsSet } from "./utils"
+import { clamp, lsGet, lsSet } from "./utils"
+import { type GameSettings, loadSettings, subscribeSettings } from "./settings"
 import { FileMusicPlayer, MUSIC_FILES, MUSIC_VOLUME } from "./audio/fileMusic"
 import { GAME_BASS, GAME_LEAD } from "./audio/tracks/game"
 import { GAME_THEME } from "./audio/tracks/gameTheme"
@@ -34,7 +35,13 @@ export class SFX {
   private master: GainNode | null = null
   /** Отдельный тракт музыки: ползунок музыки не влияет на эффекты. */
   private musicGain: GainNode | null = null
+  /** Низкочастотный фильтр: muffled-эффект при паузе. */
+  private filter: BiquadFilterNode | null = null
+  private isUnderwater = false
   private noiseBuf: AudioBuffer | null = null
+  /** Настройки графики и звука. */
+  private settings: GameSettings
+  private unsubSettings?: () => void
   /** Выключить звуковые эффекты (не влияет на музыку). */
   muted = false
   /** Выключить фоновую музыку (не влияет на эффекты). */
@@ -49,7 +56,6 @@ export class SFX {
   private musicStep = 0
   /** Активный трек. */
   private track: MusicKind = "menu"
-  /** MP3-режим: играет файл из общего набора (вместо встроенного секвенсора). */
   /** MP3-режим: играет файл из общего набора (вместо встроенного секвенсора). */
   private fileMode = MUSIC_FILES.length > 0
   /** Плеер файловой музыки: выбор трека, кроссфейд, пауза/возобновление. */
@@ -66,6 +72,11 @@ export class SFX {
   constructor() {
     this.musicVolume = loadVolume(VOL_MUSIC_KEY, 1)
     this.sfxVolume = loadVolume(VOL_SFX_KEY, 1)
+    this.settings = loadSettings()
+    this.unsubSettings = subscribeSettings((s) => {
+      this.settings = s
+      this.applyUnderwaterFilter()
+    })
   }
 
   /** MIDI-нота → частота Гц (С4 = 60). */
@@ -286,13 +297,25 @@ export class SFX {
         // Без WebAudio MP3-музыка всё равно возможна — контекст не обязателен.
         if (AC) {
           this.ctx = new AC()
+          this.filter = this.ctx.createBiquadFilter ? this.ctx.createBiquadFilter() : null
+          if (this.filter) {
+            this.filter.type = "lowpass"
+            this.filter.frequency.setValueAtTime(
+              this.isUnderwater && this.settings.underwaterFilter ? 380 : 22000,
+              this.ctx.currentTime
+            )
+            this.filter.Q.setValueAtTime(1.5, this.ctx.currentTime)
+            this.filter.connect(this.ctx.destination)
+          }
+
+          const outTarget: AudioNode = this.filter ?? this.ctx.destination
           this.master = this.ctx.createGain()
           this.master.gain.value = MASTER_VOLUME * this.sfxVolume
-          this.master.connect(this.ctx.destination)
+          this.master.connect(outTarget)
           // Музыкальный тракт отдельный: ползунок звука не влияет на музыку.
           this.musicGain = this.ctx.createGain()
           this.musicGain.gain.value = MASTER_VOLUME * this.musicVolume
-          this.musicGain.connect(this.ctx.destination)
+          this.musicGain.connect(outTarget)
           const len = Math.floor(this.ctx.sampleRate * 0.4)
           this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate)
           const data = this.noiseBuf.getChannelData(0)
@@ -305,10 +328,28 @@ export class SFX {
       this.ctx = null
       this.master = null
       this.musicGain = null
+      this.filter = null
     }
     this.armGestureUnlock()
     // Запуск вне try: MP3-музыка играет даже там, где WebAudio недоступен.
     this.startMusic()
+  }
+
+  /** Включить/выключить низкочастотный фильтр (эффект приглушения под водой в паузе). */
+  setUnderwater(active: boolean) {
+    this.isUnderwater = active
+    this.applyUnderwaterFilter()
+  }
+
+  private applyUnderwaterFilter() {
+    const active = this.isUnderwater && this.settings.underwaterFilter
+    if (this.ctx && this.filter) {
+      const t = this.ctx.currentTime
+      const target = active ? 380 : 22000
+      this.filter.frequency.cancelScheduledValues(t)
+      this.filter.frequency.setTargetAtTime(target, t, 0.08)
+    }
+    this.filePlayer.setUnderwater(active)
   }
   private tone(
     freq: number,
@@ -318,7 +359,8 @@ export class SFX {
     slideTo?: number,
     delay = 0,
     /** Адресат звука: null — эффекты (мастер-гейн), musicGain — музыка. */
-    bus: GainNode | null = null
+    bus: GainNode | null = null,
+    pan?: number
   ) {
     if (!this.ctx || !this.master) return
     const t = this.ctx.currentTime + delay
@@ -333,7 +375,21 @@ export class SFX {
     g.gain.exponentialRampToValueAtTime(Math.max(0.001, vol), t + 0.008)
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
     osc.connect(g)
-    g.connect(bus ?? this.master)
+
+    const dest = bus ?? this.master
+    if (
+      this.settings.stereoPanning &&
+      pan !== undefined &&
+      typeof this.ctx.createStereoPanner === "function"
+    ) {
+      const panner = this.ctx.createStereoPanner()
+      panner.pan.setValueAtTime(clamp(pan, -0.85, 0.85), t)
+      g.connect(panner)
+      panner.connect(dest)
+    } else {
+      g.connect(dest)
+    }
+
     osc.start(t)
     osc.stop(t + dur + 0.02)
   }
@@ -344,13 +400,14 @@ export class SFX {
     type: OscillatorType,
     vol: number,
     slideTo?: number,
-    delay = 0
+    delay = 0,
+    pan?: number
   ) {
     if (this.muted) return
-    this.tone(freq, dur, type, vol, slideTo, delay)
+    this.tone(freq, dur, type, vol, slideTo, delay, null, pan)
   }
 
-  private noise(dur: number, vol: number, delay = 0) {
+  private noise(dur: number, vol: number, delay = 0, pan?: number) {
     if (!this.ctx || !this.master || this.muted || !this.noiseBuf) return
     const t = this.ctx.currentTime + delay
     const src = this.ctx.createBufferSource()
@@ -359,26 +416,43 @@ export class SFX {
     g.gain.setValueAtTime(vol, t)
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
     src.connect(g)
-    g.connect(this.master)
+
+    if (
+      this.settings.stereoPanning &&
+      pan !== undefined &&
+      typeof this.ctx.createStereoPanner === "function"
+    ) {
+      const panner = this.ctx.createStereoPanner()
+      panner.pan.setValueAtTime(clamp(pan, -0.85, 0.85), t)
+      src.connect(g)
+      g.connect(panner)
+      panner.connect(this.master)
+    } else {
+      g.connect(this.master)
+    }
+
     src.start(t)
     src.stop(t + dur + 0.02)
   }
 
-  paddle(intensity: number) {
-    this.blip(240 + intensity * 140, 0.06, "square", 0.22, 340)
+  paddle(intensity: number, pan?: number) {
+    this.blip(240 + intensity * 140, 0.06, "square", 0.22, 340, 0, pan)
   }
-  wall() {
-    this.blip(190, 0.04, "triangle", 0.14, 150)
+  wall(pan?: number) {
+    this.blip(190, 0.04, "triangle", 0.14, 150, 0, pan)
   }
-  brick(hp: number) {
-    this.blip(420 + hp * 90, 0.07, "square", 0.2, 300 + hp * 60)
-    this.noise(0.05, 0.1)
+  brick(hp: number, pan?: number, combo = 0) {
+    const pitchMult =
+      this.settings.comboPitch && combo > 1 ? 1 + Math.min((combo - 1) * 0.045, 0.75) : 1
+    this.blip((420 + hp * 90) * pitchMult, 0.07, "square", 0.2, (300 + hp * 60) * pitchMult, 0, pan)
+    this.noise(0.05, 0.1, 0, pan)
   }
   destroy(): void
-  destroy(tier: number): void
-  destroy(tier?: number) {
+  destroy(tier: number, pan?: number, combo?: number): void
+  destroy(tier?: number, pan?: number, combo = 0) {
     if (tier === undefined) {
       this.stopMusic()
+      this.unsubSettings?.()
       if (!this.unlockBound || typeof window === "undefined") return
       window.removeEventListener("pointerdown", this.onUnlockInput)
       window.removeEventListener("keydown", this.onUnlockInput)
@@ -386,9 +460,19 @@ export class SFX {
       this.unlockBound = false
       return
     }
-    this.blip(660 + tier * 120, 0.09, "square", 0.22, 990 + tier * 140)
-    this.blip(330, 0.12, "triangle", 0.14, 220, 0.02)
-    this.noise(0.09, 0.14)
+    const pitchMult =
+      this.settings.comboPitch && combo > 1 ? 1 + Math.min((combo - 1) * 0.045, 0.75) : 1
+    this.blip(
+      (660 + tier * 120) * pitchMult,
+      0.09,
+      "square",
+      0.22,
+      (990 + tier * 140) * pitchMult,
+      0,
+      pan
+    )
+    this.blip(330 * pitchMult, 0.12, "triangle", 0.14, 220 * pitchMult, 0.02, pan)
+    this.noise(0.09, 0.14, 0, pan)
   }
   launch() {
     this.blip(300, 0.12, "sawtooth", 0.16, 640)
@@ -417,31 +501,31 @@ export class SFX {
     this.noise(0.32, 0.26)
     this.blip(120, 0.28, "square", 0.2, 40)
   }
-  shieldHit() {
-    this.blip(520, 0.12, "sine", 0.24, 880)
-    this.blip(880, 0.1, "sine", 0.16, 440, 0.05)
+  shieldHit(pan?: number) {
+    this.blip(520, 0.12, "sine", 0.24, 880, 0, pan)
+    this.blip(880, 0.1, "sine", 0.16, 440, 0.05, pan)
   }
-  burn() {
-    this.blip(980, 0.09, "sawtooth", 0.13, 240)
-    this.noise(0.06, 0.06)
+  burn(pan?: number) {
+    this.blip(980, 0.09, "sawtooth", 0.13, 240, 0, pan)
+    this.noise(0.06, 0.06, 0, pan)
   }
-  freeze() {
+  freeze(pan?: number) {
     // заморозка: стеклянный перелив вниз
-    this.blip(1720, 0.09, "triangle", 0.16, 1180)
-    this.blip(2300, 0.07, "sine", 0.1, 1560, 0.03)
+    this.blip(1720, 0.09, "triangle", 0.16, 1180, 0, pan)
+    this.blip(2300, 0.07, "sine", 0.1, 1560, 0.03, pan)
   }
-  iceShatter() {
+  iceShatter(pan?: number) {
     // раскалывание льда: хрустящий шум + россыпь высоких «звонов»
-    this.noise(0.16, 0.2)
+    this.noise(0.16, 0.2, 0, pan)
     for (let i = 0; i < 5; i++) {
-      this.blip(1400 + i * 260, 0.06, "triangle", 0.09, undefined, i * 0.025)
+      this.blip(1400 + i * 260, 0.06, "triangle", 0.09, undefined, i * 0.025, pan)
     }
-    this.blip(520, 0.1, "square", 0.08, 180, 0.02)
+    this.blip(520, 0.1, "square", 0.08, 180, 0.02, pan)
   }
-  zap() {
+  zap(pan?: number) {
     // электрический разряд: резкий писк вниз + треск
-    this.blip(1600, 0.05, "sawtooth", 0.12, 320)
-    this.noise(0.07, 0.12)
+    this.blip(1600, 0.05, "sawtooth", 0.12, 320, 0, pan)
+    this.noise(0.07, 0.12, 0, pan)
   }
   spring() {
     // пружинный блок: «бо-инг» вверх

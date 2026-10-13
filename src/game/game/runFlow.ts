@@ -56,6 +56,7 @@ export function resetRun(g: Game) {
   g.weaponCd = 0
   g.effectsKey = ""
   g.transition = 0
+  g.sfx.setUnderwater(false)
 }
 
 export function launch(g: Game) {

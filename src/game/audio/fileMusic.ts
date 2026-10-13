@@ -53,6 +53,8 @@ export class FileMusicPlayer {
   /** Активные fade-переходы громкости: элемент → id интервала. */
   private fades = new Map<HTMLAudioElement, number>()
 
+  private underwater = false
+
   constructor(
     /** Текущая целевая громкость (базовая × ползунок музыки). */
     private readonly getVolume: () => number,
@@ -65,10 +67,25 @@ export class FileMusicPlayer {
     return this.audio !== null
   }
 
+  /** Эффективная громкость с учётом приглушения паузы. */
+  private effectiveVolume(): number {
+    const base = this.getVolume()
+    return this.underwater ? base * 0.45 : base
+  }
+
+  /** Установить режим приглушения (подводный фильтр во время паузы). */
+  setUnderwater(active: boolean) {
+    if (this.underwater === active) return
+    this.underwater = active
+    if (this.audio) {
+      this.fadeAudio(this.audio, this.effectiveVolume())
+    }
+  }
+
   /** Возобновить/запустить текущий трек с актуальной громкостью. */
   resume() {
     if (!this.audio) return
-    this.audio.volume = this.getVolume()
+    this.audio.volume = this.effectiveVolume()
     void this.audio.play().catch(() => {})
   }
 
@@ -78,8 +95,8 @@ export class FileMusicPlayer {
   }
 
   /** Обновить громкость без перезапуска (ползунок музыки). */
-  setVolume(v: number) {
-    if (this.audio) this.audio.volume = v
+  setVolume(_v: number) {
+    if (this.audio) this.audio.volume = this.effectiveVolume()
   }
 
   play() {

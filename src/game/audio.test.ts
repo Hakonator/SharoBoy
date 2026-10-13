@@ -145,4 +145,29 @@ describe("SFX: раздельные ползунки громкости музы
     expect(notes).toBeGreaterThan(0)
     expect(lead.length - notes).toBeGreaterThan(notes * 2)
   })
+
+  it("поддерживает воспроизведение звуков со стерео-панорамой и множителем комбо", () => {
+    stubStorage()
+    const s = new SFX()
+    expect(() => {
+      s.paddle(0.5, -0.7)
+      s.wall(0.8)
+      s.brick(2, -0.3, 5)
+      s.destroy(1, 0.4, 8)
+      s.iceShatter(-0.5)
+      s.shieldHit(0.2)
+      s.burn(-0.8)
+      s.freeze(0.1)
+      s.zap(-0.2)
+    }).not.toThrow()
+  })
+
+  it("корректно переключает режим подводного фильтра (пауза)", () => {
+    stubStorage()
+    const s = new SFX()
+    expect(() => {
+      s.setUnderwater(true)
+      s.setUnderwater(false)
+    }).not.toThrow()
+  })
 })

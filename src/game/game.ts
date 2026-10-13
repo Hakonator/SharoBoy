@@ -13,6 +13,12 @@ import { WeaponsSystem } from "./weapons"
 import { InputController } from "./input"
 import { Effects } from "./effects"
 import { lsGet } from "./utils"
+import {
+  type GameSettings,
+  loadSettings,
+  particleLimitForQuality,
+  subscribeSettings,
+} from "./settings"
 import type { MinibossCreature } from "./types"
 import type { Ball, Block, Bubble, HudData, MouthBubble, PaddleShapeKind } from "./types"
 import type { PaddleState, Phase, PowerUp, Projectile, ScoreEntry, SparkHit } from "./types"
@@ -223,6 +229,8 @@ export class Game {
   topEndless: ScoreEntry[] = []
   sfx = new SFX()
   nick = ""
+  settings: GameSettings = loadSettings()
+  unsubSettings?: () => void
 
   constructor(canvas: HTMLCanvasElement, onHud: (h: HudData) => void, nick?: string) {
     this.canvas = canvas
@@ -231,6 +239,11 @@ export class Game {
     this.ctx = ctx
     this.onHud = onHud
     if (nick) this.nick = nick
+    this.fx.maxParticles = particleLimitForQuality(this.settings.graphicsQuality)
+    this.unsubSettings = subscribeSettings((s) => {
+      this.settings = s
+      this.fx.maxParticles = particleLimitForQuality(s.graphicsQuality)
+    })
     this.input = createInput(this, canvas)
     this.bossSys = new BossSystem(makeBossHost(this))
     this.powersSys = new PowersSystem(makePowersHost(this))

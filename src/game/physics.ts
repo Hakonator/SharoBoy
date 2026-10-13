@@ -270,20 +270,20 @@ export class Physics {
         ball.vx = Math.abs(ball.vx)
         ball.vy += rand(-1, 1) * speed * 0.06
         ball.squash = 1
-        g.sfx.wall()
+        g.sfx.wall(-0.85)
       }
       if (ball.x + ball.r > g.w) {
         ball.x = g.w - ball.r
         ball.vx = -Math.abs(ball.vx)
         ball.vy += rand(-1, 1) * speed * 0.06
         ball.squash = 1
-        g.sfx.wall()
+        g.sfx.wall(0.85)
       }
       if (ball.y - ball.r < g.blockTop) {
         ball.y = g.blockTop + ball.r
         ball.vy = Math.abs(ball.vy)
         ball.squash = 1
-        g.sfx.wall()
+        g.sfx.wall(clamp((ball.x / g.w) * 2 - 1, -0.85, 0.85))
       }
 
       // низ — щит или потеря
@@ -293,7 +293,7 @@ export class Physics {
         ball.vy = -Math.abs(ball.vy)
         ball.squash = 1
         ball.sinceHit = 0
-        g.sfx.shieldHit()
+        g.sfx.shieldHit(clamp((ball.x / g.w) * 2 - 1, -0.85, 0.85))
         g.fx.burst(ball.x, g.h - 14, "#4dff9e", 14, 220)
         g.fx.rings.push({
           x: ball.x,

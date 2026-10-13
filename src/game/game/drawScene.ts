@@ -40,8 +40,10 @@ export function draw(g: Game) {
   ctx.globalAlpha = 1
 
   ctx.save()
-  if (g.shake > 0) {
-    ctx.translate(rand(-g.shake, g.shake), rand(-g.shake, g.shake))
+  const shakeMult = g.settings.screenShake
+  if (g.shake > 0 && shakeMult > 0) {
+    const s = g.shake * shakeMult
+    ctx.translate(rand(-s, s), rand(-s, s))
   }
 
   drawBackground(ctx, w, h, g.combo, g.bubbles)
@@ -115,8 +117,9 @@ export function draw(g: Game) {
 
   ctx.restore()
 
-  if (g.flash > 0) {
-    ctx.fillStyle = `rgba(234,247,255,${g.flash * 0.3})`
+  const flashMult = g.settings.screenFlash
+  if (g.flash > 0 && flashMult > 0) {
+    ctx.fillStyle = `rgba(234,247,255,${g.flash * 0.3 * flashMult})`
     ctx.fillRect(0, 0, w, h)
   }
 

@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import { ACHIEVEMENTS } from "../../game/achievements"
 import type { HudData } from "../../game/types"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "../../game/upgrades"
-import { IconJelly, IconMusic, IconSound, VolSlider } from "../icons"
+import { IconJelly, IconMusic, IconSettings, IconSound, VolSlider } from "../icons"
 
 import { MenuSection } from "./shared"
 
@@ -14,16 +14,18 @@ export function MenuCornerControls({
   onMusic,
   onMusicVolume,
   onSfxVolume,
+  onSettings,
 }: {
   hud: HudData
   onMute: () => void
   onMusic: () => void
   onMusicVolume: (v: number) => void
   onSfxVolume: (v: number) => void
+  onSettings?: () => void
 }) {
   return (
     <>
-      {/* Кнопки музыки и звука с ползунками громкости — в углу меню */}
+      {/* Кнопки музыки, звука и настроек с ползунками громкости — в углу меню */}
       <div className="absolute right-3 top-3 z-10 flex items-center gap-2 sm:right-5 sm:top-5 sm:gap-3">
         <div className="flex items-center gap-1.5">
           <button
@@ -45,6 +47,16 @@ export function MenuCornerControls({
           </button>
           <VolSlider value={hud.sfxVolume} onChange={onSfxVolume} label="Громкость звука" />
         </div>
+        {onSettings && (
+          <button
+            className="icon-btn pointer-events-auto flex h-10 w-10 items-center justify-center text-foam hover:text-cyan-neon"
+            onClick={onSettings}
+            aria-label="Настройки"
+            title="Настройки графики и звука"
+          >
+            <IconSettings className="h-5 w-5" />
+          </button>
+        )}
       </div>
     </>
   )

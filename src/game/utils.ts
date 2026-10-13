@@ -6,11 +6,21 @@
 export const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
 export const rand = (a: number, b: number) => a + Math.random() * (b - a)
 
+function getStorage(): Storage | null {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) return window.localStorage
+    if (typeof localStorage !== "undefined") return localStorage
+  } catch {
+    /* sandbox SecurityError */
+  }
+  return null
+}
+
 /** Безопасный доступ к localStorage: в sandbox-окружениях обращение к
  *  хранилищу бросает SecurityError — игра должна работать и без него. */
 export function lsGet(key: string): string | null {
   try {
-    return window.localStorage.getItem(key)
+    return getStorage()?.getItem(key) ?? null
   } catch {
     return null
   }
@@ -18,7 +28,7 @@ export function lsGet(key: string): string | null {
 
 export function lsSet(key: string, value: string) {
   try {
-    window.localStorage.setItem(key, value)
+    getStorage()?.setItem(key, value)
   } catch {
     /* нет доступа к хранилищу — играем без рекордов на диске */
   }

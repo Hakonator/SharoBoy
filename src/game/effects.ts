@@ -1,8 +1,8 @@
 import type { Lightning, Particle, Popup, Ring } from "./types"
 import { compactInPlace, rand } from "./utils"
 
-/** Ёмкость пула частиц — защита от лавины эффектов на слабых машинах. */
-const MAX_PARTICLES = 420
+/** Базовая ёмкость пула частиц по умолчанию. */
+const DEFAULT_MAX_PARTICLES = 400
 
 /**
  * Контейнер визуальных эффектов: искры-частицы, расходящиеся кольца,
@@ -14,10 +14,12 @@ export class Effects {
   rings: Ring[] = []
   popups: Popup[] = []
   lightnings: Lightning[] = []
+  /** Динамический лимит частиц (управляется графическими настройками). */
+  maxParticles: number = DEFAULT_MAX_PARTICLES
 
   /** Взрыв-фейерверк: count частиц из точки со скоростями 0.3–1 × speed. */
   burst(x: number, y: number, color: string, count: number, speed: number) {
-    if (this.particles.length > MAX_PARTICLES) return
+    if (this.particles.length > this.maxParticles) return
     for (let i = 0; i < count; i++) {
       const a = rand(0, Math.PI * 2)
       const v = rand(speed * 0.3, speed)
@@ -37,7 +39,7 @@ export class Effects {
 
   /** Раскалывание льда: веер осколков-треугольников + мелкая ледяная пыль. */
   iceShatter(x: number, y: number) {
-    if (this.particles.length > MAX_PARTICLES) return
+    if (this.particles.length > this.maxParticles) return
     const colors = ["#eaf9ff", "#bfeaff", "#8fd4ff"]
     for (let i = 0; i < 14; i++) {
       const a = rand(0, Math.PI * 2)

@@ -34,6 +34,7 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
   const lvy = ball.vx * sn + ball.vy * cs
   if (lvy <= 0) return
   const rel = clamp(lx / (p.w / 2), -1, 1)
+  const paddlePan = clamp((ball.x / g.w) * 2 - 1, -0.85, 0.85)
   // магнит: шар прилипает вместо отскока
   if ((g.magnetActive() || g.magneticPaddleActive()) && !ball.stuck) {
     ball.stuck = true
@@ -42,7 +43,7 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
     ball.vy = 0
     ball.squash = 1
     ball.sinceHit = 0
-    g.sfx.paddle(Math.abs(rel))
+    g.sfx.paddle(Math.abs(rel), paddlePan)
     g.fx.burst(ball.x, p.y + ly - ball.r, "#4dff9e", 8, 140)
     return
   }
@@ -96,7 +97,7 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
   ball.sinceHit = 0
   p.squash = 1
   g.combo = 0
-  g.sfx.paddle(Math.abs(rel))
+  g.sfx.paddle(Math.abs(rel), paddlePan)
   g.fx.burst(ball.x, ball.y - ball.r, "#7cf5ff", 6, 130)
   g.pushHud()
 }
@@ -145,7 +146,8 @@ export function collidePaddleShape(
   ball.sinceHit = 0
   p.squash = 1
   g.combo = 0
-  g.sfx.paddle(Math.abs(rel))
+  const paddlePan = clamp((ball.x / g.w) * 2 - 1, -0.85, 0.85)
+  g.sfx.paddle(Math.abs(rel), paddlePan)
 }
 export function collideBlocks(g: PhysicsWorld, ball: Ball) {
   const fire = g.fireActive()
@@ -182,9 +184,10 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
     // специальный блок (§6): пружина/вата/вращение/телепорт. Телепорт
     // поглощает контакт целиком (без отражения и урона от шара).
     if (onBallHitSpecial(g, b, ball, lx, ly, ex)) return
+    const blockPan = clamp((b.x / g.w) * 2 - 1, -0.85, 0.85)
     if (fire && !b.isMiniboss && !(g.frostActive() && !b.frozen)) {
       // обычные блоки огонь прожигает насквозь (без отскока)
-      g.sfx.burn()
+      g.sfx.burn(blockPan)
       damageBlock(g, b, g.debugBallDamage * FIREBALL_DAMAGE_MULT)
       continue
     }
@@ -193,7 +196,7 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
     if (g.frostActive() && !b.frozen && !b.isMiniboss && !b.bomb) {
       const frozen = freezeCluster(g.blocks, b)
       if (frozen.length > 0) {
-        g.sfx.freeze()
+        g.sfx.freeze(blockPan)
         g.fx.burst(b.x, b.y, "#bfeaff", 10, 140)
         g.fx.rings.push({
           x: b.x,

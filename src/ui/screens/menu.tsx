@@ -41,6 +41,7 @@ export function MenuScreen({
   onMusic,
   onMusicVolume,
   onSfxVolume,
+  onOpenSettings,
 }: {
   hud: HudData
   stats: PlayerStats
@@ -81,6 +82,8 @@ export function MenuScreen({
   onMusicVolume: (v: number) => void
   /** Ползунок громкости эффектов (0..1). */
   onSfxVolume: (v: number) => void
+  /** Открыть модальное окно настроек. */
+  onOpenSettings?: () => void
 }) {
   /** Есть улучшение, которое игрок уже может купить, — индикатор на секции. */
 
@@ -93,6 +96,7 @@ export function MenuScreen({
         onMusic={onMusic}
         onMusicVolume={onMusicVolume}
         onSfxVolume={onSfxVolume}
+        onSettings={onOpenSettings}
       />
       <div className="relative flex min-h-full flex-col items-start justify-center gap-8 p-6 md:flex-row md:items-center md:gap-16 md:p-16 lg:p-24">
         <div className="anim-rise max-w-xl">

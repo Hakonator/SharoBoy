@@ -54,6 +54,7 @@ export function destroy(g: Game) {
   // Движок уничтожен (например, пересоздание в dev-режиме) — музыка не должна
   // остаться играть «вторым» экземпляром.
   g.sfx.destroy()
+  g.unsubSettings?.()
 }
 
 export function resizeHandler(g: Game) {

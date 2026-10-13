@@ -30,8 +30,9 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1, allowBrittle = t
     b.sp.armor -= absorbed
     dmg -= absorbed
     b.flash = 1
+    const pan = clamp((b.x / g.w) * 2 - 1, -0.85, 0.85)
     if (dmg <= 0) {
-      g.sfx.brick(b.tier)
+      g.sfx.brick(b.tier, pan, g.combo)
       g.fx.burst(b.x, b.y, "#bfeaff", 5, 130)
       g.pushHud()
       return
@@ -47,8 +48,9 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1, allowBrittle = t
     b.hp -= dmg
   }
   b.flash = 1
+  const pan = clamp((b.x / g.w) * 2 - 1, -0.85, 0.85)
   if (b.hp > 0) {
-    g.sfx.brick(b.tier)
+    g.sfx.brick(b.tier, pan, g.combo)
     g.fx.burst(b.x, b.y, TIER[b.tier].base, 5, 130)
     g.combo++
     g.addScore(10 * comboMult(g), b.x, b.y, "#9fd6ea", 12)
@@ -62,7 +64,7 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1, allowBrittle = t
     if (b.sp.rotVel !== 0) b.sp.rotDir = b.sp.rotVel < 0 ? -1 : 1
     b.sp.rotDir ??= 1
     b.sp.rotVel = b.sp.rotDir * SPIN_MAX
-    g.sfx.brick(b.tier)
+    g.sfx.brick(b.tier, pan, g.combo)
     g.fx.burst(b.x, b.y, TIER[b.tier].base, 5, 130)
     g.pushHud()
     return
@@ -111,10 +113,10 @@ export function damageBlock(g: PhysicsWorld, b: Block, dmg = 1, allowBrittle = t
   g.addScore((30 + b.tier * 20) * mult, b.x, b.y, TIER[b.tier].base, 14 + b.tier * 2)
   if (b.frozen) {
     // замороженный блок колется с одного удара: веер ледяных осколков
-    g.sfx.iceShatter()
+    g.sfx.iceShatter(pan)
     g.fx.iceShatter(b.x, b.y)
   } else {
-    g.sfx.destroy(b.tier)
+    g.sfx.destroy(b.tier, pan, g.combo)
     g.fx.burst(b.x, b.y, TIER[b.tier].base, 10 + b.tier * 4, 190 + b.tier * 40)
   }
   g.fx.rings.push({

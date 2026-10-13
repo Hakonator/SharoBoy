@@ -11,6 +11,7 @@ import {
   GameOverScreen,
   WinScreen,
   TopSubmit,
+  SettingsModal,
 } from "./ui/screens"
 import { CommunityMaps } from "./ui/screens/communityMaps"
 import { AdminPanel } from "./ui/screens/AdminPanel"
@@ -75,6 +76,7 @@ export default function App() {
   const [mapTesterJson, setMapTesterJson] = useState<string | undefined>()
   const [showCommunityMaps, setShowCommunityMaps] = useState(false)
   const [showAdminPanel, setShowAdminPanel] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   const onHud = useCallback((h: HudData) => setHud(h), [])
 
@@ -230,6 +232,7 @@ export default function App() {
             onMusic={() => g()?.toggleMusic()}
             onMusicVolume={(v) => g()?.setMusicVolume(v)}
             onSfxVolume={(v) => g()?.setSfxVolume(v)}
+            onOpenSettings={() => setShowSettings(true)}
           />
           <button
             className="absolute left-4 top-4 z-50 rounded-lg border border-cyan-neon/50 bg-deep/90 px-3 py-2 text-sm text-cyan-neon shadow-lg hover:bg-cyan-neon/10 sm:left-6 sm:top-6"
@@ -309,6 +312,18 @@ export default function App() {
           onResume={() => g()?.togglePause()}
           onRestart={() => (hud.mode === "endless" ? g()?.startEndless() : g()?.startGame())}
           onMenu={() => g()?.toMenu()}
+          onOpenSettings={() => setShowSettings(true)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsModal
+          hud={hud}
+          onClose={() => setShowSettings(false)}
+          onMusicVolume={(v) => g()?.setMusicVolume(v)}
+          onSfxVolume={(v) => g()?.setSfxVolume(v)}
+          onToggleMusic={() => g()?.toggleMusic()}
+          onToggleMute={() => g()?.toggleMute()}
         />
       )}
 

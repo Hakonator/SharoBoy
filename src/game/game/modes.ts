@@ -104,6 +104,7 @@ export function toMenu(g: Game) {
   g.shake = 0
   g.flash = 0
   g.hitStop = 0
+  g.sfx.setUnderwater(false)
   pushHud(g)
 }
 
@@ -120,10 +121,12 @@ export function togglePause(g: Game) {
     g.phase = "paused"
     g.input.keys.space = false
     g.input.releaseLock()
+    g.sfx.setUnderwater(true)
     g.sfx.ui()
   } else if (g.phase === "paused") {
     g.phase = "playing"
     g.countdown = 3
+    g.sfx.setUnderwater(false)
     g.sfx.ui()
   }
   pushHud(g)

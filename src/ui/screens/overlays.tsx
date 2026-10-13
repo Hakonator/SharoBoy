@@ -8,10 +8,12 @@ export function PauseScreen({
   onResume,
   onRestart,
   onMenu,
+  onOpenSettings,
 }: {
   onResume: () => void
   onRestart: () => void
   onMenu: () => void
+  onOpenSettings?: () => void
 }) {
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-abyss/70 p-6">
@@ -26,6 +28,14 @@ export function PauseScreen({
             >
               <IconPlay /> Продолжить
             </button>
+            {onOpenSettings && (
+              <button
+                className="btn-ghost flex items-center justify-center gap-2 px-6 py-3 text-cyan-neon hover:text-foam"
+                onClick={onOpenSettings}
+              >
+                ⚙ Настройки
+              </button>
+            )}
             <button className="btn-ghost px-6 py-3" onClick={onRestart}>
               Заново
             </button>
