@@ -97,8 +97,11 @@ describe("сквозной цикл кампании по карте", () => {
       const outs = map.edges.filter((e) => e.from === from).map((e) => e.to)
       expect(outs.length, "у не-боссового узла обязан быть путь вперёд").toBeGreaterThan(0)
       // боевые узлы предпочтительнее: узлы-события не продвигают по ярусам,
-      // а телепортируют назад (обход их в тесте отдельной веткой ниже)
-      const battleOuts = outs.filter((id) => !map.nodes.find((n) => n.id === id)!.isEvent)
+      // а магазины открывают лавку
+      const battleOuts = outs.filter((id) => {
+        const n = map.nodes.find((node) => node.id === id)!
+        return !n.isEvent && !n.isShop
+      })
       const targetId = battleOuts.length ? battleOuts[0] : outs[0]
       const target = map.nodes.find((n) => n.id === targetId)!
       expect(target).toBeTruthy()
@@ -113,6 +116,12 @@ describe("сквозной цикл кампании по карте", () => {
 
       g.enterMapNode(targetId)
       expect(g.phase === "map" || g.phase === "playing").toBe(true)
+
+      if (target.isShop) {
+        expect(g.phase).toBe("map")
+        g.closeCampaignShop()
+        continue
+      }
 
       // узел, на котором реально идёт бой (событие может телепортировать назад)
       let battleNode = target
@@ -225,9 +234,19 @@ describe("сквозной цикл кампании по карте", () => {
       const evOuts = outs.filter(
         (id) => map.nodes.find((n) => n.id === id)!.isEvent && !raw.campaignVisited.includes(id)
       )
-      const targetId = evOuts.length ? evOuts[0] : outs[0]
+      const battleOuts = outs.filter((id) => {
+        const n = map.nodes.find((node) => node.id === id)!
+        return !n.isEvent && !n.isShop
+      })
+      const targetId = evOuts.length ? evOuts[0] : battleOuts.length ? battleOuts[0] : outs[0]
       const target = map.nodes.find((n) => n.id === targetId)!
       g.enterMapNode(targetId)
+
+      if (target.isShop) {
+        expect(g.phase).toBe("map")
+        g.closeCampaignShop()
+        continue
+      }
 
       // первое срабатывание события: оверлей → подтверждение → телепорт
       const firstTrigger = target.isEvent && g.phase === "map"
@@ -308,6 +327,146 @@ describe("сквозной цикл кампании по карте", () => {
     expect(g.phase).toBe("menu")
     const snap = hudLog[hudLog.length - 1]
     expect(snap.map).toBeNull()
+    g.destroy()
+  })
+
+  it("магазин кампании открывается, продаёт товары за монеты и закрывается", () => {
+    const { game, g, step } = makeEnv()
+    g.startGame()
+    step(2)
+    game.coins = 100
+
+    const shopNode: CampaignNode = {
+      id: 999,
+      tier: 1,
+      x: 0.1,
+      y: 0.5,
+      isBoss: false,
+      isEvent: false,
+      isShop: true,
+      name: "ЛАВКА ГЛУБИН",
+    }
+    const map = game.campaign!
+    map.nodes.push(shopNode)
+    map.edges.push({ from: game.campaignPlayerId, to: 999 })
+    game.campaignVisible.push(999)
+
+    g.enterMapNode(999)
+    step(1)
+
+    expect(g.phase).toBe("map")
+    expect(game.campaignShop).toBeTruthy()
+    expect(game.campaignShop!.items.length).toBeGreaterThanOrEqual(3)
+
+    const initialCoins = game.coins
+    const lifeItem = game.campaignShop!.items.find((i) => i.id === "life")
+    if (lifeItem) {
+      game.lives = 3
+      const bought = game.buyCampaignShopItem(lifeItem.id)
+      expect(bought).toBe(true)
+      expect(game.lives).toBe(4)
+      expect(game.coins).toBe(initialCoins - lifeItem.price)
+      expect(lifeItem.sold).toBe(true)
+
+      // Повторная покупка невозможна
+      expect(game.buyCampaignShopItem(lifeItem.id)).toBe(false)
+    }
+
+    // Закрываем магазин
+    game.closeCampaignShop()
+    expect(game.campaignShop).toBeNull()
+    expect(game.campaignPlayerId).toBe(999)
+
+    g.destroy()
+  })
+
+  it("интерактивное случайное событие позволяет сделать выбор и применить эффект", () => {
+    const { game, g, step } = makeEnv()
+    g.startGame()
+    step(2)
+    game.coins = 50
+
+    const eventNode: CampaignNode = {
+      id: 998,
+      tier: 2,
+      x: 0.15,
+      y: 0.5,
+      isBoss: false,
+      isEvent: true,
+      name: "ВОДОВОРОТ",
+    }
+    const map = game.campaign!
+    map.nodes.push(eventNode)
+    map.edges.push({ from: game.campaignPlayerId, to: 998 })
+    game.campaignVisible.push(998)
+
+    g.enterMapNode(998)
+    step(1)
+
+    expect(game.campaignEventData).toBeTruthy()
+    expect(game.campaignEventData!.choices.length).toBe(3)
+
+    // Выбираем первый вариант: "Маневровые двигатели" (тратит 10 монет, даёт +1 щит, остаётся на узле)
+    const initialShield = game.shield
+    game.chooseCampaignEventOption(0)
+
+    expect(game.campaignEventData!.resolved).toBe(true)
+    expect(game.shield).toBe(initialShield + 1)
+    expect(game.coins).toBe(40)
+    expect(game.campaignEventTarget).toBe(-1) // остался на месте
+
+    // Подтверждаем и продолжаем путь
+    g.dismissCampaignEvent()
+    expect(game.campaignEventData).toBeNull()
+    expect(game.campaignPlayerId).toBe(998)
+    expect(g.phase).toBe("map")
+
+    g.destroy()
+  })
+
+  it("узел-испытание гарантирует минибосса и награждает повышенными монетами при зачистке", () => {
+    const { game, g, step } = makeEnv()
+    g.startGame()
+    step(2)
+    game.coins = 10
+
+    const challengeNode: CampaignNode = {
+      id: 997,
+      tier: 2,
+      x: 0.15,
+      y: 0.5,
+      isBoss: false,
+      isEvent: false,
+      isChallenge: true,
+      name: "ИСПЫТАНИЕ",
+    }
+    const map = game.campaign!
+    map.nodes.push(challengeNode)
+    map.edges.push({ from: game.campaignPlayerId, to: 997 })
+    game.campaignVisible.push(997)
+
+    g.enterMapNode(997)
+    step(3)
+
+    expect(g.phase).toBe("playing")
+    // В узле-испытании гарантирован минибосс
+    expect(game.minibosses.length).toBeGreaterThanOrEqual(1)
+
+    // Зачищаем узел
+    game.blocks.length = 0
+    game.bossSys.clear()
+    game.minibosses.length = 0
+    game.powers.length = 0
+    game.transition = 0
+    game.bannerTimer = 0
+    game.countdown = 0
+
+    step(10)
+
+    // Проверяем, что за победу начислены повышенные монеты (+25 за испытание)
+    expect(game.coins).toBeGreaterThanOrEqual(35)
+    expect(g.phase).toBe("map")
+
     g.destroy()
   })
 })

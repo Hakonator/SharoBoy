@@ -1,21 +1,38 @@
 import { type ReactNode } from "react"
 
-import { IconBall, IconFish, IconJelly, IconOctopus } from "../icons"
+import {
+  IconBall,
+  IconChallenge,
+  IconCoin,
+  IconFish,
+  IconJelly,
+  IconOctopus,
+  IconShield,
+  IconShop,
+  IconVortex,
+} from "../icons"
 import type { HudData } from "../../game/types"
 
 /**
  * Экран рогаликовой карты кампании: узлы слева-направо, рёбра-связи и туман
- * войны. Видны только посещённые и соседние узлы; кликабельны только соседние.
+ * войны. Включает лавки торговцев за монеты, интерактивные события с выбором,
+ * элитные узлы испытаний и финального босса.
  */
 export function MapScreen({
   hud,
   onMapNode,
   onEventDismiss,
+  onEventChoice,
+  onBuyShopItem,
+  onCloseShop,
   onMenu,
 }: {
   hud: HudData
   onMapNode: (id: number) => void
   onEventDismiss: () => void
+  onEventChoice?: (index: number) => void
+  onBuyShopItem?: (itemId: string) => void
+  onCloseShop?: () => void
   onMenu: () => void
 }) {
   const view = hud.map
@@ -28,9 +45,7 @@ export function MapScreen({
   const revealedEdges = view.edges.filter((e) => revealed.has(e.from) && revealed.has(e.to))
   const eventTarget = view.eventTargetId === undefined ? undefined : byId.get(view.eventTargetId)
   const player = byId.get(view.playerId)
-  // маркеры существ — только на УЖЕ ПОСЕЩЁННЫХ узлах: до боя локация хранит
-  // сюрприз. SVG-иконки в едином стиле вместо эмодзи (на части систем эмодзи
-  // показывались квадратами). рыба/медуза — источник жизней, осьминог — босс
+
   const mbIcon: Record<string, (p: { className?: string }) => ReactNode> = {
     fish: IconFish,
     jelly: IconJelly,
@@ -38,17 +53,23 @@ export function MapScreen({
   const mbName: Record<string, string> = { fish: "рыба", jelly: "медуза" }
   const visitedMb = view.visited.filter((id) => (view.minibosses[id]?.length ?? 0) > 0)
 
+  const shop = hud.campaignShop
+  const eventData = hud.campaignEventData
+
+  const coins = hud.coins ?? 0
+
   return (
     <div className="absolute inset-0 z-10 flex flex-col bg-abyss/55">
-      {/* Верхний бар: счёт, жизни, рекорд и выход в меню */}
+      {/* Верхний бар: счёт, жизни, щиты, монеты, рекорд и выход в меню */}
       <div className="flex items-center justify-between gap-2 p-2 sm:p-4">
         <div className="flex flex-wrap items-start gap-1.5 sm:gap-2">
           <div className="hud-chip px-3 py-1.5">
             <div className="hud-label">Счёт</div>
             <div className="font-display text-lg leading-none text-foam tabular-nums sm:text-2xl">
-              {hud.score.toLocaleString("ru-RU")}
+              {(hud.score ?? 0).toLocaleString("ru-RU")}
             </div>
           </div>
+
           <div className="hud-chip px-3 py-1.5 sm:px-3.5 sm:py-2">
             <div className="hud-label hidden sm:block">Жизни</div>
             <div className="flex gap-1 sm:mt-1">
@@ -63,7 +84,30 @@ export function MapScreen({
               ))}
             </div>
           </div>
+
+          {(hud.shield ?? 0) > 0 && (
+            <div className="hud-chip flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2">
+              <IconShield className="h-4 w-4 text-cyan-neon" />
+              <div>
+                <div className="hud-label hidden sm:block">Щит</div>
+                <div className="font-display text-sm font-bold text-cyan-neon tabular-nums sm:text-base">
+                  {hud.shield}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="hud-chip flex items-center gap-1.5 border-gold/30 bg-gold/10 px-3 py-1.5 shadow-[0_0_12px_rgba(255,201,77,0.15)] sm:px-3.5 sm:py-2">
+            <IconCoin className="h-4 w-4 sm:h-5 sm:w-5" />
+            <div>
+              <div className="hud-label text-gold/80">Монеты</div>
+              <div className="font-display text-base font-bold text-gold tabular-nums sm:text-xl">
+                {coins.toLocaleString("ru-RU")}
+              </div>
+            </div>
+          </div>
         </div>
+
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="hud-chip hidden px-3.5 py-2 sm:block">
             <div className="hud-label">Рекорд</div>
@@ -77,8 +121,7 @@ export function MapScreen({
         </div>
       </div>
 
-      {/* Карта: рёбра в SVG, узлы — круглые кнопки в %-координатах. Ярусов
-          много, поэтому на узких экранах карта скроллится по горизонтали. */}
+      {/* Карта: рёбра в SVG, узлы — круглые кнопки в %-координатах */}
       <div className="relative flex-1 overflow-x-auto overflow-y-hidden">
         <div className="relative h-full min-w-[900px]">
           <svg
@@ -144,16 +187,42 @@ export function MapScreen({
               const clickable = playerOut.has(n.id)
               const mbKinds = view.minibosses[n.id] ?? []
               const showMb = view.visited.includes(n.id) && mbKinds.length > 0
-              const size = n.isBoss ? "h-12 w-12 sm:h-14 sm:w-14" : "h-7 w-7 sm:h-8 sm:w-8"
-              const tint = isEventTarget
-                ? "border-2 border-gold bg-gold text-abyss shadow-[0_0_0_4px_rgba(255,201,77,0.25),0_0_24px_rgba(255,201,77,0.85)] animate-pulse"
-                : n.isBoss
-                  ? "bg-coral shadow-[0_0_18px_rgba(255,106,92,0.85)]"
-                  : isCurrent
-                    ? "bg-cyan-neon shadow-[0_0_16px_rgba(53,224,255,0.9)]"
-                    : clickable
-                      ? "bg-mint shadow-[0_0_14px_rgba(93,255,176,0.75)]"
-                      : "bg-deep border border-line"
+              const size = n.isBoss
+                ? "h-12 w-12 sm:h-14 sm:w-14"
+                : n.isShop || n.isChallenge || n.isEvent
+                  ? "h-8 w-8 sm:h-9 sm:w-9"
+                  : "h-7 w-7 sm:h-8 sm:w-8"
+
+              let tint = "bg-deep border border-line"
+              if (isEventTarget) {
+                tint =
+                  "border-2 border-gold bg-gold text-abyss shadow-[0_0_0_4px_rgba(255,201,77,0.25),0_0_24px_rgba(255,201,77,0.85)] animate-pulse"
+              } else if (n.isBoss) {
+                tint = "bg-coral shadow-[0_0_18px_rgba(255,106,92,0.85)]"
+              } else if (n.isShop) {
+                tint = isCurrent
+                  ? "border-2 border-gold bg-gold text-abyss shadow-[0_0_18px_rgba(255,201,77,0.9)]"
+                  : clickable
+                    ? "border-2 border-gold bg-deep text-gold shadow-[0_0_14px_rgba(255,201,77,0.8)]"
+                    : "border border-gold/50 bg-deep/80 text-gold/70"
+              } else if (n.isChallenge) {
+                tint = isCurrent
+                  ? "border-2 border-[#ff477e] bg-[#ff477e] text-abyss shadow-[0_0_18px_rgba(255,71,126,0.9)]"
+                  : clickable
+                    ? "border-2 border-[#ff477e] bg-deep text-[#ff477e] shadow-[0_0_14px_rgba(255,71,126,0.8)]"
+                    : "border border-[#ff477e]/50 bg-deep/80 text-[#ff477e]/70"
+              } else if (n.isEvent) {
+                tint = isCurrent
+                  ? "border-2 border-amber-400 bg-amber-400 text-abyss shadow-[0_0_18px_rgba(251,191,36,0.9)]"
+                  : clickable
+                    ? "border-2 border-amber-400 bg-deep text-amber-300 shadow-[0_0_14px_rgba(251,191,36,0.8)]"
+                    : "border border-amber-400/50 bg-deep/80 text-amber-300/70"
+              } else if (isCurrent) {
+                tint = "bg-cyan-neon shadow-[0_0_16px_rgba(53,224,255,0.9)]"
+              } else if (clickable) {
+                tint = "bg-mint shadow-[0_0_14px_rgba(93,255,176,0.75)]"
+              }
+
               return (
                 <button
                   key={n.id}
@@ -172,9 +241,16 @@ export function MapScreen({
                   >
                     {n.isBoss ? (
                       <IconOctopus className="h-6 w-6 sm:h-7 sm:w-7" />
+                    ) : n.isShop ? (
+                      <IconShop className="h-4 w-4 sm:h-5 sm:w-5" />
+                    ) : n.isChallenge ? (
+                      <IconChallenge className="h-4 w-4 sm:h-5 sm:w-5" />
+                    ) : n.isEvent ? (
+                      <IconVortex className="h-4 w-4 sm:h-5 sm:w-5" />
                     ) : isCurrent ? (
                       <span className="h-2 w-2 rounded-full bg-abyss sm:h-2.5 sm:w-2.5" />
                     ) : null}
+
                     {!n.isBoss && showMb && (
                       <span
                         className="absolute -right-2 -top-2.5 flex items-center gap-0.5 drop-shadow-[0_1px_0_rgba(4,18,26,0.9)]"
@@ -187,6 +263,7 @@ export function MapScreen({
                       </span>
                     )}
                   </span>
+
                   {n.isBoss && !clickable && (
                     <span className="whitespace-nowrap font-display text-[10px] tracking-widest text-coral drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs">
                       БОСС
@@ -194,7 +271,17 @@ export function MapScreen({
                   )}
                   {(clickable || isEventTarget) && (
                     <span
-                      className={`whitespace-nowrap font-display text-[10px] tracking-wider drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs ${isEventTarget ? "text-gold" : "text-foam"}`}
+                      className={`whitespace-nowrap font-display text-[10px] tracking-wider drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs ${
+                        isEventTarget
+                          ? "text-gold"
+                          : n.isShop
+                            ? "text-gold"
+                            : n.isChallenge
+                              ? "text-[#ff477e]"
+                              : n.isEvent
+                                ? "text-amber-300"
+                                : "text-foam"
+                      }`}
                     >
                       {n.name}
                     </span>
@@ -205,21 +292,32 @@ export function MapScreen({
         </div>
       </div>
 
-      {/* Подсказка снизу + легенда существ, если игрок уже их встречал */}
+      {/* Подсказка снизу + легенда */}
       <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex flex-col items-center gap-1 px-4">
-        {visitedMb.length > 0 && (
-          <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-mint sm:text-xs">
-            <span className="flex items-center gap-0.5">
-              <IconFish className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <IconJelly className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            </span>
-            МИНИ-БОСС В УЗЛЕ — ПОБЕДИ И ПОЛУЧИ ЖИЗНЬ
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {visitedMb.length > 0 && (
+            <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-mint sm:text-xs">
+              <span className="flex items-center gap-0.5">
+                <IconFish className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <IconJelly className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </span>
+              МИНИ-БОСС В УЗЛЕ
+            </div>
+          )}
+          <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-gold sm:text-xs">
+            <IconShop className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            ЛАВКА ЗА МОНЕТЫ
           </div>
-        )}
-        <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-coral sm:text-xs">
-          <IconOctopus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-          ФИНАЛЬНЫЙ БОСС ГЛУБИН
+          <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-[#ff477e] sm:text-xs">
+            <IconChallenge className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            ИСПЫТАНИЕ
+          </div>
+          <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-coral sm:text-xs">
+            <IconOctopus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            БОСС ГЛУБИН
+          </div>
         </div>
+
         <div className="hud-chip px-5 py-2 text-center font-display text-xs tracking-widest text-cyan-neon sm:text-sm">
           {playerOut.size > 1
             ? "ВЫБЕРИ ОДИН ИЗ ПУТЕЙ"
@@ -229,8 +327,151 @@ export function MapScreen({
         </div>
       </div>
 
-      {/* Оверлей события: боя не было — игрока отнесло в пройденный узел */}
-      {hud.campaignEvent && (
+      {/* Модальное окно магазина */}
+      {shop && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-abyss/80 p-3 backdrop-blur-md sm:p-6">
+          <div className="hud-chip flex w-full max-w-xl flex-col items-center border border-gold/40 bg-abyss/95 p-4 text-center shadow-[0_0_32px_rgba(255,201,77,0.2)] sm:p-6">
+            <div className="flex items-center gap-2">
+              <IconShop className="h-6 w-6 text-gold" />
+              <div className="hud-label text-gold">ПОДВОДНЫЙ ТОРГОВЕЦ</div>
+            </div>
+            <h2 className="mt-1 font-display text-xl text-foam sm:text-2xl">{shop.name}</h2>
+            <div className="mt-2 flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/15 px-3.5 py-1 text-gold">
+              <IconCoin className="h-4 w-4" />
+              <span className="font-display text-sm font-bold sm:text-base">
+                Баланс: {coins} монет
+              </span>
+            </div>
+
+            <div className="mt-4 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
+              {shop.items.map((item) => {
+                const isLife = item.category === "life"
+                const isShield = item.category === "shield"
+                const atMaxLife = isLife && hud.lives >= 5
+                const atMaxShield = isShield && hud.shield >= 5
+                const affordable = coins >= item.price
+                const canBuy = !item.sold && affordable && !atMaxLife && !atMaxShield
+
+                let btnLabel = `КУПИТЬ (${item.price} 🪙)`
+                if (item.sold) btnLabel = "КУПЛЕНО"
+                else if (atMaxLife) btnLabel = "МАКС. ЖИЗНЕЙ (5)"
+                else if (atMaxShield) btnLabel = "МАКС. ЩИТОВ (5)"
+                else if (!affordable) btnLabel = `НУЖНО ${item.price} 🪙`
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex flex-col justify-between rounded-lg border p-3 text-left transition-all ${
+                      item.sold
+                        ? "border-line/40 bg-deep/40 opacity-60"
+                        : "border-gold/30 bg-deep/90 hover:border-gold/60"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-display text-sm font-bold text-foam sm:text-base">
+                          {item.name}
+                        </span>
+                        <span className="font-display text-xs font-bold text-gold">
+                          {item.price} 🪙
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-foam/80">{item.desc}</p>
+                    </div>
+
+                    <button
+                      disabled={!canBuy}
+                      onClick={() => onBuyShopItem?.(item.id)}
+                      className={`mt-3 w-full rounded py-1.5 font-display text-xs font-bold transition-all ${
+                        item.sold
+                          ? "cursor-default bg-line/20 text-foam/40"
+                          : canBuy
+                            ? "cursor-pointer bg-gold text-abyss shadow-[0_0_12px_rgba(255,201,77,0.5)] hover:scale-[1.02] active:scale-[0.98]"
+                            : "cursor-not-allowed bg-line/30 text-foam/40"
+                      }`}
+                    >
+                      {btnLabel}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            <button
+              className="btn-ghost mt-5 px-6 py-2 font-display text-sm text-cyan-neon hover:text-foam"
+              onClick={onCloseShop}
+            >
+              ПРОДОЛЖИТЬ ПУТЬ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Оверлей интерактивного события с выбором */}
+      {eventData && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-abyss/75 p-3 backdrop-blur-md sm:p-6">
+          <div className="hud-chip flex w-full max-w-lg flex-col items-center border border-amber-400/40 bg-abyss/95 p-4 text-center shadow-[0_0_32px_rgba(251,191,36,0.2)] sm:p-6">
+            <div className="flex items-center gap-2">
+              <IconVortex className="h-5 w-5 text-amber-300" />
+              <div className="hud-label text-amber-300">{eventData.title}</div>
+            </div>
+            <p className="mt-2 font-display text-sm leading-relaxed text-foam sm:text-base">
+              {eventData.text}
+            </p>
+
+            {!eventData.resolved ? (
+              <div className="mt-4 flex w-full flex-col gap-2.5">
+                {eventData.choices.map((choice, idx) => {
+                  const affordable = !choice.cost || coins >= choice.cost
+                  return (
+                    <button
+                      key={choice.id}
+                      disabled={!affordable}
+                      onClick={() => onEventChoice?.(idx)}
+                      className={`flex flex-col items-start rounded-lg border p-3 text-left transition-all ${
+                        affordable
+                          ? "cursor-pointer border-amber-400/40 bg-deep/90 hover:border-amber-300 hover:bg-deep active:scale-[0.99]"
+                          : "cursor-not-allowed border-line/30 bg-deep/40 opacity-50"
+                      }`}
+                    >
+                      <div className="flex w-full items-center justify-between">
+                        <span className="font-display text-sm font-bold text-amber-200">
+                          {idx + 1}. {choice.label}
+                        </span>
+                        {choice.cost && (
+                          <span
+                            className={`font-display text-xs ${
+                              affordable ? "text-gold" : "text-coral"
+                            }`}
+                          >
+                            {choice.cost} 🪙
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-foam/80">{choice.desc}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="mt-4 w-full">
+                <div className="rounded-lg border border-mint/40 bg-mint/10 p-3 text-sm text-mint">
+                  {eventData.outcomeText}
+                </div>
+                <button
+                  className="btn-ghost mt-4 px-6 py-2 font-display text-sm text-cyan-neon hover:text-foam"
+                  onClick={onEventDismiss}
+                >
+                  ПРОДОЛЖИТЬ ПУТЬ
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Обратная совместимость: оверлей текстового события (если eventData не задан) */}
+      {!eventData && hud.campaignEvent && (
         <div className="absolute inset-0 z-30 flex items-start justify-center bg-abyss/25 px-3 pt-20 sm:items-center sm:bg-abyss/70 sm:p-4">
           <div className="hud-chip flex max-w-[min(90vw,28rem)] flex-col items-center bg-abyss/75 px-4 py-3 text-center backdrop-blur-sm sm:px-6 sm:py-5">
             <div className="hud-label mb-1 sm:mb-2">СЛУЧАЙНОЕ СОБЫТИЕ</div>

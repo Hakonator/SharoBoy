@@ -58,6 +58,43 @@ export interface HudData {
   map: CampaignMapView | null
   /** Текст активного события на карте (null — события нет / уже закрыто). */
   campaignEvent: string | null
+  /** Данные интерактивного события с выбором вариантов. */
+  campaignEventData?: CampaignEventData | null
+  /** Активный открытый магазин забега на карте (null — закрыт). */
+  campaignShop?: CampaignShopState | null
+}
+
+export interface CampaignShopItem {
+  id: string
+  name: string
+  desc: string
+  price: number
+  category: "life" | "shield" | "perk"
+  sold: boolean
+  icon: "life" | "shield" | "laser" | "magnet" | "wide" | "fire" | "coin"
+}
+
+export interface CampaignShopState {
+  nodeId: number
+  name: string
+  items: CampaignShopItem[]
+}
+
+export interface CampaignEventChoice {
+  id: string
+  label: string
+  desc: string
+  cost?: number
+  disabled?: boolean
+}
+
+export interface CampaignEventData {
+  id: string
+  title: string
+  text: string
+  choices: CampaignEventChoice[]
+  resolved?: boolean
+  outcomeText?: string
 }
 
 export interface ScoreEntry {

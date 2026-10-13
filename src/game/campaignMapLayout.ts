@@ -10,6 +10,10 @@ export const MAX_BRANCHES = 4
 export const MAX_TIER_WIDTH = 4
 /** Доля узлов-событий среди обычных узлов (бой не проводится, телепорт назад). */
 export const EVENT_NODE_CHANCE = 0.12
+/** Доля узлов-магазинов (торговля за монеты, появляются начиная с 4-го яруса). */
+export const SHOP_NODE_CHANCE = 0.1
+/** Доля узлов-испытаний (сложный бой с повышенной наградой монет и щитов). */
+export const CHALLENGE_NODE_CHANCE = 0.14
 /** Событие отбрасывает игрока не дальше чем на это число ярусов («зон») назад. */
 export const EVENT_MAX_BACK_TIERS = 3
 
@@ -29,6 +33,12 @@ const NODE_NAMES = [
 
 /** Имена узлов-событий: боя нет, событие переносит игрока на пройденный узел. */
 const EVENT_NAMES = ["ВОДОВОРОТ", "ТЕЧЕНИЕ", "ГРОТ", "ГЕЙЗЕР"]
+
+/** Имена узлов-магазинов: лавка подводного торговца за монеты. */
+export const SHOP_NAMES = ["ТОРГОВЕЦ", "ЛАВКА ГЛУБИН", "ПОДВОДНЫЙ БАЗАР", "ТАЙНИК КОНТРАБАНДИСТА"]
+
+/** Имена элитных узлов-испытаний. */
+export const CHALLENGE_NAMES = ["ИСПЫТАНИЕ", "АРЕНА БЕЗДНЫ", "ЛОГОВО СТРАЖА", "ЦИХЛИДА-ХИЩНИК"]
 
 /**
  * Тексты событий-телепортов (подводная тематика); плейсхолдер {place}
@@ -56,12 +66,31 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
   let id = 0
   for (let t = 0; t < tiers; t++) {
     const row: number[] = []
+    let tierHasShop = false
     for (let i = 0; i < widths[t]; i++) {
       const isBoss = t === tiers - 1
       // На первом боевом ярусе игрок посещал только старт, поэтому событие
       // всегда возвращало бы его туда. События начинаются со второго яруса,
       // где уже есть несколько возможных целей для переноса.
       const isEvent = !isBoss && t > 1 && rng() < EVENT_NODE_CHANCE
+      // Магазины начинаются с 4-го яруса и только если в ярусе есть альтернативные узлы
+      const canBeShop =
+        !isBoss && !isEvent && t >= 4 && t < tiers - 2 && widths[t] > 1 && !tierHasShop
+      const isShop = canBeShop && rng() < SHOP_NODE_CHANCE
+      if (isShop) tierHasShop = true
+      // Испытания (элитные боевые узлы с повышенной сложностью и наградой)
+      const isChallenge = !isBoss && !isEvent && !isShop && t >= 3 && rng() < CHALLENGE_NODE_CHANCE
+
+      const name = isBoss
+        ? "БОСС"
+        : isEvent
+          ? EVENT_NAMES[Math.floor(rng() * EVENT_NAMES.length)]
+          : isShop
+            ? SHOP_NAMES[Math.floor(rng() * SHOP_NAMES.length)]
+            : isChallenge
+              ? CHALLENGE_NAMES[Math.floor(rng() * CHALLENGE_NAMES.length)]
+              : NODE_NAMES[Math.floor(rng() * NODE_NAMES.length)]
+
       nodes.push({
         id,
         tier: t,
@@ -69,11 +98,9 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
         y: 0.5, // точная вертикаль считается после связывания ярусов
         isBoss,
         isEvent,
-        name: isBoss
-          ? "БОСС"
-          : isEvent
-            ? EVENT_NAMES[Math.floor(rng() * EVENT_NAMES.length)]
-            : NODE_NAMES[Math.floor(rng() * NODE_NAMES.length)],
+        isShop,
+        isChallenge,
+        name,
       })
       row.push(id)
       id++

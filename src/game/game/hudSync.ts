@@ -101,6 +101,8 @@ export function pushHud(g: Game) {
     topEndless: g.topEndless,
     map: currentMapView(g),
     campaignEvent: g.campaignEvent,
+    campaignEventData: g.campaignEventData,
+    campaignShop: g.campaignShop,
     newAchievements: g.achQueue.splice(0),
   })
 }

@@ -7,9 +7,13 @@ export interface GameInternals {
   phase: string
   level: number
   lives: number
+  coins: number
+  shield: number
   blocks: unknown[]
   balls: unknown[]
   campaign: unknown
+  campaignShop: unknown
+  campaignEventData: unknown
   campaignPlayerId: number
   campaignVisited: number[]
   campaignVisible: number[]
@@ -19,6 +23,9 @@ export interface GameInternals {
   startLevelBattle: (n: number) => void
   enterMapNode: (id: number) => void
   dismissCampaignEvent: () => void
+  chooseCampaignEventOption: (index: number) => void
+  buyCampaignShopItem: (id: string) => boolean
+  closeCampaignShop: () => void
   enterNextNodeOnAction: () => void
   toMenu: () => void
   destroy: () => void

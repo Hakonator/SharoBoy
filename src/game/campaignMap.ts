@@ -18,6 +18,10 @@ export {
   EVENT_NODE_CHANCE,
   EVENT_MAX_BACK_TIERS,
   EVENT_TEXTS,
+  SHOP_NODE_CHANCE,
+  CHALLENGE_NODE_CHANCE,
+  SHOP_NAMES,
+  CHALLENGE_NAMES,
   generateCampaignMap,
 } from "./campaignMapLayout"
 
@@ -33,6 +37,10 @@ export interface CampaignNode {
   isBoss: boolean
   /** Узел-событие: без боя, переносит игрока на один из пройденных узлов. */
   isEvent: boolean
+  /** Узел-магазин: торговля за монеты (жизни, щиты, временные перки). */
+  isShop?: boolean
+  /** Элитный узел-испытание: повышенная сложность и щедрая награда. */
+  isChallenge?: boolean
   /** Отображаемое имя узла. */
   name: string
 }

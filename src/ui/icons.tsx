@@ -194,6 +194,98 @@ export function IconOctopus({ className }: { className?: string }) {
   )
 }
 
+/** Золотая монета глубин. */
+export function IconCoin({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} aria-hidden>
+      <circle cx="10" cy="10" r="8.5" fill="#ffc94d" />
+      <circle cx="10" cy="10" r="6.6" fill="#d99b1a" />
+      <circle cx="10" cy="10" r="5.2" fill="#ffd86b" />
+      <polygon points="10,6.5 12.8,10 10,13.5 7.2,10" fill="#a46e00" />
+      <circle cx="8" cy="8" r="1.2" fill="#fff9db" opacity="0.8" />
+    </svg>
+  )
+}
+
+/** Защитный энергощит. */
+export function IconShield({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} aria-hidden>
+      <path
+        d="M10 2.5 4.5 5v5.5c0 4.2 2.7 7.5 5.5 8.5 2.8-1 5.5-4.3 5.5-8.5V5L10 2.5Z"
+        fill="#35e0ff"
+        stroke="#1a8ea8"
+        strokeWidth="1"
+      />
+      <path
+        d="M10 4.5 6 6.5v4c0 3 1.8 5.5 4 6.3 2.2-.8 4-3.3 4-6.3v-4L10 4.5Z"
+        fill="#8de7ff"
+        opacity="0.45"
+      />
+    </svg>
+  )
+}
+
+/** Лавка подводного торговца. */
+export function IconShop({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} aria-hidden>
+      <path d="M3 6.5 4.5 4h11L17 6.5H3Z" fill="#ffc94d" />
+      <path
+        d="M3 6.5v2a2 2 0 0 0 3.5 1.3A2 2 0 0 0 10 9.8a2 2 0 0 0 3.5 0A2 2 0 0 0 17 8.5v-2H3Z"
+        fill="#e6a822"
+      />
+      <rect
+        x="4.5"
+        y="10"
+        width="11"
+        height="6.5"
+        rx="1"
+        fill="#2d6a7a"
+        stroke="#ffc94d"
+        strokeWidth="1"
+      />
+      <rect x="7.5" y="12" width="5" height="4.5" fill="#ffc94d" opacity="0.85" />
+    </svg>
+  )
+}
+
+/** Элитный узел испытания: скрещенные клинки. */
+export function IconChallenge({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className={className}
+      fill="none"
+      stroke="#ff477e"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <path d="m4 4 12 12M16 4 4 16" />
+      <path d="M3 7 7 3M17 7l-4-4M3 13l4 4M17 13l-4 4" strokeWidth="1.4" />
+      <circle cx="10" cy="10" r="2.5" fill="#ff477e" stroke="none" />
+    </svg>
+  )
+}
+
+/** Водоворот/стихия для узлов-событий. */
+export function IconVortex({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className={className}
+      fill="none"
+      stroke="#fbbf24"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <path d="M10 2.5a7.5 7.5 0 0 1 7.5 7.5c0 4.1-3.4 7.5-7.5 7.5A6 6 0 0 1 4 11.5 4.5 4.5 0 0 1 8.5 7a3 3 0 0 1 3 3 1.5 1.5 0 0 1-1.5 1.5" />
+    </svg>
+  )
+}
+
 export function IconChevron() {
   return (
     <svg

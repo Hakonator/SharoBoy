@@ -197,6 +197,9 @@ export default function App() {
           hud={hud}
           onMapNode={(id) => g()?.enterMapNode(id)}
           onEventDismiss={() => g()?.dismissCampaignEvent()}
+          onEventChoice={(idx) => g()?.chooseCampaignEventOption(idx)}
+          onBuyShopItem={(id) => g()?.buyCampaignShopItem(id)}
+          onCloseShop={() => g()?.closeCampaignShop()}
           onMenu={() => g()?.toMenu()}
         />
       )}

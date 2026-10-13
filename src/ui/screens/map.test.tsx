@@ -31,6 +31,7 @@ describe("MapScreen: маршрут события кампании", () => {
       score: 0,
       lives: 3,
       best: 0,
+      coins: 0,
       phase: "map",
     } as HudData
 
@@ -46,5 +47,49 @@ describe("MapScreen: маршрут события кампании", () => {
     expect(html).toContain(target.name)
     expect(html).toContain("bg-abyss/25")
     expect(html).toContain("backdrop-blur-sm")
+  })
+
+  it("рендерит модальное окно магазина с товарами и балансом", () => {
+    const map = generateCampaignMap(541)
+    const player = map.nodes.find((node) => node.id === map.startId)!
+    const hud = {
+      map: {
+        ...map,
+        playerId: player.id,
+        visited: [player.id],
+        visible: map.edges.filter((edge) => edge.from === player.id).map((edge) => edge.to),
+        minibosses: {},
+      },
+      campaignShop: {
+        nodeId: player.id,
+        name: "ЛАВКА ГЛУБИН",
+        items: [
+          {
+            id: "life",
+            name: "Ремонт обшивки",
+            desc: "+1 жизнь",
+            price: 24,
+            category: "life",
+            icon: "life",
+            sold: false,
+          },
+        ],
+      },
+      score: 0,
+      lives: 3,
+      coins: 50,
+      best: 0,
+      phase: "map",
+    } as HudData
+
+    const html = renderToStaticMarkup(
+      <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
+    )
+
+    expect(html).toContain("ПОДВОДНЫЙ ТОРГОВЕЦ")
+    expect(html).toContain("ЛАВКА ГЛУБИН")
+    expect(html).toContain("Ремонт обшивки")
+    expect(html).toContain("24 🪙")
+    expect(html).toContain("50")
   })
 })

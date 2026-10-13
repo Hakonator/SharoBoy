@@ -19,13 +19,20 @@ import {
   particleLimitForQuality,
   subscribeSettings,
 } from "./settings"
-import type { MinibossCreature } from "./types"
+import type {
+  CampaignEventData,
+  CampaignShopItem,
+  CampaignShopState,
+  MinibossCreature,
+} from "./types"
 import type { Ball, Block, Bubble, HudData, MouthBubble, PaddleShapeKind } from "./types"
 import type { PaddleState, Phase, PowerUp, Projectile, ScoreEntry, SparkHit } from "./types"
 import type { CampaignMap } from "./campaignMap"
 import type { PlayerMapSpec } from "./mapSpec"
 import type { LevelSpec } from "./levels"
 import type { MinibossKind } from "./minibosses"
+import { buyCampaignShopItem, closeCampaignShop } from "./campaignShop"
+import { chooseCampaignEventChoice as chooseCampaignEventOption } from "./campaignEvents"
 import { makeBossHost, makePowersHost } from "./game/hosts"
 import { makePhysicsHost, makeWeaponsHost } from "./game/hosts"
 import { paddleShape } from "./game/paddleControl"
@@ -210,10 +217,24 @@ export class Game {
   minibossPity = 0
   /** Активное событие на карте (текст для оверлея; null — события нет). */
   campaignEvent: string | null = null
+  /** Структурированные данные интерактивного события с выбором вариантов. */
+  campaignEventData: CampaignEventData | null = null
   /** Узел назначения события-телепорта (бой стартует после подтверждения). */
   campaignEventTarget = -1
   /** Узлы-события, которые уже сработали (повторный вход — обычный бой). */
   campaignSpentEvents: number[] = []
+  /** Активный открытый магазин на карте забега (null — закрыт). */
+  campaignShop: CampaignShopState | null = null
+  /** Ассортименты магазинов по id узлов (для сохранения статуса купленных товаров). */
+  campaignShops: Record<number, CampaignShopItem[]> = {}
+  /** Временные бонусы и перки текущего забега кампании. */
+  campaignPerks: {
+    laserStart?: boolean
+    wideStart?: boolean
+    magnetStart?: boolean
+    fireStart?: boolean
+    coinBoost?: boolean
+  } = {}
   campaignPlayerId = -1
   campaignVisited: number[] = []
   campaignVisible: number[] = []
@@ -343,6 +364,15 @@ export class Game {
   }
   dismissCampaignEvent() {
     dismissCampaignEvent(this)
+  }
+  chooseCampaignEventOption(index: number) {
+    chooseCampaignEventOption(this, index)
+  }
+  buyCampaignShopItem(itemId: string): boolean {
+    return buyCampaignShopItem(this, itemId)
+  }
+  closeCampaignShop() {
+    closeCampaignShop(this)
   }
   enterNextNodeOnAction() {
     enterNextNodeOnAction(this)

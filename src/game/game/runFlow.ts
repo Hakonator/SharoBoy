@@ -1,11 +1,13 @@
 import type { Game } from "../game"
 import { LEVELS } from "../levels"
 import { rand, lsSet } from "../utils"
+import { nodeById } from "../campaignMap"
 
 import { applyTrack } from "./audioControls"
 import { enterMapView } from "./campaignFlow"
 import { pushHud, saveTop, setBanner } from "./hudSync"
 import { buildLevel, buildWave, serveBall } from "./levelBuild"
+import { addCoins } from "./progress"
 
 export function resetRun(g: Game) {
   g.customWinCondition = null
@@ -17,6 +19,10 @@ export function resetRun(g: Game) {
   g.campaignPlayerId = -1
   g.campaignVisited = []
   g.campaignVisible = []
+  g.campaignShop = null
+  g.campaignShops = {}
+  g.campaignEventData = null
+  g.campaignPerks = {}
   g.activeSpec = null
   g.onBossNode = false
   g.score = 0
@@ -152,7 +158,25 @@ export function onLevelCleared(g: Game) {
       pushHud(g)
       return
     }
-    // Обычный узел зачищен — возвращаемся на карту за следующим шагом.
+    // Обычный или элитный узел зачищен: награда монетами и щитом
+    const currentNode = g.campaign ? nodeById(g.campaign, g.campaignPlayerId) : undefined
+    const isChallenge = currentNode?.isChallenge ?? false
+    const baseWinCoins = isChallenge ? 25 : 5
+    const coinBonus = g.campaignPerks.coinBoost ? Math.round(baseWinCoins * 0.5) : 0
+    addCoins(g, baseWinCoins + coinBonus)
+    if (isChallenge && g.shield < 3) {
+      g.shield++
+    }
+    g.fx.popups.push({
+      x: g.w / 2,
+      y: g.h * 0.48,
+      text: isChallenge
+        ? `ИСПЫТАНИЕ! +${baseWinCoins + coinBonus} 🪙`
+        : `ПОБЕДА! +${baseWinCoins + coinBonus} 🪙`,
+      color: isChallenge ? "#ffc94d" : "#5dffb0",
+      t: 0,
+      size: 22,
+    })
     g.sfx.levelClear()
     enterMapView(g)
     return

@@ -179,4 +179,40 @@ describe("generateCampaignMap", () => {
       }
     }
   })
+
+  it("узлы-магазины встречаются начиная с 4-го яруса и никогда не являются боссами", () => {
+    let totalShops = 0
+    for (let seed = 1; seed <= 60; seed++) {
+      const map = generateCampaignMap(seed)
+      for (const n of map.nodes) {
+        if (!n.isShop) continue
+        totalShops++
+        expect(n.isBoss).toBe(false)
+        expect(n.isEvent).toBe(false)
+        expect(n.tier).toBeGreaterThanOrEqual(4)
+        expect(n.tier).toBeLessThan(map.tiers - 1)
+        expect(["ТОРГОВЕЦ", "ЛАВКА ГЛУБИН", "ПОДВОДНЫЙ БАЗАР", "ТАЙНИК КОНТРАБАНДИСТА"]).toContain(
+          n.name
+        )
+      }
+    }
+    expect(totalShops).toBeGreaterThan(0)
+  })
+
+  it("узлы-испытания встречаются в промежуточных ярусах", () => {
+    let totalChallenges = 0
+    for (let seed = 1; seed <= 60; seed++) {
+      const map = generateCampaignMap(seed)
+      for (const n of map.nodes) {
+        if (!n.isChallenge) continue
+        totalChallenges++
+        expect(n.isBoss).toBe(false)
+        expect(n.isEvent).toBe(false)
+        expect(n.tier).toBeGreaterThanOrEqual(3)
+        expect(n.tier).toBeLessThan(map.tiers - 1)
+        expect(["ИСПЫТАНИЕ", "АРЕНА БЕЗДНЫ", "ЛОГОВО СТРАЖА", "ЦИХЛИДА-ХИЩНИК"]).toContain(n.name)
+      }
+    }
+    expect(totalChallenges).toBeGreaterThan(0)
+  })
 })

@@ -8,6 +8,8 @@ import { nodeById, outgoingIds, visibleFrom, isAdjacent } from "../campaignMap"
 import { daySeed } from "../utils"
 import type { LevelSpec } from "../levels"
 import type { CampaignMapView, CampaignNode } from "../campaignMap"
+import { openCampaignShop } from "../campaignShop"
+import { buildCampaignEvent } from "../campaignEvents"
 
 import { applyTrack } from "./audioControls"
 import { pushHud, setBanner } from "./hudSync"
@@ -49,8 +51,12 @@ export function startCampaignMap(g: Game) {
   g.campaignMbSeen = {}
   g.minibossPity = 0
   g.campaignEvent = null
+  g.campaignEventData = null
   g.campaignEventTarget = -1
   g.campaignSpentEvents = []
+  g.campaignShop = null
+  g.campaignShops = {}
+  g.campaignPerks = {}
   g.campaignPlayerId = g.campaign.startId
   g.campaignVisited = [g.campaign.startId]
   g.campaignVisible = visibleFrom(g.campaign, g.campaignPlayerId)
@@ -108,29 +114,34 @@ export function enterMapNode(g: Game, id: number) {
     resolveCampaignEvent(g, node)
     return
   }
+  if (node.isShop) {
+    g.campaignShop = openCampaignShop(g, node.id, node.name, node.tier)
+    g.campaignVisible = visibleFrom(g.campaign, id)
+    g.phase = "map"
+    g.sfx.power()
+    pushHud(g)
+    return
+  }
   g.campaignVisible = visibleFrom(g.campaign, id)
   startMapBattle(g, node)
 }
 
 /**
  * Узел-событие: боя нет — подводная стихия (водоворот, течение, гейзер)
- * уносит игрока в один из уже пройденных узлов, но не дальше чем на
- * EVENT_MAX_BACK_TIERS зон назад. Расклад события (узел назначения и текст)
- * рандомизируется прямо в момент срабатывания — живым ГПСЧ, а не
- * детерминированным раскладом карты. Целями не могут быть узлы-события:
- * цепочка телепортов на одном ходу исключена. Само перемещение фишки и старт
- * боя на узле назначения происходят в dismissCampaignEvent, после того как
- * игрок прочитал сообщение. Событие срабатывает один за забег: повторный
- * вход в узел-событие — обычный бой (см. enterMapNode). В будущем здесь же
- * появится вариант «остаться на месте за кристаллы».
+ * предлагает игроку выбор с риском и наградой.
  */
 export function resolveCampaignEvent(g: Game, node: CampaignNode) {
   if (!g.campaign) return
   const options = g.campaignVisited.filter((v) => {
     if (v === node.id) return false
     const visited = nodeById(g.campaign!, v)
-    // не-событийные узлы не дальше EVENT_MAX_BACK_TIERS зон назад
-    return !!visited && !visited.isEvent && visited.tier >= node.tier - EVENT_MAX_BACK_TIERS
+    // не-событийные и не-магазинные узлы не дальше EVENT_MAX_BACK_TIERS зон назад
+    return (
+      !!visited &&
+      !visited.isEvent &&
+      !visited.isShop &&
+      visited.tier >= node.tier - EVENT_MAX_BACK_TIERS
+    )
   })
   if (!options.length) {
     // редкий случай: окно из 3 зон съедено цепочкой событий — стихия стихла,
@@ -146,6 +157,7 @@ export function resolveCampaignEvent(g: Game, node: CampaignNode) {
   const target = to >= 0 ? nodeById(g.campaign, to) : undefined
   const template = EVENT_TEXTS[Math.floor(Math.random() * EVENT_TEXTS.length)]
   g.campaignEvent = template.replace("{place}", target ? target.name : "НЕИЗВЕСТНОЕ МЕСТО")
+  g.campaignEventData = buildCampaignEvent(g, node, to)
   g.onBossNode = false
   g.activeSpec = null
   g.phase = "map"
@@ -155,21 +167,27 @@ export function resolveCampaignEvent(g: Game, node: CampaignNode) {
 }
 
 /**
- * Закрытие экрана события («плыть дальше»): фишка перемещается на узел из
- * сообщения, и там сразу стартует бой — с вновь случайным шансом минибоссов
- * (не по раскладу карты). Повторные события-телепорты на этом ходу исключены:
- * узлы-события не бывают целью, бой стартует напрямую.
+ * Закрытие экрана события («плыть дальше»): если событие переместило игрока
+ * на узел назначения, там стартует бой; если игрок удержался на месте — остаётся
+ * на карте для выбора следующего шага.
  */
 export function dismissCampaignEvent(g: Game) {
   const target = g.campaignEventTarget
   g.campaignEvent = null
+  g.campaignEventData = null
   g.campaignEventTarget = -1
-  if (g.phase !== "map" || !g.campaign || target < 0) {
+  if (g.phase !== "map" || !g.campaign) {
+    pushHud(g)
+    return
+  }
+  if (target < 0) {
+    // Игрок остался на текущем узле (результат выбора в событии)
+    g.campaignVisible = visibleFrom(g.campaign, g.campaignPlayerId)
     pushHud(g)
     return
   }
   const node = nodeById(g.campaign, target)
-  if (!node || node.isEvent) {
+  if (!node || node.isEvent || node.isShop) {
     pushHud(g)
     return
   }
@@ -188,14 +206,16 @@ export function enterNextNodeOnAction(g: Game) {
 
 /**
  * Запуск боя на узле карты. Обычный узел — авторская раскладка кампании по
- * кругу, узел босса — финальная арена, масштабирующаяся по ярусу. Минибоссы
- * разыгрываются полностью случайно при старте каждого боя с pity-системой.
+ * кругу, узел босса — финальная арена, узел-испытание — элитный бой с минибоссом
+ * и повышенной наградой.
  */
 export function startMapBattle(g: Game, node: CampaignNode) {
   if (!g.campaign) return
   g.level = node.tier + 1
   g.levelLostBall = false
   g.campaignEvent = null
+  g.campaignEventData = null
+  g.campaignShop = null
   if (node.isBoss) {
     g.activeSpec = null
     g.onBossNode = true
@@ -214,16 +234,20 @@ export function startMapBattle(g: Game, node: CampaignNode) {
   g.onBossNode = false
   g.activeSpec = nodeSpecFor(g, node)
   buildFromSpec(g, g.activeSpec)
-  // Минибоссы: полностью случайный ролл в момент старта боя с pity-системой —
-  // пока существо не появлялось, шанс растёт, после появления — снова базовый.
-  // Появлявшиеся существа запоминаются для маркеров на карте забега.
-  const rolled = rollMinibossLive(g.minibossPity)
+  // Минибоссы: случайный ролл с pity-системой, в узлах-испытаниях минибосс гарантирован!
+  let rolled = rollMinibossLive(g.minibossPity)
+  if (node.isChallenge && rolled.kinds.length === 0) {
+    rolled = { kinds: ["fish"], pity: 0 }
+  }
   g.minibossPity = rolled.pity
   if (rolled.kinds.length) g.campaignMbSeen[node.id] = rolled.kinds
   for (const kind of rolled.kinds) {
-    addMiniboss(g, kind, minibossHpFor(node.tier, g.campaign.tiers))
+    const baseHp = minibossHpFor(node.tier, g.campaign.tiers)
+    const hp = node.isChallenge ? Math.round(baseHp * 1.3) : baseHp
+    addMiniboss(g, kind, hp)
   }
-  launchNodeBattle(g, node.name)
+  const label = node.isChallenge ? `⚔️ ИСПЫТАНИЕ: ${node.name}` : node.name
+  launchNodeBattle(g, label)
 }
 
 /** Раскладка обычного узла: авторские уровни по кругу (босс исключён). */
@@ -232,10 +256,29 @@ export function nodeSpecFor(g: Game, node: CampaignNode): LevelSpec {
   return generateMotifSpec(g.campaignSeed + node.id * 7919, node.tier + 1, speed)
 }
 
-/** Общий вход в бой: подача шара, трек, баннер и бонусы прокачки. */
+/** Общий вход в бой: подача шара, трек, баннер и бонусы прокачки / магазина. */
 export function launchNodeBattle(g: Game, label: string) {
   g.magnetUntil = g.time + 4 * (g.upgrades.magnet ?? 0)
   g.laserArmed = (g.upgrades.laser ?? 0) > 0
+
+  // Временные бонусы забега из магазина/событий:
+  if (g.campaignPerks.laserStart) {
+    g.laserArmed = true
+    g.campaignPerks.laserStart = false
+  }
+  if (g.campaignPerks.wideStart) {
+    g.wideUntil = Math.max(g.wideUntil, g.time + 15)
+    g.campaignPerks.wideStart = false
+  }
+  if (g.campaignPerks.magnetStart) {
+    g.magnetUntil = Math.max(g.magnetUntil, g.time + 10)
+    g.campaignPerks.magnetStart = false
+  }
+  if (g.campaignPerks.fireStart) {
+    g.fireUntil = Math.max(g.fireUntil, g.time + 12)
+    g.campaignPerks.fireStart = false
+  }
+
   g.laserArmedUntil = g.laserArmed ? Number.POSITIVE_INFINITY : 0
   serveBall(g)
   g.phase = "playing"
