@@ -22,6 +22,7 @@ import { usePlayerStats } from "./ui/usePlayerStats"
 import { usePortrait } from "./ui/usePortrait"
 import { MapTesterView } from "./ui/MapTesterView"
 import type { PlayerMapSpec } from "./game/mapSpec"
+import { clearAccountStorage } from "./game/account"
 import { EditorView } from "./ui/editor"
 
 const INITIAL_HUD: HudData = {
@@ -99,12 +100,20 @@ export default function App() {
     }
   }, [])
 
-  const { unlocked, achToasts } = useAchToasts(hud)
-  const { stats } = usePlayerStats(hud)
+  const { unlocked, achToasts, resetUnlocked } = useAchToasts(hud)
+  const { stats, resetStats } = usePlayerStats(hud)
   const debug = useDebugControls(gameRef)
   const leaderboard = useLeaderboard(hud, nick, handleNickChange)
   /** Вертикальный экран: HUD живёт в зарезервированной неигровой зоне сверху. */
   const portrait = usePortrait()
+
+  const handleResetAccount = useCallback(() => {
+    clearAccountStorage()
+    gameRef.current?.resetAccountData()
+    resetUnlocked()
+    resetStats()
+    handleNickChange("")
+  }, [handleNickChange, resetUnlocked, resetStats])
 
   /* Инициализация движка: без этого gameRef.current остаётся null,
      и кнопки меню (Кампания / Бесконечный) не запускают игру. */
@@ -328,6 +337,7 @@ export default function App() {
           onSfxVolume={(v) => g()?.setSfxVolume(v)}
           onToggleMusic={() => g()?.toggleMusic()}
           onToggleMute={() => g()?.toggleMute()}
+          onResetAccount={handleResetAccount}
         />
       )}
 

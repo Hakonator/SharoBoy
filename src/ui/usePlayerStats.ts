@@ -39,5 +39,9 @@ export function usePlayerStats(hud: HudData) {
     })
   }, [hud.phase, hud.score, hud.wave, hud.level])
 
-  return { stats }
+  const resetStats = () => {
+    setStats({ ...DEFAULT_STATS })
+  }
+
+  return { stats, resetStats }
 }

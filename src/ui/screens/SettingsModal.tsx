@@ -19,6 +19,7 @@ interface SettingsModalProps {
   onSfxVolume: (v: number) => void
   onToggleMusic: () => void
   onToggleMute: () => void
+  onResetAccount?: () => void
 }
 
 export function SettingsModal({
@@ -28,8 +29,12 @@ export function SettingsModal({
   onSfxVolume,
   onToggleMusic,
   onToggleMute,
+  onResetAccount,
 }: SettingsModalProps) {
   const [settings, setSettings] = useState<GameSettings>(() => loadSettings())
+  const [confirmStep, setConfirmStep] = useState<"none" | "step1" | "step2">("none")
+  const [confirmInput, setConfirmInput] = useState("")
+  const [resetDone, setResetDone] = useState(false)
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -37,12 +42,17 @@ export function SettingsModal({
         e.stopPropagation()
         e.stopImmediatePropagation()
         e.preventDefault()
-        onClose()
+        if (confirmStep !== "none") {
+          setConfirmStep("none")
+          setConfirmInput("")
+        } else {
+          onClose()
+        }
       }
     }
     window.addEventListener("keydown", handleKeyDown, { capture: true })
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true })
-  }, [onClose])
+  }, [onClose, confirmStep])
 
   const updateSetting = <K extends keyof GameSettings>(key: K, val: GameSettings[K]) => {
     const updated = saveSettings({ [key]: val })
@@ -314,6 +324,40 @@ export function SettingsModal({
               </button>
             </div>
           </section>
+
+          {/* СЕКЦИЯ: АККАУНТ И ПРОГРЕСС */}
+          <section className="space-y-3.5">
+            <div className="font-display text-xs tracking-widest text-coral">
+              ⚠️ ПРОГРЕСС И ДАННЫЕ АККАУНТА
+            </div>
+
+            <div className="rounded-lg border border-coral/30 bg-abyss/40 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="font-medium text-foam">Обнуление данных аккаунта</div>
+                  <div className="text-xs text-dim">
+                    Сброс монет, улучшений, рекордов, статистики и всех достижений
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmStep("step1")
+                    setResetDone(false)
+                  }}
+                  className="shrink-0 rounded border border-coral/50 bg-coral/15 px-3 py-1.5 font-display text-xs font-semibold text-coral transition hover:bg-coral/25 active:scale-95"
+                >
+                  🗑️ Обнулить данные
+                </button>
+              </div>
+
+              {resetDone && (
+                <div className="mt-2.5 rounded border border-mint/40 bg-mint/10 px-2.5 py-1.5 text-xs font-medium text-mint">
+                  ✓ Данные аккаунта успешно обнулены!
+                </div>
+              )}
+            </div>
+          </section>
         </div>
 
         {/* Подвал */}
@@ -329,6 +373,123 @@ export function SettingsModal({
           </button>
         </div>
       </div>
+
+      {/* Шаг 1: Первое подтверждение с предупреждением о последствиях */}
+      {confirmStep === "step1" && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-abyss/85 p-4 backdrop-blur-md">
+          <div className="anim-pop w-full max-w-md rounded-xl border border-coral/60 bg-deep p-5 shadow-2xl">
+            <div className="flex items-center gap-2.5 text-coral">
+              <span className="text-2xl">⚠️</span>
+              <h3 className="font-display text-lg tracking-wide text-foam">
+                СБРОС ДАННЫХ АККАУНТА
+              </h3>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-foam/90 sm:text-sm">
+              Вы действительно хотите обнулить аккаунт? Будут безвозвратно удалены:
+            </p>
+            <ul className="mt-2.5 space-y-1 text-xs text-dim">
+              <li className="flex items-center gap-1.5">
+                <span className="text-gold">🪙</span> Все монеты и кристаллы
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="text-cyan-neon">🛠</span> Все купленные постоянные улучшения
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="text-coral">🏆</span> Личные рекорды кампании и бесконечного режима
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="text-purple-400">🏅</span> Все открытые достижения
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="text-mint">📊</span> Статистика сыгранных партий и побед
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="text-foam">👤</span> Имя игрока (ник)
+              </li>
+            </ul>
+            <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-line/60 pt-3.5">
+              <button
+                type="button"
+                onClick={() => setConfirmStep("none")}
+                className="rounded border border-line/60 bg-deep/80 px-4 py-2 font-display text-xs text-foam transition hover:bg-line/40 active:scale-95"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmStep("step2")
+                  setConfirmInput("")
+                }}
+                className="rounded border border-coral bg-coral/20 px-4 py-2 font-display text-xs font-bold text-coral transition hover:bg-coral/30 active:scale-95"
+              >
+                Продолжить сброс →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Шаг 2: Дополнительный подтверждающий запрос со словом «СБРОС» */}
+      {confirmStep === "step2" && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-abyss/85 p-4 backdrop-blur-md">
+          <div className="anim-pop w-full max-w-md rounded-xl border border-coral bg-deep p-5 shadow-2xl ring-2 ring-coral/40">
+            <div className="flex items-center gap-2.5 text-coral">
+              <span className="text-2xl">🚨</span>
+              <h3 className="font-display text-lg tracking-wide text-coral">
+                ФИНАЛЬНОЕ ПОДТВЕРЖДЕНИЕ
+              </h3>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-foam sm:text-sm">
+              Это действие <b>необратимо</b>. Весь прогресс будет стёрт без возможности
+              восстановления.
+            </p>
+            <div className="mt-4 rounded-lg border border-line/60 bg-abyss/60 p-3">
+              <label htmlFor="confirm-reset-input" className="block text-xs font-medium text-dim">
+                Для подтверждения введите слово <span className="font-bold text-coral">СБРОС</span>:
+              </label>
+              <input
+                id="confirm-reset-input"
+                type="text"
+                value={confirmInput}
+                onChange={(e) => setConfirmInput(e.target.value)}
+                placeholder="СБРОС"
+                autoFocus
+                className="mt-2 h-10 w-full rounded border border-coral/50 bg-deep px-3 font-display text-sm tracking-widest text-foam uppercase outline-none placeholder:text-dim/40 focus:border-coral focus:ring-1 focus:ring-coral"
+              />
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-line/60 pt-3.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmStep("none")
+                  setConfirmInput("")
+                }}
+                className="rounded border border-line/60 bg-deep/80 px-4 py-2 font-display text-xs text-foam transition hover:bg-line/40 active:scale-95"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={confirmInput.trim().toUpperCase() !== "СБРОС"}
+                onClick={() => {
+                  onResetAccount?.()
+                  setResetDone(true)
+                  setConfirmStep("none")
+                  setConfirmInput("")
+                }}
+                className={`rounded px-4 py-2 font-display text-xs font-bold transition ${
+                  confirmInput.trim().toUpperCase() === "СБРОС"
+                    ? "cursor-pointer bg-coral text-abyss shadow-[0_0_15px_rgba(255,106,92,0.6)] hover:brightness-110 active:scale-95"
+                    : "cursor-not-allowed border border-line/40 bg-line/20 text-dim/50"
+                }`}
+              >
+                🔥 Подтверждаю, удалить всё
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

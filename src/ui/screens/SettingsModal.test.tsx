@@ -111,4 +111,22 @@ describe("SettingsModal", () => {
     expect(html).toContain("50%")
     expect(html).toContain("100%")
   })
+
+  it("содержит секцию обнуления данных аккаунта", () => {
+    const html = renderToStaticMarkup(
+      <SettingsModal
+        hud={dummyHud}
+        onClose={vi.fn()}
+        onMusicVolume={vi.fn()}
+        onSfxVolume={vi.fn()}
+        onToggleMusic={vi.fn()}
+        onToggleMute={vi.fn()}
+        onResetAccount={vi.fn()}
+      />
+    )
+
+    expect(html).toContain("ПРОГРЕСС И ДАННЫЕ АККАУНТА")
+    expect(html).toContain("Обнуление данных аккаунта")
+    expect(html).toContain("Обнулить данные")
+  })
 })

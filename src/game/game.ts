@@ -33,10 +33,10 @@ import type { LevelSpec } from "./levels"
 import type { MinibossKind } from "./minibosses"
 import { buyCampaignShopItem, closeCampaignShop } from "./campaignShop"
 import { chooseCampaignEventChoice as chooseCampaignEventOption } from "./campaignEvents"
-import { makeBossHost, makePowersHost } from "./game/hosts"
-import { makePhysicsHost, makeWeaponsHost } from "./game/hosts"
+import { makeBossHost, makePowersHost, makePhysicsHost, makeWeaponsHost } from "./game/hosts"
 import { paddleShape } from "./game/paddleControl"
-import { loadProgress, buyUpgrade } from "./game/progress"
+import { loadProgress, buyUpgrade, applyUpgrades, saveProgress } from "./game/progress"
+import { clearAccountStorage } from "./account"
 import {
   loadScoreEntries,
   createInput,
@@ -396,6 +396,23 @@ export class Game {
   }
   buyUpgrade(id: string): boolean {
     return buyUpgrade(this, id)
+  }
+  resetAccountData() {
+    this.coins = 0
+    this.crystals = 0
+    this.crystalsRunTotal = 0
+    this.upgrades = {}
+    this.best = 0
+    this.top = []
+    this.topEndless = []
+    this.score = 0
+    this.combo = 0
+    this.achQueue = []
+    this.nick = ""
+    applyUpgrades(this)
+    saveProgress(this)
+    clearAccountStorage()
+    pushHud(this)
   }
   debugDamageUp() {
     debugDamageUp(this)

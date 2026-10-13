@@ -52,5 +52,10 @@ export function useAchToasts(hud: HudData) {
     return () => clearTimeout(timer)
   }, [achToasts])
 
-  return { unlocked, achToasts }
+  const resetUnlocked = () => {
+    setUnlocked({})
+    setAchToasts([])
+  }
+
+  return { unlocked, achToasts, resetUnlocked }
 }
