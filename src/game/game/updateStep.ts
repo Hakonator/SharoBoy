@@ -121,8 +121,25 @@ export function update(g: Game, dt: number) {
   drainQueue(g.boomQueue, g.time, (q) => g.weaponsSys.explode(q.x, q.y))
   drainQueue(g.sparkQueue, g.time, (q) => strikeSpark(g, q))
 
+  const customTargetsCleared =
+    g.customWinCondition?.kind === "targets"
+      ? g.customTargetBlocks.every((block) => block.dead)
+      : g.blocks.length === 0
+  const isLevelCleared =
+    (g.mode === "custom" ? customTargetsCleared : g.blocks.length === 0) && !g.bossSys.boss
+
+  if (isLevelCleared) {
+    for (const ball of g.balls) {
+      ball.vx = 0
+      ball.vy = 0
+      ball.squash = 0
+      ball.lost = false
+      ball.trail = []
+    }
+  }
+
   const frozen = g.transition > 0 || g.bannerTimer > 1.1 || g.countdown > 0
-  if (!frozen) {
+  if (!frozen && !isLevelCleared) {
     const fire = g.input.keys.space || g.input.consumeTapFire()
     g.weaponsSys.updateLaser(fire)
     g.weaponsSys.tryFire(dt, fire)
@@ -138,15 +155,11 @@ export function update(g: Game, dt: number) {
   updateMouthBubbles(g, dt)
   applyFishWake(g, dt)
 
-  const customTargetsCleared =
-    g.customWinCondition?.kind === "targets"
-      ? g.customTargetBlocks.every((block) => block.dead)
-      : g.blocks.length === 0
   if (
-    (g.mode === "custom" ? customTargetsCleared : g.blocks.length === 0) &&
-    !g.bossSys.boss &&
+    isLevelCleared &&
     g.transition <= 0 &&
     g.phase === "playing" &&
+    g.boomQueue.length === 0 &&
     // Зачистка ждёт упавшую за минибосса жизнь: её нужно успеть поймать.
     !g.powers.some((p) => p.type === "life")
   ) {

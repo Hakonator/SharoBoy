@@ -110,6 +110,15 @@ export function killMiniboss(
   }
   g.blocks = g.blocks.filter((b) => !b.dead)
   g.minibosses = g.minibosses.filter((c) => c.group !== creature.group)
+  if (g.blocks.length === 0) {
+    for (const ball of g.balls) {
+      ball.vx = 0
+      ball.vy = 0
+      ball.squash = 0
+      ball.lost = false
+      ball.trail = []
+    }
+  }
   // рыба погибла — пузырьки изо рта и кильватер больше не нужны
   if (creature.kind === "fish") {
     g.mouthBubbles = []

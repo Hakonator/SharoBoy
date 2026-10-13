@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { makeEnv } from "../frameInvariant.helpers"
 
-import { addMiniboss, resetMiniboss } from "./minibossRuntime"
+import { addMiniboss, killMiniboss, resetMiniboss } from "./minibossRuntime"
 
 /** Регресс «невидимой медузы»: дуэт рыба+медуза не должен уродовать существа. */
 describe("addMiniboss: дуэт двух существ в уровне", () => {
@@ -54,6 +54,70 @@ describe("addMiniboss: дуэт двух существ в уровне", () => 
       expect(minibossCountAfterFirst).toBe(29)
       expect(minibossCountAfterSecond - minibossCountAfterFirst).toBe(9)
       expect(minibossCountAfterSecond).toBe(38)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  it("после гибели последнего минибосса при отсутствии блоков шар замирает (vx=0, vy=0) и не теряет жизнь", () => {
+    const { game, restoreRandom, step } = makeEnv()
+    try {
+      resetMiniboss(game)
+      game.phase = "playing"
+      game.mode = "campaign"
+      game.blocks = []
+      addMiniboss(game, "fish")
+      // Оставляем только блоки рыбы
+      game.blocks = game.blocks.filter((b) => b.isMiniboss)
+      const creature = game.minibosses[0]
+      expect(creature).toBeDefined()
+
+      // Задаём шару скорость
+      game.balls = [
+        {
+          x: 200,
+          y: 300,
+          vx: 300,
+          vy: -300,
+          r: 8,
+          speed: 400,
+          stuck: false,
+          stuckOffset: 0,
+          trail: [{ x: 190, y: 310 }],
+          squash: 1,
+          sinceHit: 0,
+        },
+      ]
+
+      // Уничтожаем минибосса
+      killMiniboss(game, creature)
+      expect(game.blocks.length).toBe(0)
+
+      // Шар должен мгновенно замереть
+      expect(game.balls[0].vx).toBe(0)
+      expect(game.balls[0].vy).toBe(0)
+      const posX = game.balls[0].x
+      const posY = game.balls[0].y
+
+      // Искусственно добавляем жизнь, чтобы уровень ожидал её подбора
+      game.powers.push({
+        x: game.w / 2,
+        y: 100,
+        vy: 150,
+        type: "life",
+        t: 0,
+      })
+
+      // Прогоняем несколько кадров
+      step(5)
+
+      // Шар не должен двигаться
+      expect(game.balls[0].x).toBe(posX)
+      expect(game.balls[0].y).toBe(posY)
+      expect(game.balls[0].vx).toBe(0)
+      expect(game.balls[0].vy).toBe(0)
+      expect(game.phase).toBe("playing") // ждёт жизнь
     } finally {
       restoreRandom()
       game.destroy()
