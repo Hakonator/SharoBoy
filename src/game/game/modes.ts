@@ -6,7 +6,7 @@ import { applyTrack } from "./audioControls"
 import { startCampaignMap } from "./campaignFlow"
 import { pushHud, saveTop, setBanner } from "./hudSync"
 import { buildWave, serveBall } from "./levelBuild"
-import { applyUpgrades } from "./progress"
+import { applyUpgrades, addCoins } from "./progress"
 import { resetRun } from "./runFlow"
 
 /** Старт забега: генерирует карту кампании и открывает экран карты (фог войны). */
@@ -76,6 +76,17 @@ export function toMenu(g: Game) {
   g.sfx.ui()
   g.input.releaseLock()
   if (g.mode !== "custom") saveTop(g)
+  if (g.mode === "campaign" && g.crystalsRunTotal > 0) {
+    const mult = g.campaignRelics.relicConverter ? 1.5 : 1.0
+    const earnedCoins = Math.round(g.crystalsRunTotal * mult)
+    if (earnedCoins > 0) {
+      addCoins(g, earnedCoins)
+    }
+  }
+  g.crystals = 0
+  g.crystalsRunTotal = 0
+  g.campaignRelics = {}
+  g.campaignSparkBounceCount = 0
   g.phase = "menu"
   g.mode = "campaign"
   g.customWinCondition = null

@@ -1,5 +1,4 @@
 import type { Game } from "./game"
-import { addCoins } from "./game/progress"
 import { pushHud } from "./game/hudSync"
 import type { CampaignEventData } from "./types"
 import type { CampaignNode } from "./campaignMap"
@@ -32,13 +31,13 @@ export function buildCampaignEvent(
           {
             id: "stabilize",
             label: "Маневровые двигатели",
-            desc: "Потратить 10 монет: удержать курс на месте и укрепить корпус (+1 ЩИТ).",
+            desc: "Потратить 10 💎: удержать курс на месте и укрепить корпус (+1 ЩИТ).",
             cost: 10,
           },
           {
             id: "dive",
             label: "Нырнуть в жерло воронки",
-            desc: `Рискнуть: 50% шанс выловить клад (+30 монет) или 50% шанс быть выброшенным в «${placeName}».`,
+            desc: `Рискнуть: 50% шанс выловить клад (+30 💎) или 50% шанс быть выброшенным в «${placeName}».`,
           },
           {
             id: "surrender",
@@ -57,13 +56,13 @@ export function buildCampaignEvent(
           {
             id: "anchor",
             label: "Защитный якорь",
-            desc: "Потратить 15 монет: закрепиться на рифе и зарядить лазер на следующий бой.",
+            desc: "Потратить 15 💎: закрепиться на рифе и зарядить лазер на следующий бой.",
             cost: 15,
           },
           {
             id: "crystals",
             label: "Собрать кристаллы",
-            desc: "Рискнуть: 60% шанс добыть +25 монет или 40% потерять 1 щит из-за турбулентности.",
+            desc: "Рискнуть: 60% шанс добыть +25 💎 или 40% потерять 1 щит из-за турбулентности.",
           },
           {
             id: "drift",
@@ -82,13 +81,13 @@ export function buildCampaignEvent(
           {
             id: "offering",
             label: "Подношение алтарю",
-            desc: "Пожертвовать 12 монет духам глубин и восстановить +1 жизнь.",
+            desc: "Пожертвовать 12 💎 духам глубин и восстановить +1 жизнь.",
             cost: 12,
           },
           {
             id: "explore",
             label: "Обыскать расщелину",
-            desc: `50% шанс найти сокровищницу (+35 монет) или 50% шанс обвала — откат в «${placeName}».`,
+            desc: `50% шанс найти сокровищницу (+35 💎) или 50% шанс обвала — откат в «${placeName}».`,
           },
           {
             id: "leave",
@@ -113,7 +112,7 @@ export function buildCampaignEvent(
           {
             id: "gather",
             label: "Собрать минералы",
-            desc: `70% шанс получить +20 монет или 30% шанс быть отброшенным взрывом в «${placeName}».`,
+            desc: `70% шанс получить +20 💎 или 30% шанс быть отброшенным взрывом в «${placeName}».`,
           },
           {
             id: "bypass",
@@ -134,10 +133,10 @@ export function chooseCampaignEventChoice(g: Game, choiceIndex: number) {
   const choice = event.choices[choiceIndex]
   if (!choice) return
 
-  // Проверка стоимости
+  // Проверка стоимости в кристаллах забега
   if (choice.cost && choice.cost > 0) {
-    if (g.coins < choice.cost) return
-    g.coins -= choice.cost
+    if (g.crystals < choice.cost) return
+    g.crystals -= choice.cost
   }
 
   const defaultTarget = g.campaignEventTarget
@@ -156,10 +155,10 @@ export function chooseCampaignEventChoice(g: Game, choiceIndex: number) {
     case "dive": {
       const lucky = Math.random() < 0.5
       if (lucky) {
-        addCoins(g, 30)
+        g.addCrystals(30)
         outcome = {
           targetId: -1,
-          text: "Удача! Вы нырнули в эпицентр и подняли сундук древних глубин (+30 монет)!",
+          text: "Удача! Вы нырнули в эпицентр и подняли сундук древних глубин (+30 💎)!",
         }
       } else {
         outcome = {
@@ -190,10 +189,10 @@ export function chooseCampaignEventChoice(g: Game, choiceIndex: number) {
     case "crystals": {
       const lucky = Math.random() < 0.6
       if (lucky) {
-        addCoins(g, 25)
+        g.addCrystals(25)
         outcome = {
           targetId: -1,
-          text: "Вы успешно собрали россыпь сияющих кристаллов (+25 монет)!",
+          text: "Вы успешно собрали россыпь сияющих кристаллов (+25 💎)!",
         }
       } else {
         if (g.shield > 0) g.shield--
@@ -224,10 +223,10 @@ export function chooseCampaignEventChoice(g: Game, choiceIndex: number) {
     case "explore": {
       const lucky = Math.random() < 0.5
       if (lucky) {
-        addCoins(g, 35)
+        g.addCrystals(35)
         outcome = {
           targetId: -1,
-          text: "В расщелине лежал клад затонувшего галеона (+35 монет)!",
+          text: "В расщелине лежал клад затонувшего галеона (+35 💎)!",
         }
       } else {
         outcome = {
@@ -258,10 +257,10 @@ export function chooseCampaignEventChoice(g: Game, choiceIndex: number) {
     case "gather": {
       const lucky = Math.random() < 0.7
       if (lucky) {
-        addCoins(g, 20)
+        g.addCrystals(20)
         outcome = {
           targetId: -1,
-          text: "Вы собрали ценные геотермальные минералы (+20 монет)!",
+          text: "Вы собрали ценные геотермальные минералы (+20 💎)!",
         }
       } else {
         outcome = {

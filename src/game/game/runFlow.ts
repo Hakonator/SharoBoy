@@ -23,6 +23,8 @@ export function resetRun(g: Game) {
   g.campaignShops = {}
   g.campaignEventData = null
   g.campaignPerks = {}
+  g.campaignRelics = {}
+  g.campaignSparkBounceCount = 0
   g.activeSpec = null
   g.onBossNode = false
   g.score = 0
@@ -151,6 +153,12 @@ export function onLevelCleared(g: Game) {
       // Финальный босс карты повержен — забег пройден.
       g.onBossNode = false
       g.phase = "won"
+      const mult = g.campaignRelics.relicConverter ? 1.5 : 1.0
+      const earnedCoins = Math.round(g.crystalsRunTotal * mult)
+      if (earnedCoins > 0) {
+        addCoins(g, earnedCoins)
+      }
+      g.crystalsRunTotal = 0
       g.input.releaseLock()
       applyTrack(g)
       g.sfx.win()
@@ -158,22 +166,19 @@ export function onLevelCleared(g: Game) {
       pushHud(g)
       return
     }
-    // Обычный или элитный узел зачищен: награда монетами и щитом
+    // Обычный или элитный узел зачищен: награда кристаллами и щитом
     const currentNode = g.campaign ? nodeById(g.campaign, g.campaignPlayerId) : undefined
     const isChallenge = currentNode?.isChallenge ?? false
-    const baseWinCoins = isChallenge ? 25 : 5
-    const coinBonus = g.campaignPerks.coinBoost ? Math.round(baseWinCoins * 0.5) : 0
-    addCoins(g, baseWinCoins + coinBonus)
+    const baseWinCrystals = isChallenge ? 40 : 10
+    g.addCrystals(baseWinCrystals)
     if (isChallenge && g.shield < 3) {
       g.shield++
     }
     g.fx.popups.push({
       x: g.w / 2,
       y: g.h * 0.48,
-      text: isChallenge
-        ? `ИСПЫТАНИЕ! +${baseWinCoins + coinBonus} 🪙`
-        : `ПОБЕДА! +${baseWinCoins + coinBonus} 🪙`,
-      color: isChallenge ? "#ffc94d" : "#5dffb0",
+      text: isChallenge ? `ИСПЫТАНИЕ! +${baseWinCrystals} 💎` : `ПОБЕДА! +${baseWinCrystals} 💎`,
+      color: isChallenge ? "#e879f9" : "#c084fc",
       t: 0,
       size: 22,
     })
@@ -229,6 +234,14 @@ export function loseLife(g: Game) {
     if (g.mode === "custom") {
       finishCustomRun(g, "over")
       return
+    }
+    if (g.mode === "campaign") {
+      const mult = g.campaignRelics.relicConverter ? 1.5 : 1.0
+      const earnedCoins = Math.round(g.crystalsRunTotal * mult)
+      if (earnedCoins > 0) {
+        addCoins(g, earnedCoins)
+      }
+      g.crystalsRunTotal = 0
     }
     g.phase = "over"
     g.input.releaseLock()

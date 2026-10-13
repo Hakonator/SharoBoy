@@ -3,6 +3,7 @@ import type { BossHost } from "../boss"
 import type { PowersWorld } from "../powers"
 import type { PhysicsWorld } from "../physics"
 import type { WeaponsWorld } from "../weapons"
+import { queueSparkChain, sparkChainTargets } from "../physics/spark"
 
 import { addCoins } from "./progress"
 import { pushHud } from "./hudSync"
@@ -304,7 +305,8 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     fx: g.fx,
     sfx: g.sfx,
-    fireActive: () => g.time < g.fireUntil,
+    fireActive: () =>
+      g.time < g.fireUntil || (Boolean(g.campaignRelics?.relicFire) && g.combo >= 3),
     frostActive: () => g.time < g.frostUntil,
     sparkActive: () => g.time < g.sparkUntil,
     get sparkQueue() {
@@ -325,6 +327,31 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
     damageMiniboss: (dmg, block) => damageMiniboss(g, dmg, block),
     onBombHitPaddle: () => onBombHitPaddle(g),
+    onPaddleBounce: () => {
+      if (g.campaignRelics?.relicSpark) {
+        g.campaignSparkBounceCount = (g.campaignSparkBounceCount ?? 0) + 1
+        if (g.campaignSparkBounceCount >= 15) {
+          g.campaignSparkBounceCount = 0
+          const alive = g.blocks.filter((b) => !b.dead)
+          if (alive.length > 0) {
+            const sorted = [...alive].sort(
+              (a, b) =>
+                Math.hypot(a.x - g.paddle.x, a.y - g.paddle.y) -
+                Math.hypot(b.x - g.paddle.x, b.y - g.paddle.y)
+            )
+            const target = sorted[0]
+            queueSparkChain(
+              g.sparkQueue,
+              sparkChainTargets(g.blocks, target, { max: 4, radius: 120 }),
+              { x: g.paddle.x, y: g.paddle.y - 10 },
+              g.time
+            )
+            g.sfx.zap()
+            g.fx.burst(g.paddle.x, g.paddle.y - 10, "#7cf5ff", 14, 190)
+          }
+        }
+      }
+    },
     pushHud: () => pushHud(g),
   }
 }

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { EVENT_MAX_BACK_TIERS, type CampaignNode } from "./campaignMap"
 import { makeEnv } from "./campaignFlow.helpers"
 import { nodeSpecFor } from "./game/campaignFlow"
+import { loseLife } from "./game/runFlow"
 import { LEVEL_MOTIF_NAMES } from "./levelMotifs"
 import type { Game } from "./game"
 
@@ -330,11 +331,11 @@ describe("сквозной цикл кампании по карте", () => {
     g.destroy()
   })
 
-  it("магазин кампании открывается, продаёт товары за монеты и закрывается", () => {
+  it("магазин кампании открывается, продаёт товары за кристаллы и закрывается", () => {
     const { game, g, step } = makeEnv()
     g.startGame()
     step(2)
-    game.coins = 100
+    game.crystals = 100
 
     const shopNode: CampaignNode = {
       id: 999,
@@ -358,14 +359,14 @@ describe("сквозной цикл кампании по карте", () => {
     expect(game.campaignShop).toBeTruthy()
     expect(game.campaignShop!.items.length).toBeGreaterThanOrEqual(3)
 
-    const initialCoins = game.coins
+    const initialCrystals = game.crystals
     const lifeItem = game.campaignShop!.items.find((i) => i.id === "life")
     if (lifeItem) {
       game.lives = 3
       const bought = game.buyCampaignShopItem(lifeItem.id)
       expect(bought).toBe(true)
       expect(game.lives).toBe(4)
-      expect(game.coins).toBe(initialCoins - lifeItem.price)
+      expect(game.crystals).toBe(initialCrystals - lifeItem.price)
       expect(lifeItem.sold).toBe(true)
 
       // Повторная покупка невозможна
@@ -380,11 +381,60 @@ describe("сквозной цикл кампании по карте", () => {
     g.destroy()
   })
 
+  it("магазин позволяет купить пассивную реликвию забега", () => {
+    const { game, g, step } = makeEnv()
+    g.startGame()
+    step(2)
+    game.crystals = 100
+    game.shield = 0
+
+    const shopNode: CampaignNode = {
+      id: 999,
+      tier: 1,
+      x: 0.1,
+      y: 0.5,
+      isBoss: false,
+      isEvent: false,
+      isShop: true,
+      name: "ЛАВКА ГЛУБИН",
+    }
+    const map = game.campaign!
+    map.nodes.push(shopNode)
+    map.edges.push({ from: game.campaignPlayerId, to: 999 })
+    game.campaignVisible.push(999)
+
+    g.enterMapNode(999)
+    step(1)
+
+    // Принудительно добавим реликвию в инвентарь для детерминированного теста
+    game.campaignShop!.items.push({
+      id: "relic_shield",
+      name: "Жемчужина глубин",
+      desc: "Реликвия",
+      price: 35,
+      category: "relic",
+      icon: "shield",
+      relic: true,
+      sold: false,
+    })
+
+    const bought = game.buyCampaignShopItem("relic_shield")
+    expect(bought).toBe(true)
+    expect(game.campaignRelics.relicShield).toBe(true)
+    expect(game.shield).toBe(1)
+    expect(game.crystals).toBe(65)
+
+    // Повторная покупка реликвии невозможна
+    expect(game.buyCampaignShopItem("relic_shield")).toBe(false)
+
+    g.destroy()
+  })
+
   it("интерактивное случайное событие позволяет сделать выбор и применить эффект", () => {
     const { game, g, step } = makeEnv()
     g.startGame()
     step(2)
-    game.coins = 50
+    game.crystals = 50
 
     const eventNode: CampaignNode = {
       id: 998,
@@ -406,13 +456,13 @@ describe("сквозной цикл кампании по карте", () => {
     expect(game.campaignEventData).toBeTruthy()
     expect(game.campaignEventData!.choices.length).toBe(3)
 
-    // Выбираем первый вариант: "Маневровые двигатели" (тратит 10 монет, даёт +1 щит, остаётся на узле)
+    // Выбираем первый вариант: "Маневровые двигатели" (тратит 10 кристаллов, даёт +1 щит, остаётся на узле)
     const initialShield = game.shield
     game.chooseCampaignEventOption(0)
 
     expect(game.campaignEventData!.resolved).toBe(true)
     expect(game.shield).toBe(initialShield + 1)
-    expect(game.coins).toBe(40)
+    expect(game.crystals).toBe(40)
     expect(game.campaignEventTarget).toBe(-1) // остался на месте
 
     // Подтверждаем и продолжаем путь
@@ -424,11 +474,11 @@ describe("сквозной цикл кампании по карте", () => {
     g.destroy()
   })
 
-  it("узел-испытание гарантирует минибосса и награждает повышенными монетами при зачистке", () => {
+  it("узел-испытание гарантирует минибосса и награждает повышенными кристаллами при зачистке", () => {
     const { game, g, step } = makeEnv()
     g.startGame()
     step(2)
-    game.coins = 10
+    game.crystals = 10
 
     const challengeNode: CampaignNode = {
       id: 997,
@@ -463,9 +513,29 @@ describe("сквозной цикл кампании по карте", () => {
 
     step(10)
 
-    // Проверяем, что за победу начислены повышенные монеты (+25 за испытание)
-    expect(game.coins).toBeGreaterThanOrEqual(35)
+    // Проверяем, что за победу начислены повышенные кристаллы (+40 за испытание)
+    expect(game.crystals).toBeGreaterThanOrEqual(50)
     expect(g.phase).toBe("map")
+
+    g.destroy()
+  })
+
+  it("в конце забега кристаллы конвертируются в монеты мета-прокачки с учётом реликвии-конвертера", () => {
+    const { game, g, step } = makeEnv()
+    g.startGame()
+    step(2)
+    game.coins = 0
+    game.crystals = 100
+    game.crystalsRunTotal = 100
+    game.campaignRelics.relicConverter = true
+
+    // Завершаем кампанию через поражение
+    game.lives = 1
+    loseLife(game)
+
+    expect(game.phase).toBe("over")
+    // 100 * 1.5 = 150 монет
+    expect(game.coins).toBe(150)
 
     g.destroy()
   })

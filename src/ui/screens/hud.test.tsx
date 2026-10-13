@@ -39,12 +39,13 @@ const makeHud = (phase: HudData["phase"]): HudData =>
     sparkOn: false,
     magnetOn: false,
     coins: 0,
+    crystals: 0,
     upgrades: {},
     top: [],
     topEndless: [],
     map: null,
     campaignEvent: null,
-  }) as HudData
+  }) as unknown as HudData
 
 function renderHud(phase: HudData["phase"], debug: boolean) {
   return renderToStaticMarkup(

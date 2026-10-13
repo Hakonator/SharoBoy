@@ -110,6 +110,7 @@ export interface PhysicsWorld {
   damageMiniboss(dmg: number, block: Block): void
   /** Попадание бомбы осьминога по ракетке. */
   onBombHitPaddle(): void
+  onPaddleBounce?(): void
   pushHud(): void
   /** Множитель урона шара (отладка: увеличивается клавишей NumpadSubtract). */
   readonly debugBallDamage: number

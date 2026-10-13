@@ -55,6 +55,7 @@ const dummyHud: HudData = {
   sparkOn: false,
   magnetOn: false,
   coins: 0,
+  crystals: 0,
   upgrades: {},
   top: [],
   topEndless: [],

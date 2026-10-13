@@ -57,6 +57,10 @@ export function startCampaignMap(g: Game) {
   g.campaignShop = null
   g.campaignShops = {}
   g.campaignPerks = {}
+  g.campaignRelics = {}
+  g.campaignSparkBounceCount = 0
+  g.crystals = 20
+  g.crystalsRunTotal = 20
   g.campaignPlayerId = g.campaign.startId
   g.campaignVisited = [g.campaign.startId]
   g.campaignVisible = visibleFrom(g.campaign, g.campaignPlayerId)
@@ -260,6 +264,11 @@ export function nodeSpecFor(g: Game, node: CampaignNode): LevelSpec {
 export function launchNodeBattle(g: Game, label: string) {
   g.magnetUntil = g.time + 4 * (g.upgrades.magnet ?? 0)
   g.laserArmed = (g.upgrades.laser ?? 0) > 0
+
+  // Пассивная реликвия: восстанавливает +1 щит перед боем (до 3)
+  if (g.campaignRelics.relicShield && g.shield < 3) {
+    g.shield++
+  }
 
   // Временные бонусы забега из магазина/событий:
   if (g.campaignPerks.laserStart) {

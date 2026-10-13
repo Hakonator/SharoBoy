@@ -4,6 +4,7 @@ import {
   IconBall,
   IconChallenge,
   IconCoin,
+  IconCrystal,
   IconFish,
   IconJelly,
   IconOctopus,
@@ -57,10 +58,11 @@ export function MapScreen({
   const eventData = hud.campaignEventData
 
   const coins = hud.coins ?? 0
+  const crystals = hud.crystals ?? 0
 
   return (
     <div className="absolute inset-0 z-10 flex flex-col bg-abyss/55">
-      {/* Верхний бар: счёт, жизни, щиты, монеты, рекорд и выход в меню */}
+      {/* Верхний бар: счёт, жизни, щиты, кристаллы, монеты, рекорд и выход в меню */}
       <div className="flex items-center justify-between gap-2 p-2 sm:p-4">
         <div className="flex flex-wrap items-start gap-1.5 sm:gap-2">
           <div className="hud-chip px-3 py-1.5">
@@ -96,6 +98,16 @@ export function MapScreen({
               </div>
             </div>
           )}
+
+          <div className="hud-chip flex items-center gap-1.5 border-purple-500/30 bg-purple-500/10 px-3 py-1.5 shadow-[0_0_12px_rgba(192,132,252,0.2)] sm:px-3.5 sm:py-2">
+            <IconCrystal className="h-4 w-4 sm:h-5 sm:w-5" />
+            <div>
+              <div className="hud-label text-purple-300">Кристаллы</div>
+              <div className="font-display text-base font-bold text-purple-200 tabular-nums sm:text-xl">
+                {crystals.toLocaleString("ru-RU")}
+              </div>
+            </div>
+          </div>
 
           <div className="hud-chip flex items-center gap-1.5 border-gold/30 bg-gold/10 px-3 py-1.5 shadow-[0_0_12px_rgba(255,201,77,0.15)] sm:px-3.5 sm:py-2">
             <IconCoin className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -304,9 +316,9 @@ export function MapScreen({
               МИНИ-БОСС В УЗЛЕ
             </div>
           )}
-          <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-gold sm:text-xs">
+          <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-purple-300 sm:text-xs">
             <IconShop className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            ЛАВКА ЗА МОНЕТЫ
+            ЛАВКА ЗА КРИСТАЛЛЫ
           </div>
           <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-[#ff477e] sm:text-xs">
             <IconChallenge className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -330,16 +342,16 @@ export function MapScreen({
       {/* Модальное окно магазина */}
       {shop && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-abyss/80 p-3 backdrop-blur-md sm:p-6">
-          <div className="hud-chip flex w-full max-w-xl flex-col items-center border border-gold/40 bg-abyss/95 p-4 text-center shadow-[0_0_32px_rgba(255,201,77,0.2)] sm:p-6">
+          <div className="hud-chip flex w-full max-w-xl flex-col items-center border border-purple-400/40 bg-abyss/95 p-4 text-center shadow-[0_0_32px_rgba(192,132,252,0.25)] sm:p-6">
             <div className="flex items-center gap-2">
-              <IconShop className="h-6 w-6 text-gold" />
-              <div className="hud-label text-gold">ПОДВОДНЫЙ ТОРГОВЕЦ</div>
+              <IconShop className="h-6 w-6 text-purple-300" />
+              <div className="hud-label text-purple-300">ПОДВОДНЫЙ ТОРГОВЕЦ</div>
             </div>
             <h2 className="mt-1 font-display text-xl text-foam sm:text-2xl">{shop.name}</h2>
-            <div className="mt-2 flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/15 px-3.5 py-1 text-gold">
-              <IconCoin className="h-4 w-4" />
+            <div className="mt-2 flex items-center gap-1.5 rounded-full border border-purple-400/30 bg-purple-500/15 px-3.5 py-1 text-purple-200">
+              <IconCrystal className="h-4 w-4" />
               <span className="font-display text-sm font-bold sm:text-base">
-                Баланс: {coins} монет
+                Баланс: {crystals} 💎
               </span>
             </div>
 
@@ -347,16 +359,17 @@ export function MapScreen({
               {shop.items.map((item) => {
                 const isLife = item.category === "life"
                 const isShield = item.category === "shield"
+                const isRelic = item.category === "relic"
                 const atMaxLife = isLife && hud.lives >= 5
                 const atMaxShield = isShield && hud.shield >= 5
-                const affordable = coins >= item.price
+                const affordable = crystals >= item.price
                 const canBuy = !item.sold && affordable && !atMaxLife && !atMaxShield
 
-                let btnLabel = `КУПИТЬ (${item.price} 🪙)`
+                let btnLabel = `КУПИТЬ (${item.price} 💎)`
                 if (item.sold) btnLabel = "КУПЛЕНО"
                 else if (atMaxLife) btnLabel = "МАКС. ЖИЗНЕЙ (5)"
                 else if (atMaxShield) btnLabel = "МАКС. ЩИТОВ (5)"
-                else if (!affordable) btnLabel = `НУЖНО ${item.price} 🪙`
+                else if (!affordable) btnLabel = `НУЖНО ${item.price} 💎`
 
                 return (
                   <div
@@ -364,16 +377,25 @@ export function MapScreen({
                     className={`flex flex-col justify-between rounded-lg border p-3 text-left transition-all ${
                       item.sold
                         ? "border-line/40 bg-deep/40 opacity-60"
-                        : "border-gold/30 bg-deep/90 hover:border-gold/60"
+                        : isRelic
+                          ? "border-purple-400/50 bg-deep/90 shadow-[0_0_16px_rgba(192,132,252,0.15)] hover:border-purple-300"
+                          : "border-gold/30 bg-deep/90 hover:border-gold/60"
                     }`}
                   >
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-display text-sm font-bold text-foam sm:text-base">
-                          {item.name}
-                        </span>
-                        <span className="font-display text-xs font-bold text-gold">
-                          {item.price} 🪙
+                      <div className="flex items-center justify-between gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-display text-sm font-bold text-foam sm:text-base">
+                            {item.name}
+                          </span>
+                          {isRelic && (
+                            <span className="rounded bg-purple-500/30 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-purple-200">
+                              РЕЛИКВИЯ
+                            </span>
+                          )}
+                        </div>
+                        <span className="whitespace-nowrap font-display text-xs font-bold text-purple-300">
+                          {item.price} 💎
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-foam/80">{item.desc}</p>
@@ -386,7 +408,9 @@ export function MapScreen({
                         item.sold
                           ? "cursor-default bg-line/20 text-foam/40"
                           : canBuy
-                            ? "cursor-pointer bg-gold text-abyss shadow-[0_0_12px_rgba(255,201,77,0.5)] hover:scale-[1.02] active:scale-[0.98]"
+                            ? isRelic
+                              ? "cursor-pointer bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-[0_0_12px_rgba(192,132,252,0.5)] hover:scale-[1.02] active:scale-[0.98]"
+                              : "cursor-pointer bg-gold text-abyss shadow-[0_0_12px_rgba(255,201,77,0.5)] hover:scale-[1.02] active:scale-[0.98]"
                             : "cursor-not-allowed bg-line/30 text-foam/40"
                       }`}
                     >
@@ -422,7 +446,7 @@ export function MapScreen({
             {!eventData.resolved ? (
               <div className="mt-4 flex w-full flex-col gap-2.5">
                 {eventData.choices.map((choice, idx) => {
-                  const affordable = !choice.cost || coins >= choice.cost
+                  const affordable = !choice.cost || crystals >= choice.cost
                   return (
                     <button
                       key={choice.id}
@@ -441,10 +465,10 @@ export function MapScreen({
                         {choice.cost && (
                           <span
                             className={`font-display text-xs ${
-                              affordable ? "text-gold" : "text-coral"
+                              affordable ? "text-purple-300" : "text-coral"
                             }`}
                           >
-                            {choice.cost} 🪙
+                            {choice.cost} 💎
                           </span>
                         )}
                       </div>

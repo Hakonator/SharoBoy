@@ -51,6 +51,8 @@ export interface HudData {
   sparkOn: boolean
   magnetOn: boolean
   coins: number
+  /** Кристаллы текущего забега в кампании (валюта забега). */
+  crystals: number
   upgrades: Record<string, number>
   top: ScoreEntry[]
   topEndless: ScoreEntry[]
@@ -69,9 +71,10 @@ export interface CampaignShopItem {
   name: string
   desc: string
   price: number
-  category: "life" | "shield" | "perk"
+  category: "life" | "shield" | "perk" | "relic"
   sold: boolean
-  icon: "life" | "shield" | "laser" | "magnet" | "wide" | "fire" | "coin"
+  icon: "life" | "shield" | "laser" | "magnet" | "wide" | "fire" | "coin" | "crystal"
+  relic?: boolean
 }
 
 export interface CampaignShopState {

@@ -100,6 +100,7 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
   if (Math.abs(rel) > 0.65) g.hitStop = Math.max(g.hitStop, 0.015)
   g.sfx.paddle(Math.abs(rel), paddlePan)
   g.fx.burst(ball.x, ball.y - ball.r, "#7cf5ff", 6, 130)
+  g.onPaddleBounce?.()
   g.pushHud()
 }
 /** Отскок от изогнутой поверхности ракетки (купол или чаша). Поверхность —
@@ -150,6 +151,8 @@ export function collidePaddleShape(
   if (Math.abs(rel) > 0.65) g.hitStop = Math.max(g.hitStop, 0.015)
   const paddlePan = clamp((ball.x / g.w) * 2 - 1, -0.85, 0.85)
   g.sfx.paddle(Math.abs(rel), paddlePan)
+  g.onPaddleBounce?.()
+  g.pushHud()
 }
 export function collideBlocks(g: PhysicsWorld, ball: Ball) {
   const fire = g.fireActive()

@@ -75,7 +75,7 @@ export function draw(g: Game) {
   drawBalls(ctx, g.balls, {
     time: g.time,
     hidden: g.phase === "menu",
-    fire: g.time < g.fireUntil,
+    fire: g.time < g.fireUntil || (Boolean(g.campaignRelics?.relicFire) && g.combo >= 3),
     frost: g.time < g.frostUntil,
     spark: g.time < g.sparkUntil,
     slow: g.time < g.slowUntil,

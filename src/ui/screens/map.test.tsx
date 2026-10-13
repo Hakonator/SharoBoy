@@ -33,7 +33,7 @@ describe("MapScreen: маршрут события кампании", () => {
       best: 0,
       coins: 0,
       phase: "map",
-    } as HudData
+    } as unknown as HudData
 
     const html = renderToStaticMarkup(
       <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
@@ -78,9 +78,10 @@ describe("MapScreen: маршрут события кампании", () => {
       score: 0,
       lives: 3,
       coins: 50,
+      crystals: 50,
       best: 0,
       phase: "map",
-    } as HudData
+    } as unknown as HudData
 
     const html = renderToStaticMarkup(
       <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
@@ -89,7 +90,51 @@ describe("MapScreen: маршрут события кампании", () => {
     expect(html).toContain("ПОДВОДНЫЙ ТОРГОВЕЦ")
     expect(html).toContain("ЛАВКА ГЛУБИН")
     expect(html).toContain("Ремонт обшивки")
-    expect(html).toContain("24 🪙")
+    expect(html).toContain("24 💎")
     expect(html).toContain("50")
+  })
+
+  it("рендерит реликвии с бейджем РЕЛИКВИЯ", () => {
+    const map = generateCampaignMap(541)
+    const player = map.nodes.find((node) => node.id === map.startId)!
+    const hud = {
+      map: {
+        ...map,
+        playerId: player.id,
+        visited: [player.id],
+        visible: [],
+        minibosses: {},
+      },
+      campaignShop: {
+        nodeId: player.id,
+        name: "ЛАВКА ГЛУБИН",
+        items: [
+          {
+            id: "relic_shield",
+            name: "Жемчужина глубин",
+            desc: "Реликвия: +1 щит",
+            price: 35,
+            category: "relic",
+            icon: "shield",
+            relic: true,
+            sold: false,
+          },
+        ],
+      },
+      score: 0,
+      lives: 3,
+      coins: 100,
+      crystals: 40,
+      best: 0,
+      phase: "map",
+    } as unknown as HudData
+
+    const html = renderToStaticMarkup(
+      <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
+    )
+
+    expect(html).toContain("Жемчужина глубин")
+    expect(html).toContain("РЕЛИКВИЯ")
+    expect(html).toContain("35 💎")
   })
 })

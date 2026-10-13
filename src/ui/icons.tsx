@@ -207,6 +207,19 @@ export function IconCoin({ className = "h-4 w-4" }: { className?: string }) {
   )
 }
 
+/** Кристалл глубин: валюта забега в кампании. */
+export function IconCrystal({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} aria-hidden>
+      <polygon points="10,2 16,6.5 13.5,17.5 6.5,17.5 4,6.5" fill="#c084fc" />
+      <polygon points="10,2 16,6.5 13,8 10,6 7,8 4,6.5" fill="#e879f9" opacity="0.9" />
+      <polygon points="10,6 13,8 10,17.5 7,8" fill="#a855f7" />
+      <polygon points="10,2 13,8 10,17.5" fill="#f0abfc" opacity="0.4" />
+      <circle cx="8" cy="7" r="1" fill="#fff" opacity="0.8" />
+    </svg>
+  )
+}
+
 /** Защитный энергощит. */
 export function IconShield({ className = "h-4 w-4" }: { className?: string }) {
   return (

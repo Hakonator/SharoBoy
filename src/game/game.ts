@@ -199,6 +199,10 @@ export class Game {
   fieldShift: null | { t: number; dur: number; dx: number; dy: number } = null
   blocksInitial = 1
   coins = 0
+  /** Кристаллы текущего забега в кампании (тратятся в лавках и событиях). */
+  crystals = 0
+  /** Всего собрано кристаллов за забег (для конверсии в монеты в конце). */
+  crystalsRunTotal = 0
   upgrades: Record<string, number> = {}
   banner: string | null = null
   bannerTimer = 0
@@ -235,6 +239,14 @@ export class Game {
     fireStart?: boolean
     coinBoost?: boolean
   } = {}
+  /** Постоянные пассивные реликвии текущего забега кампании. */
+  campaignRelics: {
+    relicShield?: boolean
+    relicSpark?: boolean
+    relicFire?: boolean
+    relicConverter?: boolean
+  } = {}
+  campaignSparkBounceCount = 0
   campaignPlayerId = -1
   campaignVisited: number[] = []
   campaignVisible: number[] = []
@@ -373,6 +385,11 @@ export class Game {
   }
   closeCampaignShop() {
     closeCampaignShop(this)
+  }
+  addCrystals(n: number) {
+    this.crystals += n
+    this.crystalsRunTotal += n
+    pushHud(this)
   }
   enterNextNodeOnAction() {
     enterNextNodeOnAction(this)

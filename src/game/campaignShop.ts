@@ -1,6 +1,5 @@
 import type { Game } from "./game"
 import { mulberry32 } from "./utils"
-import { saveProgress } from "./game/progress"
 import { pushHud } from "./game/hudSync"
 import type { CampaignShopItem, CampaignShopState } from "./types"
 
@@ -9,8 +8,9 @@ export interface ShopCatalogEntry {
   name: string
   desc: string
   basePrice: number
-  category: "life" | "shield" | "perk"
-  icon: "life" | "shield" | "laser" | "magnet" | "wide" | "fire" | "coin"
+  category: "life" | "shield" | "perk" | "relic"
+  icon: "life" | "shield" | "laser" | "magnet" | "wide" | "fire" | "coin" | "crystal"
+  relic?: boolean
 }
 
 export const SHOP_CATALOG: ShopCatalogEntry[] = [
@@ -70,13 +70,42 @@ export const SHOP_CATALOG: ShopCatalogEntry[] = [
     category: "perk",
     icon: "fire",
   },
+  // Пассивные реликвии на весь забег (Вариант 2):
   {
-    id: "coin_boost",
-    name: "Глубинный эхолот",
-    desc: "Бонус +50% монет за победы во всех боях текущего забега.",
-    basePrice: 20,
-    category: "perk",
+    id: "relic_shield",
+    name: "Жемчужина глубин",
+    desc: "Реликвия: восстанавливает +1 щит в начале каждого яруса.",
+    basePrice: 35,
+    category: "relic",
+    icon: "shield",
+    relic: true,
+  },
+  {
+    id: "relic_spark",
+    name: "Грозовой коралл",
+    desc: "Реликвия: пускает цепь молний каждые 15 отскоков от ракетки.",
+    basePrice: 40,
+    category: "relic",
+    icon: "crystal",
+    relic: true,
+  },
+  {
+    id: "relic_fire",
+    name: "Огненная амбра",
+    desc: "Реликвия: при комбо ×3 и выше шар зажигается огнём.",
+    basePrice: 38,
+    category: "relic",
+    icon: "fire",
+    relic: true,
+  },
+  {
+    id: "relic_converter",
+    name: "Золотой компас",
+    desc: "Реликвия: +50% монет при конверсии кристаллов в конце забега.",
+    basePrice: 30,
+    category: "relic",
     icon: "coin",
+    relic: true,
   },
 ]
 
@@ -98,16 +127,16 @@ export function generateShopInventory(seed: number, tier: number): CampaignShopI
     price: defEntry.basePrice,
     category: defEntry.category,
     icon: defEntry.icon,
+    relic: defEntry.relic,
     sold: false,
   })
 
-  // 2) 2–3 перка/усилителя без повторов
+  // 2) Временные перки на следующий бой (1–2 шт)
   const perkPool = SHOP_CATALOG.filter((i) => i.category === "perk")
-  const shuffled = [...perkPool].sort(() => rng() - 0.5)
-  const count = 2 + (rng() < 0.5 ? 1 : 0)
-
-  for (let i = 0; i < count && i < shuffled.length; i++) {
-    const entry = shuffled[i]
+  const shuffledPerks = [...perkPool].sort(() => rng() - 0.5)
+  const perkCount = 1 + (rng() < 0.6 ? 1 : 0)
+  for (let i = 0; i < perkCount && i < shuffledPerks.length; i++) {
+    const entry = shuffledPerks[i]
     items.push({
       id: entry.id,
       name: entry.name,
@@ -115,9 +144,24 @@ export function generateShopInventory(seed: number, tier: number): CampaignShopI
       price: entry.basePrice,
       category: entry.category,
       icon: entry.icon,
+      relic: entry.relic,
       sold: false,
     })
   }
+
+  // 3) Пассивная реликвия на весь забег
+  const relicPool = SHOP_CATALOG.filter((i) => i.category === "relic")
+  const relicEntry = relicPool[Math.floor(rng() * relicPool.length)]
+  items.push({
+    id: relicEntry.id,
+    name: relicEntry.name,
+    desc: relicEntry.desc,
+    price: relicEntry.basePrice,
+    category: relicEntry.category,
+    icon: relicEntry.icon,
+    relic: relicEntry.relic,
+    sold: false,
+  })
 
   return items
 }
@@ -145,17 +189,29 @@ export function canBuyCampaignShopItem(
   item: CampaignShopItem
 ): { canBuy: boolean; reason?: string } {
   if (item.sold) return { canBuy: false, reason: "Уже куплено" }
-  if (g.coins < item.price) return { canBuy: false, reason: "Недостаточно монет" }
+  if (g.crystals < item.price) return { canBuy: false, reason: "Недостаточно кристаллов" }
   if (item.category === "life" && g.lives >= 5) {
     return { canBuy: false, reason: "Максимум жизней (5)" }
   }
   if (item.category === "shield" && g.shield >= 5) {
     return { canBuy: false, reason: "Максимум щитов (5)" }
   }
+  if (item.id === "relic_shield" && g.campaignRelics.relicShield) {
+    return { canBuy: false, reason: "Реликвия уже активна" }
+  }
+  if (item.id === "relic_spark" && g.campaignRelics.relicSpark) {
+    return { canBuy: false, reason: "Реликвия уже активна" }
+  }
+  if (item.id === "relic_fire" && g.campaignRelics.relicFire) {
+    return { canBuy: false, reason: "Реликвия уже активна" }
+  }
+  if (item.id === "relic_converter" && g.campaignRelics.relicConverter) {
+    return { canBuy: false, reason: "Реликвия уже активна" }
+  }
   return { canBuy: true }
 }
 
-/** Покупка товара в магазине забега */
+/** Покупка товара в магазине забега за кристаллы */
 export function buyCampaignShopItem(g: Game, itemId: string): boolean {
   if (!g.campaignShop) return false
   const item = g.campaignShop.items.find((i) => i.id === itemId)
@@ -164,7 +220,7 @@ export function buyCampaignShopItem(g: Game, itemId: string): boolean {
   const check = canBuyCampaignShopItem(g, item)
   if (!check.canBuy) return false
 
-  g.coins -= item.price
+  g.crystals -= item.price
   item.sold = true
 
   // Применение эффекта
@@ -190,12 +246,21 @@ export function buyCampaignShopItem(g: Game, itemId: string): boolean {
     case "fire":
       g.campaignPerks.fireStart = true
       break
-    case "coin_boost":
-      g.campaignPerks.coinBoost = true
+    case "relic_shield":
+      g.campaignRelics.relicShield = true
+      if (g.shield < 5) g.shield++
+      break
+    case "relic_spark":
+      g.campaignRelics.relicSpark = true
+      break
+    case "relic_fire":
+      g.campaignRelics.relicFire = true
+      break
+    case "relic_converter":
+      g.campaignRelics.relicConverter = true
       break
   }
 
-  saveProgress(g)
   g.sfx.ensure()
   g.sfx.power()
   pushHud(g)
