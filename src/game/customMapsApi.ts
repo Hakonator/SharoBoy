@@ -35,7 +35,7 @@ export interface ApprovedMapsParams {
 
 const API_URL = `${SUPABASE_URL}/functions/v1/maps`
 const VOTER_ID_KEY = "sharoboy-custom-map-voter-id"
-const REQUEST_TIMEOUT_MS = 10_000
+const REQUEST_TIMEOUT_MS = 15_000
 
 function headers(): Record<string, string> {
   return {
@@ -61,7 +61,43 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
 
 async function errorMessage(response: Response, fallback: string): Promise<string> {
   const data = (await response.json().catch(() => null)) as { error?: unknown } | null
-  return typeof data?.error === "string" ? data.error : `${fallback} (${response.status})`
+  if (typeof data?.error === "string") {
+    return data.error
+  }
+  if (response.status >= 500) {
+    return `Сервер временно недоступен (ошибка ${response.status}). Пожалуйста, повторите попытку позже.`
+  }
+  if (response.status === 404) {
+    return "Запрашиваемые данные не найдены на сервере."
+  }
+  return `${fallback} (код ${response.status})`
+}
+
+export function humanizeMapsApiError(
+  reason: unknown,
+  fallback = "Не удалось загрузить каталог карт. Сервер временно недоступен."
+): string {
+  if (reason instanceof DOMException && reason.name === "AbortError") {
+    return "Время ожидания ответа сервера истекло. Пожалуйста, попробуйте обновить список ещё раз."
+  }
+  if (reason instanceof Error) {
+    const msg = reason.message.toLowerCase()
+    if (msg.includes("abort") || msg.includes("timeout")) {
+      return "Время ожидания ответа сервера истекло. Пожалуйста, попробуйте обновить список ещё раз."
+    }
+    if (
+      msg.includes("failed to fetch") ||
+      msg.includes("network") ||
+      msg.includes("load failed") ||
+      msg.includes("networkerror")
+    ) {
+      return "Сервер карт временно недоступен или отсутствует подключение к сети. Пожалуйста, повторите попытку."
+    }
+    if (/[а-яА-ЯёЁ]/.test(reason.message)) {
+      return reason.message
+    }
+  }
+  return fallback
 }
 
 function unavailable(): Error {

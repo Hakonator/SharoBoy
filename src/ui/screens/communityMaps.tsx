@@ -4,6 +4,7 @@ import { LEADERBOARD_ENABLED } from "../../config"
 import {
   fetchApprovedMaps,
   getVoterId,
+  humanizeMapsApiError,
   voteMap,
   type CustomMapRecord,
 } from "../../game/customMapsApi"
@@ -69,7 +70,12 @@ export function CommunityMaps({ onBack, onPlay, onEditCopy }: CommunityMapsProps
     try {
       setMaps(await fetchApprovedMaps({ sort, search, limit: 50 }))
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось загрузить каталог карт.")
+      setError(
+        humanizeMapsApiError(
+          reason,
+          "Не удалось загрузить каталог карт. Сервер временно недоступен."
+        )
+      )
     } finally {
       setLoading(false)
     }
@@ -94,7 +100,9 @@ export function CommunityMaps({ onBack, onPlay, onEditCopy }: CommunityMapsProps
         )
       )
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось поставить лайк.")
+      setError(
+        humanizeMapsApiError(reason, "Не удалось поставить лайк. Сервер временно недоступен.")
+      )
     } finally {
       setLikingId(null)
     }

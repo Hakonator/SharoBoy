@@ -41,6 +41,10 @@ export function damageBlock(
   // Блоки минибосса неразрушаемы: урон идёт в пул HP его существа.
   if (b.isMiniboss) {
     b.flash = 1
+    const pan = clamp((b.x / g.w) * 2 - 1, -0.85, 0.85)
+    g.sfx.brick(b.tier || 2, pan, g.combo)
+    emitBlockShatter(g, b.x, b.y, "#ffc94d", 5, 130, impactAngle)
+    g.hitStop = Math.max(g.hitStop, 0.015)
     g.damageMiniboss(dmg, b)
     return
   }

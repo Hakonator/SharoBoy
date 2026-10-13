@@ -140,6 +140,7 @@ export class InputController {
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
+    if (e.defaultPrevented) return
     const target = e.target
     if (
       target !== null &&

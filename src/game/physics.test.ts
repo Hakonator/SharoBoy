@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { FIREBALL_DAMAGE_MULT, Physics, type PhysicsWorld } from "./physics"
 import type { Ball, Block } from "./types"
@@ -208,11 +208,13 @@ describe("Physics — огненное ядро", () => {
     expect(ball.y).toBeGreaterThan(block.y) // шар отлетел от существа
   })
 
-  it("обычный шар по минибоссу: урон ×1 и отскок", () => {
+  it("обычный шар по минибоссу: урон ×1, отскок и воспроизведение звука удара", () => {
     const { world, ball, miniDamage } = makeWorld(makeBlock(true), false)
+    const brickSpy = vi.spyOn(world.sfx, "brick")
     run(world, ball)
     expect(miniDamage).toEqual([1])
     expect(ball.vy).toBeGreaterThan(0)
+    expect(brickSpy).toHaveBeenCalled()
   })
 
   it("огонь прожигает обычные блоки: урон ×3 за каждое касание, без отскока", () => {

@@ -14,6 +14,7 @@ import {
   fetchApprovedMaps,
   fetchMapStatus,
   getVoterId,
+  humanizeMapsApiError,
   publishCustomMap,
   requestMapEdit,
   recordMapPlay,
@@ -159,5 +160,27 @@ describe("customMapsApi", () => {
       edit_status: "approved",
     })
     expect(fetchMock.mock.calls[0]?.[0]).toContain("/status?map_uid=uid-123")
+  })
+
+  it("humanizes network, timeout, and server errors into friendly Russian messages", () => {
+    const abortDomError = new DOMException("The user aborted a request.", "AbortError")
+    expect(humanizeMapsApiError(abortDomError)).toBe(
+      "Время ожидания ответа сервера истекло. Пожалуйста, попробуйте обновить список ещё раз."
+    )
+
+    const abortError = new Error("The operation was aborted due to timeout")
+    expect(humanizeMapsApiError(abortError)).toBe(
+      "Время ожидания ответа сервера истекло. Пожалуйста, попробуйте обновить список ещё раз."
+    )
+
+    const failedFetch = new TypeError("Failed to fetch")
+    expect(humanizeMapsApiError(failedFetch)).toBe(
+      "Сервер карт временно недоступен или отсутствует подключение к сети. Пожалуйста, повторите попытку."
+    )
+
+    const russianError = new Error("Карта не прошла валидацию")
+    expect(humanizeMapsApiError(russianError)).toBe("Карта не прошла валидацию")
+
+    expect(humanizeMapsApiError(12345, "Запасная ошибка")).toBe("Запасная ошибка")
   })
 })

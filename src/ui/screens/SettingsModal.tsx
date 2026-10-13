@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import {
   type FlashMultiplier,
@@ -30,6 +30,19 @@ export function SettingsModal({
   onToggleMute,
 }: SettingsModalProps) {
   const [settings, setSettings] = useState<GameSettings>(() => loadSettings())
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" || e.code === "Escape") {
+        e.stopPropagation()
+        e.stopImmediatePropagation()
+        e.preventDefault()
+        onClose()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown, { capture: true })
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true })
+  }, [onClose])
 
   const updateSetting = <K extends keyof GameSettings>(key: K, val: GameSettings[K]) => {
     const updated = saveSettings({ [key]: val })
