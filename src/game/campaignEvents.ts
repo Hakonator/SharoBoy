@@ -1,5 +1,6 @@
 import type { Game } from "./game"
 import { pushHud } from "./game/hudSync"
+import { addCoins } from "./game/progress"
 import type { CampaignEventData } from "./types"
 import type { CampaignNode } from "./campaignMap"
 import { nodeById } from "./campaignMap"
@@ -412,7 +413,7 @@ export function chooseCampaignEventChoice(g: Game, choiceIndex: number) {
     case "chest_smash": {
       const lucky = Math.random() < 0.65
       if (lucky) {
-        g.addCoins(60)
+        addCoins(g, 60)
         g.addCrystals(30)
         outcome = {
           targetId: -1,

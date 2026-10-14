@@ -7,24 +7,23 @@ import { resetRun, onLevelCleared } from "./game/runFlow"
 import { makePhysicsHost } from "./game/hosts"
 import { collideBoss, collidePaddle } from "./physics/collide"
 import { buildCampaignEvent, chooseCampaignEventChoice } from "./campaignEvents"
-import type { Ball, CampaignNode, Popup } from "./types"
+import type { Ball, Popup } from "./types"
+import type { CampaignNode } from "./campaignMap"
 import type { Game } from "./game"
 
 describe("Новые апгрейды, мета-кристаллы, боссы Актов и криты ×3", () => {
   beforeEach(() => {
+    const store: Record<string, string> = {}
     vi.stubGlobal("localStorage", {
-      store: {} as Record<string, string>,
-      getItem(k: string) {
-        return this.store[k] ?? null
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => {
+        store[k] = String(v)
       },
-      setItem(k: string, v: string) {
-        this.store[k] = String(v)
+      removeItem: (k: string) => {
+        delete store[k]
       },
-      removeItem(k: string) {
-        delete this.store[k]
-      },
-      clear() {
-        this.store = {}
+      clear: () => {
+        for (const k of Object.keys(store)) delete store[k]
       },
     })
   })
@@ -151,21 +150,21 @@ describe("Новые апгрейды, мета-кристаллы, боссы �
     // Удар 1 (чистый)
     collideBoss(host, ball)
     expect(game.bossCleanHits).toBe(1)
-    expect(host.boss.hp).toBe(99)
+    expect(host.boss?.hp).toBe(99)
 
     // Удар 2 (чистый)
     ball.y = 150 + 40
     ball.vy = -100
     collideBoss(host, ball)
     expect(game.bossCleanHits).toBe(2)
-    expect(host.boss.hp).toBe(98)
+    expect(host.boss?.hp).toBe(98)
 
     // Удар 3 (КРИТ! урон ×3)
     ball.y = 150 + 40
     ball.vy = -100
     collideBoss(host, ball)
     expect(game.bossCleanHits).toBe(0) // сброс серии после крита
-    expect(host.boss.hp).toBe(95) // 98 - 3 = 95
+    expect(host.boss?.hp).toBe(95) // 98 - 3 = 95
     expect(host.fx.popups.some((p: Popup) => p.text.includes("КРИТ ×3!"))).toBe(true)
 
     // Касание ракетки сбрасывает счётчик чистых ударов
