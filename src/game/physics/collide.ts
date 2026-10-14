@@ -96,7 +96,9 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
   ball.squash = 1
   ball.sinceHit = 0
   p.squash = 1
-  g.combo = 0
+  g.resetBossCleanHits?.()
+  const keepMult = g.comboMasterLevel ? (g.comboMasterLevel >= 2 ? 0.7 : 0.35) : 0
+  g.combo = Math.floor(g.combo * keepMult)
   if (Math.abs(rel) > 0.65) g.hitStop = Math.max(g.hitStop, 0.015)
   g.sfx.paddle(Math.abs(rel), paddlePan)
   g.fx.burst(ball.x, ball.y - ball.r, "#7cf5ff", 6, 130)
@@ -147,7 +149,9 @@ export function collidePaddleShape(
   ball.squash = 1
   ball.sinceHit = 0
   p.squash = 1
-  g.combo = 0
+  g.resetBossCleanHits?.()
+  const keepMult = g.comboMasterLevel ? (g.comboMasterLevel >= 2 ? 0.7 : 0.35) : 0
+  g.combo = Math.floor(g.combo * keepMult)
   if (Math.abs(rel) > 0.65) g.hitStop = Math.max(g.hitStop, 0.015)
   const paddlePan = clamp((ball.x / g.w) * 2 - 1, -0.85, 0.85)
   g.sfx.paddle(Math.abs(rel), paddlePan)
@@ -311,5 +315,11 @@ export function collideBoss(g: PhysicsWorld, ball: Ball) {
   }
   ball.squash = 1
   ball.sinceHit = 0
-  g.damageBoss(g.debugBallDamage * (g.fireActive() ? FIREBALL_DAMAGE_MULT : 1), false)
+  // Механика критического урона ×3: 3 последовательных чистых попадания без касания ракетки
+  const cleanHits = (g.bossCleanHits ?? 0) + 1
+  const isCrit = cleanHits >= 3
+  if (g.bossCleanHits !== undefined) {
+    g.bossCleanHits = isCrit ? 0 : cleanHits
+  }
+  g.damageBoss(g.debugBallDamage * (g.fireActive() ? FIREBALL_DAMAGE_MULT : 1), false, isCrit)
 }

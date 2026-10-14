@@ -83,9 +83,17 @@ export function MenuUpgrades({
     <div className="space-y-2">
       <div className="flex items-center justify-between px-1 pb-1 text-xs">
         <span className="text-dim">Постоянные улучшения</span>
-        <span className="flex items-center gap-1 font-display font-bold text-gold">
-          🪙 Баланс: {hud.coins.toLocaleString("ru-RU")}
-        </span>
+        <div className="flex items-center gap-3">
+          <span
+            className="flex items-center gap-1 font-display font-bold text-sky-400"
+            title="Несгораемые мета-кристаллы за победу над боссами"
+          >
+            💠 {(hud.metaCrystals ?? 0).toLocaleString("ru-RU")}
+          </span>
+          <span className="flex items-center gap-1 font-display font-bold text-gold">
+            🪙 {hud.coins.toLocaleString("ru-RU")}
+          </span>
+        </div>
       </div>
       <div className="space-y-1.5">
         {UPGRADE_DEFS.map((u) => {

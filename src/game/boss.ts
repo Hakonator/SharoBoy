@@ -180,8 +180,8 @@ export class BossSystem {
     }
   }
 
-  /** Урон боссу; fromWeapon — от лазера/ракет (с кулдауном), иначе от шара. */
-  damage(dmg: number, fromWeapon: boolean) {
+  /** Урон боссу; fromWeapon — от лазера/ракет (с кулдауном), иначе от шара; isCrit — критический урон ×3. */
+  damage(dmg: number, fromWeapon: boolean, isCrit = false) {
     const bo = this.boss
     if (!bo) return
     if (fromWeapon && this.g.time < this.weaponHitCd) return
@@ -205,17 +205,33 @@ export class BossSystem {
       }
     }
 
-    bo.hp -= dmg
+    const actualDmg = isCrit ? dmg * 3 : dmg
+    bo.hp -= actualDmg
     bo.flash = 1
-    this.g.sfx.brick(3)
-    this.g.fx.burst(
-      bo.x + rand(-bo.r * 0.5, bo.r * 0.5),
-      bo.y + rand(-bo.r * 0.3, bo.r * 0.3),
-      "#ff5ca8",
-      8,
-      200
-    )
-    this.g.addRawScore(5)
+    if (isCrit) {
+      this.g.sfx.brick(4)
+      this.g.fx.burst(bo.x, bo.y, "#ff2a6d", 24, 320)
+      this.g.fx.popups.push({
+        x: bo.x,
+        y: bo.y - bo.r - 20,
+        text: `КРИТ ×3! -${Math.round(actualDmg)} 💥`,
+        color: "#ff2a6d",
+        t: 0,
+        size: 24,
+      })
+      this.g.shake = Math.min(this.g.shake + 6, 12)
+      this.g.hitStop = Math.max(this.g.hitStop, 0.06)
+    } else {
+      this.g.sfx.brick(3)
+      this.g.fx.burst(
+        bo.x + rand(-bo.r * 0.5, bo.r * 0.5),
+        bo.y + rand(-bo.r * 0.3, bo.r * 0.3),
+        "#ff5ca8",
+        8,
+        200
+      )
+    }
+    this.g.addRawScore(isCrit ? 25 : 5)
     if (bo.hp <= 0) {
       this.kill()
     } else {

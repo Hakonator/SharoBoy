@@ -97,6 +97,106 @@ export function buildCampaignEvent(
         ],
       }
 
+    case "АЛТАРЬ БЕЗДНЫ":
+      return {
+        id: `event-${node.id}`,
+        title: "АЛТАРЬ БЕЗДНЫ",
+        text: `Тёмный подводный монумент пульсирует фиолетовой энергией глубин. Древний алтарь требует жертвы или подношения.`,
+        choices: [
+          {
+            id: "abyss_sacrifice",
+            label: "Кровавая жертва",
+            desc: "Пожертвовать 1 жизнь: обрести Реликвию Вечного Огня (огненный шар в каждом бою забега!).",
+          },
+          {
+            id: "abyss_offering",
+            label: "Дар кристаллами",
+            desc: "Пожертвовать 30 💎: восстановить здоровье (+1 ЖИЗНЬ) и получить комплект щитов (+2 ЩИТ).",
+            cost: 30,
+          },
+          {
+            id: "abyss_leave",
+            label: "Уплыть прочь",
+            desc: "Не прикасаться к запретной магии глубин и безопасно продолжить путь.",
+          },
+        ],
+      }
+
+    case "СУНДУК КОРСАРОВ":
+      return {
+        id: `event-${node.id}`,
+        title: "ЗАТОНУВШИЙ СУНДУК КОРСАРОВ",
+        text: `Среди водорослей лежит окованный бронзой сундук с древним кодовым замком.`,
+        choices: [
+          {
+            id: "chest_smash",
+            label: "Сбить замок шаром",
+            desc: "65% шанс открыть клад (+60 монет и +30 💎); 35% активировать защитную ловушку (потеря 1 щита).",
+          },
+          {
+            id: "chest_pick",
+            label: "Аккуратный взлом",
+            desc: "Потратить 15 💎: осторожно вскрыть механизм, зарядить лазер и получить +1 щит.",
+            cost: 15,
+          },
+          {
+            id: "chest_leave",
+            label: "Оставить на дне",
+            desc: "Не рисковать целостностью шара и плыть дальше.",
+          },
+        ],
+      }
+
+    case "ОСЬМИНОГ-ШУЛЕР":
+      return {
+        id: `event-${node.id}`,
+        title: "АЗАРТНЫЙ ОСЬМИНОГ",
+        text: `Хитрый осьминог в пиратской треуголке тасует три ракушки с сияющими жемчужинами. «Сыграем, капитан?»`,
+        choices: [
+          {
+            id: "gamble_bet",
+            label: "Сыграть на кристаллы",
+            desc: "Ставка 25 💎: 55% шанс угадать и получить +50 💎; 45% потерять ставку.",
+            cost: 25,
+          },
+          {
+            id: "gamble_trade",
+            label: "Попросить талисман",
+            desc: "Потратить 20 💎: осьминог делится секретным перком (Огненный старт на следующий бой).",
+            cost: 20,
+          },
+          {
+            id: "gamble_leave",
+            label: "Отказаться от игры",
+            desc: "Вежливо помахать щупальцу и продолжить свой курс.",
+          },
+        ],
+      }
+
+    case "РАЗВИЛКА ТЕЧЕНИЙ":
+      return {
+        id: `event-${node.id}`,
+        title: "РАЗВИЛКА ТЕЧЕНИЙ",
+        text: `Фарватер разделяется: один поток ревёт и несёт обломки, другой ведёт в тихую светящуюся лагуну.`,
+        choices: [
+          {
+            id: "current_storm",
+            label: "Бурный фарватер",
+            desc: `Рискнуть на стремнине: получить +35 💎 и временный разгон лазера, но с риском отката в «${placeName}» (30%).`,
+          },
+          {
+            id: "current_calm",
+            label: "Спокойная лагуна",
+            desc: "Заплыть в тихие воды: перевести дух, починить обшивку (+1 ЖИЗНЬ) и укрепить энергощит (+1 ЩИТ).",
+          },
+          {
+            id: "current_survey",
+            label: "Держаться середины",
+            desc: "Сохранить стабильный курс и продолжить обычный маршрут без изменений.",
+          },
+        ],
+      }
+
     case "ГЕЙЗЕР":
     default:
       return {
@@ -275,6 +375,140 @@ export function chooseCampaignEventChoice(g: Game, choiceIndex: number) {
       outcome = {
         targetId: -1,
         text: "Вы аккуратно обошли опасный гейзер и продолжили движение.",
+      }
+      break
+
+    // АЛТАРЬ БЕЗДНЫ
+    case "abyss_sacrifice":
+      if (g.lives > 1) {
+        g.lives--
+      } else if (g.shield > 0) {
+        g.shield--
+      }
+      g.campaignRelics.relicFire = true
+      outcome = {
+        targetId: -1,
+        text: "Тёмный алтарь принял жертву! Вы получили Реликвию Вечного Огня — шар пылает в каждом бою!",
+      }
+      break
+
+    case "abyss_offering":
+      g.lives = Math.min(5, g.lives + 1)
+      g.shield = Math.min(5, g.shield + 2)
+      outcome = {
+        targetId: -1,
+        text: "Древние духи приняли кристаллы: корпус исцелён (+1 ЖИЗНЬ) и усилен экранами (+2 ЩИТ)!",
+      }
+      break
+
+    case "abyss_leave":
+      outcome = {
+        targetId: -1,
+        text: "Вы благоразумно отплыли от алтаря Бездны и продолжили свой путь.",
+      }
+      break
+
+    // СУНДУК КОРСАРОВ
+    case "chest_smash": {
+      const lucky = Math.random() < 0.65
+      if (lucky) {
+        g.addCoins(60)
+        g.addCrystals(30)
+        outcome = {
+          targetId: -1,
+          text: "Замок раскололся! Из сундука хлынуло сокровище: +60 монет и +30 💎!",
+        }
+      } else {
+        if (g.shield > 0) g.shield--
+        outcome = {
+          targetId: -1,
+          text: "Сработала охранная ловушка сундука! Взрывом сбило 1 щит, но шар уцелел.",
+        }
+      }
+      break
+    }
+
+    case "chest_pick":
+      g.campaignPerks.laserStart = true
+      g.shield = Math.min(5, g.shield + 1)
+      outcome = {
+        targetId: -1,
+        text: "Механизм замка аккуратно обезврежен! Найдены лазерная батарея и энергощит (+1 ЩИТ).",
+      }
+      break
+
+    case "chest_leave":
+      outcome = {
+        targetId: -1,
+        text: "Вы решили не рисковать и оставили загадочный сундук на дне.",
+      }
+      break
+
+    // ОСЬМИНОГ-ШУЛЕР
+    case "gamble_bet": {
+      const lucky = Math.random() < 0.55
+      if (lucky) {
+        g.addCrystals(50)
+        outcome = {
+          targetId: -1,
+          text: "Жемчужина угадана! Осьминог с почётом вручает выигрыш (+50 💎)!",
+        }
+      } else {
+        outcome = {
+          targetId: -1,
+          text: "Осьминог ловко перетасовал ракушки — ставка проиграна. В другой раз повезёт!",
+        }
+      }
+      break
+    }
+
+    case "gamble_trade":
+      g.campaignPerks.fireStart = true
+      outcome = {
+        targetId: -1,
+        text: "Осьминог подмигнул и передал пиротехнический порошок: огненный старт в следующем бою!",
+      }
+      break
+
+    case "gamble_leave":
+      outcome = {
+        targetId: -1,
+        text: "Вы вежливо отказались от азартных игр и поплыли дальше по фарватеру.",
+      }
+      break
+
+    // РАЗВИЛКА ТЕЧЕНИЙ
+    case "current_storm": {
+      const lucky = Math.random() < 0.7
+      if (lucky) {
+        g.addCrystals(35)
+        g.campaignPerks.laserStart = true
+        outcome = {
+          targetId: -1,
+          text: "Вы оседлали бешеный поток! Награда за отвагу: +35 💎 и заряженный лазер!",
+        }
+      } else {
+        outcome = {
+          targetId: defaultTarget,
+          text: "Штормовое течение закружило шар и выбросило обратно на пройденный рубеж!",
+        }
+      }
+      break
+    }
+
+    case "current_calm":
+      g.lives = Math.min(5, g.lives + 1)
+      g.shield = Math.min(5, g.shield + 1)
+      outcome = {
+        targetId: -1,
+        text: "Тихая лагуна позволила восстановить силы: +1 жизнь и +1 защитный экран!",
+      }
+      break
+
+    case "current_survey":
+      outcome = {
+        targetId: -1,
+        text: "Вы сохранили выверенный курс и спокойно продолжили исследование фарватера.",
       }
       break
   }

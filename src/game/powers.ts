@@ -62,6 +62,8 @@ export interface PowersWorld {
   sfx: SFX
   addCoins(n: number): void
   pushHud(): void
+  buffDurationMult?: number
+  coinMagnetLevel?: number
 }
 
 export class PowersSystem {
@@ -237,10 +239,19 @@ export class PowersSystem {
   updatePowers(dt: number) {
     const g = this.g
     const p = g.paddle
+    const magnetLvl = g.coinMagnetLevel ?? 0
     for (const pw of g.powers) {
       pw.t += dt
       pw.y += pw.vy * dt
       pw.x += Math.sin(pw.t * 4) * 14 * dt
+      // Монетный магнит: бонусы притягиваются к центру ракетки при приближении
+      if (magnetLvl > 0) {
+        const dy = p.y - pw.y
+        if (dy > 0 && dy < 260 && Math.abs(pw.x - p.x) < p.w / 2 + 140) {
+          const sign = Math.sign(p.x - pw.x)
+          pw.x += sign * Math.min(Math.abs(p.x - pw.x), 110 * magnetLvl * dt)
+        }
+      }
       // Ловля на верхней поверхности: купол поднимает зону над телом ракетки
       const topY = this.catchTopY(pw, p)
       if (

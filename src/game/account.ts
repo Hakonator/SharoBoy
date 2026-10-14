@@ -5,6 +5,7 @@
 /** Список ключей localStorage, относящихся к прогрессу аккаунта игрока. */
 export const ACCOUNT_STORAGE_KEYS = [
   "sharoboy-coins",
+  "sharoboy-meta-crystals",
   "sharoboy-upgrades",
   "sharoboy-best",
   "sharoboy-top",

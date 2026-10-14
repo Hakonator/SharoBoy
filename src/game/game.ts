@@ -199,6 +199,10 @@ export class Game {
   fieldShift: null | { t: number; dur: number; dx: number; dy: number } = null
   blocksInitial = 1
   coins = 0
+  /** Постоянные несгораемые мета-кристаллы профиля. */
+  metaCrystals = 0
+  /** Серия чистых попаданий по боссу без касания ракетки (для крита ×3). */
+  bossCleanHits = 0
   /** Кристаллы текущего забега в кампании (тратятся в лавках и событиях). */
   crystals = 0
   /** Всего собрано кристаллов за забег (для конверсии в монеты в конце). */
@@ -399,6 +403,8 @@ export class Game {
   }
   resetAccountData() {
     this.coins = 0
+    this.metaCrystals = 0
+    this.bossCleanHits = 0
     this.crystals = 0
     this.crystalsRunTotal = 0
     this.upgrades = {}

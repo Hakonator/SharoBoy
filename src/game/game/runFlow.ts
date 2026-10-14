@@ -7,7 +7,7 @@ import { applyTrack } from "./audioControls"
 import { enterMapView } from "./campaignFlow"
 import { pushHud, saveTop, setBanner } from "./hudSync"
 import { buildLevel, buildWave, serveBall } from "./levelBuild"
-import { addCoins } from "./progress"
+import { addCoins, addMetaCrystals } from "./progress"
 
 export function resetRun(g: Game) {
   g.customWinCondition = null
@@ -60,7 +60,8 @@ export function resetRun(g: Game) {
   g.magnetUntil = 0
   g.magneticPaddleUntil = 0
   g.aimAngle = -Math.PI / 2
-  g.shield = 0
+  g.shield = (g.upgrades.shieldStart ?? 0) > 0 ? 1 : 0
+  g.bossCleanHits = 0
   g.weaponCd = 0
   g.effectsKey = ""
   g.transition = 0
@@ -150,26 +151,51 @@ export function onLevelCleared(g: Game) {
   }
   if (g.mode === "campaign") {
     if (g.onBossNode) {
-      // Финальный босс карты повержен — забег пройден.
       g.onBossNode = false
-      g.phase = "won"
-      const mult = g.campaignRelics.relicConverter ? 1.5 : 1.0
-      const earnedCoins = Math.round(g.crystalsRunTotal * mult)
-      if (earnedCoins > 0) {
-        addCoins(g, earnedCoins)
+      const isFinalBoss = !g.campaign || g.campaignPlayerId === g.campaign.bossId
+      if (isFinalBoss) {
+        // Финальный босс карты повержен — забег пройден.
+        g.phase = "won"
+        const mult = g.campaignRelics.relicConverter ? 1.5 : 1.0
+        const earnedCoins = Math.round(g.crystalsRunTotal * mult)
+        if (earnedCoins > 0) {
+          addCoins(g, earnedCoins)
+        }
+        g.crystalsRunTotal = 0
+        addMetaCrystals(g, 150)
+        g.input.releaseLock()
+        applyTrack(g)
+        g.sfx.win()
+        saveTop(g)
+        pushHud(g)
+        return
       }
-      g.crystalsRunTotal = 0
-      g.input.releaseLock()
-      applyTrack(g)
-      g.sfx.win()
-      saveTop(g)
-      pushHud(g)
+
+      // Промежуточный босс Акта повержен: награда несгораемыми мета-кристаллами
+      const currentNode = g.campaign ? nodeById(g.campaign, g.campaignPlayerId) : undefined
+      const actNumber = currentNode && currentNode.tier < 15 ? 1 : 2
+      const actReward = actNumber === 1 ? 25 : 50
+      addMetaCrystals(g, actReward)
+      if (g.shield < 3) {
+        g.shield++
+      }
+      g.fx.popups.push({
+        x: g.w / 2,
+        y: g.h * 0.45,
+        text: `АКТ ${actNumber === 1 ? "I" : "II"} ПРОЙДЕН! +${actReward} 💠`,
+        color: "#38bdf8",
+        t: 0,
+        size: 24,
+      })
+      g.sfx.levelClear()
+      enterMapView(g)
       return
     }
     // Обычный или элитный узел зачищен: награда кристаллами и щитом
     const currentNode = g.campaign ? nodeById(g.campaign, g.campaignPlayerId) : undefined
     const isChallenge = currentNode?.isChallenge ?? false
-    const baseWinCrystals = isChallenge ? 40 : 10
+    const veinMult = 1 + 0.25 * (g.upgrades.crystalVein ?? 0)
+    const baseWinCrystals = Math.round((isChallenge ? 40 : 10) * veinMult)
     g.addCrystals(baseWinCrystals)
     if (isChallenge && g.shield < 3) {
       g.shield++

@@ -97,6 +97,7 @@ export function pushHud(g: Game) {
     magnetOn: g.time < g.magnetUntil,
     coins: g.coins,
     crystals: g.crystals,
+    metaCrystals: g.metaCrystals ?? 0,
     upgrades: { ...g.upgrades },
     top: g.top,
     topEndless: g.topEndless,

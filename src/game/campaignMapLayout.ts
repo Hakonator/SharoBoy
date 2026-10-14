@@ -31,8 +31,17 @@ const NODE_NAMES = [
   "ФАРВАТЕР",
 ]
 
-/** Имена узлов-событий: боя нет, событие переносит игрока на пройденный узел. */
-const EVENT_NAMES = ["ВОДОВОРОТ", "ТЕЧЕНИЕ", "ГРОТ", "ГЕЙЗЕР"]
+/** Имена узлов-событий: интерактивные встречи и стихии с выбором риск/награда. */
+export const EVENT_NAMES = [
+  "ВОДОВОРОТ",
+  "ТЕЧЕНИЕ",
+  "ГРОТ",
+  "ГЕЙЗЕР",
+  "АЛТАРЬ БЕЗДНЫ",
+  "СУНДУК КОРСАРОВ",
+  "ОСЬМИНОГ-ШУЛЕР",
+  "РАЗВИЛКА ТЕЧЕНИЙ",
+]
 
 /** Имена узлов-магазинов: лавка подводного торговца за монеты. */
 export const SHOP_NAMES = ["ТОРГОВЕЦ", "ЛАВКА ГЛУБИН", "ПОДВОДНЫЙ БАЗАР", "ТАЙНИК КОНТРАБАНДИСТА"]
@@ -56,9 +65,13 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
   const seed = seedIn | 0 || 1
   const rng = mulberry32(seed)
 
-  /* Ширины ярусов: старт 1, далее дрейф в коридоре 2..4, последний ярус — босс. */
+  /* Ширины ярусов: старт 1, боссы Актов (ярусы 9 и 19 при 30 ярусах) — ширина 1,
+     последний ярус — финальный босс (ширина 1). Между ними — развилка 2..4. */
   const widths = [1]
-  for (let t = 1; t < tiers - 1; t++) widths.push(pickWidth(rng, widths[t - 1]))
+  for (let t = 1; t < tiers - 1; t++) {
+    const isActBossTier = tiers >= 28 && (t === 9 || t === 19)
+    widths.push(isActBossTier ? 1 : pickWidth(rng, widths[t - 1]))
+  }
   widths.push(1)
 
   const nodes: CampaignNode[] = []
@@ -68,7 +81,7 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
     const row: number[] = []
     let tierHasShop = false
     for (let i = 0; i < widths[t]; i++) {
-      const isBoss = t === tiers - 1
+      const isBoss = t === tiers - 1 || (tiers >= 28 && (t === 9 || t === 19))
       // На первом боевом ярусе игрок посещал только старт, поэтому событие
       // всегда возвращало бы его туда. События начинаются со второго яруса,
       // где уже есть несколько возможных целей для переноса.
@@ -82,7 +95,11 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
       const isChallenge = !isBoss && !isEvent && !isShop && t >= 3 && rng() < CHALLENGE_NODE_CHANCE
 
       const name = isBoss
-        ? "БОСС"
+        ? t === 9
+          ? "БОСС: АКТ I"
+          : t === 19
+            ? "БОСС: АКТ II"
+            : "ФИНАЛЬНЫЙ БОСС"
         : isEvent
           ? EVENT_NAMES[Math.floor(rng() * EVENT_NAMES.length)]
           : isShop

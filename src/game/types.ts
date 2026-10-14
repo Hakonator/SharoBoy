@@ -53,6 +53,8 @@ export interface HudData {
   coins: number
   /** Кристаллы текущего забега в кампании (валюта забега). */
   crystals: number
+  /** Постоянные несгораемые мета-кристаллы профиля. */
+  metaCrystals?: number
   upgrades: Record<string, number>
   top: ScoreEntry[]
   topEndless: ScoreEntry[]

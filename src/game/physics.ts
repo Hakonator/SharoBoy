@@ -81,6 +81,7 @@ export interface PhysicsWorld {
   readonly sparkQueue: SparkHit[]
   shield: number
   combo: number
+  bossCleanHits?: number
   shake: number
   hitStop: number
   flash: number
@@ -104,7 +105,9 @@ export interface PhysicsWorld {
   bounceGuideActive(): boolean
   addScore(n: number, x: number, y: number, color: string, size: number): void
   dropPower(x: number, y: number): void
-  damageBoss(dmg: number, fromWeapon: boolean): void
+  comboMasterLevel?: number
+  resetBossCleanHits?(): void
+  damageBoss(dmg: number, fromWeapon: boolean, isCrit?: boolean): void
   /** Урон в пул HP минибосса, по блоку которого пришёл удар (блоки существа
    *  неразрушаемы) — существ в уровне может быть несколько. */
   damageMiniboss(dmg: number, block: Block): void

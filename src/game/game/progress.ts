@@ -7,20 +7,28 @@ import { pushHud } from "./hudSync"
 export function loadProgress(g: Game) {
   try {
     g.coins = Math.max(0, Number(lsGet("sharoboy-coins") || 0) || 0)
+    g.metaCrystals = Math.max(0, Number(lsGet("sharoboy-meta-crystals") || 0) || 0)
     const up = JSON.parse(lsGet("sharoboy-upgrades") || "{}") as unknown
     g.upgrades = up && typeof up === "object" ? (up as Record<string, number>) : {}
   } catch {
     g.coins = 0
+    g.metaCrystals = 0
     g.upgrades = {}
   }
 }
 export function saveProgress(g: Game) {
   lsSet("sharoboy-coins", String(g.coins))
+  lsSet("sharoboy-meta-crystals", String(g.metaCrystals ?? 0))
   lsSet("sharoboy-upgrades", JSON.stringify(g.upgrades))
 }
 export function addCoins(g: Game, n: number) {
   const mult = 1 + (g.upgrades.coin ?? 0)
   g.coins += n * mult
+  saveProgress(g)
+  pushHud(g)
+}
+export function addMetaCrystals(g: Game, n: number) {
+  g.metaCrystals = (g.metaCrystals ?? 0) + Math.max(0, n)
   saveProgress(g)
   pushHud(g)
 }

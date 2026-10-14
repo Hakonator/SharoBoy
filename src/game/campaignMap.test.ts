@@ -11,6 +11,7 @@ import {
   visibleFrom,
   type CampaignMap,
 } from "./campaignMap"
+import { EVENT_NAMES } from "./campaignMapLayout"
 
 /** Все узлы, достижимые из start по исходящим рёбрам (обход в ширину). */
 function reachableFrom(map: CampaignMap, start: number): Set<number> {
@@ -41,24 +42,27 @@ describe("generateCampaignMap", () => {
         expect(n.y).toBeLessThanOrEqual(1)
       }
 
-      // ровно один старт (левый ярус) и ровно один босс (правый ярус)
+      // ровно один старт (левый ярус) и боссы (актов и финальный)
       expect(map.nodes.filter((n) => n.tier === 0)).toHaveLength(1)
       expect(map.startId).toBe(map.nodes[0].id)
       const bosses = map.nodes.filter((n) => n.isBoss)
-      expect(bosses).toHaveLength(1)
-      expect(bosses[0].id).toBe(map.bossId)
+      expect(bosses).toHaveLength(3)
+      expect(bosses[bosses.length - 1].id).toBe(map.bossId)
       expect(map.bossId).toBe(map.nodes[map.nodes.length - 1].id)
 
-      // ярусы обычных боёв не уже двух узлов (развилка выбора 2–4)
+      // ярусы обычных боёв (кроме узлов боссов актов) не уже двух узлов (развилка выбора 2–4)
       for (let t = 1; t < map.tiers - 1; t++) {
-        expect(map.nodes.filter((n) => n.tier === t).length).toBeGreaterThanOrEqual(2)
+        if (t === 9 || t === 19) {
+          expect(map.nodes.filter((n) => n.tier === t).length).toBe(1)
+        } else {
+          expect(map.nodes.filter((n) => n.tier === t).length).toBeGreaterThanOrEqual(2)
+        }
       }
 
-      // ветвление: у обычного узла 2..4 исходящих, у предбоссового — ровно одно
-      // ребро к единственному боссу, у босса — ни одного
+      // ветвление: у обычного узла 2..4 исходящих, у финального босса — ни одного
       for (const n of map.nodes) {
         const out = outgoingIds(map, n.id)
-        if (n.isBoss) {
+        if (n.id === map.bossId) {
           expect(out).toHaveLength(0)
         } else {
           const nextWidth = map.nodes.filter((m) => m.tier === n.tier + 1).length
@@ -116,7 +120,7 @@ describe("generateCampaignMap", () => {
       while (node.tier < map.tiers - 2) {
         const next = visibleFrom(map, cur)
         expect(next.length).toBeGreaterThanOrEqual(1)
-        for (const id of next) expect(nodeById(map, id)!.isBoss).toBe(false)
+        for (const id of next) expect(nodeById(map, id)!.id === map.bossId).toBe(false)
         cur = next[0]
         node = nodeById(map, cur)!
       }
@@ -154,7 +158,7 @@ describe("generateCampaignMap", () => {
         expect(n.isBoss).toBe(false)
         expect(n.tier).toBeGreaterThan(1)
         expect(n.tier).toBeLessThan(map.tiers - 1)
-        expect(["ВОДОВОРОТ", "ТЕЧЕНИЕ", "ГРОТ", "ГЕЙЗЕР"]).toContain(n.name)
+        expect(EVENT_NAMES).toContain(n.name)
       }
     }
     // за 60 карт события обязаны встретиться

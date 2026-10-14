@@ -223,6 +223,12 @@ export function makePowersHost(g: Game): PowersWorld {
     sfx: g.sfx,
     addCoins: (n) => addCoins(g, n),
     pushHud: () => pushHud(g),
+    get buffDurationMult() {
+      return 1 + 0.25 * (g.upgrades.buffDuration ?? 0)
+    },
+    get coinMagnetLevel() {
+      return g.upgrades.coinMagnet ?? 0
+    },
   }
 }
 
@@ -316,18 +322,32 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     fastActive: () => g.time < g.fastUntil,
     magnetActive: () => g.time < g.magnetUntil,
     magneticPaddleActive: () => g.time < g.magneticPaddleUntil,
-    paddleRotatable: () => isDebugEffectActive(g, "paddleRotation"),
+    paddleRotatable: () =>
+      (g.upgrades.paddleRotation ?? 0) > 0 || isDebugEffectActive(g, "paddleRotation"),
     aimGuideActive: () => g.isAimGuideActive(),
     bounceGuideActive: () => g.isBounceGuideActive(),
     wideActive: () => g.time < g.wideUntil,
     shrinkActive: () => g.time < g.shrinkUntil,
     paddleShape: () => g.paddleShapeKind(),
+    get bossCleanHits() {
+      return g.bossCleanHits
+    },
+    set bossCleanHits(v) {
+      g.bossCleanHits = v
+    },
+    resetBossCleanHits: () => {
+      g.bossCleanHits = 0
+    },
+    get comboMasterLevel() {
+      return g.upgrades.comboMaster ?? 0
+    },
     addScore: (n, x, y, color, size) => addScore(g, n, x, y, color, size),
     dropPower: (x, y) => g.powersSys.dropPower(x, y),
-    damageBoss: (dmg, fromWeapon) => g.bossSys.damage(dmg, fromWeapon),
+    damageBoss: (dmg, fromWeapon, isCrit) => g.bossSys.damage(dmg, fromWeapon, isCrit),
     damageMiniboss: (dmg, block) => damageMiniboss(g, dmg, block),
     onBombHitPaddle: () => onBombHitPaddle(g),
     onPaddleBounce: () => {
+      g.bossCleanHits = 0
       if (g.campaignRelics?.relicSpark) {
         g.campaignSparkBounceCount = (g.campaignSparkBounceCount ?? 0) + 1
         if (g.campaignSparkBounceCount >= 15) {

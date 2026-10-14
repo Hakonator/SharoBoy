@@ -109,6 +109,19 @@ export function MapScreen({
             </div>
           </div>
 
+          <div
+            className="hud-chip flex items-center gap-1.5 border-sky-500/30 bg-sky-500/10 px-3 py-1.5 shadow-[0_0_12px_rgba(56,189,248,0.2)] sm:px-3.5 sm:py-2"
+            title="Несгораемые мета-кристаллы за победу над боссами"
+          >
+            <span className="text-base sm:text-lg">💠</span>
+            <div>
+              <div className="hud-label text-sky-300">Мета-кристаллы</div>
+              <div className="font-display text-base font-bold text-sky-200 tabular-nums sm:text-xl">
+                {(hud.metaCrystals ?? 0).toLocaleString("ru-RU")}
+              </div>
+            </div>
+          </div>
+
           <div className="hud-chip flex items-center gap-1.5 border-gold/30 bg-gold/10 px-3 py-1.5 shadow-[0_0_12px_rgba(255,201,77,0.15)] sm:px-3.5 sm:py-2">
             <IconCoin className="h-4 w-4 sm:h-5 sm:w-5" />
             <div>

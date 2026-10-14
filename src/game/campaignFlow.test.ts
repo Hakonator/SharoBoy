@@ -166,7 +166,7 @@ describe("сквозной цикл кампании по карте", () => {
       raw.powers.length = 0
       step(3)
 
-      if (battleNode.isBoss) {
+      if (battleNode.id === map.bossId) {
         bossFought = true
         expect(g.phase, "после финального босса забег завершён").toBe("won")
       } else {

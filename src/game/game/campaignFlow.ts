@@ -61,6 +61,8 @@ export function startCampaignMap(g: Game) {
   g.campaignSparkBounceCount = 0
   g.crystals = 20
   g.crystalsRunTotal = 20
+  g.shield = (g.upgrades.shieldStart ?? 0) > 0 ? 1 : 0
+  g.bossCleanHits = 0
   g.campaignPlayerId = g.campaign.startId
   g.campaignVisited = [g.campaign.startId]
   g.campaignVisible = visibleFrom(g.campaign, g.campaignPlayerId)
@@ -223,8 +225,9 @@ export function startMapBattle(g: Game, node: CampaignNode) {
   if (node.isBoss) {
     g.activeSpec = null
     g.onBossNode = true
-    // Вариативность: тип финального босса детерминирован сидом карты и ярусом.
-    const variant = pickBossVariant(g.campaignSeed + node.id * 7919, node.tier)
+    // Вариативность: ярус босса масштабируется по Актам (0: Акт 1, 1: Акт 2, 2+: Финал)
+    const actBossTier = node.tier < 15 ? 0 : node.tier < 25 ? 1 : 2
+    const variant = pickBossVariant(g.campaignSeed + node.id * 7919, actBossTier)
     if (variant.kind === "jellyfish") {
       buildJellyfishBossLevel(g, variant)
     } else if (variant.tentacles > 0) {
@@ -232,7 +235,9 @@ export function startMapBattle(g: Game, node: CampaignNode) {
     } else {
       buildBossLevel(g, variant.hp, variant.minions, 4)
     }
-    launchNodeBattle(g, `ФИНАЛЬНЫЙ БОСС: ${variant.name}`)
+    const isFinal = !g.campaign || node.id === g.campaign.bossId
+    const bannerTitle = isFinal ? `ФИНАЛЬНЫЙ БОСС: ${variant.name}` : `БОСС: ${variant.name}`
+    launchNodeBattle(g, bannerTitle)
     return
   }
   g.onBossNode = false

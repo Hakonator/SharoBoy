@@ -16,14 +16,15 @@ export function applyPower(g: PowersWorld, type: PowerType) {
       t: 0,
       size: 18,
     })
+  const mult = g.buffDurationMult ?? 1
   switch (type) {
     case "wide":
-      g.wideUntil = g.time + 12
+      g.wideUntil = g.time + 12 * mult
       g.shrinkUntil = 0
       popup("ШИРОКАЯ РАКЕТКА")
       break
     case "slow":
-      g.slowUntil = g.time + 8
+      g.slowUntil = g.time + 8 * mult
       g.fastUntil = 0
       popup("ЗАМЕДЛЕНИЕ")
       break
@@ -34,37 +35,37 @@ export function applyPower(g: PowersWorld, type: PowerType) {
     case "laser":
       // луч не стреляет сам: бонус взводит лазер, залп — по пробелу/клику
       g.laserArmed = true
-      g.laserArmedUntil = g.time + 4
+      g.laserArmedUntil = g.time + 4 * mult
       popup("ЛАЗЕР ГОТОВ — ПРОБЕЛ")
       break
     case "rocket":
-      g.rocketUntil = g.time + 12
+      g.rocketUntil = g.time + 12 * mult
       popup("РАКЕТЫ — ПРОБЕЛ")
       break
     case "fire":
-      g.fireUntil = g.time + 8
+      g.fireUntil = g.time + 8 * mult
       g.frostUntil = 0
       g.sparkUntil = 0
       popup("ОГНЕННОЕ ЯДРО!")
       break
     case "frost":
-      g.frostUntil = g.time + 8
+      g.frostUntil = g.time + 8 * mult
       g.fireUntil = 0
       g.sparkUntil = 0
       popup("МОРОЗНЫЙ МЯЧ!")
       break
     case "spark":
-      g.sparkUntil = g.time + 8
+      g.sparkUntil = g.time + 8 * mult
       g.fireUntil = 0
       g.frostUntil = 0
       popup("ЭЛЕКТРОШАР!")
       break
     case "magnet":
-      g.magnetUntil = g.time + 7
+      g.magnetUntil = g.time + 7 * mult
       popup("МАГНИТ!")
       break
     case "magneticPaddle":
-      g.magneticPaddleUntil = g.time + 12
+      g.magneticPaddleUntil = g.time + 12 * mult
       popup("МАГНИТНАЯ РАКЕТКА!")
       break
     case "multi": {
