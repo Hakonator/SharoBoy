@@ -241,28 +241,35 @@ preview-ветке или после `supabase db reset` — боевой баз
 
 ## Структура
 
-    index.html                заставка + точка входа (+ мета-теги PWA)
-    public/                   manifest.webmanifest, sw.js, иконки
-    scripts/make-icons.mjs    генератор PWA-иконок (node scripts/make-icons.mjs)
-    src/main.tsx              монтирование React + регистрация сервис-воркера
-    src/index.css             тема (Tailwind v4)
-    src/App.tsx               HUD и экраны (в т.ч. магазин прокачки)
-    src/config.ts             URL/ключ Supabase (рекордборд)
-    src/game/audio.ts         синтезатор звуков (WebAudio)
-    src/game/game.ts          движок: физика, уровни, босс, бонусы, прокачка
-    src/game/levelBuilder.ts  генерация уровней (плотность зависит от пропорций поля)
-    src/game/viewport.ts      эталонное разрешение 1920×1080 и масштаб мира
-    src/game/boss.ts          босс «Царь-шар» (фазы, негативные дропы);
-                              финальный босс кампании — «Осьминог» (щупальца, бомбы)
-    src/game/powers.ts        бонусы (позитивные и негативные дропы)
-    src/game/achievements.ts  12 достижений (условия, localStorage)
-    src/game/leaderboard.ts   клиент мирового топа (вызывает Edge Function)
-    src/game/profanity.ts     ре-экспорт фильтра ников (общий с Edge Function)
-    src/ui/screens.tsx        React-экраны (меню, топ, магазин, достижения)
-    src/vite-env.d.ts         типы Vite (import.meta.env)
-    supabase/config.toml         конфиг Supabase CLI (project_ref, порты)
-    supabase/migrations/         SQL-миграции базы данных (версионированные)
-    supabase/functions/scores    Edge Function «scores»: запись и чтение топа
-                              (+ общий фильтр ников profanity.ts)
+    index.html                         заставка + точка входа (+ мета-теги PWA)
+    public/                            manifest.webmanifest, sw.js, иконки
+    scripts/make-icons.mjs             генератор PWA-иконок (node scripts/make-icons.mjs)
+    src/main.tsx                       монтирование React + регистрация сервис-воркера
+    src/index.css                      тема (Tailwind v4)
+    src/App.tsx                        HUD, оверлеи и модальные экраны
+    src/config.ts                      URL/ключ Supabase (рекордборд)
+    src/game/game.ts                   фасад движка: делегаты и состояние Game
+    src/game/game/                     логика движка по host-паттерну (updateStep, runFlow, levelBuild, etc.)
+    src/game/situational.ts            ситуативные механики (фокус, сэйв на грани, овердрайв, снабжение)
+    src/game/campaignMap.ts            граф и логика карты кампании (узлы, ветвления, фог-вар)
+    src/game/campaignChallenges.ts     квестовые узлы-челленджи (4 вида боевых испытаний)
+    src/game/campaignModifiers.ts      модификаторы забегов (мутаторы с множителями наград)
+    src/game/campaignEvents.ts         интерактивные события выбора на узлах «?»
+    src/game/cosmetics.ts              скины ракетки, шлейфы шара и темы поля
+    src/game/audio.ts                  фасад WebAudio + пространственное панорамирование
+    src/game/physics.ts                физический движок (столкновения, криты, отскоки)
+    src/game/boss.ts                   боссы кампании (Царь-шар, Осьминог, Кракен)
+    src/game/bossVariants.ts           альтернативные боссы (Грозовая Медуза, Меха-Краб, Хронос)
+    src/game/powers.ts                 бонусы и оружие (лазеры, ракеты, щиты, огненный/электро-шар)
+    src/game/achievements.ts           12 достижений (условия, localStorage)
+    src/game/upgrades.ts               мета-прокачка (12 постоянных улучшений)
+    src/game/leaderboard.ts            клиент мирового топа (вызывает Edge Function)
+    src/ui/screens/                    React-экраны и модальные окна (меню, карта, HUD, мутаторы)
+    src/ui/editor/                     полноэкранный визуальный Редактор Карт (1920×1080)
+    supabase/config.toml               конфиг Supabase CLI (project_ref, порты)
+    supabase/migrations/               SQL-миграции базы данных (версионированные)
+    supabase/functions/scores          Edge Function «scores»: запись и чтение топа
+    supabase/functions/maps            Edge Function «maps»: каталог пользовательских карт
+    supabase/functions/admin-maps      Edge Function «admin-maps»: модерация карт сообщества
 
 См. также `docs/REFACTORING.md`.
