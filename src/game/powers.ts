@@ -37,10 +37,8 @@ export interface PowersWorld {
   /** Текущий режим партии: в кампании жизни выпадают только с минибоссов. */
   readonly mode: "campaign" | "endless" | "custom"
   powers: PowerUp[]
-  fieldShift: null | { t: number; dur: number; dx: number; dy: number }
   spawnTimer: number
   skyDropTimer: number
-  shiftTimer: number
   wideUntil: number
   slowUntil: number
   fastUntil: number
@@ -137,44 +135,6 @@ export class PowersSystem {
       })
       break
     }
-  }
-
-  /** Редкое смещение всего поля (плавный дрейф). */
-  tryFieldShift(dt: number) {
-    const g = this.g
-    g.shiftTimer -= dt
-    if (g.shiftTimer > 0 || g.fieldShift) return
-    g.shiftTimer = rand(12, 18)
-    if (!g.blocks.length) return
-    const ang = rand(0, Math.PI * 2)
-    const mag = rand(22, 40)
-    let dx = Math.cos(ang) * mag
-    let dy = Math.sin(ang) * mag * 0.6
-    let minX = Infinity
-    let maxX = -Infinity
-    let minY = Infinity
-    let maxY = -Infinity
-    for (const b of g.blocks) {
-      if (b.minionOrbit) continue
-      minX = Math.min(minX, b.x - b.rx)
-      maxX = Math.max(maxX, b.x + b.rx)
-      minY = Math.min(minY, b.y - b.ry)
-      maxY = Math.max(maxY, b.y + b.ry)
-    }
-    if (minX + dx < 6) dx = 6 - minX
-    if (maxX + dx > g.w - 6) dx = g.w - 6 - maxX
-    if (minY + dy < g.blockTop) dy = g.blockTop - minY
-    if (maxY + dy > g.h * 0.8) dy = g.h * 0.8 - maxY
-    g.fieldShift = { t: 0, dur: rand(0.6, 0.9), dx: dx * 2.2, dy: dy * 2.2 }
-    g.fx.popups.push({
-      x: g.w / 2,
-      y: g.h * 0.25,
-      text: "СДВИГ ПОЛЯ",
-      color: "#9fd6ea",
-      t: 0,
-      size: 20,
-    })
-    g.shake = Math.min(g.shake + 1.5, 5)
   }
 
   private pickPowerType(): PowerType {

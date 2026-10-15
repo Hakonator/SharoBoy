@@ -209,8 +209,6 @@ export class Game {
   sparkQueue: SparkHit[] = []
   spawnTimer = 18
   skyDropTimer = 22
-  shiftTimer = 14
-  fieldShift: null | { t: number; dur: number; dx: number; dy: number } = null
   blocksInitial = 1
   coins = 0
   /** Постоянные несгораемые мета-кристаллы профиля. */

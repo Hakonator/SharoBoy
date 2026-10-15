@@ -104,12 +104,6 @@ export function makePowersHost(g: Game): PowersWorld {
     set powers(v) {
       g.powers = v
     },
-    get fieldShift() {
-      return g.fieldShift
-    },
-    set fieldShift(v) {
-      g.fieldShift = v
-    },
     get spawnTimer() {
       return g.spawnTimer
     },
@@ -121,12 +115,6 @@ export function makePowersHost(g: Game): PowersWorld {
     },
     set skyDropTimer(v) {
       g.skyDropTimer = v
-    },
-    get shiftTimer() {
-      return g.shiftTimer
-    },
-    set shiftTimer(v) {
-      g.shiftTimer = v
     },
     get wideUntil() {
       return g.wideUntil

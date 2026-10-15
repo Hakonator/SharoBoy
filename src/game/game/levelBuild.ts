@@ -26,7 +26,6 @@ export function buildFromSpec(g: Game, spec: LevelSpec) {
   g.levelLostBall = false
   g.bossSys.clear()
   g.boomQueue = []
-  g.fieldShift = null
   resetMiniboss(g)
   const top = blockTop(g)
   if ("boss" in spec) {
@@ -82,7 +81,6 @@ export function buildBossLevel(g: Game, hp: number, minions: number, bombs: numb
 export function buildOctopusBossLevel(g: Game, variant: BossVariant) {
   g.bossSys.clear()
   g.boomQueue = []
-  g.fieldShift = null
   resetMiniboss(g)
   g.blocks = []
   const boss = buildOctopusBoss(g, variant.hp, variant)
@@ -94,7 +92,6 @@ export function buildOctopusBossLevel(g: Game, variant: BossVariant) {
 export function buildJellyfishBossLevel(g: Game, variant: BossVariant) {
   g.bossSys.clear()
   g.boomQueue = []
-  g.fieldShift = null
   resetMiniboss(g)
   const boss = buildJellyfishBoss(g, variant.hp, variant)
   g.bossSys.spawn(boss)
@@ -105,7 +102,6 @@ export function buildJellyfishBossLevel(g: Game, variant: BossVariant) {
 export function buildCrabBossLevel(g: Game, variant: BossVariant) {
   g.bossSys.clear()
   g.boomQueue = []
-  g.fieldShift = null
   resetMiniboss(g)
   g.blocks = []
   const { boss, blocks } = buildCrabBoss(g.w, g.h, variant.hp, variant)
@@ -118,7 +114,6 @@ export function buildCrabBossLevel(g: Game, variant: BossVariant) {
 export function buildChronoBossLevel(g: Game, variant: BossVariant) {
   g.bossSys.clear()
   g.boomQueue = []
-  g.fieldShift = null
   resetMiniboss(g)
   g.blocks = []
   const { boss, blocks } = buildChronoBoss(g.w, g.h, variant.hp, variant)
@@ -173,8 +168,6 @@ export function serveBall(g: Game) {
   g.balls = [ball]
   g.spawnTimer = rand(16, 22)
   g.skyDropTimer = rand(18, 27)
-  g.shiftTimer = rand(12, 18)
-  g.fieldShift = null
   pushHud(g)
 }
 

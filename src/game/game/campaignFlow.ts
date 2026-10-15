@@ -88,7 +88,6 @@ export function enterMapView(g: Game) {
   g.projectiles = []
   g.bossSys.clear()
   g.boomQueue = []
-  g.fieldShift = null
   g.banner = null
   g.bannerTimer = 0
   g.transition = 0

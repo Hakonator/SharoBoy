@@ -6,7 +6,7 @@ import { applyChronoRiftsToBalls } from "../bossChrono"
 import { pushHud, syncEffectsHud } from "./hudSync"
 import { applyFishWake, updateMouthBubbles } from "./minibossFx"
 import { stepBlock } from "./blockMotion"
-import { blockTop, updatePaddleRotation } from "./paddleControl"
+import { updatePaddleRotation } from "./paddleControl"
 import { draw } from "./drawScene"
 import { loseLife, onLevelCleared } from "./runFlow"
 
@@ -88,20 +88,6 @@ export function update(g: Game, dt: number) {
   // Деструкция крутящихся блоков завершается после ровно одной секунды анимации.
   g.physics.finishSpinDeaths()
 
-  // плавный дрейф поля
-  if (g.fieldShift) {
-    const fs = g.fieldShift
-    fs.t += dt
-    const k = clamp(fs.t / fs.dur, 0, 1)
-    const e = k * k * (3 - 2 * k)
-    for (const b of g.blocks) {
-      if (b.minionOrbit) continue
-      b.x0 = clamp(b.x0 + fs.dx * e * dt, b.rx + 4, g.w - b.rx - 4)
-      b.y = clamp(b.y + fs.dy * e * dt, blockTop(g) + b.ry, g.h * 0.8)
-    }
-    if (k >= 1) g.fieldShift = null
-  }
-
   if (g.phase !== "playing") return
 
   syncEffectsHud(g)
@@ -113,7 +99,6 @@ export function update(g: Game, dt: number) {
   g.powersSys.updatePowers(dt)
   g.powersSys.periodicSpawn(dt)
   g.powersSys.periodicPowerDrop(dt)
-  g.powersSys.tryFieldShift(dt)
   g.bossSys.step(dt)
   /* Очереди отложенных событий: zero-alloc drain in-place. Нулевые задачи
      обрабатываются по расписанию; новые звенья, добавленные во время
