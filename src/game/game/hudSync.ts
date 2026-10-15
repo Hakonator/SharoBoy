@@ -4,6 +4,7 @@ import { LEVELS } from "../levels"
 import { lsSet } from "../utils"
 import { UPGRADE_DEFS } from "../upgrades"
 import type { ScoreEntry } from "../types"
+import { formatChallengeHud } from "../campaignChallenges"
 
 import { currentMapView } from "./campaignFlow"
 import { levelDisplayName } from "./levelBuild"
@@ -106,6 +107,8 @@ export function pushHud(g: Game) {
     campaignEvent: g.campaignEvent,
     campaignEventData: g.campaignEventData,
     campaignShop: g.campaignShop,
+    campaignModifiers: g.campaignModifiers?.length ? [...g.campaignModifiers] : undefined,
+    activeChallenge: g.activeChallenge ? formatChallengeHud(g.activeChallenge) : null,
     newAchievements: g.achQueue.splice(0),
   })
 }

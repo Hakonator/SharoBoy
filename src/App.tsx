@@ -15,6 +15,7 @@ import {
 } from "./ui/screens"
 import { CommunityMaps } from "./ui/screens/communityMaps"
 import { AdminPanel } from "./ui/screens/AdminPanel"
+import { CampaignModifiersModal } from "./ui/screens/CampaignModifiersModal"
 import { useAchToasts } from "./ui/useAchToasts"
 import { useDebugControls } from "./ui/useDebugControls"
 import { useLeaderboard } from "./ui/useLeaderboard"
@@ -79,6 +80,7 @@ export default function App() {
   const [showCommunityMaps, setShowCommunityMaps] = useState(false)
   const [showAdminPanel, setShowAdminPanel] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showModifiersModal, setShowModifiersModal] = useState(false)
 
   const onHud = useCallback((h: HudData) => setHud(h), [])
 
@@ -229,7 +231,7 @@ export default function App() {
             onNickChange={handleNickChange}
             onPeriod={leaderboard.setPeriod}
             onScreen={leaderboard.setScreen}
-            onCampaign={() => g()?.startGame()}
+            onCampaign={() => setShowModifiersModal(true)}
             onEndless={() => g()?.startEndless()}
             onCommunityMaps={() => setShowCommunityMaps(true)}
             onAdmin={() => setShowAdminPanel(true)}
@@ -263,6 +265,15 @@ export default function App() {
           >
             Редактор карт
           </button>
+          {showModifiersModal && (
+            <CampaignModifiersModal
+              onStart={(modifiers) => {
+                setShowModifiersModal(false)
+                g()?.startGame(modifiers)
+              }}
+              onClose={() => setShowModifiersModal(false)}
+            />
+          )}
         </>
       )}
 

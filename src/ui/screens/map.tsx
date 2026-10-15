@@ -13,6 +13,7 @@ import {
   IconVortex,
 } from "../icons"
 import type { HudData } from "../../game/types"
+import { CAMPAIGN_MODIFIERS_MAP } from "../../game/campaignModifiers"
 
 /**
  * Экран рогаликовой карты кампании: узлы слева-направо, рёбра-связи и туман
@@ -131,6 +132,26 @@ export function MapScreen({
               </div>
             </div>
           </div>
+
+          {hud.campaignModifiers && hud.campaignModifiers.length > 0 && (
+            <div className="hud-chip hidden items-center gap-1.5 border-purple-500/30 bg-purple-950/20 px-3 py-1.5 sm:flex sm:px-3.5 sm:py-2">
+              <span className="text-base sm:text-lg">⚡</span>
+              <div>
+                <div className="hud-label text-purple-300">МУТАТОРЫ</div>
+                <div className="flex items-center gap-1">
+                  {hud.campaignModifiers.map((m) => (
+                    <span
+                      key={m}
+                      className="rounded bg-purple-500/25 px-1 py-0.5 text-[10px] font-bold text-purple-200"
+                      title={CAMPAIGN_MODIFIERS_MAP[m]?.desc}
+                    >
+                      {CAMPAIGN_MODIFIERS_MAP[m]?.icon} {CAMPAIGN_MODIFIERS_MAP[m]?.title}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
@@ -295,21 +316,28 @@ export function MapScreen({
                     </span>
                   )}
                   {(clickable || isEventTarget) && (
-                    <span
-                      className={`whitespace-nowrap font-display text-[10px] tracking-wider drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs ${
-                        isEventTarget
-                          ? "text-gold"
-                          : n.isShop
+                    <div className="flex flex-col items-center">
+                      <span
+                        className={`whitespace-nowrap font-display text-[10px] tracking-wider drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs ${
+                          isEventTarget
                             ? "text-gold"
-                            : n.isChallenge
-                              ? "text-[#ff477e]"
-                              : n.isEvent
-                                ? "text-amber-300"
-                                : "text-foam"
-                      }`}
-                    >
-                      {n.name}
-                    </span>
+                            : n.isShop
+                              ? "text-gold"
+                              : n.isChallenge
+                                ? "text-[#ff477e]"
+                                : n.isEvent
+                                  ? "text-amber-300"
+                                  : "text-foam"
+                        }`}
+                      >
+                        {n.isChallenge && n.challenge ? n.challenge.title : n.name}
+                      </span>
+                      {n.isChallenge && n.challenge && clickable && (
+                        <span className="whitespace-nowrap font-display text-[9px] text-[#ff477e]/90 drop-shadow-[0_1px_0_rgba(4,18,26,0.9)] sm:text-[10px]">
+                          +{n.challenge.rewardCrystals} 💎 +{n.challenge.rewardMeta} 💠
+                        </span>
+                      )}
+                    </div>
                   )}
                 </button>
               )
@@ -335,7 +363,7 @@ export function MapScreen({
           </div>
           <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-[#ff477e] sm:text-xs">
             <IconChallenge className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            ИСПЫТАНИЕ
+            ИСПЫТАНИЕ (+💎 +💠)
           </div>
           <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-coral sm:text-xs">
             <IconOctopus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />

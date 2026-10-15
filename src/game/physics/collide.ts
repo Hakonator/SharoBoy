@@ -44,6 +44,7 @@ export function applyClutchRebound(g: PhysicsWorld, ball: Ball, rel: number, pad
       t: 0,
       size: 18,
     })
+    g.onClutchSave?.()
   }
 }
 

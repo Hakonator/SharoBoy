@@ -10,6 +10,7 @@ import type { LevelSpec } from "../levels"
 import type { CampaignMapView, CampaignNode } from "../campaignMap"
 import { openCampaignShop } from "../campaignShop"
 import { buildCampaignEvent } from "../campaignEvents"
+import { initActiveChallenge } from "../campaignChallenges"
 
 import { applyTrack } from "./audioControls"
 import { pushHud, setBanner } from "./hudSync"
@@ -95,6 +96,7 @@ export function enterMapView(g: Game) {
   g.fx.clear()
   g.onBossNode = false
   g.activeSpec = null
+  g.activeChallenge = null
   applyTrack(g)
   pushHud(g)
 }
@@ -260,7 +262,12 @@ export function startMapBattle(g: Game, node: CampaignNode) {
     const hp = node.isChallenge ? Math.round(baseHp * 1.3) : baseHp
     addMiniboss(g, kind, hp)
   }
-  const label = node.isChallenge ? `⚔️ ИСПЫТАНИЕ: ${node.name}` : node.name
+  if (node.isChallenge && node.challenge) {
+    g.activeChallenge = initActiveChallenge(node.challenge)
+  } else {
+    g.activeChallenge = null
+  }
+  const label = node.isChallenge ? `🎯 ИСПЫТАНИЕ: ${node.challenge?.title ?? node.name}` : node.name
   launchNodeBattle(g, label)
 }
 

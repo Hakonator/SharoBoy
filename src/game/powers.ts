@@ -59,9 +59,11 @@ export interface PowersWorld {
   fx: Effects
   sfx: SFX
   addCoins(n: number): void
+  addScore?(n: number, x: number, y: number, color: string, size: number): void
   pushHud(): void
   buffDurationMult?: number
   coinMagnetLevel?: number
+  isIronman?(): boolean
 }
 
 export class PowersSystem {

@@ -7,6 +7,8 @@
 import type { CampaignMapView } from "./campaignMap"
 import type { BlockSpecial } from "./blockKinds"
 import type { PlayerCosmetics } from "./cosmetics"
+import type { CampaignModifierId } from "./campaignModifiers"
+import type { ActiveChallengeHud } from "./campaignChallenges"
 
 export type Phase = "menu" | "playing" | "paused" | "over" | "won" | "map"
 
@@ -69,6 +71,10 @@ export interface HudData {
   campaignEventData?: CampaignEventData | null
   /** Активный открытый магазин забега на карте (null — закрыт). */
   campaignShop?: CampaignShopState | null
+  /** Активные модификаторы (мутаторы) текущего забега кампании. */
+  campaignModifiers?: CampaignModifierId[]
+  /** Активное испытание узла (если бой идёт на узле-челлендже). */
+  activeChallenge?: ActiveChallengeHud | null
 }
 
 export interface CampaignShopItem {

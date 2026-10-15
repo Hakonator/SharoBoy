@@ -50,6 +50,8 @@ import {
   DEFAULT_UNLOCKED_COSMETICS,
   DEFAULT_EQUIPPED_COSMETICS,
 } from "./cosmetics"
+import { type CampaignModifierId, computeRunMultipliers } from "./campaignModifiers"
+import type { ActiveChallengeState } from "./campaignChallenges"
 import { clearAccountStorage } from "./account"
 import {
   loadScoreEntries,
@@ -277,6 +279,10 @@ export class Game {
   campaignPlayerId = -1
   campaignVisited: number[] = []
   campaignVisible: number[] = []
+  /** Активные модификаторы (мутаторы) текущего забега кампании. */
+  campaignModifiers: CampaignModifierId[] = []
+  /** Активное квестовое испытание на текущем боевом узле карты. */
+  activeChallenge: ActiveChallengeState | null = null
   /** Раскладка текущего боя (null вне карты и на узле финального босса). */
   activeSpec: LevelSpec | null = null
   /** Идёт ли сейчас бой с финальным боссом (а не с обычным узлом). */
@@ -338,8 +344,8 @@ export class Game {
   setNick(nick: string) {
     setNick(this, nick)
   }
-  startGame() {
-    startGame(this)
+  startGame(modifiers?: CampaignModifierId[]) {
+    startGame(this, modifiers)
   }
   startLevelBattle(n: number) {
     startLevelBattle(this, n)
@@ -414,8 +420,10 @@ export class Game {
     closeCampaignShop(this)
   }
   addCrystals(n: number) {
-    this.crystals += n
-    this.crystalsRunTotal += n
+    const { crystalMultiplier } = computeRunMultipliers(this.campaignModifiers)
+    const multiplied = Math.round(n * crystalMultiplier)
+    this.crystals += multiplied
+    this.crystalsRunTotal += multiplied
     pushHud(this)
   }
   enterNextNodeOnAction() {

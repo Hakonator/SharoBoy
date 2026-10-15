@@ -1,7 +1,9 @@
 import { vi } from "vitest"
 
 import { Game } from "./game"
-import type { CampaignMapView } from "./campaignMap"
+import type { CampaignMap, CampaignMapView } from "./campaignMap"
+import type { CampaignModifierId } from "./campaignModifiers"
+import type { Block, Ball } from "./types"
 
 export interface GameInternals {
   phase: string
@@ -9,17 +11,18 @@ export interface GameInternals {
   lives: number
   coins: number
   shield: number
-  blocks: unknown[]
-  balls: unknown[]
-  campaign: unknown
+  blocks: Block[]
+  balls: Ball[]
+  campaign: CampaignMap | null
   campaignShop: unknown
   campaignEventData: unknown
   campaignPlayerId: number
   campaignVisited: number[]
   campaignVisible: number[]
+  campaignModifiers: CampaignModifierId[]
   activeSpec: { name: string } | null
   onBossNode: boolean
-  startGame: () => void
+  startGame: (modifiers?: CampaignModifierId[]) => void
   startLevelBattle: (n: number) => void
   enterMapNode: (id: number) => void
   dismissCampaignEvent: () => void

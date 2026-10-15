@@ -1,6 +1,7 @@
 import type { Game } from "../game"
 import type { PlayerMapSpec } from "../mapSpec"
 import { mapSpecToBlocks } from "../mapAdapter"
+import type { CampaignModifierId } from "../campaignModifiers"
 
 import { applyTrack } from "./audioControls"
 import { startCampaignMap } from "./campaignFlow"
@@ -10,13 +11,17 @@ import { applyUpgrades, addCoins } from "./progress"
 import { resetRun } from "./runFlow"
 
 /** Старт забега: генерирует карту кампании и открывает экран карты (фог войны). */
-export function startGame(g: Game) {
+export function startGame(g: Game, modifiers?: CampaignModifierId[]) {
   g.sfx.ensure()
   g.sfx.ui()
   g.mode = "campaign"
   g.wave = 0
   g.waveSpec = null
   resetRun(g)
+  g.campaignModifiers = modifiers ? [...modifiers] : []
+  if (g.campaignModifiers.includes("ironman")) {
+    g.lives = 1
+  }
   startCampaignMap(g)
 }
 
@@ -103,6 +108,8 @@ export function toMenu(g: Game) {
   g.campaignVisible = []
   g.activeSpec = null
   g.onBossNode = false
+  g.campaignModifiers = []
+  g.activeChallenge = null
   applyTrack(g)
   g.balls = []
   g.blocks = []

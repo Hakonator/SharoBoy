@@ -1,5 +1,6 @@
 import { clamp, mulberry32 } from "./utils"
 import type { CampaignEdge, CampaignMap, CampaignNode } from "./campaignMap"
+import { createCampaignChallenge } from "./campaignChallenges"
 
 /** Количество ярусов карты (последний ярус — босс). */
 export const MAP_TIERS = 30
@@ -93,6 +94,7 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
       if (isShop) tierHasShop = true
       // Испытания (элитные боевые узлы с повышенной сложностью и наградой)
       const isChallenge = !isBoss && !isEvent && !isShop && t >= 3 && rng() < CHALLENGE_NODE_CHANCE
+      const challenge = isChallenge ? createCampaignChallenge(seed + id * 7919, t) : undefined
 
       const name = isBoss
         ? t === 9
@@ -117,6 +119,7 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
         isEvent,
         isShop,
         isChallenge,
+        challenge,
         name,
       })
       row.push(id)

@@ -116,6 +116,12 @@ export interface PhysicsWorld {
   /** Попадание бомбы осьминога по ракетке. */
   onBombHitPaddle(): void
   onPaddleBounce?(): void
+  onClutchSave?(): void
+  onCritHit?(): void
+  heavyGravityActive?(): boolean
+  glassPaddleActive?(): boolean
+  invertedControlsActive?(): boolean
+  hyperSpeedActive?(): boolean
   pushHud(): void
   /** Множитель урона шара (отладка: увеличивается клавишей NumpadSubtract). */
   readonly debugBallDamage: number
@@ -141,19 +147,23 @@ export class Physics {
     let wMult = 1
     if (this.g.wideActive()) wMult = 1.45
     else if (this.g.shrinkActive()) wMult = 0.6
+    if (this.g.glassPaddleActive?.()) wMult *= 0.8
     const targetW = p.baseW * wMult
     p.w += (targetW - p.w) * Math.min(1, dt * 10)
 
     const inp = this.g.input
+    const inverted = Boolean(this.g.invertedControlsActive?.())
+    const dirMult = inverted ? -1 : 1
     if (inp.keys.left || inp.keys.right) {
-      const dir = (inp.keys.right ? 1 : 0) - (inp.keys.left ? 1 : 0)
+      const dir = ((inp.keys.right ? 1 : 0) - (inp.keys.left ? 1 : 0)) * dirMult
       p.vx += dir * 5200 * dt
       p.vx = clamp(p.vx, -900, 900)
       inp.pointerX = null
     } else if (inp.pointerX !== null) {
+      const targetPointerX = inverted ? this.g.w - inp.pointerX : inp.pointerX
       const k = 1 - Math.exp(-dt * (inp.locked ? 44 : 26))
-      p.vx = (inp.pointerX - p.x) * k * 30
-      p.x += (inp.pointerX - p.x) * k
+      p.vx = (targetPointerX - p.x) * k * 30
+      p.x += (targetPointerX - p.x) * k
     } else {
       p.vx *= Math.exp(-dt * 10)
     }
@@ -268,6 +278,9 @@ export class Physics {
     const steps = Math.max(1, Math.ceil((speed * dt) / (ball.r * 0.8)))
     const sdt = dt / steps
     for (let s = 0; s < steps; s++) {
+      if (this.g.heavyGravityActive?.()) {
+        ball.vy += 220 * sdt
+      }
       ball.x += ball.vx * sdt
       ball.y += ball.vy * sdt
 

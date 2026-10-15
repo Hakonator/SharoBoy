@@ -11,6 +11,7 @@ import {
   VolSlider,
 } from "../icons"
 import type { HudData } from "../../game/types"
+import { computeRunMultipliers, CAMPAIGN_MODIFIERS_MAP } from "../../game/campaignModifiers"
 
 /** Наложение во время игры: верхний HUD-бар, цели на мобильных, эффекты, подсказки, баннер. */
 export function HudOverlay({
@@ -149,6 +150,30 @@ export function HudOverlay({
         </div>
       </div>
     ) : null
+  const crystalsChip =
+    hud.mode === "campaign" && (hud.crystals ?? 0) > 0 ? (
+      <div className={`hud-chip ${pad} border-purple-500/20 bg-purple-950/20`}>
+        <div className="hud-label text-purple-300">Кристаллы</div>
+        <div className={`font-display ${val} leading-none text-purple-200 tabular-nums`}>
+          {hud.crystals} 💎
+        </div>
+      </div>
+    ) : null
+  const { crystalMultiplier } = computeRunMultipliers(hud.campaignModifiers ?? [])
+  const mutatorBadge =
+    (hud.campaignModifiers?.length ?? 0) > 0 ? (
+      <div
+        className={`hud-chip hidden sm:flex items-center gap-1.5 border-purple-500/30 bg-purple-950/30 ${pad}`}
+        title={(hud.campaignModifiers ?? [])
+          .map((m) => CAMPAIGN_MODIFIERS_MAP[m]?.title ?? m)
+          .join(", ")}
+      >
+        <div className="hud-label text-purple-300">Мутаторы</div>
+        <div className={`font-display ${val} leading-none font-bold text-purple-200`}>
+          ×{crystalMultiplier.toFixed(2)}
+        </div>
+      </div>
+    ) : null
   const rightControls = (
     <div className="flex items-start gap-1.5 sm:gap-2">
       <div className={`hud-chip ${pad}`}>
@@ -251,12 +276,30 @@ export function HudOverlay({
                 </div>
                 {rightControls}
               </div>
-              {(hud.best > 0 || comboChip || coinsChip || shieldChip) && (
+              {(hud.best > 0 || comboChip || coinsChip || shieldChip || crystalsChip) && (
                 <div className="flex flex-wrap items-start gap-1">
                   {bestChip}
                   {comboChip}
                   {coinsChip}
+                  {crystalsChip}
                   {shieldChip}
+                </div>
+              )}
+              {hud.activeChallenge && (
+                <div
+                  className={`hud-chip flex items-center justify-between px-3 py-1 text-xs font-bold ${
+                    hud.activeChallenge.failed
+                      ? "border-red-500/50 bg-red-950/40 text-red-300"
+                      : hud.activeChallenge.completed
+                        ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-200"
+                        : "border-[#ff477e]/60 bg-[#ff477e]/15 text-[#ff477e]"
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>🎯</span>
+                    <span>{hud.activeChallenge.title}</span>
+                  </div>
+                  <div className="tabular-nums font-display">{hud.activeChallenge.statusText}</div>
                 </div>
               )}
             </>
@@ -268,20 +311,48 @@ export function HudOverlay({
                 {bestChip}
                 {comboChip}
                 {coinsChip}
+                {crystalsChip}
+                {mutatorBadge}
                 {shieldChip}
               </div>
 
-              {/* Ландшафт/десктоп: центральная плашка целей на md+ */}
-              <div className="hud-chip stripe-hazard hidden px-5 py-2 text-center md:block">
-                <div className="hud-label">
-                  {hud.mode === "endless"
-                    ? `Волна ${hud.wave} · ∞`
-                    : `Уровень ${hud.level}/${hud.levelCount} · ${hud.levelName}`}
+              {/* Ландшафт/десктоп: центральная плашка челленджа или целей */}
+              {hud.activeChallenge ? (
+                <div
+                  className={`hud-chip px-5 py-2 text-center transition-all ${
+                    hud.activeChallenge.failed
+                      ? "border-red-500/60 bg-red-950/50 text-red-300"
+                      : hud.activeChallenge.completed
+                        ? "border-emerald-500/60 bg-emerald-950/50 text-emerald-200 shadow-[0_0_16px_rgba(16,185,129,0.3)]"
+                        : "border-[#ff477e]/60 bg-abyss/90 shadow-[0_0_20px_rgba(255,71,126,0.35)]"
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span className="text-sm">🎯</span>
+                    <span className="hud-label font-bold tracking-wider text-[#ff477e]">
+                      {hud.activeChallenge.title}
+                    </span>
+                  </div>
+                  <div className="font-display text-base font-bold tracking-wide sm:text-lg">
+                    {hud.activeChallenge.statusText}
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-foam/80">
+                    Награда: +{hud.activeChallenge.rewardCrystals} 💎 +
+                    {hud.activeChallenge.rewardMeta} 💠
+                  </div>
                 </div>
-                <div className="font-display text-lg leading-tight text-cyan-neon">
-                  ЦЕЛИ: <span className="text-foam tabular-nums">{hud.blocksLeft}</span>
+              ) : (
+                <div className="hud-chip stripe-hazard hidden px-5 py-2 text-center md:block">
+                  <div className="hud-label">
+                    {hud.mode === "endless"
+                      ? `Волна ${hud.wave} · ∞`
+                      : `Уровень ${hud.level}/${hud.levelCount} · ${hud.levelName}`}
+                  </div>
+                  <div className="font-display text-lg leading-tight text-cyan-neon">
+                    ЦЕЛИ: <span className="text-foam tabular-nums">{hud.blocksLeft}</span>
+                  </div>
                 </div>
-              </div>
+              )}
               {rightControls}
             </>
           )}

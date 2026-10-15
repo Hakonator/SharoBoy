@@ -9,6 +9,7 @@
  */
 
 import type { MinibossKind } from "./minibosses"
+import type { CampaignChallenge } from "./campaignChallenges"
 
 export {
   MAP_TIERS,
@@ -41,6 +42,8 @@ export interface CampaignNode {
   isShop?: boolean
   /** Элитный узел-испытание: повышенная сложность и щедрая награда. */
   isChallenge?: boolean
+  /** Квестовое боевое условие для узла-испытания. */
+  challenge?: CampaignChallenge
   /** Отображаемое имя узла. */
   name: string
 }

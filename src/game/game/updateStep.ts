@@ -3,6 +3,7 @@ import { clamp, compactInPlace, drainQueue } from "../utils"
 import type { SparkHit } from "../types"
 import { applyChronoRiftsToBalls } from "../bossChrono"
 import { stepGravitationalFocus } from "../situational"
+import { updateActiveChallenge } from "../campaignChallenges"
 
 import { pushHud, syncEffectsHud } from "./hudSync"
 import { applyFishWake, updateMouthBubbles } from "./minibossFx"
@@ -128,6 +129,37 @@ export function update(g: Game, dt: number) {
 
   const frozen = g.transition > 0 || g.bannerTimer > 1.1 || g.countdown > 0
   if (!frozen && !isLevelCleared) {
+    if (g.activeChallenge) {
+      updateActiveChallenge(g.activeChallenge, dt, {
+        onSurviveWin: () => {
+          for (const b of g.blocks) b.dead = true
+          g.blocks = []
+          g.fx.burst(g.w / 2, g.h * 0.4, "#ffd700", 24, 280)
+          g.fx.popups.push({
+            x: g.w / 2,
+            y: g.h * 0.42,
+            text: "ВЫЖИВАНИЕ ПРОЙДЕНО! 🏆",
+            color: "#ffd700",
+            t: 0,
+            size: 24,
+          })
+          g.sfx.win()
+          pushHud(g)
+        },
+        onTimeExpired: () => {
+          g.fx.popups.push({
+            x: g.w / 2,
+            y: g.h * 0.42,
+            text: "ВРЕМЯ ИСТЕКЛО! ИСПЫТАНИЕ ПРОВАЛЕНО",
+            color: "#f87171",
+            t: 0,
+            size: 18,
+          })
+          g.sfx.loseLife()
+          pushHud(g)
+        },
+      })
+    }
     const fire = g.input.keys.space || g.input.consumeTapFire()
     g.weaponsSys.updateLaser(fire)
     g.weaponsSys.tryFire(dt, fire)

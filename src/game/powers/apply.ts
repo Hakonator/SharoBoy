@@ -97,6 +97,11 @@ export function applyPower(g: PowersWorld, type: PowerType) {
       break
     }
     case "life":
+      if (g.isIronman?.()) {
+        g.addScore?.(1000, g.paddle.x, g.paddle.y - 40, "#ffd700", 20)
+        popup("ЖЕЛЕЗНАЯ ВОЛЯ! +1000")
+        break
+      }
       g.lives = Math.min(5, g.lives + 1)
       popup("+1 ЖИЗНЬ")
       break

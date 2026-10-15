@@ -4,6 +4,8 @@ import type { PowersWorld } from "../powers"
 import type { PhysicsWorld } from "../physics"
 import type { WeaponsWorld } from "../weapons"
 import { queueSparkChain, sparkChainTargets } from "../physics/spark"
+import { hasModifier } from "../campaignModifiers"
+import { recordChallengeCrit } from "../campaignChallenges"
 
 import { addCoins } from "./progress"
 import { pushHud } from "./hudSync"
@@ -210,6 +212,8 @@ export function makePowersHost(g: Game): PowersWorld {
     fx: g.fx,
     sfx: g.sfx,
     addCoins: (n) => addCoins(g, n),
+    addScore: (n, x, y, color, size) => addScore(g, n, x, y, color, size),
+    isIronman: () => hasModifier(g.campaignModifiers, "ironman"),
     pushHud: () => pushHud(g),
     get buffDurationMult() {
       return 1 + 0.25 * (g.upgrades.buffDuration ?? 0)
@@ -340,11 +344,32 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     addScore: (n, x, y, color, size) => addScore(g, n, x, y, color, size),
     dropPower: (x, y) => g.powersSys.dropPower(x, y),
-    damageBoss: (dmg, fromWeapon, isCrit) => g.bossSys.damage(dmg, fromWeapon, isCrit),
+    damageBoss: (dmg, fromWeapon, isCrit) => {
+      g.bossSys.damage(dmg, fromWeapon, isCrit)
+      if (isCrit && g.activeChallenge) {
+        recordChallengeCrit(g.activeChallenge, () => {
+          g.fx.popups.push({
+            x: g.w / 2,
+            y: g.h * 0.45,
+            text: "ЦЕЛЬ КРИТОВ ДОСТИГНУТА! 🎯",
+            color: "#ffd700",
+            t: 0,
+            size: 22,
+          })
+          g.sfx.win()
+        })
+        pushHud(g)
+      }
+    },
     damageMiniboss: (dmg, block) => damageMiniboss(g, dmg, block),
     onBombHitPaddle: () => onBombHitPaddle(g),
     onPaddleBounce: () => {
       g.bossCleanHits = 0
+      if (hasModifier(g.campaignModifiers, "hyper_speed")) {
+        for (const b of g.balls) {
+          b.speed = Math.min(b.speed * 1.025, 1200)
+        }
+      }
       if (g.campaignRelics?.relicSpark) {
         g.campaignSparkBounceCount = (g.campaignSparkBounceCount ?? 0) + 1
         if (g.campaignSparkBounceCount >= 15) {
@@ -369,6 +394,42 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
         }
       }
     },
+    onClutchSave: () => {
+      if (g.activeChallenge) {
+        recordChallengeCrit(g.activeChallenge, () => {
+          g.fx.popups.push({
+            x: g.w / 2,
+            y: g.h * 0.45,
+            text: "ЦЕЛЬ КРИТОВ ДОСТИГНУТА! 🎯",
+            color: "#ffd700",
+            t: 0,
+            size: 22,
+          })
+          g.sfx.win()
+        })
+        pushHud(g)
+      }
+    },
+    onCritHit: () => {
+      if (g.activeChallenge) {
+        recordChallengeCrit(g.activeChallenge, () => {
+          g.fx.popups.push({
+            x: g.w / 2,
+            y: g.h * 0.45,
+            text: "ЦЕЛЬ КРИТОВ ДОСТИГНУТА! 🎯",
+            color: "#ffd700",
+            t: 0,
+            size: 22,
+          })
+          g.sfx.win()
+        })
+        pushHud(g)
+      }
+    },
+    heavyGravityActive: () => hasModifier(g.campaignModifiers, "heavy_gravity"),
+    glassPaddleActive: () => hasModifier(g.campaignModifiers, "glass_paddle"),
+    invertedControlsActive: () => hasModifier(g.campaignModifiers, "inverted_controls"),
+    hyperSpeedActive: () => hasModifier(g.campaignModifiers, "hyper_speed"),
     pushHud: () => pushHud(g),
   }
 }

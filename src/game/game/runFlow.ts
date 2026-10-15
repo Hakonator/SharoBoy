@@ -2,6 +2,8 @@ import type { Game } from "../game"
 import { LEVELS } from "../levels"
 import { rand, lsSet } from "../utils"
 import { nodeById } from "../campaignMap"
+import { computeRunMultipliers, hasModifier } from "../campaignModifiers"
+import { recordChallengeBallLost } from "../campaignChallenges"
 
 import { applyTrack } from "./audioControls"
 import { enterMapView } from "./campaignFlow"
@@ -28,6 +30,7 @@ export function resetRun(g: Game) {
   g.campaignSparkBounceCount = 0
   g.activeSpec = null
   g.onBossNode = false
+  g.activeChallenge = null
   g.score = 0
   g.lives = 3 + (g.upgrades.life ?? 0)
   g.combo = 0
@@ -89,13 +92,15 @@ export function launch(g: Game) {
 /* ---------- построение уровней ---------- */
 
 export function addScore(g: Game, n: number, x: number, y: number, color: string, size: number) {
-  g.score += Math.round(n)
+  const { scoreMultiplier } = computeRunMultipliers(g.campaignModifiers)
+  const finalN = Math.round(n * scoreMultiplier)
+  g.score += finalN
   if (g.score > g.best) {
     g.best = g.score
     g.newRecord = true
     lsSet("sharoboy-best", String(g.best))
   }
-  g.fx.popups.push({ x, y, text: `+${Math.round(n)}`, color, t: 0, size })
+  g.fx.popups.push({ x, y, text: `+${finalN}`, color, t: 0, size })
 }
 
 /* ---------- хост для BossSystem ---------- */
@@ -194,8 +199,46 @@ export function onLevelCleared(g: Game) {
     }
     // Обычный или элитный узел зачищен: награда кристаллами и щитом
     const currentNode = g.campaign ? nodeById(g.campaign, g.campaignPlayerId) : undefined
-    const isChallenge = currentNode?.isChallenge ?? false
+    const challenge = g.activeChallenge
     const veinMult = 1 + 0.25 * (g.upgrades.crystalVein ?? 0)
+
+    if (challenge) {
+      if (!challenge.failed) {
+        // Успешное прохождение квеста-испытания!
+        const meta = challenge.def.rewardMeta
+        const crystals = Math.round(challenge.def.rewardCrystals * veinMult)
+        addMetaCrystals(g, meta)
+        g.addCrystals(crystals)
+        if (g.shield < 3) g.shield++
+        g.fx.popups.push({
+          x: g.w / 2,
+          y: g.h * 0.46,
+          text: `ИСПЫТАНИЕ ПРОЙДЕНО! +${meta} 💠 +${crystals} 💎`,
+          color: "#38bdf8",
+          t: 0,
+          size: 24,
+        })
+        g.sfx.win()
+      } else {
+        // Испытание провалено
+        const crystals = Math.round(15 * veinMult)
+        g.addCrystals(crystals)
+        g.fx.popups.push({
+          x: g.w / 2,
+          y: g.h * 0.48,
+          text: `ИСПЫТАНИЕ ПРОВАЛЕНО! +${crystals} 💎`,
+          color: "#f87171",
+          t: 0,
+          size: 20,
+        })
+        g.sfx.levelClear()
+      }
+      g.activeChallenge = null
+      enterMapView(g)
+      return
+    }
+
+    const isChallenge = currentNode?.isChallenge ?? false
     const baseWinCrystals = Math.round((isChallenge ? 40 : 10) * veinMult)
     g.addCrystals(baseWinCrystals)
     if (isChallenge && g.shield < 3) {
@@ -231,7 +274,24 @@ export function loseLife(g: Game) {
     if (g.balls.length === 0) serveBall(g)
     return
   }
-  g.lives--
+  if (g.activeChallenge) {
+    recordChallengeBallLost(g.activeChallenge, () => {
+      g.fx.popups.push({
+        x: g.w / 2,
+        y: g.h * 0.42,
+        text: "ИСПЫТАНИЕ ПРОВАЛЕНО!",
+        color: "#f87171",
+        t: 0,
+        size: 20,
+      })
+      pushHud(g)
+    })
+  }
+  if (hasModifier(g.campaignModifiers, "ironman")) {
+    g.lives = 0
+  } else {
+    g.lives--
+  }
   g.runLivesLost++
   g.levelLostBall = true
   g.combo = 0

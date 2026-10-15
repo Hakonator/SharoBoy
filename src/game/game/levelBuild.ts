@@ -12,6 +12,7 @@ import { updateJellyTentacles } from "../bossJelly"
 import { buildCrabBoss } from "../bossCrab"
 import { buildChronoBoss } from "../bossChrono"
 import type { LevelSpec } from "../levels"
+import { hasModifier } from "../campaignModifiers"
 
 import { pushHud } from "./hudSync"
 import { resetMiniboss } from "./minibossRuntime"
@@ -49,6 +50,14 @@ export function buildFromSpec(g: Game, spec: LevelSpec) {
   }
   // спецблоки §6: только для обычных уровней (не боссовых арен)
   if (!("boss" in spec)) decorateLevel(g)
+  if (hasModifier(g.campaignModifiers, "dense_armor")) {
+    for (const b of g.blocks) {
+      if (!b.isMiniboss && !b.isTentacle && !b.isClaw) {
+        b.hp += 1
+        b.maxHp += 1
+      }
+    }
+  }
   g.blocksInitial = Math.max(1, g.blocks.length)
 }
 
@@ -149,7 +158,10 @@ export function serveBall(g: Game) {
   )
   /* Единый масштаб мира (viewport.ts): скорость одна на всех экранах —
        поле в мировых единицах имеет сопоставимые пропорции. */
-  const speed = base
+  let speed = base
+  if (hasModifier(g.campaignModifiers, "hyper_speed")) {
+    speed *= 1.25
+  }
   /* Старт: шар на поверхности ракетки (купол выше грани, чаша — ниже). */
   const bump = Physics.surfaceAt(g.paddle.w / 2, 0, g.paddleShapeKind(), g.paddle.h)
   const ball: Ball = {
