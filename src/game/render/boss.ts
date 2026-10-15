@@ -330,31 +330,6 @@ function drawCrabBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block[]) {
 
   const bodyRx = bo.r * 1.15
   const bodyRy = bo.r * 0.85
-  const ringRx = bodyRx + 9
-  const ringRy = bodyRy + 9
-
-  // Кольцо HP — строго по эллиптическому контуру туловища
-  ctx.lineWidth = 5.5
-  ctx.lineCap = "round"
-  ctx.strokeStyle = "rgba(4,18,26,0.75)"
-  ctx.beginPath()
-  ctx.ellipse(0, 0, ringRx, ringRy, 0, 0, Math.PI * 2)
-  ctx.stroke()
-
-  if (frac > 0) {
-    ctx.strokeStyle = frac > 0.55 ? "#5dffb0" : frac > 0.25 ? "#ffc94d" : "#ff5347"
-    ctx.shadowColor =
-      frac > 0.55
-        ? "rgba(93,255,176,0.8)"
-        : frac > 0.25
-          ? "rgba(255,201,77,0.8)"
-          : "rgba(255,83,71,0.8)"
-    ctx.shadowBlur = 10
-    ctx.beginPath()
-    ctx.ellipse(0, 0, ringRx, ringRy, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
-    ctx.stroke()
-    ctx.shadowBlur = 0
-  }
 
   // Тело-панцирь: массивный овальный щит
   ctx.shadowColor = angry ? "#ff2a14" : "#ff7700"
@@ -369,15 +344,6 @@ function drawCrabBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block[]) {
   ctx.fill()
   ctx.shadowBlur = 0
 
-  // Швы брони панциря
-  ctx.strokeStyle = "rgba(255,220,180,0.3)"
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(0, -bo.r * 0.8)
-  ctx.lineTo(0, bo.r * 0.8)
-  ctx.arc(0, 0, bo.r * 0.45, -Math.PI * 0.6, Math.PI * 0.6)
-  ctx.stroke()
-
   if (bo.flash > 0) {
     ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.7})`
     ctx.beginPath()
@@ -385,39 +351,201 @@ function drawCrabBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block[]) {
     ctx.fill()
   }
 
-  // Стебельчатые глаза-перископы
+  // Кольцо HP — строго вписано внутрь периметра панциря (внутренняя окантовка тела без выступа)
+  const ringRx = bodyRx - 3.5
+  const ringRy = bodyRy - 3.5
+  ctx.lineWidth = 4.5
+  ctx.lineCap = "round"
+  ctx.strokeStyle = "rgba(10,2,0,0.75)"
+  ctx.beginPath()
+  ctx.ellipse(0, 0, ringRx, ringRy, 0, 0, Math.PI * 2)
+  ctx.stroke()
+
+  if (frac > 0) {
+    ctx.strokeStyle = frac > 0.55 ? "#5dffb0" : frac > 0.25 ? "#ffc94d" : "#ff5347"
+    ctx.shadowColor =
+      frac > 0.55
+        ? "rgba(93,255,176,0.85)"
+        : frac > 0.25
+          ? "rgba(255,201,77,0.85)"
+          : "rgba(255,83,71,0.85)"
+    ctx.shadowBlur = 8
+    ctx.beginPath()
+    ctx.ellipse(0, 0, ringRx, ringRy, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
+    ctx.stroke()
+    ctx.shadowBlur = 0
+  }
+
+  // 4. Осмысленная кибернетическая морда краба
+  // А) Массивные скошенные надбровные пластины (грозный прищур)
+  ctx.strokeStyle = angry ? "#ffe29a" : "rgba(255,220,170,0.85)"
+  ctx.fillStyle = angry ? "rgba(180,30,10,0.55)" : "rgba(80,20,5,0.45)"
+  ctx.lineWidth = 2.2
+  ctx.lineJoin = "round"
+
+  for (const sx of [-1, 1]) {
+    ctx.beginPath()
+    ctx.moveTo(sx * bo.r * 0.62, -bo.r * 0.38)
+    ctx.lineTo(sx * bo.r * 0.14, -bo.r * 0.16)
+    ctx.lineTo(sx * bo.r * 0.14, -bo.r * 0.05)
+    ctx.lineTo(sx * bo.r * 0.58, -bo.r * 0.22)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+
+    // Горизонтальные узкие оптические визоры-щели под бровями (кибер-глазки)
+    ctx.fillStyle = angry ? "#ff1a1a" : "#00f0ff"
+    ctx.shadowColor = angry ? "#ff0000" : "#00f0ff"
+    ctx.shadowBlur = 6
+    ctx.beginPath()
+    ctx.moveTo(sx * bo.r * 0.48, -bo.r * 0.2)
+    ctx.lineTo(sx * bo.r * 0.18, -bo.r * 0.08)
+    ctx.lineTo(sx * bo.r * 0.18, -bo.r * 0.04)
+    ctx.lineTo(sx * bo.r * 0.48, -bo.r * 0.16)
+    ctx.closePath()
+    ctx.fill()
+    ctx.shadowBlur = 0
+  }
+
+  // Б) Центральный респиратор / пасть кибер-краба
+  const mouthY = bo.r * 0.15
+  ctx.fillStyle = "#140402"
+  ctx.strokeStyle = angry ? "#ff5347" : "#ff9e42"
+  ctx.lineWidth = 1.8
+  ctx.beginPath()
+  ctx.ellipse(0, mouthY, bo.r * 0.26, bo.r * 0.16, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.stroke()
+
+  // Вентиляционные прорези пасти
+  ctx.strokeStyle = angry ? "rgba(255,80,40,0.7)" : "rgba(255,180,80,0.6)"
+  ctx.lineWidth = 1.4
+  for (let vx = -3; vx <= 3; vx++) {
+    const x = vx * (bo.r * 0.06)
+    const h = Math.sqrt(Math.max(0, 1 - (x / (bo.r * 0.26)) ** 2)) * (bo.r * 0.13)
+    ctx.beginPath()
+    ctx.moveTo(x, mouthY - h)
+    ctx.lineTo(x, mouthY + h)
+    ctx.stroke()
+  }
+
+  // В) Механические жвалы-челюсти краба (мандибулы) по бокам рта
+  const mandibleTwitch = Math.sin(bo.t * 5.5) * 0.06
+  for (const sx of [-1, 1]) {
+    const mAngle = sx * (0.28 + mandibleTwitch + (angry ? 0.12 : 0))
+    const mBaseX = sx * bo.r * 0.24
+    const mBaseY = mouthY - bo.r * 0.08
+
+    ctx.save()
+    ctx.translate(mBaseX, mBaseY)
+    ctx.rotate(mAngle)
+
+    // Клиновидная зазубренная створка жвалы
+    ctx.fillStyle = angry ? "#e63900" : "#c4421a"
+    ctx.strokeStyle = "#ffe29a"
+    ctx.lineWidth = 1.8
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.lineTo(sx * bo.r * 0.18, bo.r * 0.18)
+    ctx.lineTo(0, bo.r * 0.38)
+    ctx.lineTo(-sx * bo.r * 0.06, bo.r * 0.22)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+
+    // Металлические зубцы
+    ctx.fillStyle = "#ffffff"
+    for (let t = 1; t <= 3; t++) {
+      const toothY = bo.r * (0.08 + t * 0.08)
+      ctx.beginPath()
+      ctx.arc(0, toothY, 1.6, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.restore()
+  }
+
+  // Г) Боковые хитиновые пластины щёк с заклёпками
+  for (const sx of [-1, 1]) {
+    ctx.strokeStyle = "rgba(255,200,150,0.35)"
+    ctx.lineWidth = 1.6
+    ctx.beginPath()
+    ctx.moveTo(sx * bo.r * 0.72, -bo.r * 0.1)
+    ctx.lineTo(sx * bo.r * 0.45, bo.r * 0.35)
+    ctx.lineTo(sx * bo.r * 0.68, bo.r * 0.55)
+    ctx.stroke()
+
+    ctx.fillStyle = "#ffe29a"
+    for (const [rx, ry] of [
+      [0.68, -0.05],
+      [0.55, 0.2],
+      [0.48, 0.38],
+    ]) {
+      ctx.beginPath()
+      ctx.arc(sx * bo.r * rx, bo.r * ry, 1.8, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+
+  // Стебельчатые глаза-перископы — торчат высоко над панцирем
   const target = balls.find((b) => !b.stuck)
   let ex = 0
   let ey = 0
   if (target) {
     const dx = target.x - bo.x
-    const dy = target.y - bo.y
+    const dy = target.y - (bo.y - bo.r * 1.25)
     const dl = Math.hypot(dx, dy) || 1
-    ex = (dx / dl) * 4
-    ey = (dy / dl) * 4
+    ex = (dx / dl) * 4.5
+    ey = (dy / dl) * 4.5
   }
   for (const sx of [-1, 1]) {
-    const eyeX = sx * bo.r * 0.42
-    const eyeY = -bo.r * 0.68
-    // Стебелек глаза
-    ctx.strokeStyle = "#8f2812"
-    ctx.lineWidth = 5
+    const eyeX = sx * bo.r * 0.45
+    const eyeY = -bo.r * 1.28 // Выступают высоко над панцирем (панцирь ry = 0.85)
+    const stalkBaseX = sx * bo.r * 0.32
+    const stalkBaseY = -bo.r * 0.65
+
+    // Бронированный гидравлический стебель глаза
+    ctx.save()
+    ctx.strokeStyle = angry ? "#8f1e0a" : "#4a1204"
+    ctx.lineWidth = 6
+    ctx.lineCap = "round"
     ctx.beginPath()
-    ctx.moveTo(sx * bo.r * 0.35, -bo.r * 0.4)
-    ctx.lineTo(eyeX, eyeY)
+    ctx.moveTo(stalkBaseX, stalkBaseY)
+    const midX = sx * bo.r * 0.42
+    const midY = -bo.r * 0.98
+    ctx.quadraticCurveTo(midX, midY, eyeX, eyeY)
     ctx.stroke()
 
-    // Глазное яблоко
+    // Внутренний хромированный стержень
+    ctx.strokeStyle = angry ? "#ff6347" : "#ff9e42"
+    ctx.lineWidth = 2.5
+    ctx.stroke()
+    ctx.restore()
+
+    // Глазная капсула (глазное яблоко)
+    ctx.save()
+    ctx.shadowColor = angry ? "#ff2a14" : "#00f0ff"
+    ctx.shadowBlur = 14
     ctx.fillStyle = "#ffffff"
     ctx.beginPath()
-    ctx.arc(eyeX, eyeY, 8.5, 0, Math.PI * 2)
+    ctx.arc(eyeX, eyeY, 9, 0, Math.PI * 2)
     ctx.fill()
 
+    ctx.strokeStyle = angry ? "#ff4222" : "#d9531e"
+    ctx.lineWidth = 2
+    ctx.stroke()
+
     // Неоновый кибер-зрачок
-    ctx.fillStyle = angry ? "#ff1414" : "#00f0ff"
+    ctx.fillStyle = angry ? "#ff1414" : "#00e5ff"
     ctx.beginPath()
-    ctx.arc(eyeX + ex, eyeY + ey, 4.2, 0, Math.PI * 2)
+    ctx.arc(eyeX + ex, eyeY + ey, 4.5, 0, Math.PI * 2)
     ctx.fill()
+
+    // Блик
+    ctx.fillStyle = "rgba(255,255,255,0.85)"
+    ctx.beginPath()
+    ctx.arc(eyeX - 2.5, eyeY - 2.5, 2, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
   }
 
   ctx.restore()
@@ -451,42 +579,48 @@ function drawChronoBoss(ctx: Ctx, bo: BossState) {
       ctx.arc(0, 0, curR, 0, Math.PI * 2)
       ctx.fill()
 
-      // Спиральные хроно-кольца
-      ctx.shadowBlur = 0
+      // Плавная вращающаяся спираль воронки (без пунктиров и штрихов)
+      ctx.shadowBlur = isSlow ? 14 : 16
+      ctx.shadowColor = isSlow ? "#00f0ff" : "#ff00d4"
       const spinDir = isSlow ? -1 : 1
-      ctx.rotate(bo.t * 2.2 * spinDir)
-      ctx.strokeStyle = isSlow ? "rgba(0,240,255,0.6)" : "rgba(255,0,212,0.6)"
-      ctx.lineWidth = 2
-      ctx.setLineDash([8, 12])
-      ctx.beginPath()
-      ctx.arc(0, 0, curR * 0.78, 0, Math.PI * 2)
-      ctx.stroke()
+      const baseRot = bo.t * 2.2 * spinDir
+      const arms = 2
+      const steps = 42
 
-      ctx.strokeStyle = isSlow ? "rgba(180,245,255,0.4)" : "rgba(255,180,245,0.4)"
-      ctx.lineWidth = 1.5
-      ctx.setLineDash([4, 8])
-      ctx.beginPath()
-      ctx.arc(0, 0, curR * 0.45, 0, Math.PI * 2)
-      ctx.stroke()
-
-      // 3 вихревых спиральных рукава, визуализирующих закручивание потока
-      ctx.setLineDash([])
-      ctx.lineWidth = 1.6
-      for (let s = 0; s < 3; s++) {
-        const startAng = (s * Math.PI * 2) / 3
+      for (let a = 0; a < arms; a++) {
+        const armAngle = (a * Math.PI * 2) / arms + baseRot
         ctx.beginPath()
-        for (let p = 0; p <= 10; p++) {
-          const ratio = p / 10
-          const ang = startAng + ratio * Math.PI * 1.4 * spinDir
-          const r = curR * 0.15 + curR * 0.75 * ratio
-          const px = Math.cos(ang) * r
-          const py = Math.sin(ang) * r
-          if (p === 0) ctx.moveTo(px, py)
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps // 0 (центр) -> 1 (край)
+          // Плавная спираль Архимеда, закручивающаяся к ядру
+          const r = curR * (0.12 + 0.82 * Math.pow(t, 0.88))
+          const theta = armAngle + t * Math.PI * 2.6 * spinDir
+          const px = Math.cos(theta) * r
+          const py = Math.sin(theta) * r
+          if (i === 0) ctx.moveTo(px, py)
           else ctx.lineTo(px, py)
         }
-        ctx.strokeStyle = isSlow ? "rgba(0,240,255,0.45)" : "rgba(255,0,212,0.45)"
+        ctx.strokeStyle = isSlow
+          ? `rgba(0, 240, 255, ${0.72 - a * 0.15})`
+          : `rgba(255, 0, 212, ${0.72 - a * 0.15})`
+        ctx.lineWidth = 2.4
+        ctx.lineCap = "round"
         ctx.stroke()
       }
+
+      // Тонкие сплошные гладкие контуры ядра и внешней границы воронки (без пунктира)
+      ctx.shadowBlur = 0
+      ctx.strokeStyle = isSlow ? "rgba(0, 240, 255, 0.28)" : "rgba(255, 0, 212, 0.28)"
+      ctx.lineWidth = 1.4
+      ctx.beginPath()
+      ctx.arc(0, 0, curR * 0.92, 0, Math.PI * 2)
+      ctx.stroke()
+
+      ctx.strokeStyle = isSlow ? "rgba(180, 245, 255, 0.45)" : "rgba(255, 180, 245, 0.45)"
+      ctx.lineWidth = 1.2
+      ctx.beginPath()
+      ctx.arc(0, 0, curR * 0.32, 0, Math.PI * 2)
+      ctx.stroke()
 
       // Текстовая метка воронки
       ctx.font = '10px "Russo One", sans-serif'

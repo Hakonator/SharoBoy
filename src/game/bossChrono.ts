@@ -106,8 +106,8 @@ export function stepChrono(host: BossHost, bo: BossState, angry: boolean, dt: nu
     if (bo.chronoRifts.length < maxRifts) {
       const isSlow = bo.chronoRifts.every((r) => r.kind === "fast") || Math.random() < 0.6
       const kind = isSlow ? "slow" : "fast"
-      const riftRadius = kind === "slow" ? 72 : 62
-      const life = 11
+      const riftRadius = kind === "slow" ? 105 : 92
+      const life = 12
 
       const spawnX = clamp(
         host.w * (0.2 + Math.random() * 0.6),
@@ -136,7 +136,11 @@ export function stepChrono(host: BossHost, bo: BossState, angry: boolean, dt: nu
   }
 }
 
-/** Влияние временных воронок на пролетающие мячи: сильное искривление траектории и ускорение/замедление. */
+/**
+ * Влияние временных воронок на пролетающие мячи:
+ * Сильное отклонение траектории к центру (~30° вблизи ядра, убывает к краям)
+ * и изменение скорости (замедление / ускорение).
+ */
 export function applyChronoRiftsToBalls(
   rifts: ChronoRift[] | undefined,
   balls: Ball[],
@@ -157,26 +161,22 @@ export function applyChronoRiftsToBalls(
           const dirX = dx / safeDist
           const dirY = dy / safeDist
 
-          // 1. Мощное гравитационное притяжение к ядру воронки
-          const pull = (rift.kind === "fast" ? 2200 : 1200) * factor * dt
-          b.vx -= dirX * pull
-          b.vy -= dirY * pull
+          // 1. Мощное гравитационное притяжение к центру воронки
+          const pullAccel = (rift.kind === "fast" ? 2200 : 1300) * factor
+          b.vx -= dirX * pullAccel * dt
+          b.vy -= dirY * pullAccel * dt
 
-          // 2. Сильное тангенциальное закручивание потока (вихревая праща)
+          // 2. Сильный вихревой поток (тангенциальная праща)
           const swirlDir = rift.kind === "fast" ? 1 : -1
-          const tangentX = -dirY * swirlDir
-          const tangentY = dirX * swirlDir
-          const swirlForce = (rift.kind === "fast" ? 2600 : 1400) * factor * dt
-          b.vx += tangentX * swirlForce
-          b.vy += tangentY * swirlForce
+          const swirlAccel = (rift.kind === "fast" ? 2800 : 1600) * factor * swirlDir
+          b.vx += -dirY * swirlAccel * dt
+          b.vy += dirX * swirlAccel * dt
 
-          // 3. Множитель скорости
+          // 3. Множитель скорости (замедление в лазурной, ускорение в пурпурной)
           if (rift.kind === "slow") {
-            // Замедление мяча в лазурной воронке
-            targetChrono = Math.min(targetChrono, Math.max(0.35, 1 - 0.65 * factor))
+            targetChrono = Math.min(targetChrono, Math.max(0.38, 1 - 0.62 * factor))
           } else {
-            // Ускорение в пурпурной аномалии
-            targetChrono = Math.max(targetChrono, 1 + 0.5 * factor)
+            targetChrono = Math.max(targetChrono, 1 + 0.45 * factor)
           }
         }
       }
