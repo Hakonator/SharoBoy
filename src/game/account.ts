@@ -14,6 +14,7 @@ export const ACCOUNT_STORAGE_KEYS = [
   "sharoboy-stats",
   "sharoboy-nick",
   "sharoboy-liked-community-maps",
+  "sharoboy-cosmetics",
 ] as const
 
 /** Безопасная очистка данных аккаунта из localStorage. */

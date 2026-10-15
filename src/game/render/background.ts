@@ -1,16 +1,25 @@
 import { Bubble } from "../types"
 import { clamp } from "../utils"
+import { getTableThemeDef, type TableThemeId } from "../cosmetics"
 
 import { gradient } from "./gradCache"
 import { type Ctx } from "./shapes"
 
-export function drawBackground(ctx: Ctx, w: number, h: number, combo: number, bubbles: Bubble[]) {
+export function drawBackground(
+  ctx: Ctx,
+  w: number,
+  h: number,
+  combo: number,
+  bubbles: Bubble[],
+  themeId?: TableThemeId
+) {
+  const theme = getTableThemeDef(themeId ?? "ocean")
   const heat = clamp(combo / 12, 0, 1)
-  ctx.fillStyle = gradient(ctx, `bg:${h}`, (c) => {
+  ctx.fillStyle = gradient(ctx, `bg:${theme.id}:${h}`, (c) => {
     const g = c.createLinearGradient(0, 0, 0, h)
-    g.addColorStop(0, "#0e3a4e")
-    g.addColorStop(0.5, "#082434")
-    g.addColorStop(1, "#04121c")
+    g.addColorStop(0, theme.colors.bgTop)
+    g.addColorStop(0.5, theme.colors.bgMid)
+    g.addColorStop(1, theme.colors.bgBot)
     return g
   })
   ctx.fillRect(0, 0, w, h)
@@ -31,9 +40,9 @@ export function drawBackground(ctx: Ctx, w: number, h: number, combo: number, bu
   for (const b of bubbles) {
     ctx.beginPath()
     ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2)
-    ctx.fillStyle = "rgba(140,220,255,0.07)"
+    ctx.fillStyle = theme.colors.bubble
     ctx.fill()
-    ctx.strokeStyle = "rgba(140,220,255,0.12)"
+    ctx.strokeStyle = theme.colors.bubble
     ctx.lineWidth = 1
     ctx.stroke()
   }

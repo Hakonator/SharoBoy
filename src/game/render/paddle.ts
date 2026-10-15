@@ -1,6 +1,7 @@
 import { AimGuide, PaddleShapeKind, PaddleState, RenderView } from "../types"
 import { Physics } from "../physics"
 import { clamp } from "../utils"
+import { getPaddleSkinDef, type PaddleSkinId } from "../cosmetics"
 
 import { roundRect, type Ctx } from "./shapes"
 
@@ -15,6 +16,8 @@ export interface PaddleView extends RenderView {
   magneticPaddleUntil?: number
   /** Форма верхней поверхности: «convex» — купол, «concave» — чаша. */
   shape?: PaddleShapeKind
+  /** Идентификатор экипированного скина ракетки. */
+  skin?: PaddleSkinId
 }
 
 export function drawAimGuide(ctx: Ctx, guide: AimGuide, time: number, bounce: boolean) {
@@ -53,9 +56,10 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   ctx.translate(p.x, p.y)
   // В режиме отладки ракетка поворачивается по ЛКМ/ПКМ, иначе — лёгкий наклон от скорости
   ctx.rotate(p.rot ?? clamp(p.vx * 0.00011, -0.1, 0.1))
+  const skinDef = getPaddleSkinDef(v.skin ?? "default")
   const wide = time < v.wideUntil
   const shrink = !wide && time < v.shrinkUntil
-  ctx.shadowColor = wide ? "#ffc94d" : shrink ? "#ff5347" : "#35e0ff"
+  ctx.shadowColor = wide ? "#ffc94d" : shrink ? "#ff5347" : skinDef.colors.glow
   ctx.shadowBlur = 22
   const g = ctx.createLinearGradient(0, -hh / 2, 0, hh / 2)
   if (wide) {
@@ -67,9 +71,9 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     g.addColorStop(0.5, "#ff5347")
     g.addColorStop(1, "#8f1d12")
   } else {
-    g.addColorStop(0, "#aef7ff")
-    g.addColorStop(0.5, "#35e0ff")
-    g.addColorStop(1, "#0e86a3")
+    g.addColorStop(0, skinDef.colors.top)
+    g.addColorStop(0.5, skinDef.colors.mid)
+    g.addColorStop(1, skinDef.colors.dark)
   }
   ctx.fillStyle = g
   const shape = v.shape ?? "flat"
@@ -124,6 +128,11 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   } else {
     roundRect(ctx, -ww / 2, -hh / 2, ww, hh, hh / 2)
     ctx.fill()
+  }
+  if (!wide && !shrink && skinDef.colors.stroke) {
+    ctx.strokeStyle = skinDef.colors.stroke
+    ctx.lineWidth = 1.4
+    ctx.stroke()
   }
   ctx.shadowBlur = 0
   ctx.fillStyle = "rgba(255,255,255,0.5)"

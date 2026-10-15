@@ -6,6 +6,7 @@
 
 import type { CampaignMapView } from "./campaignMap"
 import type { BlockSpecial } from "./blockKinds"
+import type { PlayerCosmetics } from "./cosmetics"
 
 export type Phase = "menu" | "playing" | "paused" | "over" | "won" | "map"
 
@@ -55,6 +56,8 @@ export interface HudData {
   crystals: number
   /** Постоянные несгораемые мета-кристаллы профиля. */
   metaCrystals?: number
+  /** Разблокированная и экипированная косметика (скины ракетки, шлейфы мяча, темы). */
+  cosmetics?: PlayerCosmetics
   upgrades: Record<string, number>
   top: ScoreEntry[]
   topEndless: ScoreEntry[]

@@ -234,6 +234,8 @@ export default function App() {
             onCommunityMaps={() => setShowCommunityMaps(true)}
             onAdmin={() => setShowAdminPanel(true)}
             onBuyUpgrade={(id) => g()?.buyUpgrade(id)}
+            onBuyCosmetic={(category, id) => g()?.buyCosmeticItem(category, id)}
+            onEquipCosmetic={(category, id) => g()?.equipCosmeticItem(category, id)}
             debug={debug.debug}
             onToggleDebug={debug.handleToggleDebug}
             debugBoss={debug.debugBoss}

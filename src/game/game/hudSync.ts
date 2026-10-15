@@ -98,6 +98,7 @@ export function pushHud(g: Game) {
     coins: g.coins,
     crystals: g.crystals,
     metaCrystals: g.metaCrystals ?? 0,
+    cosmetics: g.cosmetics,
     upgrades: { ...g.upgrades },
     top: g.top,
     topEndless: g.topEndless,

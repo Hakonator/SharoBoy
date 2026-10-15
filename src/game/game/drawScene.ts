@@ -46,7 +46,7 @@ export function draw(g: Game) {
     ctx.translate(rand(-s, s), rand(-s, s))
   }
 
-  drawBackground(ctx, w, h, g.combo, g.bubbles)
+  drawBackground(ctx, w, h, g.combo, g.bubbles, g.cosmetics?.equipped?.theme)
   drawShieldLine(ctx, w, h, g.time, g.shield, g.phase === "menu")
   drawBlocks(ctx, g.blocks, g.time)
   drawMinibosses(ctx, g.blocks, g.time)
@@ -80,6 +80,7 @@ export function draw(g: Game) {
     spark: g.time < g.sparkUntil,
     slow: g.time < g.slowUntil,
     fast: g.time < g.fastUntil,
+    trailSkin: g.cosmetics?.equipped?.ball,
   })
   if (g.phase !== "menu" && g.phase !== "map") {
     drawPaddle(ctx, {
@@ -93,6 +94,7 @@ export function draw(g: Game) {
       magnetUntil: g.magnetUntil,
       magneticPaddleUntil: g.magneticPaddleUntil,
       shape: g.paddleShapeKind(),
+      skin: g.cosmetics?.equipped?.paddle,
     })
   }
   drawParticles(ctx, g.fx.particles)

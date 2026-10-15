@@ -35,7 +35,20 @@ import { buyCampaignShopItem, closeCampaignShop } from "./campaignShop"
 import { chooseCampaignEventChoice as chooseCampaignEventOption } from "./campaignEvents"
 import { makeBossHost, makePowersHost, makePhysicsHost, makeWeaponsHost } from "./game/hosts"
 import { paddleShape } from "./game/paddleControl"
-import { loadProgress, buyUpgrade, applyUpgrades, saveProgress } from "./game/progress"
+import {
+  loadProgress,
+  buyUpgrade,
+  applyUpgrades,
+  saveProgress,
+  buyCosmeticItem,
+  equipCosmeticItem,
+} from "./game/progress"
+import {
+  type CosmeticCategory,
+  type PlayerCosmetics,
+  DEFAULT_UNLOCKED_COSMETICS,
+  DEFAULT_EQUIPPED_COSMETICS,
+} from "./cosmetics"
 import { clearAccountStorage } from "./account"
 import {
   loadScoreEntries,
@@ -201,6 +214,11 @@ export class Game {
   coins = 0
   /** Постоянные несгораемые мета-кристаллы профиля. */
   metaCrystals = 0
+  /** Косметика игрока (скины ракетки, шлейфы шара, темы поля). */
+  cosmetics: PlayerCosmetics = {
+    unlocked: [...DEFAULT_UNLOCKED_COSMETICS],
+    equipped: { ...DEFAULT_EQUIPPED_COSMETICS },
+  }
   /** Серия чистых попаданий по боссу без касания ракетки (для крита ×3). */
   bossCleanHits = 0
   /** Кристаллы текущего забега в кампании (тратятся в лавках и событиях). */
@@ -401,9 +419,19 @@ export class Game {
   buyUpgrade(id: string): boolean {
     return buyUpgrade(this, id)
   }
+  buyCosmeticItem(category: CosmeticCategory, id: string): boolean {
+    return buyCosmeticItem(this, category, id)
+  }
+  equipCosmeticItem(category: CosmeticCategory, id: string): boolean {
+    return equipCosmeticItem(this, category, id)
+  }
   resetAccountData() {
     this.coins = 0
     this.metaCrystals = 0
+    this.cosmetics = {
+      unlocked: [...DEFAULT_UNLOCKED_COSMETICS],
+      equipped: { ...DEFAULT_EQUIPPED_COSMETICS },
+    }
     this.bossCleanHits = 0
     this.crystals = 0
     this.crystalsRunTotal = 0

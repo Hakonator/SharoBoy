@@ -5,14 +5,16 @@ import { MAX_NICK } from "../../game/profanity"
 import { DEBUG_TOOLS } from "../../config"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "../../game/upgrades"
 import { ControlsPanel, FloatingBalls } from "../icons"
+import type { CosmeticCategory } from "../../game/cosmetics"
 import type { GlobalScore, LeadPeriod, ScreenFilter } from "../../game/leaderboard"
 import type { HudData } from "../../game/types"
 
 import { MenuRecords, MenuGlobalTop } from "./menuTop"
 import { MenuCornerControls, MenuDebug, MenuUpgrades, MenuAchievements } from "./menuPanels"
+import { MenuCosmetics } from "./MenuCosmetics"
 import type { PlayerStats } from "./types"
 
-type MenuTabId = "upgrades" | "records" | "achievements" | "guide" | "debug"
+type MenuTabId = "upgrades" | "cosmetics" | "records" | "achievements" | "guide" | "debug"
 
 export function MenuScreen({
   hud,
@@ -32,6 +34,8 @@ export function MenuScreen({
   onCommunityMaps,
   onAdmin,
   onBuyUpgrade,
+  onBuyCosmetic,
+  onEquipCosmetic,
   debug,
   onToggleDebug,
   debugBoss,
@@ -62,6 +66,8 @@ export function MenuScreen({
   onCommunityMaps: () => void
   onAdmin: () => void
   onBuyUpgrade: (id: string) => void
+  onBuyCosmetic?: (category: CosmeticCategory, id: string) => void
+  onEquipCosmetic?: (category: CosmeticCategory, id: string) => void
   /** Режим отладки включён. */
   debug: boolean
   /** Переключатель режима отладки. */
@@ -238,6 +244,23 @@ export function MenuScreen({
 
                 <button
                   type="button"
+                  onClick={() => setActiveTab("cosmetics")}
+                  className={`relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-display text-xs transition sm:text-sm ${
+                    activeTab === "cosmetics"
+                      ? "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-400/50 shadow-[0_0_10px_rgba(0,240,255,0.25)] font-bold"
+                      : "bg-deep/50 text-dim hover:text-foam hover:bg-deep/90"
+                  }`}
+                >
+                  <span>✨ Стили</span>
+                  {hud.metaCrystals !== undefined && hud.metaCrystals > 0 && (
+                    <span className="text-[10px] font-mono text-cyan-300">
+                      💠{hud.metaCrystals}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setActiveTab("records")}
                   className={`relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-display text-xs transition sm:text-sm ${
                     activeTab === "records"
@@ -296,6 +319,14 @@ export function MenuScreen({
               {/* Содержимое активного таба: вертикальный слайдер в неоновом стиле игры */}
               <div className="arcade-scrollbar flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 pr-2 sm:pr-2.5 h-[360px] sm:h-[400px] md:h-[450px]">
                 {activeTab === "upgrades" && <MenuUpgrades hud={hud} onBuyUpgrade={onBuyUpgrade} />}
+
+                {activeTab === "cosmetics" && (
+                  <MenuCosmetics
+                    hud={hud}
+                    onBuyCosmetic={onBuyCosmetic}
+                    onEquipCosmetic={onEquipCosmetic}
+                  />
+                )}
 
                 {activeTab === "records" && (
                   <div className="space-y-3">
