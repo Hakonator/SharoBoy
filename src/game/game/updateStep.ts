@@ -2,6 +2,7 @@ import type { Game } from "../game"
 import { clamp, compactInPlace, drainQueue } from "../utils"
 import type { SparkHit } from "../types"
 import { applyChronoRiftsToBalls } from "../bossChrono"
+import { stepGravitationalFocus } from "../situational"
 
 import { pushHud, syncEffectsHud } from "./hudSync"
 import { applyFishWake, updateMouthBubbles } from "./minibossFx"
@@ -99,6 +100,7 @@ export function update(g: Game, dt: number) {
   g.powersSys.updatePowers(dt)
   g.powersSys.periodicSpawn(dt)
   g.powersSys.periodicPowerDrop(dt)
+  stepGravitationalFocus(g, dt)
   g.bossSys.step(dt)
   /* Очереди отложенных событий: zero-alloc drain in-place. Нулевые задачи
      обрабатываются по расписанию; новые звенья, добавленные во время

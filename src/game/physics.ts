@@ -80,8 +80,10 @@ export interface PhysicsWorld {
    *  разбирается игровым циклом (каждое звено бьёт по расписанию). */
   readonly sparkQueue: SparkHit[]
   shield: number
+  lives?: number
   combo: number
   bossCleanHits?: number
+  lastClutchTime?: number
   shake: number
   hitStop: number
   flash: number
@@ -359,6 +361,13 @@ export class Physics {
     if (ball.sinceHit > 4) {
       const k = Math.min(1.6, 0.5 + (ball.sinceHit - 4) * 0.35) * dt
       ball.vy += (Math.sign(ball.vy || -1) * sp - ball.vy) * k * 0.5
+      // Ситуативная помощь: ликвидация застревания в плоской горизонтальной траектории
+      if (ball.sinceHit > 5.5 && Math.abs(ball.vy) < sp * 0.28) {
+        const sign = ball.vy === 0 ? -1 : Math.sign(ball.vy)
+        ball.vy = sign * sp * 0.42
+        const nx = Math.sqrt(Math.max(sp * sp - ball.vy * ball.vy, 0))
+        ball.vx = Math.sign(ball.vx || 1) * nx
+      }
     }
 
     applyBlockMagnets(g, ball, dt)

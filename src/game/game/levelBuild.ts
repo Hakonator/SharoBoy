@@ -168,6 +168,9 @@ export function serveBall(g: Game) {
   g.balls = [ball]
   g.spawnTimer = rand(16, 22)
   g.skyDropTimer = rand(18, 27)
+  g.focusAlertShown = false
+  g.focusPulseTimer = 0
+  g.lastClutchTime = -999
   pushHud(g)
 }
 

@@ -273,6 +273,15 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     set shield(v) {
       g.shield = v
     },
+    get lives() {
+      return g.lives
+    },
+    get lastClutchTime() {
+      return g.lastClutchTime
+    },
+    set lastClutchTime(v) {
+      g.lastClutchTime = v
+    },
     get combo() {
       return g.combo
     },

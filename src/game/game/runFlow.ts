@@ -7,6 +7,7 @@ import { applyTrack } from "./audioControls"
 import { enterMapView } from "./campaignFlow"
 import { pushHud, saveTop, setBanner } from "./hudSync"
 import { buildLevel, buildWave, serveBall } from "./levelBuild"
+import { blockTop } from "./paddleControl"
 import { addCoins, addMetaCrystals } from "./progress"
 
 export function resetRun(g: Game) {
@@ -276,6 +277,43 @@ export function loseLife(g: Game) {
     saveTop(g)
     pushHud(g)
     return
+  }
+  // Ситуативная механика: «Тактическое снабжение» (Tactical Aid)
+  // При критическом положении (осталась 1 жизнь) игроку сбрасывается спасительный бонус
+  if (g.lives === 1) {
+    const aidType = g.shield === 0 ? "shield" : "wide"
+    g.powers.push({
+      x: g.w / 2 + rand(-60, 60),
+      y: blockTop(g) + 15,
+      vy: 110,
+      type: aidType,
+      t: 0,
+    })
+    g.fx.popups.push({
+      x: g.w / 2,
+      y: g.h * 0.42,
+      text: aidType === "shield" ? "ПОДДЕРЖКА: ЩИТ!" : "ПОДДЕРЖКА: ШИРОКАЯ РАКЕТКА!",
+      color: "#5dffb0",
+      t: 0,
+      size: 18,
+    })
+  } else if (g.lives === 2 && Math.random() < 0.6) {
+    const aidType = Math.random() < 0.5 ? "wide" : "slow"
+    g.powers.push({
+      x: g.w / 2 + rand(-80, 80),
+      y: blockTop(g) + 15,
+      vy: 110,
+      type: aidType,
+      t: 0,
+    })
+    g.fx.popups.push({
+      x: g.w / 2,
+      y: g.h * 0.42,
+      text: "ПОДДЕРЖКА СНАБЖЕНИЕМ!",
+      color: "#5dffb0",
+      t: 0,
+      size: 16,
+    })
   }
   serveBall(g)
   pushHud(g)

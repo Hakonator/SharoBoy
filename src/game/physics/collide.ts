@@ -9,6 +9,44 @@ import { freezeCluster } from "./frost"
 import { queueSparkChain, sparkChainTargets } from "./spark"
 import { onBallHitSpecial } from "./special"
 
+/** Ситуативная механика: «Критический сэйв» (Clutch Rebound).
+ *  Активируется при отскоке шара от самого края платформы (|rel| >= 0.78),
+ *  либо в опасной ситуации при 1 жизни (|rel| >= 0.70).
+ *  Даёт короткий стоп-кадр, мощный золотой взрыв и заряжает шар удвоенным уроном на 2 попадания.
+ */
+export function applyClutchRebound(g: PhysicsWorld, ball: Ball, rel: number, paddlePan: number) {
+  const isEdge = Math.abs(rel) >= 0.78
+  const isLowLives = (g.lives ?? 3) <= 1
+  const isHighDanger = isLowLives ? Math.abs(rel) >= 0.7 : isEdge
+  const now = g.time
+  const lastClutch = g.lastClutchTime ?? -999
+  if (isHighDanger && now - lastClutch >= 2.5) {
+    if (g.lastClutchTime !== undefined) g.lastClutchTime = now
+    ball.clutchHits = 2
+    g.hitStop = Math.max(g.hitStop, 0.08)
+    g.shake = Math.min(g.shake + 3.5, 7)
+    g.sfx.paddle(1, paddlePan)
+    g.sfx.power()
+    g.fx.burst(ball.x, ball.y, "#ffd700", 14, 220)
+    g.fx.rings.push({
+      x: ball.x,
+      y: ball.y,
+      r: 8,
+      maxR: 85,
+      color: "rgba(255, 215, 0, 0.85)",
+      t: 0,
+    })
+    g.fx.popups.push({
+      x: ball.x,
+      y: ball.y - 28,
+      text: "КРИТИЧЕСКИЙ СЭЙВ! ×2",
+      color: "#ffd700",
+      t: 0,
+      size: 18,
+    })
+  }
+}
+
 /** Отскок от ракетки: угол зависит от точки попадания и её скорости; магнит — прилипание. */
 export function collidePaddle(g: PhysicsWorld, ball: Ball) {
   const p = g.paddle
@@ -100,6 +138,7 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
   const keepMult = g.comboMasterLevel ? (g.comboMasterLevel >= 2 ? 0.7 : 0.35) : 0
   g.combo = Math.floor(g.combo * keepMult)
   if (Math.abs(rel) > 0.65) g.hitStop = Math.max(g.hitStop, 0.015)
+  applyClutchRebound(g, ball, rel, paddlePan)
   g.sfx.paddle(Math.abs(rel), paddlePan)
   g.fx.burst(ball.x, ball.y - ball.r, "#7cf5ff", 6, 130)
   g.onPaddleBounce?.()
@@ -154,6 +193,7 @@ export function collidePaddleShape(
   g.combo = Math.floor(g.combo * keepMult)
   if (Math.abs(rel) > 0.65) g.hitStop = Math.max(g.hitStop, 0.015)
   const paddlePan = clamp((ball.x / g.w) * 2 - 1, -0.85, 0.85)
+  applyClutchRebound(g, ball, rel, paddlePan)
   g.sfx.paddle(Math.abs(rel), paddlePan)
   g.onPaddleBounce?.()
   g.pushHud()
@@ -238,7 +278,21 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
       ball.vy -= 2 * dot * wny
     }
     const impactAngle = Math.atan2(wny, wnx)
-    damageBlock(g, b, g.debugBallDamage * (fire ? FIREBALL_DAMAGE_MULT : 1), true, impactAngle)
+    let dmg = g.debugBallDamage * (fire ? FIREBALL_DAMAGE_MULT : 1)
+    if (ball.clutchHits && ball.clutchHits > 0) {
+      ball.clutchHits--
+      dmg *= 2
+      g.fx.burst(b.x, b.y, "#ffd700", 12, 200)
+      g.fx.rings.push({
+        x: b.x,
+        y: b.y,
+        r: 6,
+        maxR: 44,
+        color: "rgba(255, 215, 0, 0.85)",
+        t: 0,
+      })
+    }
+    damageBlock(g, b, dmg, true, impactAngle)
     if (b.isClaw) {
       const spd = Math.hypot(ball.vx, ball.vy)
       const targetSpd = clamp(spd * 1.15, 600, 1150)
@@ -329,5 +383,11 @@ export function collideBoss(g: PhysicsWorld, ball: Ball) {
   if (g.bossCleanHits !== undefined) {
     g.bossCleanHits = isCrit ? 0 : cleanHits
   }
-  g.damageBoss(g.debugBallDamage * (g.fireActive() ? FIREBALL_DAMAGE_MULT : 1), false, isCrit)
+  let dmg = g.debugBallDamage * (g.fireActive() ? FIREBALL_DAMAGE_MULT : 1)
+  if (ball.clutchHits && ball.clutchHits > 0) {
+    ball.clutchHits--
+    dmg *= 2
+    g.fx.burst(bo.x, bo.y, "#ffd700", 16, 240)
+  }
+  g.damageBoss(dmg, false, isCrit)
 }

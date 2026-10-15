@@ -210,6 +210,12 @@ export class Game {
   spawnTimer = 18
   skyDropTimer = 22
   blocksInitial = 1
+  /** Время последнего критического сэйва (кулдаун 2.5 сек). */
+  lastClutchTime = -999
+  /** Таймер пульса гравитационного фокуса последних блоков. */
+  focusPulseTimer = 0
+  /** Показано ли оповещение фокуса на текущем уровне. */
+  focusAlertShown = false
   coins = 0
   /** Постоянные несгораемые мета-кристаллы профиля. */
   metaCrystals = 0

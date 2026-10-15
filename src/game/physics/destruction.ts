@@ -37,6 +37,7 @@ export function damageBlock(
   impactAngle?: number
 ) {
   if (b.dead) return
+  const comboAtHit = g.combo
   dmg = Number.isFinite(dmg) ? Math.max(0, dmg) : 0
   // Блоки минибосса неразрушаемы: урон идёт в пул HP его существа.
   if (b.isMiniboss) {
@@ -165,6 +166,45 @@ export function damageBlock(
   })
   g.shake = Math.min(g.shake + b.tier, 9)
   g.hitStop = Math.max(g.hitStop, 0.018 + b.tier * 0.012)
+
+  // Ситуативная механика: «Перегрузка комбо / Резонанс» (Combo Overdrive)
+  // При серии попаданий >= 6 между соседними блоками проскакивают дуги электрорезонанса
+  if (allowBrittle && comboAtHit >= 5) {
+    if (comboAtHit === 5 && g.fx?.popups) {
+      g.fx.popups.push({
+        x: b.x,
+        y: b.y - 24,
+        text: "РЕЗОНАНС!",
+        color: "#00f0ff",
+        t: 0,
+        size: 20,
+      })
+    }
+    let closest: Block | null = null
+    let closestDist = 160
+    for (const other of g.blocks) {
+      if (other === b || other.dead || other.isMiniboss) continue
+      const d = Math.hypot(other.x - b.x, other.y - b.y)
+      if (d < closestDist) {
+        closestDist = d
+        closest = other
+      }
+    }
+    if (closest) {
+      if (g.fx?.lightnings) {
+        g.fx.lightnings.push({
+          x1: b.x,
+          y1: b.y,
+          x2: closest.x,
+          y2: closest.y,
+          t: 0,
+        })
+      }
+      g.sfx?.zap?.()
+      g.fx?.burst?.(closest.x, closest.y, "#ffe95c", 6, 160)
+      damageBlock(g, closest, 1, false)
+    }
+  }
 
   // вехи серии
   if (g.combo === 5 || g.combo === 10 || g.combo === 15) {

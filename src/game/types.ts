@@ -274,6 +274,8 @@ export interface Ball {
   cottonT?: number
   /** Временный множитель скорости от хроно-воронок (1.0 = норма, < 1 замедление, > 1 ускорение). */
   chronoMult?: number
+  /** Заряд критического сэйва (количество следующих ударов с удвоенным уроном). */
+  clutchHits?: number
 }
 
 export type PowerType =

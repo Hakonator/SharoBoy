@@ -162,5 +162,18 @@ export function drawBalls(ctx: Ctx, balls: Ball[], v: BallView) {
     ctx.arc(0, 0, b.r, 0, Math.PI * 2)
     ctx.fill()
     ctx.restore()
+
+    // Аура критического сэйва
+    if (b.clutchHits && b.clutchHits > 0) {
+      ctx.save()
+      ctx.shadowColor = "#ffd700"
+      ctx.shadowBlur = 18
+      ctx.strokeStyle = "rgba(255, 215, 0, 0.85)"
+      ctx.lineWidth = 2.4
+      ctx.beginPath()
+      ctx.arc(b.x, b.y, b.r + 3.5 + Math.sin(v.time * 8) * 1.5, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.restore()
+    }
   }
 }
