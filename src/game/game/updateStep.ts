@@ -1,6 +1,7 @@
 import type { Game } from "../game"
 import { clamp, compactInPlace, drainQueue } from "../utils"
 import type { SparkHit } from "../types"
+import { applyChronoRiftsToBalls } from "../bossChrono"
 
 import { pushHud, syncEffectsHud } from "./hudSync"
 import { applyFishWake, updateMouthBubbles } from "./minibossFx"
@@ -144,6 +145,9 @@ export function update(g: Game, dt: number) {
     g.weaponsSys.updateLaser(fire)
     g.weaponsSys.tryFire(dt, fire)
     g.weaponsSys.updateProjectiles(dt)
+    if (g.bossSys.boss?.isChrono) {
+      applyChronoRiftsToBalls(g.bossSys.boss.chronoRifts, g.balls, dt)
+    }
     for (const ball of g.balls) g.physics.updateBall(ball, dt)
     g.physics.updateBombs(dt)
     compactInPlace(g.balls, (b) => !b.lost)

@@ -239,6 +239,14 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
     }
     const impactAngle = Math.atan2(wny, wnx)
     damageBlock(g, b, g.debugBallDamage * (fire ? FIREBALL_DAMAGE_MULT : 1), true, impactAngle)
+    if (b.isClaw) {
+      const spd = Math.hypot(ball.vx, ball.vy)
+      const targetSpd = clamp(spd * 1.15, 600, 1150)
+      const scale = targetSpd / (spd || 1)
+      ball.vx *= scale
+      ball.vy *= scale
+      g.fx.burst(b.x, b.y, "#ff9900", 8, 160)
+    }
     // электрошар: обычный урон уже нанесён, искры цепочкой перескакивают
     // по соседним блокам (звенья бьют по расписанию из очереди); сам блок
     // удара исключён — свой урон он уже получил

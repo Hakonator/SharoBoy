@@ -7,7 +7,7 @@
  */
 import { clamp, mulberry32 } from "./utils"
 
-export type BossVariantKind = "king" | "octopus" | "kraken" | "jellyfish"
+export type BossVariantKind = "king" | "jellyfish" | "octopus" | "crab" | "kraken" | "chrono"
 
 /** Параметры конкретного воплощения финального босса. */
 export interface BossVariant {
@@ -16,7 +16,7 @@ export interface BossVariant {
   name: string
   /** Базовое HP тела (уже масштабировано по ярусу). */
   hp: number
-  /** Количество миньонов на орбите (только у «Царь-шара»). */
+  /** Количество миньонов на орбите (только у «Царь-шара» и «Повелителя Времени»). */
   minions: number
   /** Количество щупалец (0 — босс без щупалец). */
   tentacles: number
@@ -32,9 +32,11 @@ const KIND_DEFAULTS: Record<
   { name: string; minions: number; tentacles: number; bombEvery: number; angryAt: number }
 > = {
   king: { name: "ЦАРЬ-ШАР", minions: 3, tentacles: 0, bombEvery: 0, angryAt: 0.4 },
-  octopus: { name: "ОСЬМИНОГ", minions: 0, tentacles: 6, bombEvery: 4.5, angryAt: 0.5 },
-  kraken: { name: "КРАКЕН", minions: 0, tentacles: 8, bombEvery: 3.2, angryAt: 0.55 },
   jellyfish: { name: "ГРОЗОВАЯ МЕДУЗА", minions: 0, tentacles: 5, bombEvery: 0, angryAt: 0.5 },
+  octopus: { name: "ОСЬМИНОГ", minions: 0, tentacles: 6, bombEvery: 4.5, angryAt: 0.5 },
+  crab: { name: "МЕХА-КРАБ", minions: 0, tentacles: 0, bombEvery: 4.0, angryAt: 0.5 },
+  kraken: { name: "КРАКЕН", minions: 0, tentacles: 8, bombEvery: 3.2, angryAt: 0.55 },
+  chrono: { name: "ПОВЕЛИТЕЛЬ ВРЕМЕНИ", minions: 4, tentacles: 0, bombEvery: 0, angryAt: 0.5 },
 }
 
 /**
@@ -47,10 +49,13 @@ export function fixedVariant(kind: BossVariantKind, tier = 2): BossVariant {
   return {
     kind,
     name: d.name,
-    // Сила масштабируется ярусом: HP растёт, миньонов прибавляется. Медуза —
-    // peer кракена по размеру и живучести.
-    hp: 40 + (tier + 1) * 6 + (kind === "kraken" || kind === "jellyfish" ? 10 : 0),
-    minions: kind === "king" ? clamp(d.minions + Math.floor(tier / 2), 3, 6) : 0,
+    // Сила масштабируется ярусом: HP растёт, миньонов прибавляется.
+    hp:
+      40 +
+      (tier + 1) * 6 +
+      (kind === "kraken" || kind === "jellyfish" || kind === "chrono" ? 10 : 0),
+    minions:
+      kind === "king" || kind === "chrono" ? clamp(d.minions + Math.floor(tier / 2), 3, 6) : 0,
     tentacles: d.tentacles,
     bombEvery: d.bombEvery,
     angryAt: d.angryAt,
@@ -67,6 +72,7 @@ export function pickBossVariant(seed: number, tier: number): BossVariant {
   const roll = rng()
   // «Кракен» открывается со 2-го яруса боссов, медуза — с 3-го (самая коварная),
   // до этого — король или осьминог.
+  // Новые боссы (Меха-Краб, Повелитель Времени) пока в отладочном режиме для тестов механики.
   const pool: BossVariantKind[] =
     tier >= 2
       ? ["king", "octopus", "kraken", "jellyfish"]

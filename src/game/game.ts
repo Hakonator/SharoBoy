@@ -31,6 +31,7 @@ import type { CampaignMap } from "./campaignMap"
 import type { PlayerMapSpec } from "./mapSpec"
 import type { LevelSpec } from "./levels"
 import type { MinibossKind } from "./minibosses"
+import type { BossVariantKind } from "./bossVariants"
 import { buyCampaignShopItem, closeCampaignShop } from "./campaignShop"
 import { chooseCampaignEventChoice as chooseCampaignEventOption } from "./campaignEvents"
 import { makeBossHost, makePowersHost, makePhysicsHost, makeWeaponsHost } from "./game/hosts"
@@ -136,7 +137,7 @@ export class Game {
   /** Режим отладки: позволяет тестировать новые механики и контент. */
   debug = false
   /** Принудительный тип босса для отладки (null = стандартное поведение). */
-  debugBossType: "octopus" | "kraken" | "jellyfish" | null = null
+  debugBossType: BossVariantKind | null = null
   /** Живые существа-минибоссы уровня (их может быть несколько): у каждого свой
    *  пул HP, номер группы (mbGroup блоков) и центр для дропа жизни. */
   minibosses: MinibossCreature[] = []
@@ -454,7 +455,7 @@ export class Game {
   debugSkipLevel() {
     debugSkipLevel(this)
   }
-  spawnDebugBoss(kind: "octopus" | "kraken" | "jellyfish") {
+  spawnDebugBoss(kind: BossVariantKind) {
     spawnDebugBoss(this, kind)
   }
   spawnDebugMiniboss(kind: MinibossKind) {

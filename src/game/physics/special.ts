@@ -27,7 +27,8 @@ export function applyBallTimers(ball: Ball, dt: number) {
 export function specialSpeedMult(ball: Ball): number {
   const spring = (ball.springT ?? 0) > 0 ? SPRING_SPEED_MULT : 1
   const cotton = (ball.cottonT ?? 0) > 0 ? COTTON_SPEED_MULT : 1
-  return spring * cotton
+  const chrono = ball.chronoMult ?? 1
+  return spring * cotton * chrono
 }
 
 /**

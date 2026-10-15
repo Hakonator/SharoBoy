@@ -9,6 +9,8 @@ import type { Ball, Block, BossState } from "../types"
 import type { BossVariant } from "../bossVariants"
 import { JELLY_SEG_RADII, JELLY_SEG_COUNT, JELLY_TENTACLES, JELLY_BOLT_EVERY } from "../bossJelly"
 import { updateJellyTentacles } from "../bossJelly"
+import { buildCrabBoss } from "../bossCrab"
+import { buildChronoBoss } from "../bossChrono"
 import type { LevelSpec } from "../levels"
 
 import { pushHud } from "./hudSync"
@@ -94,10 +96,35 @@ export function buildJellyfishBossLevel(g: Game, variant: BossVariant) {
   g.boomQueue = []
   g.fieldShift = null
   resetMiniboss(g)
-  g.blocks = []
   const boss = buildJellyfishBoss(g, variant.hp, variant)
   g.bossSys.spawn(boss)
   g.blocksInitial = Math.max(1, g.blocks.length)
+}
+
+/** Босс «Меха-Краб»: бронированный панцирь + две защитные клешни. */
+export function buildCrabBossLevel(g: Game, variant: BossVariant) {
+  g.bossSys.clear()
+  g.boomQueue = []
+  g.fieldShift = null
+  resetMiniboss(g)
+  g.blocks = []
+  const { boss, blocks } = buildCrabBoss(g.w, g.h, variant.hp, variant)
+  g.bossSys.spawn(boss)
+  g.blocks = blocks
+  g.blocksInitial = Math.max(1, blocks.length)
+}
+
+/** Босс «Повелитель Времени»: хроносфера, стрелки циферблата и временные воронки. */
+export function buildChronoBossLevel(g: Game, variant: BossVariant) {
+  g.bossSys.clear()
+  g.boomQueue = []
+  g.fieldShift = null
+  resetMiniboss(g)
+  g.blocks = []
+  const { boss, blocks } = buildChronoBoss(g.w, g.h, variant.hp, variant)
+  g.bossSys.spawn(boss)
+  g.blocks = blocks
+  g.blocksInitial = Math.max(1, blocks.length)
 }
 
 /** Скорость шара: в узле карты — по раскладке, иначе безопасный фолбэк. */

@@ -8,6 +8,8 @@ import type { SFX } from "./audio"
 import type { Block, BossState, PaddleState, PowerType, PowerUp } from "./types"
 import { clamp, rand } from "./utils"
 import { stepJellyfish } from "./bossJelly"
+import { stepCrab } from "./bossCrab"
+import { stepChrono } from "./bossChrono"
 
 /** Хост-интерфейс: то, что системе босса нужно от движка. */
 export interface BossHost {
@@ -84,6 +86,12 @@ export class BossSystem {
       // Медуза ведёт себя как настоящая: пульс купола (сжатие — рывок вверх,
       // расширение — погружение), отростки следуют за куполом, молнии.
       stepJellyfish(this.g, bo, angry, dt)
+    } else if (bo.isCrab) {
+      bo.y = bo.baseY + Math.sin(bo.t * 1.5) * 16
+      stepCrab(this.g, bo, angry, dt)
+    } else if (bo.isChrono) {
+      bo.y = bo.baseY + Math.sin(bo.t * 1.4) * 18
+      stepChrono(this.g, bo, angry, dt)
     } else {
       bo.y = bo.baseY + Math.sin(bo.t * 1.7) * 22
     }
@@ -201,6 +209,14 @@ export class BossSystem {
         // Есть живые щупальца — урон по телу заблокирован.
         this.g.sfx.brick(1)
         this.g.fx.burst(bo.x, bo.y, "#ff5ca8", 4, 100)
+        return
+      }
+    } else if (bo.isCrab) {
+      const liveClaws = this.g.blocks.filter((b) => b.isClaw && !b.dead)
+      // Если обе клешни ещё имеют целые сегменты — прямой урон отражается
+      if (liveClaws.length >= 4) {
+        this.g.sfx.brick(1)
+        this.g.fx.burst(bo.x, bo.y, "#ffaa00", 6, 140)
         return
       }
     }

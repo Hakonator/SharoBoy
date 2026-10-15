@@ -161,6 +161,10 @@ export interface Block {
   bolt?: boolean
   /** Бомба бьёт по ракетке (а не по блокам). */
   hitsPaddle?: boolean
+  /** Клешня босса-краба (левая или правая): отбивает мяч с ускорением. */
+  isClaw?: boolean
+  clawSide?: "left" | "right"
+  clawSeg?: number
   /** Блок мини-босса кампании: за уничтожение всех — шанс дропа жизни. */
   isMiniboss?: boolean
   /** Номер существа в уровне (минибоссов может быть несколько) — привязка HP. */
@@ -228,6 +232,26 @@ export interface BossState {
   chargeTent?: number | null
   /** Прогресс искрения кончика 0..1 — телеграф выстрела молнии. */
   chargeT?: number
+  /** Босс «Меха-Краб»: бронированный панцирь и подвижные защитные клешни. */
+  isCrab?: boolean
+  clawAngle?: number
+  clawSnapTimer?: number
+  /** Босс «Повелитель Времени»: хроносфера со стрелками времени и временными воронками. */
+  isChrono?: boolean
+  chronoRifts?: ChronoRift[]
+  chronoTimer?: number
+}
+
+/** Временная воронка босса «Повелитель Времени». */
+export interface ChronoRift {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  r: number
+  kind: "slow" | "fast"
+  life: number
+  maxLife: number
 }
 
 export interface Ball {
@@ -248,6 +272,8 @@ export interface Ball {
   springT?: number
   /** Таймер замедления ватного блока, сек (0/undefined — не активен). */
   cottonT?: number
+  /** Временный множитель скорости от хроно-воронок (1.0 = норма, < 1 замедление, > 1 ускорение). */
+  chronoMult?: number
 }
 
 export type PowerType =

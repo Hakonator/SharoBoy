@@ -19,6 +19,8 @@ import {
   buildLevel,
   buildOctopusBossLevel,
   buildJellyfishBossLevel,
+  buildCrabBossLevel,
+  buildChronoBossLevel,
   serveBall,
 } from "./levelBuild"
 import { addMiniboss } from "./minibossRuntime"
@@ -230,7 +232,11 @@ export function startMapBattle(g: Game, node: CampaignNode) {
     const variant = pickBossVariant(g.campaignSeed + node.id * 7919, actBossTier)
     if (variant.kind === "jellyfish") {
       buildJellyfishBossLevel(g, variant)
-    } else if (variant.tentacles > 0) {
+    } else if (variant.kind === "crab") {
+      buildCrabBossLevel(g, variant)
+    } else if (variant.kind === "chrono") {
+      buildChronoBossLevel(g, variant)
+    } else if (variant.kind === "octopus" || variant.kind === "kraken") {
       buildOctopusBossLevel(g, variant)
     } else {
       buildBossLevel(g, variant.hp, variant.minions, 4)

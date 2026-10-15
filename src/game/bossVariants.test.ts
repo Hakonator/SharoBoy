@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { pickBossVariant } from "./bossVariants"
+import { fixedVariant, pickBossVariant } from "./bossVariants"
 
 describe("pickBossVariant", () => {
   it("детерминирован: тот же сид — тот же босс", () => {
@@ -54,5 +54,25 @@ describe("pickBossVariant", () => {
 
   it("HP растёт с ярусом", () => {
     expect(pickBossVariant(7, 3).hp).toBeGreaterThan(pickBossVariant(7, 0).hp)
+  })
+})
+
+describe("fixedVariant", () => {
+  it("возвращает корректные характеристики для всех 6 боссов", () => {
+    const kinds = ["king", "jellyfish", "octopus", "crab", "kraken", "chrono"] as const
+    for (const kind of kinds) {
+      const v = fixedVariant(kind, 2)
+      expect(v.kind).toBe(kind)
+      expect(v.hp).toBeGreaterThan(30)
+      if (kind === "crab") {
+        expect(v.bombEvery).toBeGreaterThan(0)
+        expect(v.minions).toBe(0)
+        expect(v.tentacles).toBe(0)
+      } else if (kind === "chrono") {
+        expect(v.minions).toBeGreaterThan(0)
+        expect(v.bombEvery).toBe(0)
+        expect(v.tentacles).toBe(0)
+      }
+    }
   })
 })

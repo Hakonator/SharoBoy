@@ -39,20 +39,23 @@ export function useDebugControls(gameRef: RefObject<Game | null>) {
   const handleDebugStartGame = useCallback(() => {
     const game = gameRef.current
     if (!game) return
-    game.debugBossType =
-      debugBoss === "octopus" || debugBoss === "kraken" || debugBoss === "jellyfish"
-        ? debugBoss
-        : null
-    if (debugBoss === "octopus" || debugBoss === "kraken" || debugBoss === "jellyfish") {
-      game.spawnDebugBoss(debugBoss)
+    const BOSS_KINDS = ["king", "jellyfish", "octopus", "crab", "kraken", "chrono"] as const
+    if (BOSS_KINDS.includes(debugBoss as (typeof BOSS_KINDS)[number])) {
+      const bossKind = debugBoss as (typeof BOSS_KINDS)[number]
+      game.debugBossType = bossKind
+      game.spawnDebugBoss(bossKind)
     } else if (debugBoss === "minibossFish") {
+      game.debugBossType = null
       game.spawnDebugMiniboss("fish")
     } else if (debugBoss === "minibossJelly") {
+      game.debugBossType = null
       game.spawnDebugMiniboss("jelly")
     } else if (debugBoss === "specialBlocks") {
+      game.debugBossType = null
       game.spawnDebugSpecialBlocks()
     } else {
       // Пустой уровень со случайными блоками (стандартный wave 1)
+      game.debugBossType = null
       game.startEndless()
     }
   }, [gameRef, debugBoss])

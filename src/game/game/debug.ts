@@ -1,13 +1,21 @@
 import { DEBUG_TOOLS } from "../../config"
 import type { Game } from "../game"
-import { fixedVariant } from "../bossVariants"
+import { fixedVariant, type BossVariantKind } from "../bossVariants"
 import { minibossName } from "../minibosses"
 import { lsSet } from "../utils"
 import type { MinibossKind } from "../minibosses"
 import { buildSpecialBlocks } from "../debugLevels"
 
 import { pushHud, setBanner } from "./hudSync"
-import { buildOctopusBoss, buildJellyfishBoss, buildWave, serveBall } from "./levelBuild"
+import {
+  buildBossLevel,
+  buildOctopusBossLevel,
+  buildJellyfishBossLevel,
+  buildCrabBossLevel,
+  buildChronoBossLevel,
+  buildWave,
+  serveBall,
+} from "./levelBuild"
 import { addMiniboss, resetMiniboss } from "./minibossRuntime"
 import { blockTop } from "./paddleControl"
 
@@ -80,8 +88,8 @@ export function toggleDebugEffect(g: Game, id: string) {
 export function isDebugEffectActive(g: Game, id: string) {
   return g.debugEffects.has(id)
 }
-/** Принудительно спавнит щупальцевого босса (осьминог/кракен) или медузу. */
-export function spawnDebugBoss(g: Game, kind: "octopus" | "kraken" | "jellyfish") {
+/** Принудительно спавнит выбранного босса кампании для отладки и тестов. */
+export function spawnDebugBoss(g: Game, kind: BossVariantKind) {
   g.debugBossType = kind
   // Арена отладки живёт по правилам бесконечного режима: mode по умолчанию
   // «campaign», и после убийства босса onLevelCleared ушёл бы на экран карты,
@@ -96,13 +104,18 @@ export function spawnDebugBoss(g: Game, kind: "octopus" | "kraken" | "jellyfish"
   resetMiniboss(g)
   // Канонические параметры вида (как в кампании на 3-м ярусе боссов).
   const variant = fixedVariant(kind)
-  const boss =
-    kind === "jellyfish"
-      ? buildJellyfishBoss(g, variant.hp, variant)
-      : buildOctopusBoss(g, variant.hp, variant)
-  g.bossSys.spawn(boss)
-  g.blocksInitial = Math.max(1, g.blocks.length)
-  setBanner(g, `ФИНАЛЬНЫЙ БОСС: ${variant.name}`)
+  if (kind === "king") {
+    buildBossLevel(g, variant.hp, variant.minions, 4)
+  } else if (kind === "jellyfish") {
+    buildJellyfishBossLevel(g, variant)
+  } else if (kind === "crab") {
+    buildCrabBossLevel(g, variant)
+  } else if (kind === "chrono") {
+    buildChronoBossLevel(g, variant)
+  } else {
+    buildOctopusBossLevel(g, variant)
+  }
+  setBanner(g, `БОСС: ${variant.name}`)
   if (g.phase === "menu") {
     g.phase = "playing"
     serveBall(g)

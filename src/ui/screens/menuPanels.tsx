@@ -220,14 +220,17 @@ export function MenuDebug({
               {(
                 [
                   { id: "", label: "Нет" },
-                  { id: "octopus", label: "🐙 Осьминог" },
-                  { id: "kraken", label: "🦑 Кракен" },
+                  { id: "king", label: "👑 Царь-шар (Акт 1)" },
                   // эмодзи 🪼 есть не во всех шрифтах — используем SVG-иконку
                   {
                     id: "jellyfish",
-                    label: "Медуза (босс)",
+                    label: "Медуза (Акт 1)",
                     icon: <IconJelly className="h-3.5 w-3.5" />,
                   },
+                  { id: "octopus", label: "🐙 Осьминог (Акт 2)" },
+                  { id: "crab", label: "🦀 Меха-Краб (Акт 2)" },
+                  { id: "kraken", label: "🦑 Кракен (Акт 3)" },
+                  { id: "chrono", label: "⏳ Хронос (Акт 3)" },
                   { id: "minibossFish", label: "🐟 Рыба (мини)" },
                   {
                     id: "minibossJelly",

@@ -214,11 +214,298 @@ function drawJellyfishBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block
   ctx.restore()
 }
 
+/** Рендер босса «Меха-Краб»: ножки, клешни и массивный панцирь с перископами. */
+function drawCrabBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block[]) {
+  const angry = bo.hp < bo.maxHp * 0.5
+
+  // 1. Рисуем ножки краба позади панциря (по 3 с каждой стороны)
+  ctx.save()
+  ctx.strokeStyle = angry ? "#ff6a3d" : "#c4421a"
+  ctx.lineWidth = 4
+  ctx.lineCap = "round"
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const legPh = bo.t * 5 + i * 1.2 + (side > 0 ? Math.PI : 0)
+      const legX = bo.x + side * (bo.r * 0.75 + i * 4)
+      const legY = bo.y + (i - 1) * 14
+      const kneeX = legX + side * (24 + Math.sin(legPh) * 6)
+      const kneeY = legY - 14 + Math.cos(legPh) * 4
+      const footX = kneeX + side * 16
+      const footY = kneeY + 28
+      ctx.beginPath()
+      ctx.moveTo(legX, legY)
+      ctx.lineTo(kneeX, kneeY)
+      ctx.lineTo(footX, footY)
+      ctx.stroke()
+    }
+  }
+  ctx.restore()
+
+  // 2. Рисуем сегменты клешней (блоки isClaw)
+  const claws = blocks.filter((b) => b.isClaw && !b.dead)
+  for (const c of claws) {
+    const isPincer = c.clawSeg === 2
+    ctx.save()
+    ctx.shadowColor = angry ? "#ff5347" : "#ff9e42"
+    ctx.shadowBlur = isPincer ? 18 : 8
+    const grad = ctx.createRadialGradient(c.x - 4, c.y - 4, 2, c.x, c.y, c.rx)
+    grad.addColorStop(0, isPincer ? "#ffe29a" : "#ff9e42")
+    grad.addColorStop(0.5, angry ? "#ff3b14" : "#d94e24")
+    grad.addColorStop(1, "#521404")
+    ctx.fillStyle = grad
+    ctx.beginPath()
+    ctx.arc(c.x, c.y, c.rx, 0, Math.PI * 2)
+    ctx.fill()
+    if (isPincer) {
+      ctx.strokeStyle = "#ffe29a"
+      ctx.lineWidth = 2
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+
+  // 3. Панцирь краба (тело)
+  ctx.save()
+  ctx.translate(bo.x, bo.y)
+  const frac = clamp(bo.hp / bo.maxHp, 0, 1)
+
+  // Кольцо HP
+  ctx.lineWidth = 6
+  ctx.strokeStyle = "rgba(4,18,26,0.7)"
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r + 14, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.strokeStyle = frac > 0.55 ? "#5dffb0" : frac > 0.25 ? "#ffc94d" : "#ff5347"
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
+  ctx.stroke()
+
+  // Тело-панцирь: массивный овальный щит
+  ctx.shadowColor = angry ? "#ff2a14" : "#ff7700"
+  ctx.shadowBlur = 24
+  const g = ctx.createRadialGradient(-bo.r * 0.3, -bo.r * 0.3, 4, 0, 0, bo.r * 1.2)
+  g.addColorStop(0, angry ? "#ffd9d4" : "#ffe29a")
+  g.addColorStop(0.4, angry ? "#ff3b14" : "#d94e24")
+  g.addColorStop(1, "#360a02")
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.ellipse(0, 0, bo.r * 1.15, bo.r * 0.85, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.shadowBlur = 0
+
+  // Швы брони панциря
+  ctx.strokeStyle = "rgba(255,220,180,0.3)"
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(0, -bo.r * 0.8)
+  ctx.lineTo(0, bo.r * 0.8)
+  ctx.arc(0, 0, bo.r * 0.45, -Math.PI * 0.6, Math.PI * 0.6)
+  ctx.stroke()
+
+  if (bo.flash > 0) {
+    ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.7})`
+    ctx.beginPath()
+    ctx.ellipse(0, 0, bo.r * 1.15, bo.r * 0.85, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // Стебельчатые глаза-перископы
+  const target = balls.find((b) => !b.stuck)
+  let ex = 0
+  let ey = 0
+  if (target) {
+    const dx = target.x - bo.x
+    const dy = target.y - bo.y
+    const dl = Math.hypot(dx, dy) || 1
+    ex = (dx / dl) * 4
+    ey = (dy / dl) * 4
+  }
+  for (const sx of [-1, 1]) {
+    const eyeX = sx * bo.r * 0.42
+    const eyeY = -bo.r * 0.68
+    // Стебелек глаза
+    ctx.strokeStyle = "#8f2812"
+    ctx.lineWidth = 5
+    ctx.beginPath()
+    ctx.moveTo(sx * bo.r * 0.35, -bo.r * 0.4)
+    ctx.lineTo(eyeX, eyeY)
+    ctx.stroke()
+
+    // Глазное яблоко
+    ctx.fillStyle = "#ffffff"
+    ctx.beginPath()
+    ctx.arc(eyeX, eyeY, 8.5, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Неоновый кибер-зрачок
+    ctx.fillStyle = angry ? "#ff1414" : "#00f0ff"
+    ctx.beginPath()
+    ctx.arc(eyeX + ex, eyeY + ey, 4.2, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  ctx.restore()
+}
+
+/** Рендер босса «Повелитель Времени»: хроносфера, стрелки циферблата и воронки. */
+function drawChronoBoss(ctx: Ctx, bo: BossState) {
+  const angry = bo.hp < bo.maxHp * 0.5
+
+  // 1. Рисуем временные воронки (Chrono Rifts) на поле
+  if (bo.chronoRifts) {
+    for (const rift of bo.chronoRifts) {
+      const isSlow = rift.kind === "slow"
+      const alpha = clamp(rift.life / 1.5, 0, 1) * clamp((rift.maxLife - rift.life) / 0.8, 0, 1)
+      const pulse = 1 + Math.sin(bo.t * 4 + rift.x * 0.05) * 0.08
+      const curR = rift.r * pulse
+
+      ctx.save()
+      ctx.translate(rift.x, rift.y)
+      ctx.globalAlpha = alpha
+
+      // Свечение и градиент воронки
+      ctx.shadowColor = isSlow ? "#00f0ff" : "#ff00d4"
+      ctx.shadowBlur = 22
+      const rg = ctx.createRadialGradient(0, 0, 2, 0, 0, curR)
+      rg.addColorStop(0, isSlow ? "rgba(255,255,255,0.7)" : "rgba(255,230,255,0.7)")
+      rg.addColorStop(0.4, isSlow ? "rgba(0,240,255,0.25)" : "rgba(255,0,212,0.25)")
+      rg.addColorStop(1, "rgba(0,0,0,0)")
+      ctx.fillStyle = rg
+      ctx.beginPath()
+      ctx.arc(0, 0, curR, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Спиральные хроно-кольца
+      ctx.shadowBlur = 0
+      const spinDir = isSlow ? -1 : 1
+      ctx.rotate(bo.t * 1.8 * spinDir)
+      ctx.strokeStyle = isSlow ? "rgba(0,240,255,0.6)" : "rgba(255,0,212,0.6)"
+      ctx.lineWidth = 2
+      ctx.setLineDash([8, 12])
+      ctx.beginPath()
+      ctx.arc(0, 0, curR * 0.75, 0, Math.PI * 2)
+      ctx.stroke()
+
+      ctx.strokeStyle = isSlow ? "rgba(180,245,255,0.4)" : "rgba(255,180,245,0.4)"
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([4, 8])
+      ctx.beginPath()
+      ctx.arc(0, 0, curR * 0.45, 0, Math.PI * 2)
+      ctx.stroke()
+
+      // Текстовая метка воронки
+      ctx.setLineDash([])
+      ctx.font = '10px "Russo One", sans-serif'
+      ctx.fillStyle = isSlow ? "#aef7ff" : "#ffd9f8"
+      ctx.textAlign = "center"
+      ctx.textBaseline = "middle"
+      ctx.fillText(isSlow ? "SLOW" : "FAST", 0, 0)
+
+      ctx.restore()
+    }
+  }
+
+  // 2. Тело хроносферы
+  ctx.save()
+  ctx.translate(bo.x, bo.y)
+  const frac = clamp(bo.hp / bo.maxHp, 0, 1)
+
+  // Кольцо HP
+  ctx.lineWidth = 6
+  ctx.strokeStyle = "rgba(4,18,26,0.7)"
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r + 14, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.strokeStyle = frac > 0.55 ? "#5dffb0" : frac > 0.25 ? "#ffc94d" : "#ff5347"
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
+  ctx.stroke()
+
+  // Хроносфера: глубокий космический сапфир/аметист
+  ctx.shadowColor = angry ? "#ff2a85" : "#7928ca"
+  ctx.shadowBlur = 28
+  const g = ctx.createRadialGradient(-bo.r * 0.35, -bo.r * 0.35, 4, 0, 0, bo.r * 1.2)
+  g.addColorStop(0, angry ? "#ffd9f0" : "#e9d5ff")
+  g.addColorStop(0.45, angry ? "#ff007f" : "#8a2be2")
+  g.addColorStop(1, "#19062e")
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.shadowBlur = 0
+
+  if (bo.flash > 0) {
+    ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.7})`
+    ctx.beginPath()
+    ctx.arc(0, 0, bo.r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // Циферблат со стрелками времени
+  ctx.strokeStyle = "rgba(255,255,255,0.4)"
+  ctx.lineWidth = 1.5
+  for (let i = 0; i < 12; i++) {
+    const a = (i * Math.PI * 2) / 12
+    const innerR = bo.r * (i % 3 === 0 ? 0.72 : 0.82)
+    ctx.beginPath()
+    ctx.moveTo(Math.cos(a) * innerR, Math.sin(a) * innerR)
+    ctx.lineTo(Math.cos(a) * (bo.r * 0.92), Math.sin(a) * (bo.r * 0.92))
+    ctx.stroke()
+  }
+
+  // Стрелки времени
+  const spinMult = angry ? 2.2 : 1
+  const hourA = bo.t * 0.5 * spinMult
+  const minA = bo.t * 1.8 * spinMult
+  const secA = bo.t * 5.2 * spinMult
+
+  // Часовая
+  ctx.strokeStyle = "#ffe9a8"
+  ctx.lineWidth = 4
+  ctx.lineCap = "round"
+  ctx.beginPath()
+  ctx.moveTo(0, 0)
+  ctx.lineTo(Math.cos(hourA) * (bo.r * 0.45), Math.sin(hourA) * (bo.r * 0.45))
+  ctx.stroke()
+
+  // Минутная
+  ctx.strokeStyle = "#00f0ff"
+  ctx.lineWidth = 2.5
+  ctx.beginPath()
+  ctx.moveTo(0, 0)
+  ctx.lineTo(Math.cos(minA) * (bo.r * 0.65), Math.sin(minA) * (bo.r * 0.65))
+  ctx.stroke()
+
+  // Секундная
+  ctx.strokeStyle = "#ff007f"
+  ctx.lineWidth = 1.2
+  ctx.beginPath()
+  ctx.moveTo(0, 0)
+  ctx.lineTo(Math.cos(secA) * (bo.r * 0.78), Math.sin(secA) * (bo.r * 0.78))
+  ctx.stroke()
+
+  // Центральный хроно-кристалл
+  ctx.fillStyle = "#ffffff"
+  ctx.beginPath()
+  ctx.arc(0, 0, 4.5, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.restore()
+}
+
 export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks: Block[]) {
   const bo = boss
   if (!bo) return
   if (bo.isJellyfish) {
     drawJellyfishBoss(ctx, bo, balls, blocks)
+    return
+  }
+  if (bo.isCrab) {
+    drawCrabBoss(ctx, bo, balls, blocks)
+    return
+  }
+  if (bo.isChrono) {
+    drawChronoBoss(ctx, bo)
     return
   }
   const angry = bo.hp < bo.maxHp * 0.4
