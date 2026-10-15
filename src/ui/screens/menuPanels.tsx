@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import { ACHIEVEMENTS } from "../../game/achievements"
 import type { HudData } from "../../game/types"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "../../game/upgrades"
-import { IconJelly, IconMusic, IconSettings, IconSound, VolSlider } from "../icons"
+import { IconCoin, IconJelly, IconMusic, IconSettings, IconSound, VolSlider } from "../icons"
 
 import { MenuSection } from "./shared"
 
@@ -90,8 +90,9 @@ export function MenuUpgrades({
           >
             💠 {(hud.metaCrystals ?? 0).toLocaleString("ru-RU")}
           </span>
-          <span className="flex items-center gap-1 font-display font-bold text-gold">
-            🪙 {hud.coins.toLocaleString("ru-RU")}
+          <span className="flex items-center gap-1.5 font-display font-bold text-gold">
+            <IconCoin className="h-4 w-4" />
+            <span>{hud.coins.toLocaleString("ru-RU")}</span>
           </span>
         </div>
       </div>
@@ -145,13 +146,14 @@ export function MenuUpgrades({
                   <button
                     disabled={!afford}
                     onClick={() => onBuyUpgrade(u.id)}
-                    className={`rounded px-2.5 py-1 font-display text-xs font-bold transition-all ${
+                    className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 font-display text-xs font-bold transition-all ${
                       afford
                         ? "cursor-pointer bg-gold text-abyss shadow-[0_0_10px_rgba(255,201,77,0.4)] hover:scale-105 active:scale-95"
                         : "cursor-not-allowed bg-line/20 text-dim/50 border border-line/30"
                     }`}
                   >
-                    🪙 {price}
+                    <IconCoin className="h-3.5 w-3.5" />
+                    <span>{price}</span>
                   </button>
                 )}
               </div>
@@ -164,7 +166,16 @@ export function MenuUpgrades({
 
   if (asSection) {
     return (
-      <MenuSection title="🛠 Прокачка" badge={`🪙 ${hud.coins}`} dot={canBuyAny}>
+      <MenuSection
+        title="🛠 Прокачка"
+        badge={
+          <span className="inline-flex items-center gap-1">
+            <IconCoin className="h-3.5 w-3.5" />
+            <span>{hud.coins}</span>
+          </span>
+        }
+        dot={canBuyAny}
+      >
         {content}
       </MenuSection>
     )
@@ -358,7 +369,9 @@ export function MenuAchievements({
             }`}
           >
             <div className="flex items-center gap-2">
-              <span className="text-lg leading-none">{got ? d.icon : "🔒"}</span>
+              <span className="flex h-5 w-5 items-center justify-center text-lg leading-none">
+                {got ? d.icon === "🪙" ? <IconCoin className="h-4 w-4" /> : d.icon : "🔒"}
+              </span>
               <div className="min-w-0">
                 <div className={`font-display text-sm ${got ? "text-gold" : "text-dim"}`}>
                   {d.name}

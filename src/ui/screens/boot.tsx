@@ -1,3 +1,5 @@
+import { IconCoin } from "../icons"
+
 import type { AchToast } from "./types"
 
 export function BootErrorScreen({ error, onReload }: { error: string; onReload: () => void }) {
@@ -24,8 +26,9 @@ export function AchToasts({ toasts }: { toasts: AchToast[] }) {
           className="anim-pop rounded-xl border-2 border-gold/70 bg-deep/95 px-4 py-2.5 text-center shadow-[0_0_32px_rgba(255,201,77,0.28)]"
         >
           <div className="hud-label text-gold">🏅 Достижение открыто</div>
-          <div className="font-display text-lg leading-tight text-foam">
-            {t.def.icon} {t.def.name}
+          <div className="font-display text-lg leading-tight text-foam flex items-center justify-center gap-1.5">
+            {t.def.icon === "🪙" ? <IconCoin className="h-5 w-5" /> : t.def.icon}
+            <span>{t.def.name}</span>
           </div>
           <div className="text-xs text-dim">{t.def.desc}</div>
         </div>

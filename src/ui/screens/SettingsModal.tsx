@@ -10,7 +10,7 @@ import {
   saveSettings,
 } from "../../game/settings"
 import type { HudData } from "../../game/types"
-import { IconMusic, IconSettings, IconSound, VolSlider } from "../icons"
+import { IconCoin, IconMusic, IconSettings, IconSound, VolSlider } from "../icons"
 
 interface SettingsModalProps {
   hud: HudData
@@ -389,7 +389,7 @@ export function SettingsModal({
             </p>
             <ul className="mt-2.5 space-y-1 text-xs text-dim">
               <li className="flex items-center gap-1.5">
-                <span className="text-gold">🪙</span> Все монеты и кристаллы
+                <IconCoin className="h-4 w-4 shrink-0" /> Все монеты и кристаллы
               </li>
               <li className="flex items-center gap-1.5">
                 <span className="text-cyan-neon">🛠</span> Все купленные постоянные улучшения
