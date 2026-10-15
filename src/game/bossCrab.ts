@@ -16,7 +16,7 @@ import type { Block, BossState } from "./types"
 import type { BossHost } from "./boss"
 
 export const CRAB_CLAW_SEGS = 3
-export const CRAB_CLAW_RADII = [18, 15, 22] // база, предплечье, крупная клешня-щипцы
+export const CRAB_CLAW_RADII = [19, 17, 26] // база, предплечье, крупная клешня-щипцы
 
 /** Стартовая позиция панциря краба. */
 export function buildCrabBoss(
@@ -91,16 +91,16 @@ export function updateCrabClaws(bo: BossState, blocks: Block[]) {
     const sideSign = b.clawSide === "left" ? -1 : 1
     const seg = b.clawSeg ?? 0
 
-    // Базовый сустав плеча у края панциря
-    const shoulderX = bo.x + sideSign * (bo.r * 0.75)
-    const shoulderY = bo.y + bo.r * 0.2
+    // Базовый сустав плеча у бокового края панциря
+    const shoulderX = bo.x + sideSign * (bo.r * 0.85)
+    const shoulderY = bo.y + bo.r * 0.12
 
-    // Изгиб клешни вперёд и к центру
-    const armAngle = sideSign * (0.8 + baseAngle * 0.6)
-    const armDist = 32 + seg * 28
+    // Изгиб удлинённой клешни вперёд и к центру
+    const armAngle = sideSign * (0.75 + baseAngle * 0.55)
+    const armDist = 44 + seg * 40
 
     const cx = shoulderX + Math.sin(armAngle) * armDist
-    const cy = shoulderY + Math.cos(armAngle) * armDist * 0.85
+    const cy = shoulderY + Math.cos(armAngle) * armDist * 0.9
 
     b.x = cx
     b.y = cy

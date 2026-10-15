@@ -147,4 +147,32 @@ describe("Boss: Повелитель Времени (chrono)", () => {
     applyChronoRiftsToBalls([], [ball], 0.5)
     expect(ball.chronoMult).toBeCloseTo(1.0, 1)
   })
+
+  it("applyChronoRiftsToBalls сильно отклоняет траекторию шара", () => {
+    const ball: Ball = {
+      x: 380,
+      y: 300,
+      vx: 0,
+      vy: 300,
+      r: 6,
+      speed: 300,
+      stuck: false,
+      stuckOffset: 0,
+      trail: [],
+      squash: 0,
+      sinceHit: 0,
+    }
+    const fastRift = {
+      x: 400,
+      y: 300,
+      vx: 0,
+      vy: 0,
+      r: 70,
+      kind: "fast" as const,
+      life: 5,
+      maxLife: 5,
+    }
+    applyChronoRiftsToBalls([fastRift], [ball], 0.05)
+    expect(Math.abs(ball.vx)).toBeGreaterThan(20)
+  })
 })

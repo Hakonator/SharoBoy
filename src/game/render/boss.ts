@@ -241,27 +241,86 @@ function drawCrabBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block[]) {
   }
   ctx.restore()
 
-  // 2. Рисуем сегменты клешней (блоки isClaw)
-  const claws = blocks.filter((b) => b.isClaw && !b.dead)
-  for (const c of claws) {
-    const isPincer = c.clawSeg === 2
+  // 2. Рисуем сочленения и сегменты клешней (блоки isClaw)
+  for (const side of ["left", "right"] as const) {
+    const sideSign = side === "left" ? -1 : 1
+    const sideClaws = blocks
+      .filter((b) => b.isClaw && b.clawSide === side && !b.dead)
+      .sort((a, b) => (a.clawSeg ?? 0) - (b.clawSeg ?? 0))
+
+    if (sideClaws.length === 0) continue
+
+    const shoulderX = bo.x + sideSign * (bo.r * 0.85)
+    const shoulderY = bo.y + bo.r * 0.12
+
+    // Массивные гидравлические сочленения между панцирем и суставами клешни
     ctx.save()
-    ctx.shadowColor = angry ? "#ff5347" : "#ff9e42"
-    ctx.shadowBlur = isPincer ? 18 : 8
-    const grad = ctx.createRadialGradient(c.x - 4, c.y - 4, 2, c.x, c.y, c.rx)
-    grad.addColorStop(0, isPincer ? "#ffe29a" : "#ff9e42")
-    grad.addColorStop(0.5, angry ? "#ff3b14" : "#d94e24")
-    grad.addColorStop(1, "#521404")
-    ctx.fillStyle = grad
+    ctx.strokeStyle = angry ? "#8a1f0a" : "#4a1808"
+    ctx.lineWidth = 12
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
     ctx.beginPath()
-    ctx.arc(c.x, c.y, c.rx, 0, Math.PI * 2)
-    ctx.fill()
-    if (isPincer) {
-      ctx.strokeStyle = "#ffe29a"
-      ctx.lineWidth = 2
-      ctx.stroke()
-    }
+    ctx.moveTo(shoulderX, shoulderY)
+    for (const c of sideClaws) ctx.lineTo(c.x, c.y)
+    ctx.stroke()
+
+    // Внутренний механический хромированный стержень
+    ctx.strokeStyle = angry ? "#ff6347" : "#ff9e42"
+    ctx.lineWidth = 4
+    ctx.stroke()
     ctx.restore()
+
+    // Отрисовка каждого сустава клешни
+    for (let i = 0; i < sideClaws.length; i++) {
+      const c = sideClaws[i]
+      const isPincer = c.clawSeg === 2
+      ctx.save()
+      ctx.shadowColor = angry ? "#ff5347" : "#ff9e42"
+      ctx.shadowBlur = isPincer ? 20 : 10
+
+      // Круглый бронированный сустав
+      const grad = ctx.createRadialGradient(c.x - 4, c.y - 4, 2, c.x, c.y, c.rx)
+      grad.addColorStop(0, isPincer ? "#ffe29a" : "#ff9e42")
+      grad.addColorStop(0.5, angry ? "#ff3b14" : "#d94e24")
+      grad.addColorStop(1, "#521404")
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      ctx.arc(c.x, c.y, c.rx, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Для концевой клешни — мощные раскрывающиеся щипцы (две створки)
+      if (isPincer) {
+        ctx.strokeStyle = "#ffe29a"
+        ctx.lineWidth = 2.5
+        ctx.stroke()
+
+        const prev = sideClaws[i - 1] ?? { x: shoulderX, y: shoulderY }
+        const baseDir = Math.atan2(c.y - prev.y, c.x - prev.x)
+        const snapAngle = (bo.clawSnapTimer ?? 0) > 0 ? 0.08 : 0.42
+        const pincerLen = c.rx * 1.55
+
+        for (const jaw of [-1, 1]) {
+          const jawAngle = baseDir + jaw * snapAngle
+          const tipX = c.x + Math.cos(jawAngle) * pincerLen
+          const tipY = c.y + Math.sin(jawAngle) * pincerLen
+          const sideX = c.x + Math.cos(jawAngle + jaw * 0.45) * (c.rx * 0.75)
+          const sideY = c.y + Math.sin(jawAngle + jaw * 0.45) * (c.rx * 0.75)
+
+          ctx.fillStyle = angry ? "#ff3b14" : "#d94e24"
+          ctx.beginPath()
+          ctx.moveTo(c.x, c.y)
+          ctx.lineTo(sideX, sideY)
+          ctx.lineTo(tipX, tipY)
+          ctx.closePath()
+          ctx.fill()
+
+          ctx.strokeStyle = "#ffe29a"
+          ctx.lineWidth = 2
+          ctx.stroke()
+        }
+      }
+      ctx.restore()
+    }
   }
 
   // 3. Панцирь краба (тело)
@@ -269,16 +328,33 @@ function drawCrabBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block[]) {
   ctx.translate(bo.x, bo.y)
   const frac = clamp(bo.hp / bo.maxHp, 0, 1)
 
-  // Кольцо HP
-  ctx.lineWidth = 6
-  ctx.strokeStyle = "rgba(4,18,26,0.7)"
+  const bodyRx = bo.r * 1.15
+  const bodyRy = bo.r * 0.85
+  const ringRx = bodyRx + 9
+  const ringRy = bodyRy + 9
+
+  // Кольцо HP — строго по эллиптическому контуру туловища
+  ctx.lineWidth = 5.5
+  ctx.lineCap = "round"
+  ctx.strokeStyle = "rgba(4,18,26,0.75)"
   ctx.beginPath()
-  ctx.arc(0, 0, bo.r + 14, 0, Math.PI * 2)
+  ctx.ellipse(0, 0, ringRx, ringRy, 0, 0, Math.PI * 2)
   ctx.stroke()
-  ctx.strokeStyle = frac > 0.55 ? "#5dffb0" : frac > 0.25 ? "#ffc94d" : "#ff5347"
-  ctx.beginPath()
-  ctx.arc(0, 0, bo.r + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
-  ctx.stroke()
+
+  if (frac > 0) {
+    ctx.strokeStyle = frac > 0.55 ? "#5dffb0" : frac > 0.25 ? "#ffc94d" : "#ff5347"
+    ctx.shadowColor =
+      frac > 0.55
+        ? "rgba(93,255,176,0.8)"
+        : frac > 0.25
+          ? "rgba(255,201,77,0.8)"
+          : "rgba(255,83,71,0.8)"
+    ctx.shadowBlur = 10
+    ctx.beginPath()
+    ctx.ellipse(0, 0, ringRx, ringRy, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
+    ctx.stroke()
+    ctx.shadowBlur = 0
+  }
 
   // Тело-панцирь: массивный овальный щит
   ctx.shadowColor = angry ? "#ff2a14" : "#ff7700"
@@ -289,7 +365,7 @@ function drawCrabBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block[]) {
   g.addColorStop(1, "#360a02")
   ctx.fillStyle = g
   ctx.beginPath()
-  ctx.ellipse(0, 0, bo.r * 1.15, bo.r * 0.85, 0, 0, Math.PI * 2)
+  ctx.ellipse(0, 0, bodyRx, bodyRy, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.shadowBlur = 0
 
@@ -305,7 +381,7 @@ function drawCrabBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block[]) {
   if (bo.flash > 0) {
     ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.7})`
     ctx.beginPath()
-    ctx.ellipse(0, 0, bo.r * 1.15, bo.r * 0.85, 0, 0, Math.PI * 2)
+    ctx.ellipse(0, 0, bodyRx, bodyRy, 0, 0, Math.PI * 2)
     ctx.fill()
   }
 
@@ -365,10 +441,10 @@ function drawChronoBoss(ctx: Ctx, bo: BossState) {
 
       // Свечение и градиент воронки
       ctx.shadowColor = isSlow ? "#00f0ff" : "#ff00d4"
-      ctx.shadowBlur = 22
+      ctx.shadowBlur = 24
       const rg = ctx.createRadialGradient(0, 0, 2, 0, 0, curR)
-      rg.addColorStop(0, isSlow ? "rgba(255,255,255,0.7)" : "rgba(255,230,255,0.7)")
-      rg.addColorStop(0.4, isSlow ? "rgba(0,240,255,0.25)" : "rgba(255,0,212,0.25)")
+      rg.addColorStop(0, isSlow ? "rgba(255,255,255,0.8)" : "rgba(255,230,255,0.8)")
+      rg.addColorStop(0.35, isSlow ? "rgba(0,240,255,0.3)" : "rgba(255,0,212,0.3)")
       rg.addColorStop(1, "rgba(0,0,0,0)")
       ctx.fillStyle = rg
       ctx.beginPath()
@@ -378,12 +454,12 @@ function drawChronoBoss(ctx: Ctx, bo: BossState) {
       // Спиральные хроно-кольца
       ctx.shadowBlur = 0
       const spinDir = isSlow ? -1 : 1
-      ctx.rotate(bo.t * 1.8 * spinDir)
+      ctx.rotate(bo.t * 2.2 * spinDir)
       ctx.strokeStyle = isSlow ? "rgba(0,240,255,0.6)" : "rgba(255,0,212,0.6)"
       ctx.lineWidth = 2
       ctx.setLineDash([8, 12])
       ctx.beginPath()
-      ctx.arc(0, 0, curR * 0.75, 0, Math.PI * 2)
+      ctx.arc(0, 0, curR * 0.78, 0, Math.PI * 2)
       ctx.stroke()
 
       ctx.strokeStyle = isSlow ? "rgba(180,245,255,0.4)" : "rgba(255,180,245,0.4)"
@@ -393,8 +469,26 @@ function drawChronoBoss(ctx: Ctx, bo: BossState) {
       ctx.arc(0, 0, curR * 0.45, 0, Math.PI * 2)
       ctx.stroke()
 
-      // Текстовая метка воронки
+      // 3 вихревых спиральных рукава, визуализирующих закручивание потока
       ctx.setLineDash([])
+      ctx.lineWidth = 1.6
+      for (let s = 0; s < 3; s++) {
+        const startAng = (s * Math.PI * 2) / 3
+        ctx.beginPath()
+        for (let p = 0; p <= 10; p++) {
+          const ratio = p / 10
+          const ang = startAng + ratio * Math.PI * 1.4 * spinDir
+          const r = curR * 0.15 + curR * 0.75 * ratio
+          const px = Math.cos(ang) * r
+          const py = Math.sin(ang) * r
+          if (p === 0) ctx.moveTo(px, py)
+          else ctx.lineTo(px, py)
+        }
+        ctx.strokeStyle = isSlow ? "rgba(0,240,255,0.45)" : "rgba(255,0,212,0.45)"
+        ctx.stroke()
+      }
+
+      // Текстовая метка воронки
       ctx.font = '10px "Russo One", sans-serif'
       ctx.fillStyle = isSlow ? "#aef7ff" : "#ffd9f8"
       ctx.textAlign = "center"

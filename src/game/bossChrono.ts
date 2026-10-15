@@ -106,7 +106,7 @@ export function stepChrono(host: BossHost, bo: BossState, angry: boolean, dt: nu
     if (bo.chronoRifts.length < maxRifts) {
       const isSlow = bo.chronoRifts.every((r) => r.kind === "fast") || Math.random() < 0.6
       const kind = isSlow ? "slow" : "fast"
-      const riftRadius = kind === "slow" ? 64 : 52
+      const riftRadius = kind === "slow" ? 72 : 62
       const life = 11
 
       const spawnX = clamp(
@@ -136,7 +136,7 @@ export function stepChrono(host: BossHost, bo: BossState, angry: boolean, dt: nu
   }
 }
 
-/** Влияние временных воронок на пролетающие мячи. */
+/** Влияние временных воронок на пролетающие мячи: сильное искривление траектории и ускорение/замедление. */
 export function applyChronoRiftsToBalls(
   rifts: ChronoRift[] | undefined,
   balls: Ball[],
@@ -153,27 +153,37 @@ export function applyChronoRiftsToBalls(
         const dist = Math.hypot(dx, dy)
         if (dist < rift.r) {
           const factor = 1 - dist / rift.r
+          const safeDist = Math.max(1, dist)
+          const dirX = dx / safeDist
+          const dirY = dy / safeDist
+
+          // 1. Мощное гравитационное притяжение к ядру воронки
+          const pull = (rift.kind === "fast" ? 2200 : 1200) * factor * dt
+          b.vx -= dirX * pull
+          b.vy -= dirY * pull
+
+          // 2. Сильное тангенциальное закручивание потока (вихревая праща)
+          const swirlDir = rift.kind === "fast" ? 1 : -1
+          const tangentX = -dirY * swirlDir
+          const tangentY = dirX * swirlDir
+          const swirlForce = (rift.kind === "fast" ? 2600 : 1400) * factor * dt
+          b.vx += tangentX * swirlForce
+          b.vy += tangentY * swirlForce
+
+          // 3. Множитель скорости
           if (rift.kind === "slow") {
             // Замедление мяча в лазурной воронке
-            targetChrono = Math.min(targetChrono, Math.max(0.45, 1 - 0.55 * factor))
+            targetChrono = Math.min(targetChrono, Math.max(0.35, 1 - 0.65 * factor))
           } else {
             // Ускорение в пурпурной аномалии
-            targetChrono = Math.max(targetChrono, 1 + 0.35 * factor)
-            // Вихревой поворот направления
-            const swirl = 1.8 * dt * factor
-            const cos = Math.cos(swirl)
-            const sin = Math.sin(swirl)
-            const nvx = b.vx * cos - b.vy * sin
-            const nvy = b.vx * sin + b.vy * cos
-            b.vx = nvx
-            b.vy = nvy
+            targetChrono = Math.max(targetChrono, 1 + 0.5 * factor)
           }
         }
       }
     }
 
-    // Плавный возврат / переход множителя скорости
+    // Плавный переход множителя скорости
     const cur = b.chronoMult ?? 1.0
-    b.chronoMult = cur + (targetChrono - cur) * Math.min(1, dt * 10)
+    b.chronoMult = cur + (targetChrono - cur) * Math.min(1, dt * 12)
   }
 }
