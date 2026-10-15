@@ -3,6 +3,8 @@
  */
 import type { ReactNode } from "react"
 
+import type { BossVariantKind } from "../game/bossVariants"
+
 export function IconPause() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
@@ -192,6 +194,142 @@ export function IconOctopus({ className }: { className?: string }) {
       <circle cx="12.7" cy="8.4" r="0.3" fill="#ffe9e6" />
     </svg>
   )
+}
+
+/** Царь-шар / Механический Страж — золото, корона и орбитальное ядро. */
+export function IconKing({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} aria-hidden>
+      {/* Корона */}
+      <path d="M5.5 8.5 6.8 4.2 10 6.6l3.2-2.4 1.3 4.3Z" fill="#fbbf24" />
+      <circle cx="6.8" cy="4.2" r="0.8" fill="#fef08a" />
+      <circle cx="10" cy="6.6" r="0.8" fill="#fef08a" />
+      <circle cx="13.2" cy="4.2" r="0.8" fill="#fef08a" />
+      {/* Золотой шар-ядро */}
+      <circle cx="10" cy="12" r="5.5" fill="#f59e0b" />
+      <ellipse cx="8.6" cy="10" rx="2.5" ry="1.2" fill="#fef08a" opacity="0.6" />
+      {/* Центральное синее механическое око */}
+      <circle cx="10" cy="12" r="1.8" fill="rgba(4,18,26,0.92)" />
+      <circle cx="10" cy="12" r="0.9" fill="#38bdf8" />
+      <circle cx="10.4" cy="11.6" r="0.3" fill="#ffffff" />
+    </svg>
+  )
+}
+
+/** Меха-Краб — оранжевый панцирь, глаза-стебельки и пружинящие клешни. */
+export function IconCrab({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} aria-hidden>
+      {/* Глаза-стебельки */}
+      <path d="M8 8V4.8M12 8V4.8" stroke="#ea580c" strokeWidth="1.2" strokeLinecap="round" />
+      <circle cx="8" cy="4.5" r="1.2" fill="#fdba74" />
+      <circle cx="12" cy="4.5" r="1.2" fill="#fdba74" />
+      <circle cx="8" cy="4.5" r="0.6" fill="rgba(4,18,26,0.92)" />
+      <circle cx="12" cy="4.5" r="0.6" fill="rgba(4,18,26,0.92)" />
+      {/* Клешни */}
+      <path
+        d="M4.5 9.5C2.5 7.5 2.5 5 4 4c.8 1.4 1.5 2.8 1.5 4.5M15.5 9.5C17.5 7.5 17.5 5 16 4c-.8 1.4-1.5 2.8-1.5 4.5"
+        fill="none"
+        stroke="#f97316"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      {/* Панцирь */}
+      <ellipse cx="10" cy="12" rx="6" ry="4.5" fill="#ea580c" />
+      <ellipse cx="10" cy="10.8" rx="3.8" ry="1.6" fill="#fdba74" opacity="0.45" />
+      {/* Механическая ухмылка */}
+      <path
+        d="M7.5 13.5q2.5 1.5 5 0"
+        fill="none"
+        stroke="rgba(4,18,26,0.85)"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+/** Кракен — глубокий пурпур, 8 щупалец и всевидящее око Бездны. */
+export function IconKraken({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} aria-hidden>
+      {/* Щупальца */}
+      <g fill="none" stroke="#a855f7" strokeWidth="1.4" strokeLinecap="round">
+        <path d="M3.5 12.5c-.8 1.8-2.2 2.2-1.8 4.2" />
+        <path d="M6 13.2c-.5 1.8.4 2.4.2 4.1" />
+        <path d="M8.7 13.6c-.2 1.6.3 2.5.1 3.9" />
+        <path d="M11.3 13.6c.2 1.6-.3 2.5-.1 3.9" />
+        <path d="M14 13.2c.5 1.8-.4 2.4-.2 4.1" />
+        <path d="M16.5 12.5c.8 1.8 2.2 2.2 1.8 4.2" />
+      </g>
+      {/* Голова Кракена */}
+      <path
+        d="M10 2.2c4.2 0 7 3.2 7 7.2 0 1.8-.6 3.2-1.5 4.2H4.5C3.6 12.6 3 11.2 3 9.4c0-4 2.8-7.2 7-7.2Z"
+        fill="#9333ea"
+      />
+      <ellipse cx="10" cy="5.8" rx="3" ry="1.3" fill="#e9d5ff" opacity="0.5" />
+      {/* Око Бездны */}
+      <circle cx="10" cy="9.2" r="2.2" fill="rgba(4,18,26,0.95)" />
+      <circle cx="10" cy="9.2" r="1.2" fill="#f43f5e" />
+      <circle cx="10.4" cy="8.8" r="0.4" fill="#ffffff" />
+    </svg>
+  )
+}
+
+/** Повелитель Времени — лазурная хроносфера, стрелки часов и пространственный вихрь. */
+export function IconChrono({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} aria-hidden>
+      {/* Внешний хроно-вихрь */}
+      <path
+        d="M3 10a7 7 0 0 1 12.8-3.8M17 10a7 7 0 0 1-12.8 3.8"
+        fill="none"
+        stroke="#818cf8"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeDasharray="2.5 1.5"
+      />
+      {/* Хроносфера */}
+      <circle cx="10" cy="10" r="5.6" fill="#38bdf8" />
+      <circle cx="10" cy="10" r="5.6" fill="none" stroke="#c7d2fe" strokeWidth="0.8" />
+      <ellipse cx="8.5" cy="8" rx="2.2" ry="1" fill="#ffffff" opacity="0.5" />
+      {/* Стрелки циферблата */}
+      <circle cx="10" cy="10" r="1" fill="rgba(4,18,26,0.9)" />
+      <path
+        d="M10 10V6.5M10 10l2.5 1.2"
+        stroke="rgba(4,18,26,0.9)"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+      <circle cx="10" cy="10" r="0.4" fill="#67e8f9" />
+    </svg>
+  )
+}
+
+/** Иконка босса узла карты кампании по его виду. */
+export function IconBoss({
+  kind,
+  className = "h-6 w-6 sm:h-7 sm:w-7",
+}: {
+  kind?: BossVariantKind
+  className?: string
+}) {
+  switch (kind) {
+    case "king":
+      return <IconKing className={className} />
+    case "jellyfish":
+      return <IconJelly className={className} />
+    case "crab":
+      return <IconCrab className={className} />
+    case "octopus":
+      return <IconOctopus className={className} />
+    case "kraken":
+      return <IconKraken className={className} />
+    case "chrono":
+      return <IconChrono className={className} />
+    default:
+      return <IconOctopus className={className} />
+  }
 }
 
 /** Золотая монета глубин. */

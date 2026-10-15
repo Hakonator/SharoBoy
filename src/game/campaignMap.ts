@@ -10,6 +10,7 @@
 
 import type { MinibossKind } from "./minibosses"
 import type { CampaignChallenge } from "./campaignChallenges"
+import type { BossVariantKind } from "./bossVariants"
 
 export {
   MAP_TIERS,
@@ -44,6 +45,8 @@ export interface CampaignNode {
   isChallenge?: boolean
   /** Квестовое боевое условие для узла-испытания. */
   challenge?: CampaignChallenge
+  /** Вид босса для узлов боссов Актов и Финала. */
+  bossKind?: BossVariantKind
   /** Отображаемое имя узла. */
   name: string
 }

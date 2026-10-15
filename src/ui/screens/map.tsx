@@ -8,6 +8,7 @@ import {
   IconFish,
   IconJelly,
   IconOctopus,
+  IconBoss,
   IconShield,
   IconShop,
   IconVortex,
@@ -286,7 +287,7 @@ export function MapScreen({
                     }`}
                   >
                     {n.isBoss ? (
-                      <IconOctopus className="h-6 w-6 sm:h-7 sm:w-7" />
+                      <IconBoss kind={n.bossKind} className="h-6 w-6 sm:h-7 sm:w-7" />
                     ) : n.isShop ? (
                       <IconShop className="h-4 w-4 sm:h-5 sm:w-5" />
                     ) : n.isChallenge ? (
@@ -367,7 +368,7 @@ export function MapScreen({
           </div>
           <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-coral sm:text-xs">
             <IconOctopus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            БОСС ГЛУБИН
+            БОСС АКТА
           </div>
         </div>
 

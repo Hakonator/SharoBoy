@@ -63,22 +63,27 @@ export function fixedVariant(kind: BossVariantKind, tier = 2): BossVariant {
 }
 
 /**
- * Выбирает вариант финального босса для узла кампании.
+ * Пулы боссов по Актам кампании:
+ * - Акт 1 (ярус 10): Царь-шар (Механический Страж) или Грозовая Медуза
+ * - Акт 2 (ярус 20): Глубинный Спрут (Осьминог) или Меха-Краб
+ * - Акт 3 (ярус 30): Повелитель Измерений (Кракен) или Повелитель Времени (Хронос)
+ */
+export const ACT_BOSS_POOLS: Record<number, readonly BossVariantKind[]> = {
+  0: ["king", "jellyfish"],
+  1: ["octopus", "crab"],
+  2: ["kraken", "chrono"],
+}
+
+/**
+ * Выбирает вариант босса для узла кампании.
  * @param seed сид забега (детерминированность в рамках карты)
- * @param tier ярус узла босса (0-based; влияет на силу и разблокировку видов)
+ * @param tier ярус босса / индекс Акта (0: Акт 1, 1: Акт 2, 2+: Финал)
  */
 export function pickBossVariant(seed: number, tier: number): BossVariant {
   const rng = mulberry32(seed | 0 || 1)
   const roll = rng()
-  // «Кракен» открывается со 2-го яруса боссов, медуза — с 3-го (самая коварная),
-  // до этого — король или осьминог.
-  // Новые боссы (Меха-Краб, Повелитель Времени) пока в отладочном режиме для тестов механики.
-  const pool: BossVariantKind[] =
-    tier >= 2
-      ? ["king", "octopus", "kraken", "jellyfish"]
-      : tier >= 1
-        ? ["king", "octopus", "kraken"]
-        : ["king", "octopus"]
+  const actIndex = tier <= 0 ? 0 : tier === 1 ? 1 : 2
+  const pool = ACT_BOSS_POOLS[actIndex] ?? ACT_BOSS_POOLS[2]
   const kind = pool[Math.floor(roll * pool.length) % pool.length]
   return fixedVariant(kind, tier)
 }

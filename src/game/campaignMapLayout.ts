@@ -1,6 +1,7 @@
 import { clamp, mulberry32 } from "./utils"
 import type { CampaignEdge, CampaignMap, CampaignNode } from "./campaignMap"
 import { createCampaignChallenge } from "./campaignChallenges"
+import { pickBossVariant } from "./bossVariants"
 
 /** Количество ярусов карты (последний ярус — босс). */
 export const MAP_TIERS = 30
@@ -83,6 +84,10 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
     let tierHasShop = false
     for (let i = 0; i < widths[t]; i++) {
       const isBoss = t === tiers - 1 || (tiers >= 28 && (t === 9 || t === 19))
+      const bossVariant = isBoss
+        ? pickBossVariant(seed + id * 7919, t <= 9 ? 0 : t <= 19 ? 1 : 2)
+        : undefined
+      const bossKind = bossVariant?.kind
       // На первом боевом ярусе игрок посещал только старт, поэтому событие
       // всегда возвращало бы его туда. События начинаются со второго яруса,
       // где уже есть несколько возможных целей для переноса.
@@ -98,10 +103,10 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
 
       const name = isBoss
         ? t === 9
-          ? "БОСС: АКТ I"
+          ? `БОСС: АКТ I (${bossVariant!.name})`
           : t === 19
-            ? "БОСС: АКТ II"
-            : "ФИНАЛЬНЫЙ БОСС"
+            ? `БОСС: АКТ II (${bossVariant!.name})`
+            : `ФИНАЛЬНЫЙ БОСС: ${bossVariant!.name}`
         : isEvent
           ? EVENT_NAMES[Math.floor(rng() * EVENT_NAMES.length)]
           : isShop
@@ -120,6 +125,7 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
         isShop,
         isChallenge,
         challenge,
+        bossKind,
         name,
       })
       row.push(id)

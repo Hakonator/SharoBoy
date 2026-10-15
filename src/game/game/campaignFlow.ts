@@ -1,5 +1,5 @@
 import type { Game } from "../game"
-import { pickBossVariant } from "../bossVariants"
+import { fixedVariant, pickBossVariant } from "../bossVariants"
 import { minibossHpFor, rollMinibossLive } from "../minibosses"
 import { LEVELS } from "../levels"
 import { generateMotifSpec } from "../levelMotifs"
@@ -230,7 +230,9 @@ export function startMapBattle(g: Game, node: CampaignNode) {
     g.onBossNode = true
     // Вариативность: ярус босса масштабируется по Актам (0: Акт 1, 1: Акт 2, 2+: Финал)
     const actBossTier = node.tier < 15 ? 0 : node.tier < 25 ? 1 : 2
-    const variant = pickBossVariant(g.campaignSeed + node.id * 7919, actBossTier)
+    const variant = node.bossKind
+      ? fixedVariant(node.bossKind, actBossTier)
+      : pickBossVariant(g.campaignSeed + node.id * 7919, actBossTier)
     if (variant.kind === "jellyfish") {
       buildJellyfishBossLevel(g, variant)
     } else if (variant.kind === "crab") {

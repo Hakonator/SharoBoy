@@ -219,4 +219,33 @@ describe("generateCampaignMap", () => {
     }
     expect(totalChallenges).toBeGreaterThan(0)
   })
+
+  it("узлы боссов Актов имеют bossKind из соответствующих пулов и информативные имена", () => {
+    const act1Bosses = new Set<string>()
+    const act2Bosses = new Set<string>()
+    const act3Bosses = new Set<string>()
+
+    for (let seed = 1; seed <= 60; seed++) {
+      const map = generateCampaignMap(seed)
+      const bosses = map.nodes.filter((n) => n.isBoss)
+      expect(bosses).toHaveLength(3)
+
+      const [b1, b2, b3] = bosses
+      expect(["king", "jellyfish"]).toContain(b1.bossKind)
+      expect(b1.name).toContain("БОСС: АКТ I")
+      act1Bosses.add(b1.bossKind!)
+
+      expect(["octopus", "crab"]).toContain(b2.bossKind)
+      expect(b2.name).toContain("БОСС: АКТ II")
+      act2Bosses.add(b2.bossKind!)
+
+      expect(["kraken", "chrono"]).toContain(b3.bossKind)
+      expect(b3.name).toContain("ФИНАЛЬНЫЙ БОСС")
+      act3Bosses.add(b3.bossKind!)
+    }
+
+    expect(act1Bosses).toEqual(new Set(["king", "jellyfish"]))
+    expect(act2Bosses).toEqual(new Set(["octopus", "crab"]))
+    expect(act3Bosses).toEqual(new Set(["kraken", "chrono"]))
+  })
 })
