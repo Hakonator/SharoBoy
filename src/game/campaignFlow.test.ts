@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { EVENT_MAX_BACK_TIERS, type CampaignNode } from "./campaignMap"
+import { EVENT_MAX_BACK_TIERS, type CampaignMap, type CampaignNode } from "./campaignMap"
 import { makeEnv } from "./campaignFlow.helpers"
 import { nodeSpecFor } from "./game/campaignFlow"
 import { loseLife } from "./game/runFlow"
@@ -189,10 +189,7 @@ describe("сквозной цикл кампании по карте", () => {
     g.startGame()
     step(2)
     const raw = g as unknown as {
-      campaign: {
-        nodes: CampaignNode[]
-        edges: { from: number; to: number }[]
-      }
+      campaign: CampaignMap
       campaignPlayerId: number
       campaignVisited: number[]
       bossSys: { clear: () => void }
