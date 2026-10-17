@@ -265,7 +265,7 @@ describe("сквозной цикл кампании по карте", () => {
         events++
       }
       clearBattle()
-      reachedBoss = battleNode.isBoss
+      reachedBoss = battleNode.id === map.bossId
     }
     expect(reachedBoss, "дошли до босса").toBe(true)
     expect(events).toBeGreaterThan(0)
