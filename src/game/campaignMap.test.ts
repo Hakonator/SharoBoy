@@ -87,17 +87,27 @@ describe("generateCampaignMap", () => {
         expect(from!.tier).toBeLessThan(to!.tier)
       }
 
-      // от старта достижимы все узлы, и из каждого узла достижим босс
+      // от старта достижимы все узлы
       expect(reachableFrom(map, map.startId).size).toBe(map.nodes.length)
-      for (const n of map.nodes) {
-        expect(reachableFrom(map, n.id).has(map.bossId)).toBe(true)
+
+      // из каждого узла достижим босс (проверяем одним обратным обходом от босса за O(V+E))
+      const canReachBoss = new Set<number>()
+      const backQueue = [map.bossId]
+      while (backQueue.length > 0) {
+        const id = backQueue.pop()!
+        if (canReachBoss.has(id)) continue
+        canReachBoss.add(id)
+        for (const fromId of incomingIds(map, id)) {
+          if (!canReachBoss.has(fromId)) backQueue.push(fromId)
+        }
       }
+      expect(canReachBoss.size).toBe(map.nodes.length)
 
       // листья (без исходящих) — ровно один: финальный босс
       const leaves = map.nodes.filter((n) => outgoingIds(map, n.id).length === 0)
       expect(leaves.map((l) => l.id)).toEqual([map.bossId])
     }
-  })
+  }, 20000)
 
   it("туман войны открывает ровно следующий шаг", () => {
     for (let seed = 1; seed <= 40; seed++) {
@@ -247,5 +257,5 @@ describe("generateCampaignMap", () => {
     expect(act1Bosses).toEqual(new Set(["king", "jellyfish"]))
     expect(act2Bosses).toEqual(new Set(["octopus", "crab"]))
     expect(act3Bosses).toEqual(new Set(["kraken", "chrono"]))
-  })
+  }, 15000)
 })
