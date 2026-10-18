@@ -166,9 +166,13 @@ describe("MapScreen: маршрут события кампании", () => {
     expect(html).toContain("anim-radar")
     expect(html).toContain("anim-spin-slow")
     expect(html).toContain("anim-spin-reverse")
+    // Проверка центрирования статусной плашки рамки
+    expect(html).toContain("left-1/2 -translate-x-1/2")
     // Проверка позиционирования рамки на координатах текущего узла
     expect(html).toContain(`left:${player.x * 100}%`)
     expect(html).toContain(`top:${player.y * 100}%`)
+    // Проверка того, что подпись узла вынесена в абсолютную плашку снизу, не смещая центр кнопки
+    expect(html).toContain("pointer-events-none absolute top-full left-1/2 mt-3 -translate-x-1/2")
   })
 
   it("отображает узлы в виде увеличенных пиктограмм (бой, магазин, испытание, событие, босс)", () => {

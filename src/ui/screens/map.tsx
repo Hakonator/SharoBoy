@@ -404,7 +404,7 @@ export function MapScreen({
 
               {/* Динамический плавающий маркер статуса */}
               <div
-                className={`absolute -top-6 whitespace-nowrap rounded-full border px-2 py-0.5 font-display text-[9px] tracking-widest backdrop-blur-sm transition-colors ${
+                className={`absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border px-2 py-0.5 font-display text-[9px] tracking-widest backdrop-blur-sm transition-colors ${
                   isTeleporting
                     ? "border-gold/80 bg-gold/20 text-gold shadow-[0_0_12px_rgba(255,201,77,0.7)] animate-pulse"
                     : "border-cyan-neon/60 bg-abyss/85 text-cyan-neon shadow-[0_0_10px_rgba(53,224,255,0.45)]"
@@ -467,9 +467,9 @@ export function MapScreen({
                   key={n.id}
                   disabled={!clickable || travelTargetId !== null}
                   onClick={() => clickable && travelTargetId === null && handleNodeClick(n.id)}
-                  className={`absolute flex -translate-x-1/2 -translate-y-1/2 select-none flex-col items-center gap-1.5 ${
+                  className={`absolute flex items-center justify-center -translate-x-1/2 -translate-y-1/2 select-none rounded-2xl font-display leading-none ${size} ${tint} backdrop-blur-sm ${
                     clickable && travelTargetId === null
-                      ? "cursor-pointer group z-20"
+                      ? "cursor-pointer group z-20 transition-transform hover:scale-115 active:scale-95"
                       : isCurrent
                         ? "cursor-default z-10"
                         : "cursor-default z-0"
@@ -477,45 +477,42 @@ export function MapScreen({
                   style={{ left: `${n.x * 100}%`, top: `${n.y * 100}%` }}
                   aria-label={clickable ? `Открыть узел ${n.name}` : n.name}
                 >
-                  <span
-                    className={`relative flex items-center justify-center rounded-2xl font-display leading-none ${size} ${tint} backdrop-blur-sm ${
-                      clickable ? "transition-transform hover:scale-115 active:scale-95" : ""
-                    }`}
-                  >
-                    {n.isBoss ? (
-                      <IconBoss kind={n.bossKind} className="h-8 w-8 sm:h-9 sm:w-9" />
-                    ) : n.isShop ? (
-                      <IconShop className="h-5 w-5 sm:h-6 sm:w-6" />
-                    ) : n.isChallenge ? (
-                      <IconChallenge className="h-5 w-5 sm:h-6 sm:w-6" />
-                    ) : n.isEvent ? (
-                      <IconVortex className="h-5 w-5 sm:h-6 sm:w-6" />
-                    ) : (
-                      <IconCombat className="h-5 w-5 sm:h-6 sm:w-6" />
-                    )}
+                  {n.isBoss ? (
+                    <IconBoss kind={n.bossKind} className="h-8 w-8 sm:h-9 sm:w-9" />
+                  ) : n.isShop ? (
+                    <IconShop className="h-5 w-5 sm:h-6 sm:w-6" />
+                  ) : n.isChallenge ? (
+                    <IconChallenge className="h-5 w-5 sm:h-6 sm:w-6" />
+                  ) : n.isEvent ? (
+                    <IconVortex className="h-5 w-5 sm:h-6 sm:w-6" />
+                  ) : (
+                    <IconCombat className="h-5 w-5 sm:h-6 sm:w-6" />
+                  )}
 
-                    {!n.isBoss && showMb && (
-                      <span
-                        className="absolute -right-2 -top-2.5 flex items-center gap-0.5 rounded-full border border-mint/50 bg-abyss/90 px-1 py-0.5 shadow-[0_0_8px_rgba(93,255,176,0.5)] drop-shadow-[0_1px_0_rgba(4,18,26,0.9)]"
-                        aria-label={`Мини-босс: ${mbKinds.map((k) => mbName[k] ?? k).join(" и ")}`}
-                      >
-                        {mbKinds.map((k) => {
-                          const Icon = mbIcon[k]
-                          return Icon ? (
-                            <Icon key={k} className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                          ) : null
-                        })}
-                      </span>
-                    )}
-                  </span>
-
-                  {n.isBoss && !clickable && (
-                    <span className="whitespace-nowrap font-display text-[10px] tracking-widest text-coral drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs">
-                      БОСС
+                  {!n.isBoss && showMb && (
+                    <span
+                      className="absolute -right-2 -top-2.5 flex items-center gap-0.5 rounded-full border border-mint/50 bg-abyss/90 px-1 py-0.5 shadow-[0_0_8px_rgba(93,255,176,0.5)] drop-shadow-[0_1px_0_rgba(4,18,26,0.9)]"
+                      aria-label={`Мини-босс: ${mbKinds.map((k) => mbName[k] ?? k).join(" и ")}`}
+                    >
+                      {mbKinds.map((k) => {
+                        const Icon = mbIcon[k]
+                        return Icon ? <Icon key={k} className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : null
+                      })}
                     </span>
                   )}
-                  {(clickable || isEventTarget) && (
-                    <div className="flex flex-col items-center">
+
+                  {/* Информационная плашка под узлом (вынесена из вертикального потока flex,
+                      чтобы геометрический центр кнопки находился строго в (n.x, n.y)) */}
+                  {n.isBoss && !clickable && (
+                    <div className="pointer-events-none absolute top-full left-1/2 mt-3 -translate-x-1/2 flex flex-col items-center sm:mt-4">
+                      <span className="whitespace-nowrap font-display text-[10px] tracking-widest text-coral drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs">
+                        БОСС
+                      </span>
+                    </div>
+                  )}
+
+                  {(clickable || isEventTarget || isCurrent) && (
+                    <div className="pointer-events-none absolute top-full left-1/2 mt-3 -translate-x-1/2 flex flex-col items-center sm:mt-4">
                       <span
                         className={`whitespace-nowrap font-display text-[10px] tracking-wider drop-shadow-[0_2px_0_rgba(4,18,26,0.9)] sm:text-xs ${
                           isEventTarget
@@ -526,7 +523,9 @@ export function MapScreen({
                                 ? "text-[#ff477e]"
                                 : n.isEvent
                                   ? "text-amber-300"
-                                  : "text-foam"
+                                  : isCurrent
+                                    ? "text-cyan-neon"
+                                    : "text-foam"
                         }`}
                       >
                         {n.isChallenge && n.challenge ? n.challenge.title : n.name}
