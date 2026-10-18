@@ -437,6 +437,34 @@ export function IconVortex({ className = "h-4 w-4" }: { className?: string }) {
   )
 }
 
+/** Боевой узел кампании: скрещенные плазменные орудия / тактический боевой прицел */
+export function IconCombat({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" aria-hidden>
+      {/* Прицельный контур */}
+      <circle
+        cx="10"
+        cy="10"
+        r="7.5"
+        stroke="#35e0ff"
+        strokeWidth="1.1"
+        strokeDasharray="2.5 1.8"
+        opacity="0.8"
+      />
+      {/* Скрещенные орудия/бластеры */}
+      <path d="m5 15 10-10M5 5l10 10" stroke="#35e0ff" strokeWidth="1.7" strokeLinecap="round" />
+      {/* Сопла/энергетические наконечники */}
+      <circle cx="5" cy="5" r="1.1" fill="#9deeff" />
+      <circle cx="15" cy="5" r="1.1" fill="#9deeff" />
+      <circle cx="5" cy="15" r="1.1" fill="#9deeff" />
+      <circle cx="15" cy="15" r="1.1" fill="#9deeff" />
+      {/* Центральное плазменное ядро */}
+      <circle cx="10" cy="10" r="2.2" fill="#04121c" stroke="#35e0ff" strokeWidth="1.1" />
+      <circle cx="10" cy="10" r="1" fill="#5dffb0" />
+    </svg>
+  )
+}
+
 export function IconChevron() {
   return (
     <svg

@@ -305,3 +305,67 @@ canvas {
   background: linear-gradient(180deg, #7cf5ff 0%, #35e0ff 100%);
   box-shadow: 0 0 10px rgba(53, 224, 255, 0.8);
 }
+
+/* Плавное вращение динамической рамки карты кампании */
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.anim-spin-slow {
+  animation: spinSlow 14s linear infinite;
+}
+
+@keyframes spinSlowReverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+.anim-spin-reverse {
+  animation: spinSlowReverse 9s linear infinite;
+}
+
+/* Пульсация радара текущего сектора */
+@keyframes radarPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.88;
+    filter: drop-shadow(0 0 6px rgba(53, 224, 255, 0.55));
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 255, 0.95));
+  }
+}
+.anim-radar {
+  animation: radarPulse 2.4s ease-in-out infinite;
+}
+
+/* Гиперпространственный импульс при телепорте рамки */
+@keyframes warpGlow {
+  0% {
+    filter: drop-shadow(0 0 8px rgba(255, 201, 77, 0.8))
+      drop-shadow(0 0 20px rgba(53, 224, 255, 0.6));
+    transform: scale(1.18);
+  }
+  50% {
+    filter: drop-shadow(0 0 24px rgba(255, 201, 77, 1))
+      drop-shadow(0 0 40px rgba(53, 224, 255, 0.9));
+    transform: scale(1.25);
+  }
+  100% {
+    filter: drop-shadow(0 0 10px rgba(53, 224, 255, 0.7));
+    transform: scale(1);
+  }
+}
+.anim-warp {
+  animation: warpGlow 0.95s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}

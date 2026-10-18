@@ -1,9 +1,10 @@
-import { type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 
 import {
   IconBall,
   IconChallenge,
   IconCoin,
+  IconCombat,
   IconCrystal,
   IconFish,
   IconJelly,
@@ -39,6 +40,52 @@ export function MapScreen({
   onMenu: () => void
 }) {
   const view = hud.map
+  const [mounted, setMounted] = useState(false)
+  const prevPlayerIdRef = useRef<number | null>(null)
+  const [isTeleporting, setIsTeleporting] = useState(false)
+  const mapScrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Плавное отслеживание перемещения и телепорта рамки
+  useEffect(() => {
+    if (!view) return
+    const playerId = view.playerId
+    if (prevPlayerIdRef.current !== null && prevPlayerIdRef.current !== playerId) {
+      const prevNode = view.nodes.find((n) => n.id === prevPlayerIdRef.current)
+      const currNode = view.nodes.find((n) => n.id === playerId)
+      if (prevNode && currNode) {
+        const dx = currNode.x - prevNode.x
+        const dy = currNode.y - prevNode.y
+        const dist = Math.hypot(dx, dy)
+        // Телепорт: если прыжок назад (currNode.tier < prevNode.tier) или скачок через несколько ярусов
+        const isTeleport = currNode.tier < prevNode.tier || dist > 0.08
+        if (isTeleport) {
+          setIsTeleporting(true)
+          const timer = setTimeout(() => setIsTeleporting(false), 1200)
+          return () => clearTimeout(timer)
+        }
+      }
+    }
+    prevPlayerIdRef.current = playerId
+  }, [view])
+
+  // Автоцентрирование карты на текущем узле игрока
+  useEffect(() => {
+    if (!mapScrollRef.current || !view) return
+    const playerNode = view.nodes.find((n) => n.id === view.playerId)
+    if (!playerNode) return
+    const el = mapScrollRef.current
+    const targetX = playerNode.x * el.scrollWidth
+    const targetScrollLeft = targetX - el.clientWidth / 2
+    el.scrollTo({
+      left: Math.max(0, targetScrollLeft),
+      behavior: mounted ? "smooth" : "auto",
+    })
+  }, [view, mounted])
+
   if (!view) return null
 
   const byId = new Map(view.nodes.map((n) => [n.id, n]))
@@ -168,9 +215,12 @@ export function MapScreen({
         </div>
       </div>
 
-      {/* Карта: рёбра в SVG, узлы — круглые кнопки в %-координатах */}
-      <div className="relative flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="relative h-full min-w-[900px]">
+      {/* Карта: рёбра в SVG, узлы — пиктограммы в %-координатах с динамической рамкой */}
+      <div
+        ref={mapScrollRef}
+        className="relative flex-1 overflow-x-auto overflow-y-hidden arcade-scrollbar"
+      >
+        <div className="relative h-full min-w-[1300px]">
           <svg
             className="absolute inset-0 h-full w-full"
             viewBox="0 0 100 100"
@@ -226,6 +276,99 @@ export function MapScreen({
             )}
           </svg>
 
+          {/* Динамическая технологичная рамка текущего положения игрока */}
+          {player && (
+            <div
+              data-testid="current-node-reticle"
+              className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 z-10 flex items-center justify-center ${
+                player.isBoss ? "h-20 w-20 sm:h-24 sm:w-24" : "h-16 w-16 sm:h-[72px] sm:w-[72px]"
+              } ${isTeleporting ? "anim-warp" : "anim-radar"}`}
+              style={{
+                left: `${player.x * 100}%`,
+                top: `${player.y * 100}%`,
+                transition: !mounted
+                  ? "none"
+                  : isTeleporting
+                    ? "left 0.95s cubic-bezier(0.22, 1, 0.36, 1), top 0.95s cubic-bezier(0.22, 1, 0.36, 1)"
+                    : "left 0.65s cubic-bezier(0.2, 0.9, 0.3, 1), top 0.65s cubic-bezier(0.2, 0.9, 0.3, 1)",
+              }}
+              aria-hidden
+            >
+              <svg viewBox="0 0 80 80" className="h-full w-full" fill="none">
+                <defs>
+                  <filter id="reticle-glow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="2.5" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                </defs>
+
+                {/* 4 угловые тактические скобки [ ] вокруг границ узла */}
+                <g
+                  stroke={isTeleporting ? "#ffc94d" : "#35e0ff"}
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  filter="url(#reticle-glow)"
+                >
+                  {/* Верхний левый */}
+                  <path d="M 6 22 L 6 8 L 22 8" />
+                  {/* Верхний правый */}
+                  <path d="M 58 8 L 74 8 L 74 22" />
+                  {/* Нижний левый */}
+                  <path d="M 6 58 L 6 72 L 22 72" />
+                  {/* Нижний правый */}
+                  <path d="M 58 72 L 74 72 L 74 58" />
+                </g>
+
+                {/* Внешнее тактическое кольцо со штрихами (вращается по часовой) */}
+                <circle
+                  cx="40"
+                  cy="40"
+                  r={player.isBoss ? "38" : "33"}
+                  stroke={isTeleporting ? "rgba(255,201,77,0.75)" : "rgba(53,224,255,0.7)"}
+                  strokeWidth="1.2"
+                  strokeDasharray="4 6"
+                  className="anim-spin-slow origin-center"
+                />
+
+                {/* Внутреннее сканирующее кольцо (вращается против часовой) */}
+                <circle
+                  cx="40"
+                  cy="40"
+                  r={player.isBoss ? "34" : "28"}
+                  stroke={isTeleporting ? "rgba(255,201,77,0.4)" : "rgba(93,255,176,0.45)"}
+                  strokeWidth="1"
+                  strokeDasharray="8 12"
+                  className="anim-spin-reverse origin-center"
+                />
+
+                {/* Прицельные маркерные засечки */}
+                <g
+                  stroke={isTeleporting ? "#ffc94d" : "#35e0ff"}
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                >
+                  <line x1="40" y1="2" x2="40" y2="6" />
+                  <line x1="40" y1="74" x2="40" y2="78" />
+                  <line x1="2" y1="40" x2="6" y2="40" />
+                  <line x1="74" y1="40" x2="78" y2="40" />
+                </g>
+              </svg>
+
+              {/* Динамический плавающий маркер статуса */}
+              <div
+                className={`absolute -top-6 whitespace-nowrap rounded-full border px-2 py-0.5 font-display text-[9px] tracking-widest backdrop-blur-sm transition-colors ${
+                  isTeleporting
+                    ? "border-gold/80 bg-gold/20 text-gold shadow-[0_0_12px_rgba(255,201,77,0.7)] animate-pulse"
+                    : "border-cyan-neon/60 bg-abyss/85 text-cyan-neon shadow-[0_0_10px_rgba(53,224,255,0.45)]"
+                }`}
+              >
+                <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-mint animate-ping" />
+                {isTeleporting ? "ТЕЛЕПОРТАЦИЯ..." : "ТЕКУЩИЙ СЕКТОР"}
+              </div>
+            </div>
+          )}
+
           {view.nodes
             .filter((n) => revealed.has(n.id))
             .map((n) => {
@@ -234,18 +377,18 @@ export function MapScreen({
               const clickable = playerOut.has(n.id)
               const mbKinds = view.minibosses[n.id] ?? []
               const showMb = view.visited.includes(n.id) && mbKinds.length > 0
-              const size = n.isBoss
-                ? "h-12 w-12 sm:h-14 sm:w-14"
-                : n.isShop || n.isChallenge || n.isEvent
-                  ? "h-8 w-8 sm:h-9 sm:w-9"
-                  : "h-7 w-7 sm:h-8 sm:w-8"
+              const size = n.isBoss ? "h-14 w-14 sm:h-16 sm:w-16" : "h-11 w-11 sm:h-12 sm:w-12"
 
-              let tint = "bg-deep border border-line"
+              let tint = "bg-deep border border-line text-dim/70"
               if (isEventTarget) {
                 tint =
                   "border-2 border-gold bg-gold text-abyss shadow-[0_0_0_4px_rgba(255,201,77,0.25),0_0_24px_rgba(255,201,77,0.85)] animate-pulse"
               } else if (n.isBoss) {
-                tint = "bg-coral shadow-[0_0_18px_rgba(255,106,92,0.85)]"
+                tint = isCurrent
+                  ? "border-2 border-coral bg-coral/30 text-coral shadow-[0_0_24px_rgba(255,106,92,0.95)]"
+                  : clickable
+                    ? "border-2 border-coral bg-coral text-abyss shadow-[0_0_24px_rgba(255,106,92,0.9)]"
+                    : "border-2 border-coral/70 bg-deep/90 text-coral/80 shadow-[0_0_16px_rgba(255,106,92,0.6)]"
               } else if (n.isShop) {
                 tint = isCurrent
                   ? "border-2 border-gold bg-gold text-abyss shadow-[0_0_18px_rgba(255,201,77,0.9)]"
@@ -265,9 +408,11 @@ export function MapScreen({
                     ? "border-2 border-amber-400 bg-deep text-amber-300 shadow-[0_0_14px_rgba(251,191,36,0.8)]"
                     : "border border-amber-400/50 bg-deep/80 text-amber-300/70"
               } else if (isCurrent) {
-                tint = "bg-cyan-neon shadow-[0_0_16px_rgba(53,224,255,0.9)]"
+                tint =
+                  "border-2 border-cyan-neon bg-cyan-neon/25 text-cyan-neon shadow-[0_0_20px_rgba(53,224,255,0.9)]"
               } else if (clickable) {
-                tint = "bg-mint shadow-[0_0_14px_rgba(93,255,176,0.75)]"
+                tint =
+                  "border-2 border-mint bg-deep text-mint shadow-[0_0_16px_rgba(93,255,176,0.8)]"
               }
 
               return (
@@ -275,37 +420,43 @@ export function MapScreen({
                   key={n.id}
                   disabled={!clickable}
                   onClick={() => clickable && onMapNode(n.id)}
-                  className={`absolute flex -translate-x-1/2 -translate-y-1/2 select-none flex-col items-center gap-1 ${
-                    clickable ? "cursor-pointer" : "cursor-default"
+                  className={`absolute flex -translate-x-1/2 -translate-y-1/2 select-none flex-col items-center gap-1.5 ${
+                    clickable
+                      ? "cursor-pointer group z-20"
+                      : isCurrent
+                        ? "cursor-default z-10"
+                        : "cursor-default z-0"
                   }`}
                   style={{ left: `${n.x * 100}%`, top: `${n.y * 100}%` }}
                   aria-label={clickable ? `Открыть узел ${n.name}` : n.name}
                 >
                   <span
-                    className={`relative flex items-center justify-center rounded-full font-display leading-none ${size} ${tint} ${
-                      clickable ? "transition-transform hover:scale-110 active:scale-95" : ""
+                    className={`relative flex items-center justify-center rounded-2xl font-display leading-none ${size} ${tint} backdrop-blur-sm ${
+                      clickable ? "transition-transform hover:scale-115 active:scale-95" : ""
                     }`}
                   >
                     {n.isBoss ? (
-                      <IconBoss kind={n.bossKind} className="h-6 w-6 sm:h-7 sm:w-7" />
+                      <IconBoss kind={n.bossKind} className="h-8 w-8 sm:h-9 sm:w-9" />
                     ) : n.isShop ? (
-                      <IconShop className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <IconShop className="h-5 w-5 sm:h-6 sm:w-6" />
                     ) : n.isChallenge ? (
-                      <IconChallenge className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <IconChallenge className="h-5 w-5 sm:h-6 sm:w-6" />
                     ) : n.isEvent ? (
-                      <IconVortex className="h-4 w-4 sm:h-5 sm:w-5" />
-                    ) : isCurrent ? (
-                      <span className="h-2 w-2 rounded-full bg-abyss sm:h-2.5 sm:w-2.5" />
-                    ) : null}
+                      <IconVortex className="h-5 w-5 sm:h-6 sm:w-6" />
+                    ) : (
+                      <IconCombat className="h-5 w-5 sm:h-6 sm:w-6" />
+                    )}
 
                     {!n.isBoss && showMb && (
                       <span
-                        className="absolute -right-2 -top-2.5 flex items-center gap-0.5 drop-shadow-[0_1px_0_rgba(4,18,26,0.9)]"
+                        className="absolute -right-2 -top-2.5 flex items-center gap-0.5 rounded-full border border-mint/50 bg-abyss/90 px-1 py-0.5 shadow-[0_0_8px_rgba(93,255,176,0.5)] drop-shadow-[0_1px_0_rgba(4,18,26,0.9)]"
                         aria-label={`Мини-босс: ${mbKinds.map((k) => mbName[k] ?? k).join(" и ")}`}
                       >
                         {mbKinds.map((k) => {
                           const Icon = mbIcon[k]
-                          return Icon ? <Icon key={k} className="h-3 w-3 sm:h-4 sm:w-4" /> : null
+                          return Icon ? (
+                            <Icon key={k} className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                          ) : null
                         })}
                       </span>
                     )}
@@ -358,6 +509,10 @@ export function MapScreen({
               МИНИ-БОСС В УЗЛЕ
             </div>
           )}
+          <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-cyan-neon sm:text-xs">
+            <IconCombat className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            БОЙ
+          </div>
           <div className="hud-chip flex items-center justify-center gap-1.5 px-3 py-1 font-display text-[10px] tracking-wider text-purple-300 sm:text-xs">
             <IconShop className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             ЛАВКА ЗА КРИСТАЛЛЫ

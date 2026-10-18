@@ -137,4 +137,69 @@ describe("MapScreen: маршрут события кампании", () => {
     expect(html).toContain("РЕЛИКВИЯ")
     expect(html).toContain("35 💎")
   })
+
+  it("рендерит динамическую рамку текущего положения вокруг границ узла игрока", () => {
+    const map = generateCampaignMap(541)
+    const player = map.nodes.find((node) => node.id === map.startId)!
+    const hud = {
+      map: {
+        ...map,
+        playerId: player.id,
+        visited: [player.id],
+        visible: map.edges.filter((edge) => edge.from === player.id).map((edge) => edge.to),
+        minibosses: {},
+      },
+      score: 0,
+      lives: 3,
+      best: 0,
+      coins: 0,
+      phase: "map",
+    } as unknown as HudData
+
+    const html = renderToStaticMarkup(
+      <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
+    )
+
+    // Динамическая рамка с тактическим видоискателем и статусом
+    expect(html).toContain('data-testid="current-node-reticle"')
+    expect(html).toContain("ТЕКУЩИЙ СЕКТОР")
+    expect(html).toContain("anim-radar")
+    expect(html).toContain("anim-spin-slow")
+    expect(html).toContain("anim-spin-reverse")
+    // Проверка позиционирования рамки на координатах текущего узла
+    expect(html).toContain(`left:${player.x * 100}%`)
+    expect(html).toContain(`top:${player.y * 100}%`)
+  })
+
+  it("отображает узлы в виде увеличенных пиктограмм (бой, магазин, испытание, событие, босс)", () => {
+    const map = generateCampaignMap(541)
+    const player = map.nodes.find((node) => node.id === map.startId)!
+    // Раскрываем все узлы карты для проверки типов пиктограмм
+    const hud = {
+      map: {
+        ...map,
+        playerId: player.id,
+        visited: map.nodes.map((n) => n.id),
+        visible: [],
+        minibosses: {},
+      },
+      score: 0,
+      lives: 3,
+      best: 0,
+      coins: 0,
+      phase: "map",
+    } as unknown as HudData
+
+    const html = renderToStaticMarkup(
+      <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
+    )
+
+    // Увеличенные размеры узлов (h-11 w-11 / h-14 w-14)
+    expect(html).toContain("h-11 w-11 sm:h-12 sm:w-12")
+    expect(html).toContain("h-14 w-14 sm:h-16 sm:w-16")
+    // Форма со скругленными гранями технологичной пиктограммы
+    expect(html).toContain("rounded-2xl")
+    // Пиктограмма обычного боевого узла в легенде и узлах
+    expect(html).toContain("БОЙ")
+  })
 })
