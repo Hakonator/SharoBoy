@@ -202,4 +202,66 @@ describe("MapScreen: маршрут события кампании", () => {
     // Пиктограмма обычного боевого узла в легенде и узлах
     expect(html).toContain("БОЙ")
   })
+
+  it("рендерит разрешённое интерактивное событие с кнопкой «ПРОДОЛЖИТЬ ПУТЬ»", () => {
+    const map = generateCampaignMap(541)
+    const player = map.nodes.find((node) => node.id === map.startId)!
+    const hud = {
+      map: {
+        ...map,
+        playerId: player.id,
+        visited: [player.id],
+        visible: [],
+        minibosses: {},
+      },
+      campaignEventData: {
+        title: "ВОДОВОРОТ ВРЕМЕНИ",
+        text: "Глубинный хроно-водоворот раскручивает субмарину.",
+        choices: [],
+        resolved: true,
+        outcomeText: "Вас отбросило назад во времени!",
+      },
+      score: 0,
+      lives: 3,
+      best: 0,
+      coins: 0,
+      phase: "map",
+    } as unknown as HudData
+
+    const html = renderToStaticMarkup(
+      <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
+    )
+
+    expect(html).toContain("ВОДОВОРОТ ВРЕМЕНИ")
+    expect(html).toContain("Вас отбросило назад во времени!")
+    expect(html).toContain("ПРОДОЛЖИТЬ ПУТЬ")
+  })
+
+  it("рендерит фоллбэк случайного текстового события с кнопкой «ПЛЫТЬ ДАЛЬШЕ»", () => {
+    const map = generateCampaignMap(541)
+    const player = map.nodes.find((node) => node.id === map.startId)!
+    const hud = {
+      map: {
+        ...map,
+        playerId: player.id,
+        visited: [player.id],
+        visible: [],
+        minibosses: {},
+      },
+      campaignEvent: "Подводный гейзер ускорил движение вперед!",
+      score: 0,
+      lives: 3,
+      best: 0,
+      coins: 0,
+      phase: "map",
+    } as unknown as HudData
+
+    const html = renderToStaticMarkup(
+      <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
+    )
+
+    expect(html).toContain("СЛУЧАЙНОЕ СОБЫТИЕ")
+    expect(html).toContain("Подводный гейзер ускорил движение вперед!")
+    expect(html).toContain("ПЛЫТЬ ДАЛЬШЕ")
+  })
 })

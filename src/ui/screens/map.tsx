@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 
 import {
   IconBall,
@@ -42,11 +42,17 @@ export function MapScreen({
   const view = hud.map
   const [mounted, setMounted] = useState(false)
   const prevPlayerIdRef = useRef<number | null>(null)
+  const [travelTargetId, setTravelTargetId] = useState<number | null>(null)
   const [isTeleporting, setIsTeleporting] = useState(false)
+  const [eventDismissed, setEventDismissed] = useState(false)
   const mapScrollRef = useRef<HTMLDivElement>(null)
+  const travelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     setMounted(true)
+    return () => {
+      if (travelTimerRef.current) clearTimeout(travelTimerRef.current)
+    }
   }, [])
 
   // Плавное отслеживание перемещения и телепорта рамки
@@ -72,19 +78,26 @@ export function MapScreen({
     prevPlayerIdRef.current = playerId
   }, [view])
 
-  // Автоцентрирование карты на текущем узле игрока
+  // Эффективный узел для отображения рамки и камеры: во время перемещения
+  // рамка плавно стремится к целевому узлу
+  const effectiveNode = useMemo(() => {
+    if (!view) return undefined
+    const byId = new Map(view.nodes.map((n) => [n.id, n]))
+    const targetNode = travelTargetId !== null ? byId.get(travelTargetId) : undefined
+    return targetNode ?? byId.get(view.playerId)
+  }, [view, travelTargetId])
+
+  // Автоцентрирование карты на эффективном узле (следует за рамкой)
   useEffect(() => {
-    if (!mapScrollRef.current || !view) return
-    const playerNode = view.nodes.find((n) => n.id === view.playerId)
-    if (!playerNode) return
+    if (!mapScrollRef.current || !effectiveNode) return
     const el = mapScrollRef.current
-    const targetX = playerNode.x * el.scrollWidth
+    const targetX = effectiveNode.x * el.scrollWidth
     const targetScrollLeft = targetX - el.clientWidth / 2
     el.scrollTo({
       left: Math.max(0, targetScrollLeft),
       behavior: mounted ? "smooth" : "auto",
     })
-  }, [view, mounted])
+  }, [effectiveNode, mounted])
 
   if (!view) return null
 
@@ -95,6 +108,38 @@ export function MapScreen({
   const revealedEdges = view.edges.filter((e) => revealed.has(e.from) && revealed.has(e.to))
   const eventTarget = view.eventTargetId === undefined ? undefined : byId.get(view.eventTargetId)
   const player = byId.get(view.playerId)
+
+  // Клик по узлу: запускает плавное движение рамки перед вызовом боевого цикла
+  const handleNodeClick = (nodeId: number) => {
+    if (travelTargetId !== null) return
+    setTravelTargetId(nodeId)
+    setIsTeleporting(false)
+
+    travelTimerRef.current = setTimeout(() => {
+      onMapNode(nodeId)
+      setTravelTargetId(null)
+    }, 550)
+  }
+
+  // Закрытие события: если есть телепорт, плавно летим рамкой к цели перед стартом
+  const handleDismissEvent = () => {
+    if (travelTargetId !== null) return
+
+    if (eventTarget && player && eventTarget.id !== player.id) {
+      setEventDismissed(true)
+      setTravelTargetId(eventTarget.id)
+      setIsTeleporting(true)
+
+      travelTimerRef.current = setTimeout(() => {
+        onEventDismiss()
+        setTravelTargetId(null)
+        setIsTeleporting(false)
+        setEventDismissed(false)
+      }, 950)
+    } else {
+      onEventDismiss()
+    }
+  }
 
   const mbIcon: Record<string, (p: { className?: string }) => ReactNode> = {
     fish: IconFish,
@@ -277,20 +322,22 @@ export function MapScreen({
           </svg>
 
           {/* Динамическая технологичная рамка текущего положения игрока */}
-          {player && (
+          {effectiveNode && (
             <div
               data-testid="current-node-reticle"
               className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 z-10 flex items-center justify-center ${
-                player.isBoss ? "h-20 w-20 sm:h-24 sm:w-24" : "h-16 w-16 sm:h-[72px] sm:w-[72px]"
+                effectiveNode.isBoss
+                  ? "h-20 w-20 sm:h-24 sm:w-24"
+                  : "h-16 w-16 sm:h-[72px] sm:w-[72px]"
               } ${isTeleporting ? "anim-warp" : "anim-radar"}`}
               style={{
-                left: `${player.x * 100}%`,
-                top: `${player.y * 100}%`,
+                left: `${effectiveNode.x * 100}%`,
+                top: `${effectiveNode.y * 100}%`,
                 transition: !mounted
                   ? "none"
                   : isTeleporting
                     ? "left 0.95s cubic-bezier(0.22, 1, 0.36, 1), top 0.95s cubic-bezier(0.22, 1, 0.36, 1)"
-                    : "left 0.65s cubic-bezier(0.2, 0.9, 0.3, 1), top 0.65s cubic-bezier(0.2, 0.9, 0.3, 1)",
+                    : "left 0.55s cubic-bezier(0.2, 0.9, 0.3, 1), top 0.55s cubic-bezier(0.2, 0.9, 0.3, 1)",
               }}
               aria-hidden
             >
@@ -324,7 +371,7 @@ export function MapScreen({
                 <circle
                   cx="40"
                   cy="40"
-                  r={player.isBoss ? "38" : "33"}
+                  r={effectiveNode.isBoss ? "38" : "33"}
                   stroke={isTeleporting ? "rgba(255,201,77,0.75)" : "rgba(53,224,255,0.7)"}
                   strokeWidth="1.2"
                   strokeDasharray="4 6"
@@ -335,7 +382,7 @@ export function MapScreen({
                 <circle
                   cx="40"
                   cy="40"
-                  r={player.isBoss ? "34" : "28"}
+                  r={effectiveNode.isBoss ? "34" : "28"}
                   stroke={isTeleporting ? "rgba(255,201,77,0.4)" : "rgba(93,255,176,0.45)"}
                   strokeWidth="1"
                   strokeDasharray="8 12"
@@ -372,7 +419,7 @@ export function MapScreen({
           {view.nodes
             .filter((n) => revealed.has(n.id))
             .map((n) => {
-              const isCurrent = n.id === view.playerId
+              const isCurrent = n.id === (travelTargetId ?? view.playerId)
               const isEventTarget = n.id === view.eventTargetId
               const clickable = playerOut.has(n.id)
               const mbKinds = view.minibosses[n.id] ?? []
@@ -418,10 +465,10 @@ export function MapScreen({
               return (
                 <button
                   key={n.id}
-                  disabled={!clickable}
-                  onClick={() => clickable && onMapNode(n.id)}
+                  disabled={!clickable || travelTargetId !== null}
+                  onClick={() => clickable && travelTargetId === null && handleNodeClick(n.id)}
                   className={`absolute flex -translate-x-1/2 -translate-y-1/2 select-none flex-col items-center gap-1.5 ${
-                    clickable
+                    clickable && travelTargetId === null
                       ? "cursor-pointer group z-20"
                       : isCurrent
                         ? "cursor-default z-10"
@@ -629,7 +676,7 @@ export function MapScreen({
       )}
 
       {/* Оверлей интерактивного события с выбором */}
-      {eventData && (
+      {eventData && !eventDismissed && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-abyss/75 p-3 backdrop-blur-md sm:p-6">
           <div className="hud-chip flex w-full max-w-lg flex-col items-center border border-amber-400/40 bg-abyss/95 p-4 text-center shadow-[0_0_32px_rgba(251,191,36,0.2)] sm:p-6">
             <div className="flex items-center gap-2">
@@ -681,7 +728,7 @@ export function MapScreen({
                 </div>
                 <button
                   className="btn-ghost mt-4 px-6 py-2 font-display text-sm text-cyan-neon hover:text-foam"
-                  onClick={onEventDismiss}
+                  onClick={handleDismissEvent}
                 >
                   ПРОДОЛЖИТЬ ПУТЬ
                 </button>
@@ -692,7 +739,7 @@ export function MapScreen({
       )}
 
       {/* Обратная совместимость: оверлей текстового события (если eventData не задан) */}
-      {!eventData && hud.campaignEvent && (
+      {!eventData && hud.campaignEvent && !eventDismissed && (
         <div className="absolute inset-0 z-30 flex items-start justify-center bg-abyss/25 px-3 pt-20 sm:items-center sm:bg-abyss/70 sm:p-4">
           <div className="hud-chip flex max-w-[min(90vw,28rem)] flex-col items-center bg-abyss/75 px-4 py-3 text-center backdrop-blur-sm sm:px-6 sm:py-5">
             <div className="hud-label mb-1 sm:mb-2">СЛУЧАЙНОЕ СОБЫТИЕ</div>
@@ -701,7 +748,7 @@ export function MapScreen({
             </p>
             <button
               className="btn-ghost mt-2 px-4 py-1.5 text-xs sm:mt-4 sm:px-5 sm:py-2 sm:text-sm"
-              onClick={onEventDismiss}
+              onClick={handleDismissEvent}
             >
               ПЛЫТЬ ДАЛЬШЕ
             </button>
