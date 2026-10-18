@@ -58,7 +58,10 @@
 «Установить на телефон/компьютер» — через меню браузера («Добавить на главный
 экран» / «Установить приложение»).
 
-## Для разработчика
+## Документация
 
-Запуск, сборка, тесты, PWA, схема таблицы рекордов и структура проекта —
-в [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+- 🗺️ **Планы развития (Roadmap)**: [docs/ROADMAP.md](docs/ROADMAP.md)
+- 📜 **История версий и реализованный функционал**: [docs/CHANGELOG.md](docs/CHANGELOG.md)
+- 🛠️ **Руководство разработчика** (запуск, тесты, PWA, архитектура): [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- 🌌 **Лор и концепция станции «СФЕРА-1080»**: [docs/LORE_AND_EXPANSION_IDEAS.md](docs/LORE_AND_EXPANSION_IDEAS.md)
+- 🧱 **Матрица эффектов блоков**: [docs/BLOCK_EFFECT_MATRIX.md](docs/BLOCK_EFFECT_MATRIX.md)
