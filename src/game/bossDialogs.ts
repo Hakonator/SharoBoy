@@ -1,6 +1,6 @@
 import type { BossVariantKind } from "./bossVariants"
 
-export interface BossDialogData {
+export interface BossTransmissionData {
   kind: BossVariantKind
   name: string
   protocol: string
@@ -9,6 +9,9 @@ export interface BossDialogData {
   accentColor: string
   callsign: string
 }
+
+/** Псевдоним для обратной совместимости. */
+export type BossDialogData = BossTransmissionData
 
 export interface EpilogueData {
   title: string
@@ -75,9 +78,14 @@ export const BOSS_DIALOGS: Record<BossVariantKind, BossDialogData> = {
   },
 }
 
-export function getBossDialog(kind: BossVariantKind): BossDialogData {
-  return BOSS_DIALOGS[kind] ?? BOSS_DIALOGS.king
+export const BOSS_TRANSMISSIONS = BOSS_DIALOGS
+
+export function getBossTransmission(kind: BossVariantKind): BossTransmissionData {
+  return BOSS_TRANSMISSIONS[kind] ?? BOSS_TRANSMISSIONS.king
 }
+
+/** Псевдоним для обратной совместимости. */
+export const getBossDialog = getBossTransmission
 
 export function getFinalEpilogue(finalBossKind: BossVariantKind | null | undefined): EpilogueData {
   if (finalBossKind === "chrono") {

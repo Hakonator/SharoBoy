@@ -25,6 +25,29 @@ describe("Campaign Challenges (Квестовые узлы-челленджи)",
     expect(chLate.rewardMeta).toBe(2)
   })
 
+  it("увеличивает базовый лимит времени для speed_clear и добавляет +35с за каждого минибосса", () => {
+    const def = createCampaignChallenge(1, 4)
+    const speedDef = {
+      ...def,
+      kind: "speed_clear" as const,
+      targetValue: 68,
+      description: "Зачистите быстрее чем за 68 сек",
+    }
+    // 0 минибоссов
+    const active0 = initActiveChallenge(speedDef, 0)
+    expect(active0.def.targetValue).toBe(68)
+
+    // 1 минибосс: +35 сек
+    const active1 = initActiveChallenge(speedDef, 1)
+    expect(active1.def.targetValue).toBe(103)
+    expect(active1.def.description).toContain("+35 с за минибосса")
+
+    // 2 минибосса: +70 сек
+    const active2 = initActiveChallenge(speedDef, 2)
+    expect(active2.def.targetValue).toBe(138)
+    expect(active2.def.description).toContain("+70 с за минибосса")
+  })
+
   it("updateActiveChallenge для speed_clear отсчитывает время и проваливает при лимите", () => {
     const def = createCampaignChallenge(1, 4)
     const active = initActiveChallenge({

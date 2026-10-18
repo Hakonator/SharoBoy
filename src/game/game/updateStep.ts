@@ -79,6 +79,14 @@ export function update(g: Game, dt: number) {
     }
   }
 
+  if (g.bossTransmissionTimer > 0 && g.phase === "playing") {
+    g.bossTransmissionTimer -= dt
+    if (g.bossTransmissionTimer <= 0) {
+      g.bossTransmission = null
+      pushHud(g)
+    }
+  }
+
   if (g.transition > 0 && g.phase === "playing") {
     g.transition -= dt
     if (g.transition <= 0) pushHud(g)

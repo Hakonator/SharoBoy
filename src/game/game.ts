@@ -32,7 +32,7 @@ import type { PlayerMapSpec } from "./mapSpec"
 import type { LevelSpec } from "./levels"
 import type { MinibossKind } from "./minibosses"
 import type { BossVariantKind } from "./bossVariants"
-import type { BossDialogData } from "./bossDialogs"
+import type { BossTransmissionData } from "./bossDialogs"
 import { buyCampaignShopItem, closeCampaignShop } from "./campaignShop"
 import { chooseCampaignEventChoice as chooseCampaignEventOption } from "./campaignEvents"
 import { makeBossHost, makePowersHost, makePhysicsHost, makeWeaponsHost } from "./game/hosts"
@@ -143,8 +143,17 @@ export class Game {
   debugBossType: BossVariantKind | null = null
   /** Активный тип босса на текущем уровне (для лора и интро). */
   activeBossKind: BossVariantKind | null = null
-  /** Интро-диалог босса (показывается при старте боя с боссом). */
-  bossDialog: BossDialogData | null = null
+  /** Интро-сообщение / протокол босса (трансляция перед началом боя). */
+  bossTransmission: BossTransmissionData | null = null
+  /** Таймер автозакрытия сообщения босса (в секундах). */
+  bossTransmissionTimer = 0
+  /** Псевдоним для обратной совместимости. */
+  get bossDialog(): BossTransmissionData | null {
+    return this.bossTransmission
+  }
+  set bossDialog(val: BossTransmissionData | null) {
+    this.bossTransmission = val
+  }
   /** Финальный босс, побеждённый в текущем забеге кампании ("kraken" | "chrono"). */
   finalBossDefeated: BossVariantKind | null = null
   /** Живые существа-минибоссы уровня (их может быть несколько): у каждого свой
@@ -417,9 +426,13 @@ export class Game {
   dismissCampaignEvent() {
     dismissCampaignEvent(this)
   }
-  dismissBossDialog() {
-    this.bossDialog = null
+  dismissBossTransmission() {
+    this.bossTransmission = null
+    this.bossTransmissionTimer = 0
     pushHud(this)
+  }
+  dismissBossDialog() {
+    this.dismissBossTransmission()
   }
   chooseCampaignEventOption(index: number) {
     chooseCampaignEventOption(this, index)

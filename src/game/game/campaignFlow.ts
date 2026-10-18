@@ -1,6 +1,6 @@
 import type { Game } from "../game"
 import { fixedVariant, pickBossVariant } from "../bossVariants"
-import { getBossDialog } from "../bossDialogs"
+import { getBossTransmission } from "../bossDialogs"
 import { minibossHpFor, rollMinibossLive } from "../minibosses"
 import { LEVELS } from "../levels"
 import { generateMotifSpec } from "../levelMotifs"
@@ -46,10 +46,12 @@ export function startLevelBattle(g: Game, n: number) {
   if (g.onBossNode) {
     const kind = g.debugBossType ?? "king"
     g.activeBossKind = kind
-    g.bossDialog = getBossDialog(kind)
+    g.bossTransmission = getBossTransmission(kind)
+    g.bossTransmissionTimer = 5.5
   } else {
     g.activeBossKind = null
-    g.bossDialog = null
+    g.bossTransmission = null
+    g.bossTransmissionTimer = 0
   }
   launchNodeBattle(g, LEVELS[n - 1].name)
 }
@@ -80,7 +82,8 @@ export function startCampaignMap(g: Game) {
   g.campaignVisible = visibleFrom(g.campaign, g.campaignPlayerId)
   g.onBossNode = false
   g.activeBossKind = null
-  g.bossDialog = null
+  g.bossTransmission = null
+  g.bossTransmissionTimer = 0
   g.finalBossDefeated = null
   g.activeSpec = null
   g.phase = "map"
@@ -108,7 +111,8 @@ export function enterMapView(g: Game) {
   g.fx.clear()
   g.onBossNode = false
   g.activeBossKind = null
-  g.bossDialog = null
+  g.bossTransmission = null
+  g.bossTransmissionTimer = 0
   g.activeSpec = null
   g.activeChallenge = null
   applyTrack(g)
@@ -248,7 +252,8 @@ export function startMapBattle(g: Game, node: CampaignNode) {
       ? fixedVariant(node.bossKind, actBossTier)
       : pickBossVariant(g.campaignSeed + node.id * 7919, actBossTier)
     g.activeBossKind = variant.kind
-    g.bossDialog = getBossDialog(variant.kind)
+    g.bossTransmission = getBossTransmission(variant.kind)
+    g.bossTransmissionTimer = 5.5
     const isFinal = !g.campaign || node.id === g.campaign.bossId
     if (isFinal || actBossTier === 2) {
       g.finalBossDefeated = variant.kind
@@ -270,13 +275,19 @@ export function startMapBattle(g: Game, node: CampaignNode) {
   }
   g.onBossNode = false
   g.activeBossKind = null
-  g.bossDialog = null
+  g.bossTransmission = null
+  g.bossTransmissionTimer = 0
   g.activeSpec = nodeSpecFor(g, node)
   buildFromSpec(g, g.activeSpec)
   // Минибоссы: случайный ролл с pity-системой, в узлах-испытаниях минибосс гарантирован!
   let rolled = rollMinibossLive(g.minibossPity)
   if (node.isChallenge && rolled.kinds.length === 0) {
     rolled = { kinds: ["fish"], pity: 0 }
+  }
+  // На узле со спринт-зачисткой ограничиваем число минибоссов максимум 1,
+  // чтобы испытание на время оставалось динамичным и сбалансированным
+  if (node.isChallenge && node.challenge?.kind === "speed_clear" && rolled.kinds.length > 1) {
+    rolled = { kinds: [rolled.kinds[0]], pity: rolled.pity }
   }
   g.minibossPity = rolled.pity
   if (rolled.kinds.length) g.campaignMbSeen[node.id] = rolled.kinds
@@ -286,7 +297,7 @@ export function startMapBattle(g: Game, node: CampaignNode) {
     addMiniboss(g, kind, hp)
   }
   if (node.isChallenge && node.challenge) {
-    g.activeChallenge = initActiveChallenge(node.challenge)
+    g.activeChallenge = initActiveChallenge(node.challenge, rolled.kinds.length)
   } else {
     g.activeChallenge = null
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { BOSS_DIALOGS, getBossDialog, getFinalEpilogue } from "./bossDialogs"
+import { BOSS_DIALOGS, getBossDialog, getBossTransmission, getFinalEpilogue } from "./bossDialogs"
 import type { BossVariantKind } from "./bossVariants"
 
 describe("bossDialogs", () => {
@@ -27,11 +27,11 @@ describe("bossDialogs", () => {
     }
   })
 
-  it("getBossDialog возвращает правильный диалог или fallback", () => {
-    expect(getBossDialog("chrono").name).toBe("ПОВЕЛИТЕЛЬ ВРЕМЕНИ")
+  it("getBossDialog и getBossTransmission возвращают правильную трансляцию или fallback", () => {
+    expect(getBossTransmission("chrono").name).toBe("ПОВЕЛИТЕЛЬ ВРЕМЕНИ")
     expect(getBossDialog("kraken").name).toBe("КРАКЕН БЕЗДНЫ")
     // @ts-expect-error Проверка fallback на неизвестный тип
-    expect(getBossDialog("unknown_boss").kind).toBe("king")
+    expect(getBossTransmission("unknown_boss").kind).toBe("king")
   })
 
   describe("getFinalEpilogue", () => {

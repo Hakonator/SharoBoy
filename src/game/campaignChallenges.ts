@@ -51,7 +51,8 @@ export function createCampaignChallenge(seed: number, tier: number): CampaignCha
 
   switch (kind) {
     case "speed_clear": {
-      const timeLimit = Math.round(40 + tier * 0.4)
+      // Базовый таймер: комфортные 65 сек + масштабирование по ярусу
+      const timeLimit = Math.round(65 + tier * 0.8)
       return {
         kind,
         title: "СПРИНТ-ЗАЧИСТКА",
@@ -96,8 +97,30 @@ export function createCampaignChallenge(seed: number, tier: number): CampaignCha
   }
 }
 
-/** Инициализация активного состояния челленджа при старте боя. */
-export function initActiveChallenge(def: CampaignChallenge): ActiveChallengeState {
+/**
+ * Инициализация активного состояния челленджа при старте боя.
+ * Для челленджей на время ("speed_clear") каждый присутствующий на уровне минибосс
+ * автоматически добавляет +35 секунд к общему таймеру.
+ */
+export function initActiveChallenge(
+  def: CampaignChallenge,
+  minibossCount = 0
+): ActiveChallengeState {
+  if (def.kind === "speed_clear" && minibossCount > 0) {
+    const bonusTime = minibossCount * 35
+    const adjustedTarget = def.targetValue + bonusTime
+    return {
+      def: {
+        ...def,
+        targetValue: adjustedTarget,
+        description: `Зачистите уровень быстрее чем за ${adjustedTarget} сек (+${bonusTime} с за минибосса)`,
+      },
+      progress: 0,
+      failed: false,
+      completed: false,
+      notifiedFail: false,
+    }
+  }
   return {
     def,
     progress: 0,

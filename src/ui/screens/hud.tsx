@@ -420,8 +420,11 @@ export function HudOverlay({
         </button>
       )}
 
-      {hud.bossDialog && inGame && (
-        <BossIntroBanner dialog={hud.bossDialog} onDismiss={onDismissBossDialog} />
+      {(hud.bossTransmission ?? hud.bossDialog) && inGame && (
+        <BossTransmissionBanner
+          dialog={(hud.bossTransmission ?? hud.bossDialog)!}
+          onDismiss={onDismissBossDialog}
+        />
       )}
 
       {hud.banner && inGame && (
@@ -440,31 +443,34 @@ export function HudOverlay({
   )
 }
 
-/** Неоновый терминал интро-диалога босса станции «СФЕРА-1080». */
-export function BossIntroBanner({
+/** Неоновый терминал входящей трансляции / протокола босса станции «СФЕРА-1080». */
+export function BossTransmissionBanner({
   dialog,
   onDismiss,
 }: {
   dialog: BossDialogData
   onDismiss?: () => void
 }) {
-  const [visible, setVisible] = useState(true)
+  const onDismissRef = useRef(onDismiss)
+  onDismissRef.current = onDismiss
 
   useEffect(() => {
-    setVisible(true)
     const t = setTimeout(() => {
-      setVisible(false)
-      onDismiss?.()
-    }, 7000)
+      onDismissRef.current?.()
+    }, 6000)
     return () => clearTimeout(t)
-  }, [dialog, onDismiss])
-
-  if (!visible) return null
+  }, [dialog.kind])
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-14 z-30 flex justify-center px-3 sm:top-20 sm:px-4">
+      <style>{`
+        @keyframes sb-trans-progress {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+      `}</style>
       <div
-        className="pointer-events-auto relative w-full max-w-xl overflow-hidden rounded-xl border bg-abyss/95 p-3.5 shadow-2xl backdrop-blur-md transition-all sm:p-5"
+        className="relative w-full max-w-xl overflow-hidden rounded-xl border bg-abyss/95 p-3.5 shadow-2xl backdrop-blur-md transition-all sm:p-5"
         style={{
           borderColor: dialog.accentColor,
           boxShadow: `0 0 25px ${dialog.accentColor}35, inset 0 0 15px ${dialog.accentColor}15`,
@@ -509,17 +515,10 @@ export function BossIntroBanner({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setVisible(false)
-              onDismiss?.()
-            }}
-            aria-label="Закрыть диалог"
-            className="rounded border border-foam/20 bg-foam/10 px-2 py-1 font-mono text-xs text-foam/70 transition-colors hover:border-foam/50 hover:bg-foam/20 hover:text-foam"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-950/40 px-2 py-0.5 text-[10px] font-mono text-red-300">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
+            <span>В ЭФИРЕ</span>
+          </div>
         </div>
 
         <div className="mt-2.5 rounded-lg border border-foam/10 bg-deep/60 px-3 py-2 font-mono text-xs leading-relaxed text-foam/90 sm:text-sm">
@@ -527,7 +526,28 @@ export function BossIntroBanner({
           <span>{dialog.introLine}</span>
           <span className="animate-pulse font-bold text-mint">_</span>
         </div>
+
+        {/* Шкала авто-закрытия трансляции */}
+        <div className="mt-2.5">
+          <div className="h-1 w-full overflow-hidden rounded bg-foam/10">
+            <div
+              className="h-full"
+              style={{
+                backgroundColor: dialog.accentColor,
+                animation: "sb-trans-progress 5.5s linear forwards",
+                boxShadow: `0 0 8px ${dialog.accentColor}`,
+              }}
+            />
+          </div>
+          <div className="mt-1 flex items-center justify-between text-[10px] font-mono text-foam/50">
+            <span>🛰 ПЕРЕХВАТ СИСТЕМЫ «СФЕРА-1080»</span>
+            <span>АВТО-ЗАКРЫТИЕ</span>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
+
+/** Псевдоним для обратной совместимости. */
+export const BossIntroBanner = BossTransmissionBanner

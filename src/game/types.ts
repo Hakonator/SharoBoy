@@ -10,7 +10,7 @@ import type { PlayerCosmetics } from "./cosmetics"
 import type { CampaignModifierId } from "./campaignModifiers"
 import type { ActiveChallengeHud } from "./campaignChallenges"
 import type { BossVariantKind } from "./bossVariants"
-import type { BossDialogData } from "./bossDialogs"
+import type { BossDialogData, BossTransmissionData } from "./bossDialogs"
 
 export type Phase = "menu" | "playing" | "paused" | "over" | "won" | "map"
 
@@ -77,7 +77,9 @@ export interface HudData {
   campaignModifiers?: CampaignModifierId[]
   /** Активное испытание узла (если бой идёт на узле-челлендже). */
   activeChallenge?: ActiveChallengeHud | null
-  /** Активный интро-диалог/протокол босса текущего уровня. */
+  /** Активная входящая трансляция/сообщение босса текущего уровня. */
+  bossTransmission?: BossTransmissionData | null
+  /** @deprecated Псевдоним для bossTransmission. */
   bossDialog?: BossDialogData | null
   /** Финальный босс, побеждённый в текущем забеге кампании ("kraken" | "chrono"). */
   finalBossDefeated?: BossVariantKind | null

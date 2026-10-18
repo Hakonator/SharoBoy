@@ -82,9 +82,9 @@ describe("HudOverlay: кнопка пропуска уровня", () => {
     expect(html).toContain("hidden")
   })
 
-  it("рендерит интро-диалог босса при наличии bossDialog во время боя", () => {
+  it("рендерит входящую трансляцию босса при наличии bossTransmission во время боя", () => {
     const hud = makeHud("playing")
-    hud.bossDialog = {
+    hud.bossTransmission = {
       kind: "chrono",
       name: "ПОВЕЛИТЕЛЬ ВРЕМЕНИ",
       protocol: "СИНГУЛЯРНОСТЬ: ХРАНИТЕЛЬ ЦИКЛА",
@@ -112,5 +112,8 @@ describe("HudOverlay: кнопка пропуска уровня", () => {
     expect(html).toContain("СИНГУЛЯРНОСТЬ: ХРАНИТЕЛЬ ЦИКЛА")
     expect(html).toContain("ТИК-ТАК. ТЫ ОПОЗДАЛ.")
     expect(html).toContain("ХРОНОС")
+    expect(html).toContain("В ЭФИРЕ")
+    expect(html).toContain("АВТО-ЗАКРЫТИЕ")
+    expect(html).not.toContain("Закрыть диалог")
   })
 })
