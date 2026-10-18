@@ -160,6 +160,9 @@ export function onLevelCleared(g: Game) {
       g.onBossNode = false
       const isFinalBoss = !g.campaign || g.campaignPlayerId === g.campaign.bossId
       if (isFinalBoss) {
+        if (!g.finalBossDefeated && g.activeBossKind) {
+          g.finalBossDefeated = g.activeBossKind
+        }
         // Финальный босс карты повержен — забег пройден.
         g.phase = "won"
         const mult = g.campaignRelics.relicConverter ? 1.5 : 1.0

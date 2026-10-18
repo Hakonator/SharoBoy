@@ -202,6 +202,7 @@ export default function App() {
         debug={debug.debug}
         onDebugSkipLevel={() => g()?.debugSkipLevel()}
         onExitCustomMap={() => g()?.stopCustomMap()}
+        onDismissBossDialog={() => g()?.dismissBossDialog()}
       />
 
       {hud.phase === "map" && (

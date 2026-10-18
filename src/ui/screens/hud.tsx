@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react"
 import { DEBUG_TOOLS } from "../../config"
 import {
   IconBall,
+  IconBoss,
   IconMusic,
   IconPlay,
   IconPause,
@@ -11,6 +12,7 @@ import {
   VolSlider,
 } from "../icons"
 import type { HudData } from "../../game/types"
+import type { BossDialogData } from "../../game/bossDialogs"
 import { computeRunMultipliers, CAMPAIGN_MODIFIERS_MAP } from "../../game/campaignModifiers"
 
 /** Наложение во время игры: верхний HUD-бар, цели на мобильных, эффекты, подсказки, баннер. */
@@ -26,6 +28,7 @@ export function HudOverlay({
   debug,
   onDebugSkipLevel,
   onExitCustomMap,
+  onDismissBossDialog,
 }: {
   hud: HudData
   inGame: boolean
@@ -44,6 +47,8 @@ export function HudOverlay({
   /** Мгновенно завершить уровень через debug API. */
   onDebugSkipLevel: () => void
   onExitCustomMap: () => void
+  /** Закрыть активный интро-диалог босса. */
+  onDismissBossDialog?: () => void
 }) {
   const [skipArmed, setSkipArmed] = useState(false)
   const skipTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -415,6 +420,10 @@ export function HudOverlay({
         </button>
       )}
 
+      {hud.bossDialog && inGame && (
+        <BossIntroBanner dialog={hud.bossDialog} onDismiss={onDismissBossDialog} />
+      )}
+
       {hud.banner && inGame && (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
           <div className="anim-banner px-6 text-center">
@@ -428,5 +437,97 @@ export function HudOverlay({
         </div>
       )}
     </>
+  )
+}
+
+/** Неоновый терминал интро-диалога босса станции «СФЕРА-1080». */
+export function BossIntroBanner({
+  dialog,
+  onDismiss,
+}: {
+  dialog: BossDialogData
+  onDismiss?: () => void
+}) {
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    setVisible(true)
+    const t = setTimeout(() => {
+      setVisible(false)
+      onDismiss?.()
+    }, 7000)
+    return () => clearTimeout(t)
+  }, [dialog, onDismiss])
+
+  if (!visible) return null
+
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-14 z-30 flex justify-center px-3 sm:top-20 sm:px-4">
+      <div
+        className="pointer-events-auto relative w-full max-w-xl overflow-hidden rounded-xl border bg-abyss/95 p-3.5 shadow-2xl backdrop-blur-md transition-all sm:p-5"
+        style={{
+          borderColor: dialog.accentColor,
+          boxShadow: `0 0 25px ${dialog.accentColor}35, inset 0 0 15px ${dialog.accentColor}15`,
+        }}
+      >
+        <div
+          className="absolute inset-x-0 top-0 h-1 opacity-80"
+          style={{
+            background: `linear-gradient(90deg, transparent, ${dialog.accentColor}, transparent)`,
+          }}
+        />
+
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-deep/80 sm:h-12 sm:w-12"
+              style={{ borderColor: `${dialog.accentColor}60` }}
+            >
+              <IconBoss kind={dialog.kind} className="h-6 w-6 sm:h-7 sm:w-7" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span
+                  className="rounded px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-black"
+                  style={{ backgroundColor: dialog.accentColor }}
+                >
+                  {dialog.callsign}
+                </span>
+                <span className="font-mono text-[11px] tracking-wider text-foam/60">
+                  {dialog.protocol}
+                </span>
+              </div>
+              <h3
+                className="font-display text-base font-black tracking-wide sm:text-xl"
+                style={{
+                  color: dialog.accentColor,
+                  textShadow: `0 0 12px ${dialog.accentColor}80`,
+                }}
+              >
+                {dialog.name}
+              </h3>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setVisible(false)
+              onDismiss?.()
+            }}
+            aria-label="Закрыть диалог"
+            className="rounded border border-foam/20 bg-foam/10 px-2 py-1 font-mono text-xs text-foam/70 transition-colors hover:border-foam/50 hover:bg-foam/20 hover:text-foam"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mt-2.5 rounded-lg border border-foam/10 bg-deep/60 px-3 py-2 font-mono text-xs leading-relaxed text-foam/90 sm:text-sm">
+          <span className="mr-1.5 font-bold text-cyan-neon">›</span>
+          <span>{dialog.introLine}</span>
+          <span className="animate-pulse font-bold text-mint">_</span>
+        </div>
+      </div>
+    </div>
   )
 }

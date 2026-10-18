@@ -81,4 +81,36 @@ describe("HudOverlay: кнопка пропуска уровня", () => {
     expect(html).toContain("pointer-coarse:flex")
     expect(html).toContain("hidden")
   })
+
+  it("рендерит интро-диалог босса при наличии bossDialog во время боя", () => {
+    const hud = makeHud("playing")
+    hud.bossDialog = {
+      kind: "chrono",
+      name: "ПОВЕЛИТЕЛЬ ВРЕМЕНИ",
+      protocol: "СИНГУЛЯРНОСТЬ: ХРАНИТЕЛЬ ЦИКЛА",
+      introLine: "ТИК-ТАК. ТЫ ОПОЗДАЛ.",
+      defeatLine: "РАССИНХРОН...",
+      accentColor: "#38bdf8",
+      callsign: "ХРОНОС",
+    }
+    const html = renderToStaticMarkup(
+      <HudOverlay
+        hud={hud}
+        inGame
+        portrait
+        onPause={() => {}}
+        onMute={() => {}}
+        onMusic={() => {}}
+        onMusicVolume={() => {}}
+        onSfxVolume={() => {}}
+        debug={false}
+        onDebugSkipLevel={() => {}}
+        onExitCustomMap={() => {}}
+      />
+    )
+    expect(html).toContain("ПОВЕЛИТЕЛЬ ВРЕМЕНИ")
+    expect(html).toContain("СИНГУЛЯРНОСТЬ: ХРАНИТЕЛЬ ЦИКЛА")
+    expect(html).toContain("ТИК-ТАК. ТЫ ОПОЗДАЛ.")
+    expect(html).toContain("ХРОНОС")
+  })
 })

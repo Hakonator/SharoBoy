@@ -1,5 +1,6 @@
 import type { Game } from "../game"
 import { fixedVariant, pickBossVariant } from "../bossVariants"
+import { getBossDialog } from "../bossDialogs"
 import { minibossHpFor, rollMinibossLive } from "../minibosses"
 import { LEVELS } from "../levels"
 import { generateMotifSpec } from "../levelMotifs"
@@ -42,6 +43,14 @@ export function startLevelBattle(g: Game, n: number) {
   g.levelLostBall = false
   g.onBossNode = "boss" in LEVELS[n - 1]
   g.activeSpec = g.onBossNode ? null : LEVELS[n - 1]
+  if (g.onBossNode) {
+    const kind = g.debugBossType ?? "king"
+    g.activeBossKind = kind
+    g.bossDialog = getBossDialog(kind)
+  } else {
+    g.activeBossKind = null
+    g.bossDialog = null
+  }
   launchNodeBattle(g, LEVELS[n - 1].name)
 }
 
@@ -70,6 +79,9 @@ export function startCampaignMap(g: Game) {
   g.campaignVisited = [g.campaign.startId]
   g.campaignVisible = visibleFrom(g.campaign, g.campaignPlayerId)
   g.onBossNode = false
+  g.activeBossKind = null
+  g.bossDialog = null
+  g.finalBossDefeated = null
   g.activeSpec = null
   g.phase = "map"
   enterMapView(g)
@@ -95,6 +107,8 @@ export function enterMapView(g: Game) {
   g.countdown = 0
   g.fx.clear()
   g.onBossNode = false
+  g.activeBossKind = null
+  g.bossDialog = null
   g.activeSpec = null
   g.activeChallenge = null
   applyTrack(g)
@@ -233,6 +247,12 @@ export function startMapBattle(g: Game, node: CampaignNode) {
     const variant = node.bossKind
       ? fixedVariant(node.bossKind, actBossTier)
       : pickBossVariant(g.campaignSeed + node.id * 7919, actBossTier)
+    g.activeBossKind = variant.kind
+    g.bossDialog = getBossDialog(variant.kind)
+    const isFinal = !g.campaign || node.id === g.campaign.bossId
+    if (isFinal || actBossTier === 2) {
+      g.finalBossDefeated = variant.kind
+    }
     if (variant.kind === "jellyfish") {
       buildJellyfishBossLevel(g, variant)
     } else if (variant.kind === "crab") {
@@ -244,12 +264,13 @@ export function startMapBattle(g: Game, node: CampaignNode) {
     } else {
       buildBossLevel(g, variant.hp, variant.minions, 4)
     }
-    const isFinal = !g.campaign || node.id === g.campaign.bossId
     const bannerTitle = isFinal ? `ФИНАЛЬНЫЙ БОСС: ${variant.name}` : `БОСС: ${variant.name}`
     launchNodeBattle(g, bannerTitle)
     return
   }
   g.onBossNode = false
+  g.activeBossKind = null
+  g.bossDialog = null
   g.activeSpec = nodeSpecFor(g, node)
   buildFromSpec(g, g.activeSpec)
   // Минибоссы: случайный ролл с pity-системой, в узлах-испытаниях минибосс гарантирован!
