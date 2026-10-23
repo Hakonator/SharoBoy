@@ -1,11 +1,24 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 
-import { generateCampaignMap } from "../../game/campaignMap"
+import { generateCampaignMap, TIER_STEP_NODE_WIDTHS } from "../../game/campaignMap"
 import { EVENT_TEXTS } from "../../game/campaignMapLayout"
 import type { HudData } from "../../game/types"
 
 import { MapScreen } from "./map"
+
+/** Ширина пиктограммы узла на мобильных (`w-11`) и шаг яруса в px. */
+const NODE_PX = 44
+const STEP_PX = NODE_PX * TIER_STEP_NODE_WIDTHS
+
+/**
+ * Ширина полотна карты в ширинах узла: `(tiers − 1)` шагов по
+ * `TIER_STEP_NODE_WIDTHS` плюс по половине узла с каждого края.
+ */
+const canvasWidths = (tiers: number) => (tiers - 1) * TIER_STEP_NODE_WIDTHS + 1
+
+/** Ожидаемая x-координата узла в px — нормированная координата × ширина полотна. */
+const canvasX = (x: number, tiers: number) => x * canvasWidths(tiers) * NODE_PX
 
 describe("MapScreen: маршрут события кампании", () => {
   it("показывает название цели как название локации, не пытаясь склонять его", () => {
@@ -168,8 +181,9 @@ describe("MapScreen: маршрут события кампании", () => {
     expect(html).toContain("anim-spin-reverse")
     // Проверка центрирования статусной плашки рамки
     expect(html).toContain("left-1/2 -translate-x-1/2")
-    // Проверка позиционирования рамки на координатах текущего узла
-    expect(html).toContain(`left:${player.x * 100}%`)
+    // Проверка позиционирования рамки на координатах текущего узла: x — в px
+    // (постоянный шаг ярусов), y — в процентах высоты полотна
+    expect(html).toContain(`left:${canvasX(player.x, map.tiers)}px`)
     expect(html).toContain(`top:${player.y * 100}%`)
     // Проверка того, что подпись узла вынесена в абсолютную плашку снизу, не смещая центр кнопки
     expect(html).toContain("pointer-events-none absolute top-full left-1/2 mt-3 -translate-x-1/2")
@@ -267,5 +281,49 @@ describe("MapScreen: маршрут события кампании", () => {
     expect(html).toContain("СЛУЧАЙНОЕ СОБЫТИЕ")
     expect(html).toContain("Подводный гейзер ускорил движение вперед!")
     expect(html).toContain("ПЛЫТЬ ДАЛЬШЕ")
+  })
+
+  it("держит постоянный шаг между ярусами в 2 ширины узла при любом экране", () => {
+    const map = generateCampaignMap(541)
+    const player = map.nodes.find((node) => node.id === map.startId)!
+    const hud = {
+      map: {
+        ...map,
+        playerId: player.id,
+        visited: map.nodes.map((n) => n.id),
+        visible: [],
+        minibosses: {},
+      },
+      score: 0,
+      lives: 3,
+      best: 0,
+      coins: 0,
+      phase: "map",
+    } as unknown as HudData
+
+    const html = renderToStaticMarkup(
+      <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
+    )
+
+    // Полотно карты растёт вместе с числом ярусов, а не с шириной экрана
+    const canvasPx = canvasWidths(map.tiers) * NODE_PX
+    expect(html).toContain('data-testid="campaign-map-canvas"')
+    expect(html).toContain(`width:${canvasPx}px`)
+
+    // Первый и последний ярус отступают от краёв полотна на половину ширины узла
+    const first = map.nodes.find((n) => n.tier === 0)!
+    const last = map.nodes.find((n) => n.tier === map.tiers - 1)!
+    expect(canvasX(first.x, map.tiers)).toBeCloseTo(NODE_PX / 2, 6)
+    expect(canvasX(last.x, map.tiers)).toBeCloseTo(canvasPx - NODE_PX / 2, 6)
+
+    // Узлы одного яруса стоят в одной колонке, соседние ярусы — ровно на 2 ширины узла
+    const tierOne = map.nodes.filter((n) => n.tier === 1)
+    const tierTwo = map.nodes.filter((n) => n.tier === 2)
+    expect(new Set(tierOne.map((n) => n.x)).size).toBe(1)
+    expect(canvasX(tierTwo[0].x, map.tiers) - canvasX(tierOne[0].x, map.tiers)).toBeCloseTo(
+      STEP_PX,
+      6
+    )
+    expect(html).toContain(`left:${canvasX(tierOne[0].x, map.tiers)}px`)
   })
 })

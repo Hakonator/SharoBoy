@@ -19,6 +19,13 @@ export const CHALLENGE_NODE_CHANCE = 0.14
 /** Событие отбрасывает игрока не дальше чем на это число ярусов («зон») назад. */
 export const EVENT_MAX_BACK_TIERS = 3
 
+/**
+ * Шаг между столбцами карты в ширинах узла. Узлы рисуются пиктограммами
+ * 44 px (мобильные) / 48 px (от `sm`), поэтому расстояние между ярусами
+ * одинаково на любом экране: 2 ширины узла — 88 px / 96 px.
+ */
+export const TIER_STEP_NODE_WIDTHS = 2
+
 /** Имена боевых узлов. */
 const NODE_NAMES = [
   "АВАНПОСТ",
@@ -118,7 +125,7 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
       nodes.push({
         id,
         tier: t,
-        x: 0.04 + (t / Math.max(1, tiers - 1)) * 0.92,
+        x: 0, // колонки выставляет layoutTiers после генерации ярусов
         y: 0.5, // точная вертикаль считается после связывания ярусов
         isBoss,
         isEvent,
@@ -135,6 +142,7 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
   }
 
   const edges = linkTiers(rng, perTier)
+  layoutTiers(perTier, nodes)
   assignYs(rng, perTier, edges, nodes)
 
   return {
@@ -144,6 +152,28 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
     edges,
     startId: perTier[0][0],
     bossId: nodes[nodes.length - 1].id,
+  }
+}
+
+/**
+ * Раскладка по горизонтали: узлы яруса t стоят в колонке `t` и получают
+ * одинаковую x-координату. Координаты нормализованы так, что шаг яруса равен
+ * ровно `TIER_STEP_NODE_WIDTHS` ширин узла, а по краям остаётся по половине
+ * ширины узла — пиктограмма крайнего яруса не прилипает к краю полотна карты
+ * (иначе её рамка и подпись обрезались бы по границе скролла).
+ */
+function layoutTiers(perTier: number[][], nodes: CampaignNode[]) {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const tierCount = perTier.length
+  /* Полотно карты в ширинах узла: (tierCount − 1) шагов по STEP плюс по
+     половине узла с каждого края. При STEP = 2 это `2·tierCount − 1`, поэтому
+     крайние колонки отстоят от краёв на половину ширины узла, а шаг между
+     соседними ярусами всегда равен двум ширинам узла. */
+  const canvasWidths = (tierCount - 1) * TIER_STEP_NODE_WIDTHS + 1
+  for (let t = 0; t < tierCount; t++) {
+    // середина пиктограммы яруса t: полширины узла + t шагов яруса
+    const x = (0.5 + t * TIER_STEP_NODE_WIDTHS) / canvasWidths
+    for (const id of perTier[t]) byId.get(id)!.x = x
   }
 }
 

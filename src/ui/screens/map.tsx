@@ -16,6 +16,35 @@ import {
 } from "../icons"
 import type { HudData } from "../../game/types"
 import { CAMPAIGN_MODIFIERS_MAP } from "../../game/campaignModifiers"
+import { TIER_STEP_NODE_WIDTHS } from "../../game/campaignMap"
+
+/**
+ * Ширина пиктограммы обычного узла: `w-11` на мобильных, `w-12` от `sm`
+ * (синхронизировано с классом размеров кнопки-узла ниже).
+ */
+const NODE_WIDTH_MOBILE = 44
+/** Ширина узла от `sm`: используется только в медиа-запросе ниже. */
+const NODE_WIDTH_DESKTOP = 48
+/** Точка перелома Tailwind `sm` — с неё пиктограммы узлов крупнее. */
+const SM_MIN_WIDTH = 640
+
+/**
+ * Активна ли десктопная раскладка (`sm` и шире). Нужна, потому что позиции
+ * узлов считаются в px: при переходе через точку перелома шаг яруса растёт
+ * с 88 до 96 px, как и сама пиктограмма.
+ */
+function useDesktopLayout(): boolean {
+  const [isDesktop, setIsDesktop] = useState(false)
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
+    const query = window.matchMedia(`(min-width: ${SM_MIN_WIDTH}px)`)
+    const sync = () => setIsDesktop(query.matches)
+    sync()
+    query.addEventListener("change", sync)
+    return () => query.removeEventListener("change", sync)
+  }, [])
+  return isDesktop
+}
 
 /**
  * Экран рогаликовой карты кампании: узлы слева-направо, рёбра-связи и туман
@@ -47,6 +76,17 @@ export function MapScreen({
   const [eventDismissed, setEventDismissed] = useState(false)
   const mapScrollRef = useRef<HTMLDivElement>(null)
   const travelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /* Постоянный шаг ярусов: ширина полотна и шаг в px, не зависящие от экрана.
+     Полотно = (tiers − 1) шагов по `TIER_STEP_NODE_WIDTHS` узлов + по половине
+     узла с краёв — ровно та же нормализация, что в `layoutTiers`, поэтому
+     обратный перевод координаты в px — умножение на ширину полотна. */
+  const isDesktop = useDesktopLayout()
+  const tiers = view?.tiers ?? 0
+  const nodeWidth = isDesktop ? NODE_WIDTH_DESKTOP : NODE_WIDTH_MOBILE
+  const tierStep = nodeWidth * TIER_STEP_NODE_WIDTHS
+  const canvasWidth = Math.max(0, tiers - 1) * tierStep + nodeWidth
+  const nodeX = (x: number) => x * canvasWidth
 
   useEffect(() => {
     setMounted(true)
@@ -91,13 +131,13 @@ export function MapScreen({
   useEffect(() => {
     if (!mapScrollRef.current || !effectiveNode) return
     const el = mapScrollRef.current
-    const targetX = effectiveNode.x * el.scrollWidth
+    const targetX = effectiveNode.x * canvasWidth
     const targetScrollLeft = targetX - el.clientWidth / 2
     el.scrollTo({
       left: Math.max(0, targetScrollLeft),
       behavior: mounted ? "smooth" : "auto",
     })
-  }, [effectiveNode, mounted])
+  }, [effectiveNode, mounted, canvasWidth])
 
   if (!view) return null
 
@@ -260,15 +300,21 @@ export function MapScreen({
         </div>
       </div>
 
-      {/* Карта: рёбра в SVG, узлы — пиктограммы в %-координатах с динамической рамкой */}
+      {/* Карта: рёбра в SVG, узлы — пиктограммы в px-координатах с динамической рамкой.
+          Полотно — `(tiers − 1) * step + nodeWidth` px, то есть шаг ярусов постоянен
+          (2 ширины узла) при любой ширине экрана; на узком экране карта скроллится. */}
       <div
         ref={mapScrollRef}
         className="relative flex-1 overflow-x-auto overflow-y-hidden arcade-scrollbar"
       >
-        <div className="relative h-full min-w-[1300px]">
+        <div
+          data-testid="campaign-map-canvas"
+          className="relative h-full"
+          style={{ width: `${canvasWidth}px`, minWidth: `${canvasWidth}px` }}
+        >
           <svg
             className="absolute inset-0 h-full w-full"
-            viewBox="0 0 100 100"
+            viewBox={`0 0 ${canvasWidth} 100`}
             preserveAspectRatio="none"
             aria-hidden
           >
@@ -293,9 +339,9 @@ export function MapScreen({
               return (
                 <line
                   key={`${e.from}-${e.to}`}
-                  x1={a.x * 100}
+                  x1={nodeX(a.x)}
                   y1={a.y * 100}
-                  x2={b.x * 100}
+                  x2={nodeX(b.x)}
                   y2={b.y * 100}
                   stroke={active ? "#35e0ff" : "rgba(63,148,181,0.45)"}
                   strokeWidth={active ? 1.2 : 0.7}
@@ -307,9 +353,9 @@ export function MapScreen({
             })}
             {eventTarget && player && eventTarget.id !== player.id && (
               <line
-                x1={player.x * 100}
+                x1={nodeX(player.x)}
                 y1={player.y * 100}
-                x2={eventTarget.x * 100}
+                x2={nodeX(eventTarget.x)}
                 y2={eventTarget.y * 100}
                 stroke="#ffc94d"
                 strokeWidth="0.35"
@@ -331,7 +377,7 @@ export function MapScreen({
                   : "h-16 w-16 sm:h-[72px] sm:w-[72px]"
               } ${isTeleporting ? "anim-warp" : "anim-radar"}`}
               style={{
-                left: `${effectiveNode.x * 100}%`,
+                left: `${nodeX(effectiveNode.x)}px`,
                 top: `${effectiveNode.y * 100}%`,
                 transition: !mounted
                   ? "none"
@@ -474,7 +520,7 @@ export function MapScreen({
                         ? "cursor-default z-10"
                         : "cursor-default z-0"
                   }`}
-                  style={{ left: `${n.x * 100}%`, top: `${n.y * 100}%` }}
+                  style={{ left: `${nodeX(n.x)}px`, top: `${n.y * 100}%` }}
                   aria-label={clickable ? `Открыть узел ${n.name}` : n.name}
                 >
                   {n.isBoss ? (
