@@ -109,7 +109,7 @@ export function MenuScreen({
   const unlockedCount = Object.keys(unlocked).length
 
   return (
-    <div className="absolute inset-0 z-40 overflow-y-auto md:overflow-hidden">
+    <div className="page-scroll absolute inset-0 z-40 overflow-y-auto md:overflow-hidden">
       <FloatingBalls />
       <MenuCornerControls
         hud={hud}
@@ -316,8 +316,11 @@ export function MenuScreen({
                 )}
               </div>
 
-              {/* Содержимое активного таба: вертикальный слайдер в неоновом стиле игры */}
-              <div className="arcade-scrollbar flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 pr-2 sm:pr-2.5 h-[360px] sm:h-[400px] md:h-[450px]">
+              {/* Содержимое активного таба: на смартфоне растёт по контенту и
+                  прокручивается вместе со страницей — вложенный скролл ловил
+                  свайп и блокировал прокрутку меню пальцем. От `md` — внутренний
+                  вертикальный слайдер фиксированной высоты в неоновом стиле. */}
+              <div className="arcade-scrollbar p-3 sm:p-4 pr-2 sm:pr-2.5 md:min-h-0 md:flex-1 md:overflow-y-auto md:h-[450px]">
                 {activeTab === "upgrades" && <MenuUpgrades hud={hud} onBuyUpgrade={onBuyUpgrade} />}
 
                 {activeTab === "cosmetics" && (

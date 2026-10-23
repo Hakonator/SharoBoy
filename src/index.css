@@ -274,13 +274,25 @@ canvas {
   );
 }
 
+/*
+ * Скролл-контейнер страницы (главное меню, каталоги, админка).
+ *
+ * `body { touch-action: none }` гасит прокрутку пальцем во всём документе,
+ * а `overscroll-behavior: contain` на вложенной панели запрещает «передачу»
+ * цепочки скролла родителю. Поэтому у контейнера страницы ручная прокрутка
+ * разрешена явно, а цепочку скролла он не блокирует — иначе содержимое ниже
+ * (дашборд с табами) превращается в мёртвую зону для свайпа.
+ */
+.page-scroll {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Игровой вертикальный скроллбар (слайдер в неоновом стиле игры) */
 .arcade-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(53, 224, 255, 0.5) rgba(6, 24, 34, 0.7);
-  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
 }
 
 .arcade-scrollbar::-webkit-scrollbar {

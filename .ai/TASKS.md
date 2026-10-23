@@ -1672,3 +1672,83 @@ Verification commands:
 npm run typecheck
 npm run lint
 npm run test
+
+### T-027: Прокрутка главного меню пальцем на смартфоне
+
+Status: done
+Priority: high
+Assigned to: luna
+
+Описание:
+На смартфоне главное меню не прокручивалось свайпом: страницу нельзя было
+«протянуть» пальцем ни в пустой области, ни на нижнем дашборде с табами.
+
+Причины (две и обе блокировали цепочку прокрутки):
+
+1. `body { touch-action: none }` в `src/index.css` отключает прокрутку пальцем
+   во всём документе (это нужно игре, чтобы жесты браузера не мешали шару).
+   У контейнера страницы меню (`overflow-y-auto`) не было обратного разрешения
+   `touch-action: pan-y`, поэтому свайп по нему игнорировался.
+2. Панель активного таба имела собственный скролл фиксированной высоты
+   (`h-[360px] sm:h-[400px]`) с `overscroll-behavior: contain` (класс
+   `.arcade-scrollbar`). Такой скролл перехватывает палец и запрещает передачу
+   прокрутки родителю — по нижнему блоку меню нельзя было прокрутить страницу.
+
+Требование: на любом участке меню свайп пальцем прокручивает страницу; на
+десктопе поведение не меняется (панель табов — внутренний слайдер, окно не
+скроллится).
+
+1. **`src/index.css`**:
+   - Новый класс `.page-scroll` — `touch-action: pan-y` +
+     `-webkit-overflow-scrolling: touch` для контейнеров прокрутки страниц.
+   - Из `.arcade-scrollbar` убрать `touch-action: pan-y` и
+     `overscroll-behavior: contain`: класс отвечает только за вид неонового
+     слайдера, а прокруткой управляет контейнер.
+
+2. **`src/ui/screens/menu.tsx`**:
+   - Корень меню получает `page-scroll`.
+   - Панель активного таба: на мобильном растёт по контенту и скроллится вместе
+     со страницей; внутренний скролл фиксированной высоты — только от `md`
+     (`md:flex-1 md:min-h-0 md:overflow-y-auto md:h-[450px]`).
+
+3. **Тесты (`src/ui/screens/menu.test.tsx`, новый файл)**:
+   - Контейнер меню содержит `page-scroll` (иначе свайп не работает из-за
+     `body { touch-action: none }`).
+   - Панель табов содержит `md:overflow-y-auto` и не содержит мобильных
+     фиксированных высот `h-[360px]`/`h-[400px]`.
+
+Allowed files:
+
+- src/index.css
+- src/ui/screens/menu.tsx
+- src/ui/screens/menu.test.tsx
+- memory-bank/activeContext.md
+
+Forbidden files:
+
+- vite.config.js
+- tsconfig.json
+- src/game/game/*
+
+Dependencies: none
+
+Acceptance criteria:
+
+- [x] Свайп пальцем прокручивает меню в любой его области (включая нижний блок с вкладками)
+- [x] У контейнера страницы меню разрешён вертикальный жест (`touch-action: pan-y`)
+- [x] Вложенный скролл панели табов на мобильном не перехватывает жест (`overscroll-behavior: contain` убран)
+- [x] Десктопное поведение сохранено: панель табов — внутренний слайдер, окно не скроллится
+- [x] `npm run lint`, `npm run typecheck`, `npm run test` проходят без ошибок
+
+Comment: Добавлен класс `.page-scroll` (`touch-action: pan-y`), подключён к корню меню; у `.arcade-scrollbar` убраны `touch-action`/`overscroll-behavior`. Панель табов переведена на `md:`-варианты скролла с фиксированной высотой только для десктопа. Новый `menu.test.tsx` (2 теста). Проверки: lint 0/0, typecheck чистый, test — 66 файлов / 500 тестов; `npm run build` подтверждает наличие `.page-scroll` и `md:overflow-y-auto` в CSS.
+
+Test plan:
+
+1. Запустить `npm run typecheck`, `npm run lint`, `npm run test`.
+2. На смартфоне: свайп по пустой области меню, по табам и по содержимому активной вкладки прокручивает страницу до самого низа.
+3. На десктопе: окно не скроллится, панель табов имеет свой слайдер заданной высоты.
+
+Verification commands:
+npm run typecheck
+npm run lint
+npm run test
