@@ -119,14 +119,16 @@ export function MenuScreen({
         onSfxVolume={onSfxVolume}
         onSettings={onOpenSettings}
       />
-      <div className="relative flex min-h-full flex-col items-start justify-start gap-6 p-4 sm:p-6 md:h-full md:flex-row md:items-start md:justify-center md:gap-10 lg:gap-14 md:p-8 lg:p-12 md:pt-12 lg:pt-16">
+      {/* Отступ сверху на смартфоне оставляет место под угловые контролы
+          (музыка/звук/настройки) — иначе они наезжают на название. */}
+      <div className="relative flex min-h-full flex-col items-start justify-start gap-4 p-4 pt-16 sm:gap-6 sm:p-6 sm:pt-20 md:h-full md:flex-row md:items-start md:justify-center md:gap-10 md:p-8 md:pt-12 lg:gap-14 lg:p-12 lg:pt-16">
         {/* Левая колонка: логотип, режимы игры, ник */}
-        <div className="anim-rise max-w-xl shrink-0 md:pt-2">
+        <div className="anim-rise w-full max-w-xl shrink-0 md:w-auto md:pt-2">
           <h1 className="font-display leading-[0.95]">
-            <span className="title-glow block text-6xl text-foam sm:text-7xl lg:text-8xl">
+            <span className="title-glow block text-5xl text-foam sm:text-7xl lg:text-8xl">
               ШАРО
             </span>
-            <span className="title-glow block text-6xl text-cyan-neon sm:text-7xl lg:text-8xl">
+            <span className="title-glow block text-5xl text-cyan-neon sm:text-7xl lg:text-8xl">
               БОЙ<span className="text-punch">!</span>
             </span>
           </h1>
@@ -137,34 +139,37 @@ export function MenuScreen({
             <b className="text-punch">бесконечных волнах</b>.
           </p>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <button className="btn-arcade px-7 py-3.5 text-base sm:text-lg" onClick={onCampaign}>
+          <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-5 sm:gap-3">
+            <button
+              className="btn-arcade px-4 py-2.5 text-sm sm:px-7 sm:py-3.5 sm:text-lg"
+              onClick={onCampaign}
+            >
               Кампания
             </button>
             <button
-              className="btn-ghost px-5 py-3.5 font-display text-sm sm:text-base"
+              className="btn-ghost px-3 py-2.5 font-display text-xs sm:px-5 sm:py-3.5 sm:text-base"
               onClick={onCommunityMaps}
               type="button"
             >
               🗺 Карты сообщества
             </button>
             <button
-              className="btn-ghost px-5 py-3.5 font-display text-sm sm:text-base"
+              className="btn-ghost px-3 py-2.5 font-display text-xs sm:px-5 sm:py-3.5 sm:text-base"
               onClick={onEndless}
             >
               Бесконечный
             </button>
             {hud.best > 0 && (
-              <div className="hud-chip px-3.5 py-2.5">
+              <div className="hud-chip px-2.5 py-1.5 sm:px-3.5 sm:py-2.5">
                 <div className="hud-label">Рекорд</div>
-                <div className="font-display text-lg text-gold tabular-nums">
+                <div className="font-display text-base text-gold tabular-nums sm:text-lg">
                   {hud.best.toLocaleString("ru-RU")}
                 </div>
               </div>
             )}
           </div>
           <button
-            className="mt-3 text-xs text-dim underline decoration-line underline-offset-4 hover:text-gold"
+            className="mt-2 text-[11px] text-dim underline decoration-line underline-offset-4 hover:text-gold sm:mt-3 sm:text-xs"
             onClick={onAdmin}
             type="button"
           >
@@ -172,8 +177,8 @@ export function MenuScreen({
           </button>
 
           {/* Ник доступен всегда — подписывает рекорды */}
-          <div className="hud-chip mt-3 w-full max-w-64 p-2.5">
-            <div className="hud-label mb-1.5">Ник для рекордов</div>
+          <div className="hud-chip mt-2.5 w-full max-w-64 p-2 sm:mt-3 sm:p-2.5">
+            <div className="hud-label mb-1 sm:mb-1.5">Ник для рекордов</div>
             <input
               value={nick}
               maxLength={MAX_NICK}
@@ -183,7 +188,7 @@ export function MenuScreen({
                 /* не даём движку ловить пробел/латиницу как управление */
                 e.stopPropagation()
               }}
-              className="h-9 w-full border border-line bg-deep px-3 font-display text-sm text-foam outline-none placeholder:text-dim/60 focus:border-cyan-neon"
+              className="h-8 w-full border border-line bg-deep px-2.5 font-display text-sm text-foam outline-none placeholder:text-dim/60 focus:border-cyan-neon sm:h-9 sm:px-3"
             />
           </div>
         </div>

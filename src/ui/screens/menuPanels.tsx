@@ -25,36 +25,48 @@ export function MenuCornerControls({
 }) {
   return (
     <>
-      {/* Кнопки музыки, звука и настроек с ползунками громкости — в углу меню */}
-      <div className="absolute right-3 top-3 z-10 flex items-center gap-2 sm:right-5 sm:top-5 sm:gap-3">
+      {/* Кнопки музыки, звука и настроек с ползунками громкости — в углу меню.
+          На смартфоне контролы ужаты до 8 px/32 px и ползунки прячутся
+          (их дублирует модалка настроек), чтобы шапка не наезжала на название. */}
+      <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 sm:right-5 sm:top-5 sm:gap-3">
         <div className="flex items-center gap-1.5">
           <button
-            className="icon-btn pointer-events-auto flex h-10 w-10 items-center justify-center"
+            className="icon-btn pointer-events-auto flex h-8 w-8 items-center justify-center sm:h-10 sm:w-10"
             onClick={onMusic}
             aria-label="Музыка"
           >
             <IconMusic off={hud.musicMuted} />
           </button>
-          <VolSlider value={hud.musicVolume} onChange={onMusicVolume} label="Громкость музыки" />
+          <VolSlider
+            value={hud.musicVolume}
+            onChange={onMusicVolume}
+            label="Громкость музыки"
+            className="hidden sm:block"
+          />
         </div>
         <div className="flex items-center gap-1.5">
           <button
-            className="icon-btn pointer-events-auto flex h-10 w-10 items-center justify-center"
+            className="icon-btn pointer-events-auto flex h-8 w-8 items-center justify-center sm:h-10 sm:w-10"
             onClick={onMute}
             aria-label="Звук"
           >
             <IconSound off={hud.muted} />
           </button>
-          <VolSlider value={hud.sfxVolume} onChange={onSfxVolume} label="Громкость звука" />
+          <VolSlider
+            value={hud.sfxVolume}
+            onChange={onSfxVolume}
+            label="Громкость звука"
+            className="hidden sm:block"
+          />
         </div>
         {onSettings && (
           <button
-            className="icon-btn pointer-events-auto flex h-10 w-10 items-center justify-center text-foam hover:text-cyan-neon"
+            className="icon-btn pointer-events-auto flex h-8 w-8 items-center justify-center text-foam hover:text-cyan-neon sm:h-10 sm:w-10"
             onClick={onSettings}
             aria-label="Настройки"
             title="Настройки графики и звука"
           >
-            <IconSettings className="h-5 w-5" />
+            <IconSettings className="h-4 w-4 sm:h-5 sm:w-5" />
           </button>
         )}
       </div>

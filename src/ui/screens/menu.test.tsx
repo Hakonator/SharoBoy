@@ -97,3 +97,34 @@ describe("MenuScreen: прокрутка меню на смартфоне", () =
     expect(html).not.toContain("h-[400px]")
   })
 })
+
+describe("MenuScreen: компактный мобильный колонтитул", () => {
+  it("оставляет место сверху под угловые контролы звука и настроек", () => {
+    const html = renderMenu()
+
+    // Без верхнего отступа кнопки музыки/звука наезжали на название ШАРОБОЙ.
+    expect(html).toContain("pt-16")
+  })
+
+  it("растягивает левую колонку на всю ширину и ужимает кнопки режимов", () => {
+    const html = renderMenu()
+
+    // Колонка больше не «shrink-0» на мобильном — иначе поле ника упиралось
+    // в край, а кнопки могли переноситься некрасиво.
+    expect(html).toContain("w-full max-w-xl shrink-0 md:w-auto")
+
+    // Компактные кнопки: обычные размеры возвращаются от `sm`.
+    expect(html).toContain("px-4 py-2.5 text-sm sm:px-7 sm:py-3.5 sm:text-lg")
+    expect(html).toContain("px-3 py-2.5 font-display text-xs sm:px-5 sm:py-3.5 sm:text-base")
+
+    // Заголовок меньше прежних 60 px, чтобы шапка не тянулась в высоту.
+    expect(html).toContain("title-glow block text-5xl text-foam sm:text-7xl lg:text-8xl")
+  })
+
+  it("прячет ползунки громкости на смартфоне и оставляет кнопки 32 px", () => {
+    const html = renderMenu()
+
+    expect(html).toContain("vol-slider pointer-events-auto hidden sm:block")
+    expect(html).toContain("h-8 w-8 items-center justify-center sm:h-10 sm:w-10")
+  })
+})

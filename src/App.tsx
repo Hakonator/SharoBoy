@@ -252,20 +252,24 @@ export default function App() {
             onSfxVolume={(v) => g()?.setSfxVolume(v)}
             onOpenSettings={() => setShowSettings(true)}
           />
-          <button
-            className="absolute left-4 top-4 z-50 rounded-lg border border-cyan-neon/50 bg-deep/90 px-3 py-2 text-sm text-cyan-neon shadow-lg hover:bg-cyan-neon/10 sm:left-6 sm:top-6"
-            onClick={() => setShowMapTester(true)}
-            type="button"
-          >
-            Тестер карт
-          </button>
-          <button
-            className="absolute left-4 top-16 z-50 rounded-lg border border-mint/50 bg-deep/90 px-3 py-2 text-sm text-mint shadow-lg hover:bg-mint/10 sm:left-6 sm:top-20"
-            onClick={() => setShowEditor(true)}
-            type="button"
-          >
-            Редактор карт
-          </button>
+          {/* Инструменты автора: на смартфоне это две компактные кнопки под
+              заголовком, от `sm` — прежние кнопки в левом верхнем углу. */}
+          <div className="absolute left-3 top-3 z-50 flex items-center gap-2 sm:left-6 sm:top-6 sm:flex-col sm:items-stretch sm:gap-3">
+            <button
+              className="rounded-lg border border-cyan-neon/50 bg-deep/90 px-2 py-1.5 text-[11px] text-cyan-neon shadow-lg hover:bg-cyan-neon/10 sm:px-3 sm:py-2 sm:text-sm"
+              onClick={() => setShowMapTester(true)}
+              type="button"
+            >
+              Тестер карт
+            </button>
+            <button
+              className="rounded-lg border border-mint/50 bg-deep/90 px-2 py-1.5 text-[11px] text-mint shadow-lg hover:bg-mint/10 sm:px-3 sm:py-2 sm:text-sm"
+              onClick={() => setShowEditor(true)}
+              type="button"
+            >
+              Редактор карт
+            </button>
+          </div>
           {showModifiersModal && (
             <CampaignModifiersModal
               onStart={(modifiers) => {
