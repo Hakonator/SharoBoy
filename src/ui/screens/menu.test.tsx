@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import type { HudData } from "../../game/types"
+import { ControlsPanel } from "../icons"
 
 import { MenuScreen } from "./menu"
 
@@ -43,39 +44,47 @@ const hud = {
   upgrades: {},
 } as unknown as HudData
 
-const renderMenu = () =>
-  renderToStaticMarkup(
-    <MenuScreen
-      hud={hud}
-      stats={{ games: 0, wins: 0, bestScore: 0, bestWave: 0, topLevel: 0 }}
-      nick=""
-      period="all"
-      screen="mobile"
-      globalTop={[]}
-      globalTopEndless={[]}
-      unlocked={{}}
-      topSubmit={null}
-      onNickChange={() => {}}
-      onPeriod={() => {}}
-      onScreen={() => {}}
-      onCampaign={() => {}}
-      onEndless={() => {}}
-      onCommunityMaps={() => {}}
-      onAdmin={() => {}}
-      onBuyUpgrade={() => {}}
-      debug={false}
-      onToggleDebug={() => {}}
-      debugBoss=""
-      onSelectDebugBoss={() => {}}
-      isDebugEffectActive={() => false}
-      onToggleDebugEffect={() => {}}
-      onDebugStartGame={() => {}}
-      onMute={() => {}}
-      onMusic={() => {}}
-      onMusicVolume={() => {}}
-      onSfxVolume={() => {}}
-    />
-  )
+/** Пропсы меню: общий набор для всех проверок разметки. */
+const menuProps = {
+  hud,
+  stats: { games: 0, wins: 0, bestScore: 0, bestWave: 0, topLevel: 0 },
+  nick: "",
+  period: "all" as const,
+  screen: "mobile" as const,
+  globalTop: [],
+  globalTopEndless: [],
+  unlocked: {},
+  topSubmit: null,
+  onNickChange: () => {},
+  onPeriod: () => {},
+  onScreen: () => {},
+  onCampaign: () => {},
+  onEndless: () => {},
+  onCommunityMaps: () => {},
+  onAdmin: () => {},
+  onBuyUpgrade: () => {},
+  debug: false,
+  onToggleDebug: () => {},
+  debugBoss: "",
+  onSelectDebugBoss: () => {},
+  isDebugEffectActive: () => false,
+  onToggleDebugEffect: () => {},
+  onDebugStartGame: () => {},
+  onMute: () => {},
+  onMusic: () => {},
+  onMusicVolume: () => {},
+  onSfxVolume: () => {},
+}
+
+const renderMenu = () => renderToStaticMarkup(<MenuScreen {...menuProps} />)
+
+/** Текст без тегов — чтобы проверять формулировки, а не разметку. */
+const plain = (html: string) =>
+  html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .trim()
 
 describe("MenuScreen: прокрутка меню на смартфоне", () => {
   it("разрешает вертикальный свайп по странице меню", () => {
@@ -126,5 +135,63 @@ describe("MenuScreen: компактный мобильный колонтиту
 
     expect(html).toContain("vol-slider pointer-events-auto hidden sm:block")
     expect(html).toContain("h-8 w-8 items-center justify-center sm:h-10 sm:w-10")
+  })
+})
+
+describe("MenuScreen: справка по управлению под способ ввода", () => {
+  /**
+   * Заглушка `(pointer: coarse)` — сенсорный экран. `IS_REACT_ACT_ENVIRONMENT`
+   * гасит предупреждение React о `useEffect` при статичной отрисовке.
+   */
+  const stubPointer = (coarse: boolean) => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", false)
+    vi.stubGlobal(
+      "window",
+      Object.assign({}, globalThis.window, {
+        matchMedia: (query: string) => ({
+          matches: query.includes("pointer: coarse") ? coarse : false,
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }),
+      })
+    )
+  }
+
+  it("на сенсорном экране описывает только жесты пальцем", () => {
+    const text = plain(renderToStaticMarkup(<ControlsPanel touch />))
+
+    expect(text).toContain("пальцем")
+    expect(text).toContain("Отпусти палец")
+    expect(text).toContain("2 ПАЛЬЦА")
+
+    // Клавиатурных и мышиных подсказок быть не должно.
+    expect(text).not.toContain("ПРОБЕЛ")
+    expect(text).not.toContain("ЛКМ")
+    expect(text).not.toContain("ESC")
+    expect(text).not.toContain("КОЛЕСО")
+  })
+
+  it("с мышью и клавиатурой описывает только клавиши и мышь", () => {
+    const text = plain(renderToStaticMarkup(<ControlsPanel touch={false} />))
+
+    expect(text).toContain("ЛКМ")
+    expect(text).toContain("ПРОБЕЛ")
+    expect(text).toContain("ESC")
+    expect(text).toContain("КОЛЕСО")
+
+    expect(text).not.toContain("пальцем")
+    expect(text).not.toContain("2 ПАЛЬЦА")
+  })
+
+  it("в меню доступна вкладка справки при любом способе ввода", () => {
+    stubPointer(true)
+    const touchHtml = renderMenu()
+    stubPointer(false)
+    const desktopHtml = renderMenu()
+    vi.unstubAllGlobals()
+
+    expect(touchHtml).toContain("🎮 Справка")
+    expect(desktopHtml).toContain("🎮 Справка")
   })
 })

@@ -120,6 +120,25 @@ export function IconMouse() {
   )
 }
 
+/** Палец — управление с сенсорного экрана (смартфон/планшет). */
+export function IconTouch() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-6 w-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11" />
+      <path d="M12 10.5V9a1.5 1.5 0 0 1 3 0v2" />
+      <path d="M15 11.5V10a1.5 1.5 0 0 1 3 0v4.5A6 6 0 0 1 12 20.5h-1.2a4 4 0 0 1-3-1.4L5 15.4a1.6 1.6 0 0 1 2.4-2.1L9 14.6" />
+    </svg>
+  )
+}
+
 export function IconBall({ color, className }: { color: string; className?: string }) {
   return (
     <svg viewBox="0 0 20 20" className={className}>
@@ -509,26 +528,85 @@ export function EffectChip({ label, good }: { label: string; good: boolean }) {
   )
 }
 
-/** Содержимое панели управления (без карточки-обёртки) — вкладывается в секцию меню. */
-export function ControlsPanel() {
+/**
+ * Содержимое панели управления (без карточки-обёртки) — вкладывается в секцию
+ * меню. Набор подсказок зависит от способа ввода: на смартфоне показываются
+ * только жесты, на десктопе — только мышь и клавиатура (иначе половина строк
+ * описывает органы управления, которых у устройства нет).
+ */
+export function ControlsPanel({ touch }: { touch: boolean }) {
+  if (touch) return <TouchControls />
+  return <KeyboardControls />
+}
+
+/** Тач-управление: ракетка следует за пальцем, поворот — зонами у её краёв. */
+function TouchControls() {
   return (
     <ul className="space-y-2.5 text-sm text-foam/90">
       <li className="flex items-center gap-3">
-        <span className="text-cyan-neon">
-          <IconMouse />
+        <span className="shrink-0 text-cyan-neon">
+          <IconTouch />
         </span>
         <span>
-          Мышь / палец — двигать ракетку, <b className="text-cyan-neon">клик</b> — запуск (на таче:
-          веди пальцем и отпусти)
+          Веди пальцем по экрану — <b className="text-cyan-neon">ракетка следует за пальцем</b>
         </span>
       </li>
       <li className="flex items-center gap-3">
-        <span className="flex gap-1">
+        <span className="flex shrink-0 gap-1">
+          <EffectChip label="◀" good />
+          <EffectChip label="▶" good />
+        </span>
+        <span>
+          Нажми <b className="text-cyan-neon">слева</b> или <b className="text-cyan-neon">справа</b>{" "}
+          у края ракетки — наклон в эту сторону
+        </span>
+      </li>
+      <li className="flex items-center gap-3">
+        <span className="shrink-0 text-mint">
+          <IconTouch />
+        </span>
+        <span>
+          <b className="text-mint">Отпусти палец</b> — запуск шара и выстрел оружием
+        </span>
+      </li>
+      <li className="flex items-center gap-3">
+        <span className="flex shrink-0 gap-1">
+          <EffectChip label="2 ПАЛЬЦА" good />
+        </span>
+        <span>
+          Второй палец при зажатом шаре — <b className="text-cyan-neon">наводка прицела</b>
+        </span>
+      </li>
+      <li className="flex items-start gap-3">
+        <span className="flex shrink-0 gap-1">
+          <EffectChip label="HUD" good />
+        </span>
+        <span>Пауза, звук и музыка — кнопками в верхней панели, громкость — в настройках (⚙)</span>
+      </li>
+    </ul>
+  )
+}
+
+/** Десктопное управление: мышь с захватом указателя и клавиатура. */
+function KeyboardControls() {
+  return (
+    <ul className="space-y-2.5 text-sm text-foam/90">
+      <li className="flex items-center gap-3">
+        <span className="shrink-0 text-cyan-neon">
+          <IconMouse />
+        </span>
+        <span>
+          Мышь — двигать ракетку, <b className="text-cyan-neon">ЛКМ</b> — запуск шара и захват
+          указателя
+        </span>
+      </li>
+      <li className="flex items-center gap-3">
+        <span className="flex shrink-0 gap-1">
           <Key>←</Key>
           <Key>→</Key>
         </span>
         <span>
-          или <Key>A</Key> <Key>D</Key> — движение
+          или <Key>A</Key> <Key>D</Key> — движение ракетки
         </span>
       </li>
       <li className="flex items-center gap-3">
@@ -536,13 +614,24 @@ export function ControlsPanel() {
         <span>запуск шара и стрельба оружием</span>
       </li>
       <li className="flex items-center gap-3">
-        <span className="flex gap-1">
+        <span className="flex shrink-0 gap-1">
+          <EffectChip label="КОЛЕСО" good />
+        </span>
+        <span>наводка прицела, когда шар лежит на ракетке</span>
+      </li>
+      <li className="flex items-center gap-3">
+        <span className="flex shrink-0 gap-1">
           <Key>P</Key>
           <Key>ESC</Key>
         </span>
         <span>пауза</span>
-        <Key>M</Key>
-        <span>звук</span>
+      </li>
+      <li className="flex items-center gap-3">
+        <span className="flex shrink-0 gap-1">
+          <Key>M</Key>
+          <Key>N</Key>
+        </span>
+        <span>звук и музыка</span>
       </li>
     </ul>
   )

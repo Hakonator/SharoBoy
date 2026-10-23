@@ -8,6 +8,7 @@ import { ControlsPanel, FloatingBalls } from "../icons"
 import type { CosmeticCategory } from "../../game/cosmetics"
 import type { GlobalScore, LeadPeriod, ScreenFilter } from "../../game/leaderboard"
 import type { HudData } from "../../game/types"
+import { useTouchDevice } from "../useTouchDevice"
 
 import { MenuRecords, MenuGlobalTop } from "./menuTop"
 import { MenuCornerControls, MenuDebug, MenuUpgrades, MenuAchievements } from "./menuPanels"
@@ -97,6 +98,8 @@ export function MenuScreen({
   const [activeTab, setActiveTab] = useState<MenuTabId>("upgrades")
   const [recordsSubTab, setRecordsSubTab] = useState<"local" | "global">("local")
   const [guideSubTab, setGuideSubTab] = useState<"controls" | "bonuses">("controls")
+  /** Смартфон/планшет: в справке показываем только тач-жесты, без клавиш и мыши. */
+  const touchDevice = useTouchDevice()
 
   /** Проверяем, есть ли улучшения, доступные для покупки прямо сейчас. */
   const canBuyAnyUpgrade =
@@ -406,7 +409,7 @@ export function MenuScreen({
                       </button>
                     </div>
                     {guideSubTab === "controls" ? (
-                      <ControlsPanel />
+                      <ControlsPanel touch={touchDevice} />
                     ) : (
                       <div>
                         <div className="mb-3 flex flex-wrap gap-1.5 text-xs text-dim">
