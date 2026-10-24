@@ -137,6 +137,58 @@ describe("Диагностический режим: новые боссы Ак�
     }
   })
 
+  it("после смерти миноги её разряды не остаются висеть на арене", () => {
+    const { game, step, restoreRandom } = makeEnv()
+    try {
+      game.spawnDebugBoss("lamprey")
+      const boss = game.bossSys.boss!
+      const tail = game.blocks.filter((b) => (b.lampreySeg ?? 0) > 0)
+      for (let i = 0; i < 3; i++) tail[i].dead = true
+      // головной разряд уже в полёте — именно он «зависал» после победы
+      boss.lampreyBoltTimer = 0.01
+      step(2)
+      expect(game.blocks.some((b) => b.lampreyBolt)).toBe(true)
+
+      boss.hp = 1
+      game.bossSys.damage(10, false)
+      expect(game.bossSys.boss).toBeNull()
+      step(2)
+      // снаряд рисуется только рендером босса, а коллайдер у него настоящий —
+      // оставлять его на поле нельзя
+      expect(game.blocks.some((b) => b.lampreyBolt)).toBe(false)
+      expect(game.blocks.length).toBe(0)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
+
+  it("после смерти крио-дрона лёд убирается с арены", () => {
+    const { game, step, restoreRandom } = makeEnv()
+    try {
+      game.spawnDebugBoss("cryo")
+      const boss = game.bossSys.boss!
+      boss.cryoIceTimer = 0.01
+      step(1)
+      boss.cryoIceTimer = 0.01
+      step(90)
+      expect(game.blocks.some((b) => b.isIceColumn)).toBe(true)
+
+      // в режиме «черновика» лёд убирается и должен попасть в цепочку взрывов,
+      // иначе он остался бы висеть до следующей зачистки
+      const iceBefore = game.blocks.filter((b) => b.isIceColumn).length
+      boss.hp = 0
+      game.bossSys.kill()
+      expect(game.bossSys.boss).toBeNull()
+      step(2)
+      expect(game.blocks.some((b) => b.isIceColumn || b.isIceCapsule)).toBe(false)
+      expect(iceBefore).toBeGreaterThan(0)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
+
   it("углублённые фазы: мутаторы делают бой двухфазным", () => {
     const { game, restoreRandom } = makeEnv()
     try {

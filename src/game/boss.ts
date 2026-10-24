@@ -10,7 +10,7 @@ import { clamp, rand } from "./utils"
 import { stepJellyfish } from "./bossJelly"
 import { stepCrab } from "./bossCrab"
 import { stepChrono } from "./bossChrono"
-import { cryoTurbinesAlive, stepCryoDrone } from "./bossCryo"
+import { clearCryo, cryoTurbinesAlive, stepCryoDrone } from "./bossCryo"
 import { clearLamprey, lampreyHeadAlive, lampreyHeadExposed, stepLamprey } from "./bossLamprey"
 import { bossPhases, type BossPhases } from "./bossVariants"
 
@@ -309,6 +309,8 @@ export class BossSystem {
        их сразу: рендер тела выключится вместе с `boss`, а взрывы ниже нарисуют
        цепочку по последним позициям. */
     if (bo.isLamprey) clearLamprey(this.g.blocks)
+    // Лёд крио-дрона переживал победу и оставлял невидимые преграды на арене.
+    if (bo.isCryo) clearCryo(this.g.blocks)
     this.g.onBossKilled()
     this.g.addRawScore(1500)
     this.g.hitStop = Math.max(this.g.hitStop, 0.5)
@@ -326,7 +328,8 @@ export class BossSystem {
       t: 0,
     })
     this.g.fx.popups.push({ x: bo.x, y: bo.y, text: "+1500", color: "#ffc94d", t: 0, size: 30 })
-    // миньоны, бомбы и отростки щупалец/медузы разлетаются цепочкой взрывов
+    // миньоны, бомбы и отростки щупалец/медузы разлетаются цепочкой взрывов;
+    // тело миноги (`clearLamprey`) уже помечено мёртвыми — взрываем по точкам
     let i = 0
     for (const b of [...this.g.blocks]) {
       if (b.minionOrbit || b.bomb || b.isTentacle || b.isLampreySeg) {
