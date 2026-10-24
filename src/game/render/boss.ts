@@ -1,7 +1,6 @@
 import { Ball, Block, BossState } from "../types"
 import { clamp } from "../utils"
 import { jellyTentacleBase } from "../bossJelly"
-import { HEAD_REGEN_TIME } from "../bossLamprey"
 
 import { drawJellyDamageFill, drawJellyDomeHp, traceJellyDome } from "./bossJellyDome"
 import { type Ctx } from "./shapes"
@@ -1017,22 +1016,17 @@ function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[]) {
     ctx.restore()
   }
 
-  // Отбитая голова: тело бьётся в конвульсиях, кольцо показывает срок реванша.
+  /* Голова сбита — минога уже мертва (`stepLamprey` вызывает killBoss в тот же
+     кадр), поэтому кольцо реванша не рисуем: оно обещало «возвращение», которого
+     больше нет. Осталось только короткое дрожание тела для читаемости смерти. */
   if (!headAlive) {
     const first = segs[0]
-    const k = clamp(1 - (bo.lampreyRevive ?? 0) / HEAD_REGEN_TIME, 0, 1)
     ctx.save()
     ctx.translate(first.x, first.y)
-    ctx.strokeStyle = "rgba(157,255,92,0.28)"
+    ctx.strokeStyle = "rgba(157,255,92,0.35)"
     ctx.lineWidth = 3
     ctx.beginPath()
     ctx.arc(0, 0, first.rx + 14, 0, Math.PI * 2)
-    ctx.stroke()
-    ctx.shadowColor = "#9dff5c"
-    ctx.shadowBlur = 14
-    ctx.strokeStyle = "#c8ff7a"
-    ctx.beginPath()
-    ctx.arc(0, 0, first.rx + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k)
     ctx.stroke()
     ctx.restore()
   }

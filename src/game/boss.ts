@@ -11,7 +11,7 @@ import { stepJellyfish } from "./bossJelly"
 import { stepCrab } from "./bossCrab"
 import { stepChrono } from "./bossChrono"
 import { clearCryo, cryoTurbinesAlive, stepCryoDrone } from "./bossCryo"
-import { clearLamprey, lampreyHeadAlive, lampreyHeadExposed, stepLamprey } from "./bossLamprey"
+import { clearLamprey, lampreyDamageMult, lampreyHeadExposed, stepLamprey } from "./bossLamprey"
 import { bossPhases, type BossPhases } from "./bossVariants"
 
 /** Хост-интерфейс: то, что системе босса нужно от движка. */
@@ -37,6 +37,12 @@ export interface BossHost {
   /** Убийство босса засчитано (статистика партии для достижений). */
   onBossKilled(): void
   pushHud(): void
+  /**
+   * Досрочная смерть босса по правилу его собственной механики (сбитая голова
+   * миноги). Обрабатывается штатным `BossSystem.kill()`, чтобы цепочка взрывов,
+   * уборка арены и дроп бонусов остались едиными.
+   */
+  killBoss(): void
 }
 
 export class BossSystem {
@@ -255,13 +261,15 @@ export class BossSystem {
         return
       }
     } else if (bo.isLamprey) {
-      // Тело закрывает голову: урон проходит, когда разбита часть сегментов
-      // И голова на месте. Отбитая голова — не уязвимая точка: минога
-      // отращивает новую (иначе HP снимался бы «в пустоту»).
-      if (!lampreyHeadAlive(this.g.blocks) || !lampreyHeadExposed(this.g.blocks)) {
+      /* Минога: голова — смертельная точка (её снос убивает босса в
+         `stepLamprey`), а хвост НЕ блокирует урон, а ослабляет его
+         (`lampreyDamageMult`). Раньше здесь стоял полный блок урона, из-за чего
+         бой с целым хвостом выглядел как «босс неубиваем». */
+      dmg *= lampreyDamageMult(this.g.blocks)
+      if (!lampreyHeadExposed(this.g.blocks)) {
+        // бьём по защищённому телу — видно, что удар ослаблен
         this.g.sfx.brick(1)
         this.g.fx.burst(bo.x, bo.y, "#9dff5c", 6, 140)
-        return
       }
     }
 

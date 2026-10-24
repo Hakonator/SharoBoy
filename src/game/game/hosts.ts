@@ -67,6 +67,7 @@ export function makeBossHost(g: Game): BossHost {
     addRawScore: (n) => addRawScore(g, n),
     onBossKilled: () => onBossKilled(g),
     pushHud: () => pushHud(g),
+    killBoss: () => g.bossSys.kill(),
   }
 }
 /** Хост для PowersSystem: таймеры спавна, поля эффектов и последствия. */

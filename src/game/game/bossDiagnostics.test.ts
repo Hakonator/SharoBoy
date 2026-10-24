@@ -56,15 +56,17 @@ describe("Диагностический режим: новые боссы Ак�
     }
   })
 
-  it("минога: голова неуязвима, пока хвост не разбит", () => {
+  it("минога: целый хвост ослабляет урон, но не блокирует его", () => {
     const { game, step, restoreRandom } = makeEnv()
     try {
       game.spawnDebugBoss("lamprey")
       const boss = game.bossSys.boss!
       const hp = boss.hp
-      // урон по телу не проходит — сначала надо разбить сегменты
+      // тело держит удар: урон идёт, но сильно ослабленным (раньше был полный
+      // блок — из-за него бой выглядел как «босс неубиваем»)
       game.bossSys.damage(5, false)
-      expect(boss.hp).toBe(hp)
+      expect(boss.hp).toBeLessThan(hp)
+      expect(hp - boss.hp).toBeLessThan(5)
       step(10)
       // голова следует за сегментом 0 — миного действительно скользит
       const head = game.blocks.find((b) => b.lampreySeg === 0)!
@@ -75,127 +77,78 @@ describe("Диагностический режим: новые боссы Ак�
     }
   })
 
-  it("минога без головы: не стреляет из пустоты и не теряет HP", () => {
+  it("сбитая голова убивает миногу сразу — без регена и воскрешения", () => {
     const { game, step, restoreRandom } = makeEnv()
     try {
       game.spawnDebugBoss("lamprey")
-      const boss = game.bossSys.boss!
-      const hp = boss.hp
-      // разбиваем три сегмента тела и саму голову, как это делает шар
-      const tail = game.blocks.filter((b) => (b.lampreySeg ?? 0) > 0)
-      for (let i = 0; i < 3; i++) tail[i].dead = true
+      // хвост цел, но голова разбита: минога умирает сразу, как игрок и ожидает
       const head = game.blocks.find((b) => b.lampreySeg === 0)!
-      head.dead = true
+      game.physics.damageBlock(head, 99)
       game.blocks = game.blocks.filter((b) => !b.dead)
-
-      // раньше здесь босс продолжал бить «невидимыми импульсами» из пустоты
-      boss.lampreyBoltTimer = 0.01
-      step(30)
-      expect(game.blocks.some((b) => b.lampreyBolt)).toBe(false)
-      // урон по отбитой голове не снимает HP
-      game.bossSys.damage(5, false)
-      expect(boss.hp).toBe(hp)
-
-      // через HEAD_REGEN_TIME голова отрастает — бой продолжается
-      boss.lampreyRevive = 0.01
-      step(3)
-      expect(game.blocks.some((b) => b.lampreySeg === 0 && !b.dead)).toBe(true)
-      expect(boss.lampreyHeadDown).toBe(false)
-
-      boss.lampreyBoltTimer = 0.01
-      step(30)
-      expect(game.blocks.filter((b) => b.lampreyBolt).length).toBe(1)
-      // после реванша головы урон снова проходит (сегменты уже разбиты)
-      const before = boss.hp
-      game.bossSys.damage(5, false)
-      expect(boss.hp).toBe(before - 5)
-    } finally {
-      game.destroy()
-      restoreRandom()
-    }
-  })
-
-  it("минога с полностью разбитым телом: отрастает только голова, бой можно добить", () => {
-    const { game, step, restoreRandom } = makeEnv()
-    try {
-      game.spawnDebugBoss("lamprey")
-      const boss = game.bossSys.boss!
-      // худший случай из playtest: игрок разбил ВСЕ сегменты вместе с головой.
-      // Раньше `stepLamprey` возвращался по `!bodyAlive` до таймера регена:
-      // `bo` оставался в массиве, но его нельзя было ни увидеть (рисунок тела —
-      // это сегменты), ни ранить — уровень становился непроходимым.
-      for (const b of game.blocks.filter((x) => x.isLampreySeg)) game.physics.damageBlock(b, 99)
-      game.blocks = game.blocks.filter((b) => !b.dead)
-      expect(game.blocks.length).toBe(0)
       expect(game.bossSys.boss).not.toBeNull()
 
-      // реген идёт ровно HEAD_REGEN_TIME (6 c), запас на кадры таймера
+      // смерть фиксирует следующий кадр боссовой системы
+      step(2)
+      expect(game.bossSys.boss).toBeNull()
+      // никакого «возвращения» головы: спустя много секунд босса по-прежнему нет,
+      // а тело убрано с арены. В endless сразу стартует следующая волна —
+      // поэтому проверяем именно отсутствие сегментов миноги, а не пустоту поля.
       step(400)
-      // Снесённый хвост — накопленный прогресс: возвращается ТОЛЬКО голова,
-      // иначе босс «бессмертен» (полный реген каждые 6 с обнулял работу игрока).
-      expect(game.blocks.filter((b) => b.isLampreySeg).length).toBe(1)
-      expect(game.blocks.some((b) => b.lampreySeg === 0)).toBe(true)
-      // хвоста нет — голова открыта, HP реально снимается
-      const hp = boss.hp
-      game.bossSys.damage(5, false)
-      expect(boss.hp).toBe(hp - 5)
+      expect(game.bossSys.boss).toBeNull()
+      expect(game.blocks.some((b) => b.lampreySeg)).toBe(false)
     } finally {
       game.destroy()
       restoreRandom()
     }
   })
 
-  it("минога убивается до конца: снос всего тела ведёт к победе, а не к регену", () => {
-    const { game, step, restoreRandom } = makeEnv()
+  it("урон по миноге идёт всегда, но целый хвост его ослабляет", () => {
+    const { game, restoreRandom } = makeEnv()
     try {
       game.spawnDebugBoss("lamprey")
       const boss = game.bossSys.boss!
-      /* Полный проход боя без хаков: игрок сбивает сегменты (урон шара), затем
-         бьёт открытую голову. Раньше на этом пути бой либо зависал (нет головы
-         и урона), либо обнулялся (полный реген тела). */
-      let guard = 0
-      while (game.bossSys.boss && guard++ < 500) {
-        const live = game.blocks.filter((b) => b.isLampreySeg && !b.dead)
-        const tail = live.filter((b) => (b.lampreySeg ?? 0) > 0)
-        if (tail.length) game.physics.damageBlock(tail[tail.length - 1], 99)
-        game.blocks = game.blocks.filter((b) => !b.dead)
-        // урон по боссу: проходит, только когда голова открыта
-        game.bossSys.damage(10, false)
-        step(1)
-      }
-      expect(game.bossSys.boss).toBeNull()
-      // после победы арена пуста — уровень засчитывается
-      step(2)
-      expect(game.blocks.length).toBe(0)
-      expect(boss.hp).toBeLessThanOrEqual(0)
-    } finally {
-      game.destroy()
-      restoreRandom()
-    }
-  })
+      // хвост цел — тело держит удар: урон проходит, но ослабленным
+      const hp0 = boss.hp
+      game.bossSys.damage(10, false)
+      const weakHit = hp0 - boss.hp
+      expect(weakHit).toBeGreaterThan(0)
+      expect(weakHit).toBeLessThan(10)
 
-  it("сбитый хвост миноги не возвращается: броня не отрастает", () => {
-    const { game, step, restoreRandom } = makeEnv()
-    try {
-      game.spawnDebugBoss("lamprey")
-      // сбиваем три хвостовых сегмента — голова открывается для урона
+      // сбиваем три хвоста — урон становится полным
       for (const seg of [1, 2, 3]) {
         const b = game.blocks.find((x) => x.lampreySeg === seg)!
         game.physics.damageBlock(b, 99)
       }
       game.blocks = game.blocks.filter((b) => !b.dead)
-      const head = game.blocks.find((b) => b.lampreySeg === 0)!
-      game.physics.damageBlock(head, 99)
-      game.blocks = game.blocks.filter((b) => !b.dead)
+      const hp1 = boss.hp
+      game.bossSys.damage(10, false)
+      expect(hp1 - boss.hp).toBe(10)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
 
-      step(400)
-      // вернулась только голова: сбитые хвосты 1–3 не отрастают, 4–7 остались
-      expect(game.blocks.filter((b) => b.lampreySeg === 0).length).toBe(1)
-      const alive = game.blocks
-        .filter((b) => b.isLampreySeg)
-        .map((b) => b.lampreySeg)
-        .sort((a, b) => (a ?? 0) - (b ?? 0))
-      expect(alive).toEqual([0, 4, 5, 6, 7])
+  it("минога убивается через HP: снос хвоста ускоряет добивание", () => {
+    const { game, step, restoreRandom } = makeEnv()
+    try {
+      game.spawnDebugBoss("lamprey")
+      const boss = game.bossSys.boss!
+      /* Полный проход боя без хаков: сначала урон по защищённому телу (слабый),
+         затем снос трёх хвостов (урон полный) до нуля HP. */
+      let guard = 0
+      while (game.bossSys.boss && guard++ < 500) {
+        // сначала сносим хвост (каждый — 99 урона, ломает сегмент), потом бьём тело
+        const tail = game.blocks.filter((b) => (b.lampreySeg ?? 0) > 0 && !b.dead)
+        if (tail.length) game.physics.damageBlock(tail[0], 99)
+        game.blocks = game.blocks.filter((b) => !b.dead)
+        game.bossSys.damage(30, false)
+        step(1)
+      }
+      expect(game.bossSys.boss).toBeNull()
+      expect(boss.hp).toBeLessThanOrEqual(0)
+      // тело миноги убрано с арены — уровень засчитывается без «невидимых» блоков
+      expect(game.blocks.some((b) => b.isLampreySeg)).toBe(false)
     } finally {
       game.destroy()
       restoreRandom()

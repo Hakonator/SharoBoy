@@ -14,7 +14,6 @@ import {
   updateCryoTurbines,
 } from "./bossCryo"
 import {
-  HEAD_REGEN_TIME,
   LAMPREY_BOLT_EVERY,
   LAMPREY_GUARD_SEGMENTS,
   LAMPREY_SEGMENTS,
@@ -57,6 +56,7 @@ function makeHost(over: Partial<BossHost> = {}): BossHost {
     addRawScore: () => {},
     onBossKilled: () => {},
     pushHud: () => {},
+    killBoss: () => calls.push("kill"),
     ...over,
   } as unknown as BossHost
   return host
@@ -202,7 +202,7 @@ describe("Глубинная Электрическая Минога: тело �
     blocks.splice(blocks.indexOf(head), 1)
     expect(lampreyHeadAlive(blocks)).toBe(false)
 
-    // босс ведёт себя как мёртвый: разрядов нет, тело не скользит по периметру
+    // без головы минога мертва: разрядов нет, тело не скользит по периметру
     boss.lampreyBoltTimer = 0.01
     stepLamprey(host, boss, false, 0.5)
     expect(host.blocks.some((b) => b.lampreyBolt)).toBe(false)
@@ -215,16 +215,12 @@ describe("Глубинная Электрическая Минога: тело �
     expect(standingStill).toBe(true)
     expect(boss.lampreyHeadDown).toBe(true)
 
-    // через HEAD_REGEN_TIME минога отращивает голову и продолжает бой
-    stepLamprey(host, boss, false, HEAD_REGEN_TIME)
-    const revived = host.blocks.find((b) => b.lampreySeg === 0)
-    expect(revived).toBeDefined()
-    expect(lampreyHeadAlive(host.blocks)).toBe(true)
-    expect(boss.lampreyHeadDown).toBe(false)
-    expect(boss.x).toBeCloseTo(revived!.x, 6)
-
-    boss.lampreyBoltTimer = 0.01
-    stepLamprey(host, boss, false, 0.05)
-    expect(host.blocks.filter((b) => b.lampreyBolt).length).toBe(1)
+    // ГОЛОВА — смертельная точка: снос головы сразу убивает босса и никакого
+    // «возвращения» через HEAD_REGEN_TIME больше нет (иначе игрок видел
+    // воскрешение и считал босса неубиваемым).
+    expect(host.blocks.some((b) => b.lampreySeg === 0)).toBe(false)
+    stepLamprey(host, boss, false, 30)
+    expect(host.blocks.some((b) => b.lampreySeg === 0)).toBe(false)
+    expect(lampreyHeadAlive(host.blocks)).toBe(false)
   })
 })
