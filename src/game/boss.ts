@@ -59,6 +59,14 @@ export class BossSystem {
     // осьминог и медуза «злятся» при половине здоровья, остальные — при 40%.
     const angryAt = bo.angryAt ?? (bo.isOctopus || bo.isJellyfish ? 0.5 : 0.4)
     const angry = bo.hp < bo.maxHp * angryAt
+    // Смена фазы — событие боя: у финальных боссов она звучит своим акцентом
+    // (Кракен — гул бездны, Хронос — тик-так), у остальных — общим «колоколом».
+    if (angry && !bo.angryPhase) {
+      bo.angryPhase = true
+      this.g.sfx.bossPhase(
+        bo.isChrono ? "chrono" : bo.isOctopus || bo.isJellyfish ? "kraken" : "king"
+      )
+    }
     const amp = clamp(this.g.w * 0.26, 120, 420)
     /* Патруль по горизонтали: фаза накапливается интегрированием частоты, а сама
        частота плавно стремится к целевой. Раньше позиция считалась как

@@ -6,7 +6,7 @@ import type { BossState } from "./types"
 /** «Злая» фаза не должна телепортировать босса: позиция — непрерывная функция
  *  времени (фаза патруля интегрируется, частота меняется плавно). */
 describe("BossSystem — смена «злой» фазы без телепорта", () => {
-  function makeHost(): BossHost {
+  function makeHost(sfx: Partial<{ brick: () => void; bossPhase: (kind: string) => void }> = {}) {
     return {
       w: 800,
       h: 600,
@@ -19,7 +19,7 @@ describe("BossSystem — смена «злой» фазы без телепор�
       boomQueue: [],
       paddle: { x: 400, y: 560, w: 90, h: 14 },
       fx: { burst() {}, rings: [], popups: [], particles: [] },
-      sfx: { brick() {} },
+      sfx: { brick() {}, bossPhase() {}, ...sfx },
       addRawScore() {},
       onBossKilled() {},
       pushHud() {},
@@ -60,5 +60,25 @@ describe("BossSystem — смена «злой» фазы без телепор�
     // непрерывность фазы: x — синус от накопленной фазы, скачков нет по определению
     expect(boss.x).toBeGreaterThanOrEqual(400 - 208 - 1)
     expect(boss.x).toBeLessThanOrEqual(400 + 208 + 1)
+  })
+
+  it("смена фазы звучит один раз и своим акцентом для финальных боссов", () => {
+    const played: string[] = []
+    const sys = new BossSystem(makeHost({ bossPhase: (kind) => played.push(kind) }))
+    const boss: BossState = { ...makeBoss(100), isChrono: true, angryAt: 0.5 }
+    sys.spawn(boss)
+    for (let i = 0; i < 60; i++) sys.step(DT)
+    expect(played).toEqual([]) // спокойная фаза молчит
+
+    boss.hp = 40 // порог пройден
+    for (let i = 0; i < 60; i++) sys.step(DT)
+    expect(played).toEqual(["chrono"])
+
+    // Повторный проход порога (хилы, регенерация) не должен дублировать акцент.
+    boss.hp = 100
+    for (let i = 0; i < 30; i++) sys.step(DT)
+    boss.hp = 30
+    for (let i = 0; i < 30; i++) sys.step(DT)
+    expect(played).toEqual(["chrono"])
   })
 })

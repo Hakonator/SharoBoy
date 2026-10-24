@@ -48,6 +48,7 @@ export function startLevelBattle(g: Game, n: number) {
     g.activeBossKind = kind
     g.bossTransmission = getBossTransmission(kind)
     g.bossTransmissionTimer = 5.5
+    g.sfx.transmission(kind)
   } else {
     g.activeBossKind = null
     g.bossTransmission = null
@@ -189,7 +190,9 @@ export function resolveCampaignEvent(g: Game, node: CampaignNode) {
   g.activeSpec = null
   g.phase = "map"
   applyTrack(g)
-  g.sfx.power()
+  // Аномалия перебрасывает игрока — звук гиперпрыжка вместо мягкого блипа.
+  if (to >= 0) g.sfx.anomalyJump()
+  else g.sfx.power()
   pushHud(g)
 }
 
@@ -254,6 +257,8 @@ export function startMapBattle(g: Game, node: CampaignNode) {
     g.activeBossKind = variant.kind
     g.bossTransmission = getBossTransmission(variant.kind)
     g.bossTransmissionTimer = 5.5
+    // Радиопомехи и статика — протокол связи станции «поймал» частоту босса.
+    g.sfx.transmission(variant.kind)
     const isFinal = !g.campaign || node.id === g.campaign.bossId
     if (isFinal || actBossTier === 2) {
       g.finalBossDefeated = variant.kind

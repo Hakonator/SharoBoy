@@ -175,6 +175,10 @@ export function onLevelCleared(g: Game) {
         g.input.releaseLock()
         applyTrack(g)
         g.sfx.win()
+        // Эпилог: бронестворки станции раскрываются, крио-биогель стравливается
+        // в вакуум — сцена финального экрана звучит синхронно с анимацией.
+        g.sfx.stationHatch()
+        g.sfx.gelVent()
         saveTop(g)
         pushHud(g)
         return
