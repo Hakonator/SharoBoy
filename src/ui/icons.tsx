@@ -326,6 +326,64 @@ export function IconChrono({ className }: { className?: string }) {
   )
 }
 
+/** Иконка «Крио-Дрон Утилизатор»: снежинка крио-контура (Акт I). */
+export function IconCryo({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className={className}
+      fill="none"
+      stroke="#7cf5ff"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      {/* лучи снежинки */}
+      <path d="M10 2v16M3.1 6l13.8 8M3.1 14l13.8-8" />
+      {/* веточки на лучах */}
+      <path d="M10 5.4 7.6 3.6M10 5.4l2.4-1.8M10 14.6l-2.4 1.8M10 14.6l2.4 1.8" strokeWidth="1.2" />
+      <path d="M5.2 7.9 3.4 8.4M6.5 12.4l-1.9.6M14.8 7.9l1.8.5M13.5 12.4l1.9.6" strokeWidth="1.2" />
+      {/* центр */}
+      <circle cx="10" cy="10" r="2.1" fill="#7cf5ff" stroke="none" />
+      <circle cx="10" cy="10" r="3.4" strokeWidth="0.8" opacity="0.6" />
+    </svg>
+  )
+}
+
+/** Иконка «Глубинная Электрическая Минога»: волнистое тело с разрядом (Акт II). */
+export function IconLamprey({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" aria-hidden>
+      {/* тело-волна от головы к хвосту */}
+      <path
+        d="M3.4 6.2c3.2-1.6 5 2.2 8 1.1 2.3-.9 3.4-.9 5.2.5"
+        stroke="#9dff5c"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        opacity="0.85"
+      />
+      <path
+        d="M3.4 13.4c3.2 1.6 5-2.2 8-1.1 2.3.9 3.4.9 5.2-.5"
+        stroke="#4dff9e"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        opacity="0.6"
+      />
+      {/* голова с зубастым кольцом */}
+      <circle cx="4" cy="9.8" r="2.7" fill="#06131b" stroke="#9dff5c" strokeWidth="1.3" />
+      <circle cx="4" cy="9.8" r="1" fill="#9dff5c" stroke="none" />
+      {/* разряд */}
+      <path
+        d="M12.4 3.4 10.9 7h2.3l-2 3.6"
+        stroke="#ffe95c"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 /** Иконка босса узла карты кампании по его виду. */
 export function IconBoss({
   kind,
@@ -339,10 +397,14 @@ export function IconBoss({
       return <IconKing className={className} />
     case "jellyfish":
       return <IconJelly className={className} />
+    case "cryo":
+      return <IconCryo className={className} />
     case "crab":
       return <IconCrab className={className} />
     case "octopus":
       return <IconOctopus className={className} />
+    case "lamprey":
+      return <IconLamprey className={className} />
     case "kraken":
       return <IconKraken className={className} />
     case "chrono":

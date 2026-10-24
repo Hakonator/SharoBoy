@@ -179,6 +179,23 @@ export interface Block {
   isClaw?: boolean
   clawSide?: "left" | "right"
   clawSeg?: number
+  /** Тарелка/крепление «Крио-Дрона Утилизатора»: пока целы тарелки, корпус неуязвим. */
+  isCryoPart?: boolean
+  cryoSide?: "left" | "right"
+  cryoSeg?: number
+  /** Морозная капсула крио-дрона: летит к точке и раскрывается в ледяной столб. */
+  isIceCapsule?: boolean
+  /** Единица ледяного столба: колется с одного удара и не входит в цели уровня. */
+  isIceColumn?: boolean
+  /** Группа льда: единицы одного столба (и капсула, и сегменты). */
+  iceId?: number
+  iceSeg?: number
+  iceTargetX?: number
+  iceTargetY?: number
+  iceT?: number
+  /** Сегмент тела «Глубинной Электрической Миноги» (0 — голова). */
+  isLampreySeg?: boolean
+  lampreySeg?: number
   /** Блок мини-босса кампании: за уничтожение всех — шанс дропа жизни. */
   isMiniboss?: boolean
   /** Номер существа в уровне (минибоссов может быть несколько) — привязка HP. */
@@ -252,6 +269,22 @@ export interface BossState {
   isCrab?: boolean
   clawAngle?: number
   clawSnapTimer?: number
+  /** Босс «Крио-Дрон Утилизатор»: две тарелки-турбины и ледяные преграды. */
+  isCryo?: boolean
+  /** Секунды до следующего сброса ледяной капсулы. */
+  cryoIceTimer?: number
+  /** Отдача/телеграф турбин: >0 — тарелки качнулись от сброса капсулы. */
+  cryoTurbineTimer?: number
+  /** Накопленный угол раскрутки пропеллеров турбин. */
+  cryoScroll?: number
+  /** Босс «Глубинная Электрическая Минога»: сегментированное тело по периметру арены. */
+  isLamprey?: boolean
+  /** Параметрический угол головы на эллипсе периметра, рад. */
+  lampreyAng?: number
+  /** Секунды до следующего электрического разряда. */
+  lampreyBoltTimer?: number
+  /** Прогресс телеграфа разряда 0..1. */
+  lampreyCharge?: number
   /** Босс «Повелитель Времени»: хроносфера со стрелками времени и временными воронками. */
   isChrono?: boolean
   chronoRifts?: ChronoRift[]

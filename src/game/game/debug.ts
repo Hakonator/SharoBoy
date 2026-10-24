@@ -13,6 +13,8 @@ import {
   buildJellyfishBossLevel,
   buildCrabBossLevel,
   buildChronoBossLevel,
+  buildCryoBossLevel,
+  buildLampreyBossLevel,
   buildWave,
   serveBall,
 } from "./levelBuild"
@@ -108,8 +110,12 @@ export function spawnDebugBoss(g: Game, kind: BossVariantKind) {
     buildBossLevel(g, variant.hp, variant.minions, 4)
   } else if (kind === "jellyfish") {
     buildJellyfishBossLevel(g, variant)
+  } else if (kind === "cryo") {
+    buildCryoBossLevel(g, variant)
   } else if (kind === "crab") {
     buildCrabBossLevel(g, variant)
+  } else if (kind === "lamprey") {
+    buildLampreyBossLevel(g, variant)
   } else if (kind === "chrono") {
     buildChronoBossLevel(g, variant)
   } else {

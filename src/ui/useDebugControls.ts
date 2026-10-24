@@ -39,7 +39,16 @@ export function useDebugControls(gameRef: RefObject<Game | null>) {
   const handleDebugStartGame = useCallback(() => {
     const game = gameRef.current
     if (!game) return
-    const BOSS_KINDS = ["king", "jellyfish", "octopus", "crab", "kraken", "chrono"] as const
+    const BOSS_KINDS = [
+      "king",
+      "jellyfish",
+      "cryo",
+      "octopus",
+      "crab",
+      "lamprey",
+      "kraken",
+      "chrono",
+    ] as const
     if (BOSS_KINDS.includes(debugBoss as (typeof BOSS_KINDS)[number])) {
       const bossKind = debugBoss as (typeof BOSS_KINDS)[number]
       game.debugBossType = bossKind

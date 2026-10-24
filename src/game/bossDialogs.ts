@@ -40,6 +40,15 @@ export const BOSS_DIALOGS: Record<BossVariantKind, BossDialogData> = {
     accentColor: "#35e0ff",
     callsign: "СТАТИКА",
   },
+  cryo: {
+    kind: "cryo",
+    name: "КРИО-ДРОН УТИЛИЗАТОР",
+    protocol: "КРИО-КОНТУР: ПАТРУЛЬ РЕЦИРКУЛЯЦИИ",
+    introLine: "ПАТРУЛЬ КРИО-КОНТУРА НА СВЯЗИ. ТВОЙ ИМПУЛЬС ЗАМОРОЖЕН ДО НУЛЯ. ЛЁД НЕ ОБСУЖДАЕТСЯ.",
+    defeatLine: "КОНТУР РАЗГЕРМЕТИЗИРОВАН. ХЛАДАГЕНТ СТРАВЛЕН. ПРОХОД ОСВОБОЖДЁН...",
+    accentColor: "#7cf5ff",
+    callsign: "УТИЛИЗАТОР",
+  },
   octopus: {
     kind: "octopus",
     name: "ГЛУБИННЫЙ СПРУТ",
@@ -57,6 +66,15 @@ export const BOSS_DIALOGS: Record<BossVariantKind, BossDialogData> = {
     defeatLine: "ОТКАЗ ГИДРАВЛИКИ. ПАНЦИРЬ РАСКОЛОТ. ПРОТОКОЛ ОЧИСТКИ ПРЕРВАН...",
     accentColor: "#ff6a5c",
     callsign: "УТИЛИЗАТОР",
+  },
+  lamprey: {
+    kind: "lamprey",
+    name: "ГЛУБИННАЯ ЭЛЕКТРИЧЕСКАЯ МИНОГА",
+    protocol: "ГЛУБИНА_ПАМЯТИ: РЕЗОНАНСНЫЙ ХИЩНИК",
+    introLine: "ВОЛЬТ НА ПЕРИМЕТРЕ. Я СКОЛЬЖУ ПО ТВОЕЙ ТРАЕКТОРИИ. ХВОСТ ПОМНИТ КАЖДЫЙ УДАР.",
+    defeatLine: "РАЗРЯД ИСЧЕРПАН. ТЕЛО РАСПАЛОСЬ НА СЕГМЕНТЫ... КАНАЛ ЧИСТ...",
+    accentColor: "#9dff5c",
+    callsign: "РЕЗОНАНС",
   },
   kraken: {
     kind: "kraken",

@@ -18,8 +18,12 @@ const MASTER_VOLUME = 0.42
 const TRANSMISSION_PITCH: Record<BossVariantKind, number> = {
   king: 1180,
   jellyfish: 1460,
+  // крио-контур: свист хладагента выше остальных голосов
+  cryo: 1580,
   octopus: 900,
   crab: 1060,
+  // резонирующий хищник: гул на границе слышимости сервомоторов
+  lamprey: 690,
   kraken: 760,
   chrono: 1320,
 }

@@ -721,6 +721,251 @@ function drawChronoBoss(ctx: Ctx, bo: BossState) {
   ctx.restore()
 }
 
+/**
+ * «Крио-Дрон Утилизатор»: корпус холодильной камеры с кольцом HP, подвесы и
+ * вращающиеся лопасти турбин, морозный выхлоп сопла и телеграф сброса капсулы.
+ * Сегменты-блоки турбин рисует обычный drawBlocks.
+ */
+function drawCryoBoss(ctx: Ctx, bo: BossState, blocks: Block[]) {
+  const frac = clamp(bo.hp / bo.maxHp, 0, 1)
+  const angry = bo.hp < bo.maxHp * (bo.angryAt ?? 0.5)
+  // подвесы тарелок — линиями от корпуса к каждому живому сегменту
+  ctx.save()
+  ctx.strokeStyle = "rgba(168,226,255,0.55)"
+  ctx.lineWidth = 3
+  for (const b of blocks) {
+    if (!b.isCryoPart || b.dead) continue
+    ctx.beginPath()
+    ctx.moveTo(bo.x, bo.y + bo.r * 0.35)
+    ctx.lineTo(b.x, b.y)
+    ctx.stroke()
+  }
+  ctx.restore()
+
+  ctx.save()
+  ctx.translate(bo.x, bo.y)
+  // Кольцо HP
+  ctx.lineWidth = 6
+  ctx.strokeStyle = "rgba(4,18,26,0.7)"
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r + 14, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.strokeStyle = frac > 0.55 ? "#7cf5ff" : frac > 0.25 ? "#ffc94d" : "#ff5347"
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
+  ctx.stroke()
+
+  // Корпус: холодный металл с ледяной кромкой
+  ctx.shadowColor = angry ? "#ff5ca8" : "#35e0ff"
+  ctx.shadowBlur = 26
+  const g = ctx.createRadialGradient(-bo.r * 0.35, -bo.r * 0.4, 4, 0, 0, bo.r * 1.2)
+  g.addColorStop(0, "#f2fcff")
+  g.addColorStop(0.45, angry ? "#9fd6ff" : "#7cc4e8")
+  g.addColorStop(1, "#123a52")
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.shadowBlur = 0
+
+  if (bo.flash > 0) {
+    ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.75})`
+    ctx.beginPath()
+    ctx.arc(0, 0, bo.r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // Решётка холодильной камеры
+  ctx.strokeStyle = "rgba(10,40,58,0.6)"
+  ctx.lineWidth = 2
+  for (let i = -2; i <= 2; i++) {
+    ctx.beginPath()
+    ctx.moveTo(i * bo.r * 0.26, -bo.r * 0.5)
+    ctx.lineTo(i * bo.r * 0.26, bo.r * 0.5)
+    ctx.stroke()
+  }
+  // Сенсор-«глаз» патруля
+  ctx.fillStyle = angry ? "#ff2a6d" : "#0b2a3a"
+  ctx.beginPath()
+  ctx.arc(0, -bo.r * 0.28, bo.r * 0.16, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = "rgba(255,255,255,0.85)"
+  ctx.beginPath()
+  ctx.arc(-bo.r * 0.05, -bo.r * 0.32, bo.r * 0.05, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Сопло и морозный выхлоп под корпусом
+  ctx.fillStyle = "rgba(35,90,120,0.9)"
+  ctx.beginPath()
+  ctx.moveTo(-bo.r * 0.28, bo.r * 0.86)
+  ctx.lineTo(bo.r * 0.28, bo.r * 0.86)
+  ctx.lineTo(bo.r * 0.16, bo.r * 1.12)
+  ctx.lineTo(-bo.r * 0.16, bo.r * 1.12)
+  ctx.closePath()
+  ctx.fill()
+  for (let i = 0; i < 3; i++) {
+    const ph = (bo.t * 0.9 + i / 3) % 1
+    ctx.fillStyle = `rgba(124,245,255,${(1 - ph) * 0.4})`
+    ctx.beginPath()
+    ctx.arc(
+      Math.sin(bo.t * 2 + i) * bo.r * 0.12,
+      bo.r * 1.1 + ph * bo.r * 0.5,
+      5 * (1 - ph) + 2,
+      0,
+      Math.PI * 2
+    )
+    ctx.fill()
+  }
+  ctx.restore()
+
+  // Тарелки-турбины: лопасти вращаются, пока тарелка жива
+  for (const b of blocks) {
+    if (!b.isCryoPart || b.dead || b.cryoSeg !== 1) continue
+    ctx.save()
+    ctx.translate(b.x, b.y)
+    ctx.fillStyle = "rgba(20,60,84,0.85)"
+    ctx.beginPath()
+    ctx.arc(0, 0, b.rx + 2, 0, Math.PI * 2)
+    ctx.fill()
+    const spin = bo.cryoScroll ?? bo.t
+    ctx.strokeStyle = "rgba(168,226,255,0.9)"
+    ctx.lineWidth = 3
+    for (let k = 0; k < 3; k++) {
+      const a = spin + (k * Math.PI * 2) / 3
+      ctx.beginPath()
+      ctx.moveTo(0, 0)
+      ctx.lineTo(Math.cos(a) * b.rx * 0.92, Math.sin(a) * b.rx * 0.92)
+      ctx.stroke()
+    }
+    ctx.fillStyle = "#f2fcff"
+    ctx.beginPath()
+    ctx.arc(0, 0, 4, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+
+  // Телеграф сброса капсулы: свечение под соплом за 1.4 с до сброса
+  const iceTimer = bo.cryoIceTimer ?? 99
+  if (iceTimer < 1.4) {
+    const k = 1 - clamp(iceTimer / 1.4, 0, 1)
+    ctx.save()
+    ctx.shadowColor = "#7cf5ff"
+    ctx.shadowBlur = 16 + k * 20
+    ctx.fillStyle = `rgba(200,245,255,${0.25 + k * 0.5})`
+    ctx.beginPath()
+    ctx.arc(bo.x, bo.y + bo.r * 1.15, 10 + k * 10, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+}
+
+/**
+ * «Глубинная Электрическая Минога»: цепочка сегментов по периметру арены.
+ * Тело — одна линия по центрам живых сегментов (та же геометрия, что в
+ * bossLamprey), голова с зубастым кольцом рта, а во время телеграфа — дуги
+ * разрядов, бегущие вдоль тела.
+ */
+function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[]) {
+  const segs = blocks
+    .filter((b) => b.isLampreySeg && !b.dead)
+    .sort((a, b) => (a.lampreySeg ?? 0) - (b.lampreySeg ?? 0))
+  if (segs.length === 0) return
+  const angry = bo.hp < bo.maxHp * (bo.angryAt ?? 0.5)
+  const bodyGlow = angry ? "#ff5ca8" : "#4dff9e"
+  // Тело: тёмная основа + светящаяся линия по центру сегментов
+  ctx.save()
+  ctx.lineCap = "round"
+  ctx.strokeStyle = "rgba(9,48,40,0.85)"
+  ctx.lineWidth = 22
+  ctx.beginPath()
+  ctx.moveTo(segs[0].x, segs[0].y)
+  for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y)
+  ctx.stroke()
+  ctx.shadowColor = bodyGlow
+  ctx.shadowBlur = 24
+  ctx.strokeStyle = bodyGlow
+  ctx.lineWidth = 12
+  ctx.stroke()
+  ctx.restore()
+
+  for (const b of segs) {
+    const seg = b.lampreySeg ?? 0
+    const frac = clamp(b.hp / Math.max(1, b.maxHp), 0, 1)
+    ctx.save()
+    ctx.fillStyle =
+      frac > 0.6
+        ? "rgba(157,255,92,0.85)"
+        : frac > 0.3
+          ? "rgba(255,201,77,0.85)"
+          : "rgba(255,70,70,0.8)"
+    ctx.beginPath()
+    ctx.arc(b.x, b.y, b.rx * 0.62, 0, Math.PI * 2)
+    ctx.fill()
+    // блик на чешуе
+    ctx.fillStyle = "rgba(255,255,255,0.35)"
+    ctx.beginPath()
+    ctx.arc(b.x - b.rx * 0.16, b.y - b.rx * 0.2, b.rx * 0.22, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+
+    if (seg !== 0) continue
+    // Голова: кольцо HP вокруг переднего сегмента + зубастая пасть
+    const headFrac = clamp(bo.hp / bo.maxHp, 0, 1)
+    const r = b.rx + 10
+    ctx.save()
+    ctx.translate(b.x, b.y)
+    ctx.strokeStyle = "rgba(4,18,26,0.7)"
+    ctx.lineWidth = 5
+    ctx.beginPath()
+    ctx.arc(0, 0, r, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.strokeStyle = headFrac > 0.5 ? "#9dff5c" : headFrac > 0.25 ? "#ffc94d" : "#ff5347"
+    ctx.beginPath()
+    ctx.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * headFrac)
+    ctx.stroke()
+    ctx.strokeStyle = "rgba(255,255,255,0.8)"
+    ctx.lineWidth = 2
+    for (let i = 0; i < 10; i++) {
+      const a = (i * Math.PI * 2) / 10
+      ctx.beginPath()
+      ctx.moveTo(Math.cos(a) * b.rx * 0.45, Math.sin(a) * b.rx * 0.45)
+      ctx.lineTo(Math.cos(a) * b.rx * 0.8, Math.sin(a) * b.rx * 0.8)
+      ctx.stroke()
+    }
+    ctx.fillStyle = "#06131b"
+    ctx.beginPath()
+    ctx.arc(0, 0, b.rx * 0.32, 0, Math.PI * 2)
+    ctx.fill()
+    if (bo.flash > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.7})`
+      ctx.beginPath()
+      ctx.arc(0, 0, b.rx, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.restore()
+  }
+
+  // Дуги разрядов вдоль тела — телеграф выстрела (bo.lampreyCharge)
+  const charge = clamp(bo.lampreyCharge ?? 0, 0, 1)
+  if (charge <= 0.05) return
+  ctx.save()
+  ctx.shadowColor = "#c8ff7a"
+  ctx.shadowBlur = 10 + charge * 20
+  ctx.strokeStyle = `rgba(200,255,122,${0.4 + charge * 0.5})`
+  ctx.lineWidth = 2
+  for (let i = 1; i < segs.length; i++) {
+    const a = segs[i - 1]
+    const c = segs[i]
+    const off = (i % 2 ? 1 : -1) * (6 + charge * 6)
+    ctx.beginPath()
+    ctx.moveTo(a.x, a.y)
+    ctx.lineTo((a.x + c.x) / 2 + off, (a.y + c.y) / 2 - off)
+    ctx.lineTo(c.x, c.y)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
 export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks: Block[]) {
   const bo = boss
   if (!bo) return
@@ -730,6 +975,14 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
   }
   if (bo.isCrab) {
     drawCrabBoss(ctx, bo, balls, blocks)
+    return
+  }
+  if (bo.isCryo) {
+    drawCryoBoss(ctx, bo, blocks)
+    return
+  }
+  if (bo.isLamprey) {
+    drawLampreyBoss(ctx, bo, blocks)
     return
   }
   if (bo.isChrono) {

@@ -3,7 +3,16 @@ import type { ReactNode } from "react"
 import { ACHIEVEMENTS } from "../../game/achievements"
 import type { HudData } from "../../game/types"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "../../game/upgrades"
-import { IconCoin, IconJelly, IconMusic, IconSettings, IconSound, VolSlider } from "../icons"
+import {
+  IconCoin,
+  IconCryo,
+  IconJelly,
+  IconLamprey,
+  IconMusic,
+  IconSettings,
+  IconSound,
+  VolSlider,
+} from "../icons"
 
 import { MenuSection } from "./shared"
 
@@ -250,8 +259,20 @@ export function MenuDebug({
                     label: "Медуза (Акт 1)",
                     icon: <IconJelly className="h-3.5 w-3.5" />,
                   },
+                  // новых альтернативных боссов тоже выводим SVG-иконками:
+                  // ❄/🐍 есть не во всех шрифтах, а тело миноги рисуется векторно
+                  {
+                    id: "cryo",
+                    label: "Крио-Дрон (Акт 1)",
+                    icon: <IconCryo className="h-3.5 w-3.5" />,
+                  },
                   { id: "octopus", label: "🐙 Осьминог (Акт 2)" },
                   { id: "crab", label: "🦀 Меха-Краб (Акт 2)" },
+                  {
+                    id: "lamprey",
+                    label: "Эл. Минога (Акт 2)",
+                    icon: <IconLamprey className="h-3.5 w-3.5" />,
+                  },
                   { id: "kraken", label: "🦑 Кракен (Акт 3)" },
                   { id: "chrono", label: "⏳ Хронос (Акт 3)" },
                   { id: "minibossFish", label: "🐟 Рыба (мини)" },

@@ -10,6 +10,9 @@ import { clamp, rand } from "./utils"
 import { stepJellyfish } from "./bossJelly"
 import { stepCrab } from "./bossCrab"
 import { stepChrono } from "./bossChrono"
+import { cryoTurbinesAlive, stepCryoDrone } from "./bossCryo"
+import { lampreyHeadExposed, stepLamprey } from "./bossLamprey"
+import { bossPhases, type BossPhases } from "./bossVariants"
 
 /** Хост-интерфейс: то, что системе босса нужно от движка. */
 export interface BossHost {
@@ -36,10 +39,17 @@ export interface BossHost {
 
 export class BossSystem {
   boss: BossState | null = null
+  /** Фазы текущего боя (углубляются на высоком ярусе/мутаторах, см. bossVariants). */
+  phases: BossPhases = bossPhases(null)
   /** Кулдаун урона от оружия (лазер/ракеты), чтобы не сносить босса мгновенно. */
   private weaponHitCd = 0
 
   constructor(private readonly g: BossHost) {}
+
+  /** Фазы боя по варианту босса: вызывается при спавне арены. */
+  setPhases(variant: Parameters<typeof bossPhases>[0]) {
+    this.phases = bossPhases(variant)
+  }
 
   spawn(boss: BossState) {
     this.boss = boss
@@ -58,7 +68,13 @@ export class BossSystem {
     // Порог агрессии: настраивается вариантом босса (angryAt), по умолчанию —
     // осьминог и медуза «злятся» при половине здоровья, остальные — при 40%.
     const angryAt = bo.angryAt ?? (bo.isOctopus || bo.isJellyfish ? 0.5 : 0.4)
-    const angry = bo.hp < bo.maxHp * angryAt
+    const frac = bo.hp / Math.max(1, bo.maxHp)
+    const angry = frac < angryAt
+    /* Углублённые фазы (высокий ярус Акта, мутаторы): до «злой» фазы бой идёт
+       через промежуточную — поведение уже наполовину агрессивное, атаки чаще. */
+    const mid = this.phases.count > 1 && frac < this.phases.midAt && !angry
+    // rage 0 — спокойная фаза, 0.5 — промежуточная, 1 — «злая»
+    const rage = angry ? 1 : mid ? this.phases.midMix : 0
     // Смена фазы — событие боя: у финальных боссов она звучит своим акцентом
     // (Кракен — гул бездны, Хронос — тик-так), у остальных — общим «колоколом».
     if (angry && !bo.angryPhase) {
@@ -73,15 +89,9 @@ export class BossSystem {
        sin(bo.t * freq) с частотой, зависящей от «злой» фазы, — при её смене
        синус пересчитывался с новой частотой от того же времени, и босс
        телепортировался. Теперь x непрерывен всегда. */
-    const targetFreq = angry
-      ? bo.isOctopus
-        ? 1.5
-        : bo.isJellyfish
-          ? 1
-          : 1.1
-      : bo.isJellyfish
-        ? 0.45
-        : 0.6
+    const calmFreq = bo.isJellyfish ? 0.45 : 0.6
+    const angryFreq = bo.isOctopus ? 1.5 : bo.isJellyfish ? 1 : 1.1
+    const targetFreq = calmFreq + (angryFreq - calmFreq) * rage
     if (bo.swayFreq === undefined || bo.swayPhase === undefined) {
       // первый шаг: согласуем фазу со старой формулой sin(bo.t * 0.6)
       bo.swayFreq = 0.6
@@ -100,13 +110,20 @@ export class BossSystem {
     } else if (bo.isChrono) {
       bo.y = bo.baseY + Math.sin(bo.t * 1.4) * 18
       stepChrono(this.g, bo, angry, dt)
+    } else if (bo.isCryo) {
+      // Крио-дрон висит ровно, но в промежуточной фазе уже начинает «дышать»
+      bo.y = bo.baseY + Math.sin(bo.t * 1.5) * 18 * rage
+      stepCryoDrone(this.g, bo, angry, dt)
+    } else if (bo.isLamprey) {
+      // Минога скользит по периметру сама — общий патруль ей не нужен.
+      stepLamprey(this.g, bo, angry, dt)
     } else {
       bo.y = bo.baseY + Math.sin(bo.t * 1.7) * 22
     }
     for (const b of this.g.blocks) {
       const m = b.minionOrbit
       if (!m) continue
-      m.ang += m.dir * m.speed * dt * (angry ? 1.6 : 1)
+      m.ang += m.dir * m.speed * dt * (1 + 0.6 * rage)
       b.x = clamp(bo.x + Math.cos(m.ang) * m.rad, b.rx + 4, this.g.w - b.rx - 4)
       b.y = clamp(bo.y + Math.sin(m.ang) * m.rad * 0.55, b.ry + 4, this.g.h * 0.8)
     }
@@ -122,7 +139,7 @@ export class BossSystem {
     for (const b of this.g.blocks) {
       const orb = b.tentacleOrbit
       if (!orb) continue
-      orb.ang += orb.dir * orb.speed * dt * (angry ? 1.6 : 1)
+      orb.ang += orb.dir * orb.speed * dt * (1 + 0.6 * rage)
       const segT = (orb.seg + 1) / SEG_COUNT // прогресс от 0.25 до 1
       const along = segT * TENTACLE_LENGTH
       // Волновое отклонение: каждый сегмент сдвинут по фазе, создавая эффект
@@ -145,7 +162,8 @@ export class BossSystem {
     }
     bo.dropTimer -= dt
     if (bo.dropTimer <= 0) {
-      bo.dropTimer = angry ? 3.6 : 5
+      // В бою с углублёнными фазами бонусы падают чаще (общий интервал ниже).
+      bo.dropTimer = (angry ? 3.6 : 5) * (this.phases.count > 1 ? 0.8 : 1)
       const types: PowerType[] = ["fast", "shrink", "fast", "shrink", "fast"]
       this.g.powers.push({
         x: bo.x,
@@ -161,8 +179,8 @@ export class BossSystem {
     if (bombEvery > 0) {
       bo.bombTimer = (bo.bombTimer ?? bombEvery) - dt
       if (bo.bombTimer <= 0) {
-        // В агрессии бомбы летят вдвое чаще.
-        bo.bombTimer = angry ? bombEvery / 2 : bombEvery
+        // В агрессии бомбы летят вдвое чаще, в промежуточной — на 30% чаще.
+        bo.bombTimer = angry ? bombEvery / 2 : mid ? bombEvery * 0.7 : bombEvery
         // Создаём бомбу, летящую в направлении ракетки
         const paddle = this.g.paddle
         const dx = paddle.x - bo.x
@@ -225,6 +243,20 @@ export class BossSystem {
       if (liveClaws.length >= 4) {
         this.g.sfx.brick(1)
         this.g.fx.burst(bo.x, bo.y, "#ffaa00", 6, 140)
+        return
+      }
+    } else if (bo.isCryo) {
+      // Турбины-тарелки отклоняют удар: пока целы обе, корпус неуязвим.
+      if (cryoTurbinesAlive(this.g.blocks) >= 2) {
+        this.g.sfx.brick(1)
+        this.g.fx.burst(bo.x, bo.y, "#a8e2ff", 6, 140)
+        return
+      }
+    } else if (bo.isLamprey) {
+      // Тело закрывает голову: урон проходит, когда разбита часть сегментов.
+      if (!lampreyHeadExposed(this.g.blocks)) {
+        this.g.sfx.brick(1)
+        this.g.fx.burst(bo.x, bo.y, "#9dff5c", 6, 140)
         return
       }
     }

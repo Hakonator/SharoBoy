@@ -241,11 +241,13 @@ describe("generateCampaignMap", () => {
       expect(bosses).toHaveLength(3)
 
       const [b1, b2, b3] = bosses
-      expect(["king", "jellyfish"]).toContain(b1.bossKind)
+      // Пулы Актов I и II расширены альтернативными боссами (roadmap 1.2):
+      // крио-дрон и электрическая минога выбираются по тому же сиду карты.
+      expect(["king", "jellyfish", "cryo"]).toContain(b1.bossKind)
       expect(b1.name).toContain("БОСС: АКТ I")
       act1Bosses.add(b1.bossKind!)
 
-      expect(["octopus", "crab"]).toContain(b2.bossKind)
+      expect(["octopus", "crab", "lamprey"]).toContain(b2.bossKind)
       expect(b2.name).toContain("БОСС: АКТ II")
       act2Bosses.add(b2.bossKind!)
 
@@ -254,8 +256,8 @@ describe("generateCampaignMap", () => {
       act3Bosses.add(b3.bossKind!)
     }
 
-    expect(act1Bosses).toEqual(new Set(["king", "jellyfish"]))
-    expect(act2Bosses).toEqual(new Set(["octopus", "crab"]))
+    expect(act1Bosses).toEqual(new Set(["king", "jellyfish", "cryo"]))
+    expect(act2Bosses).toEqual(new Set(["octopus", "crab", "lamprey"]))
     expect(act3Bosses).toEqual(new Set(["kraken", "chrono"]))
   }, 15000)
 })

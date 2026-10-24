@@ -1,5 +1,5 @@
 import type { Game } from "../game"
-import { fixedVariant, pickBossVariant } from "../bossVariants"
+import { bossPhasesFor, fixedVariant, pickBossVariant } from "../bossVariants"
 import { getBossTransmission } from "../bossDialogs"
 import { minibossHpFor, rollMinibossLive } from "../minibosses"
 import { LEVELS } from "../levels"
@@ -22,7 +22,9 @@ import {
   buildOctopusBossLevel,
   buildJellyfishBossLevel,
   buildCrabBossLevel,
+  buildCryoBossLevel,
   buildChronoBossLevel,
+  buildLampreyBossLevel,
   serveBall,
 } from "./levelBuild"
 import { addMiniboss } from "./minibossRuntime"
@@ -251,9 +253,16 @@ export function startMapBattle(g: Game, node: CampaignNode) {
     g.onBossNode = true
     // Вариативность: ярус босса масштабируется по Актам (0: Акт 1, 1: Акт 2, 2+: Финал)
     const actBossTier = node.tier < 15 ? 0 : node.tier < 25 ? 1 : 2
+    // Углубление фаз: поздний узел Акта и/или мутаторы забега добавляют боссу
+    // промежуточную фазу (см. bossVariants.bossPhasesFor).
+    const deepNode =
+      node.tier >= 27 || (node.tier >= 12 && node.tier < 15) || (node.tier >= 22 && node.tier < 25)
+    const phases = deepNode
+      ? bossPhasesFor(actBossTier, { modifiers: g.campaignModifiers, difficultyRank: 2 })
+      : bossPhasesFor(actBossTier, { modifiers: g.campaignModifiers })
     const variant = node.bossKind
-      ? fixedVariant(node.bossKind, actBossTier)
-      : pickBossVariant(g.campaignSeed + node.id * 7919, actBossTier)
+      ? fixedVariant(node.bossKind, actBossTier, { phases })
+      : pickBossVariant(g.campaignSeed + node.id * 7919, actBossTier, phases)
     g.activeBossKind = variant.kind
     g.bossTransmission = getBossTransmission(variant.kind)
     g.bossTransmissionTimer = 5.5
@@ -265,16 +274,26 @@ export function startMapBattle(g: Game, node: CampaignNode) {
     }
     if (variant.kind === "jellyfish") {
       buildJellyfishBossLevel(g, variant)
+    } else if (variant.kind === "cryo") {
+      buildCryoBossLevel(g, variant)
     } else if (variant.kind === "crab") {
       buildCrabBossLevel(g, variant)
+    } else if (variant.kind === "lamprey") {
+      buildLampreyBossLevel(g, variant)
     } else if (variant.kind === "chrono") {
       buildChronoBossLevel(g, variant)
     } else if (variant.kind === "octopus" || variant.kind === "kraken") {
       buildOctopusBossLevel(g, variant)
     } else {
+      g.bossSys.setPhases(variant)
       buildBossLevel(g, variant.hp, variant.minions, 4)
     }
-    const bannerTitle = isFinal ? `ФИНАЛЬНЫЙ БОСС: ${variant.name}` : `БОСС: ${variant.name}`
+    // Углублённые фазы: баннер предупреждает игрока, что бой идёт через
+    // промежуточную фазу (виден и на финальном узле Акта).
+    const phaseTag = variant.phases > 1 ? " // ФАЗА II" : ""
+    const bannerTitle = isFinal
+      ? `ФИНАЛЬНЫЙ БОСС: ${variant.name}${phaseTag}`
+      : `БОСС: ${variant.name}${phaseTag}`
     launchNodeBattle(g, bannerTitle)
     return
   }

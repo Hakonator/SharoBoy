@@ -1,5 +1,55 @@
 # Активный контекст (Active Context)
 
+## Последнее обновление (24.10.2026, Альтернативные боссы Актов I/II — roadmap 1.2)
+
+- **Задача T-031**: пункт 1.2 роадмапа — в Актах I и II было по два босса, а
+  фазы не углублялись на высокой сложности. Пользователь дополнительно попросил
+  вывести новых боссов в диагностический режим.
+- **`src/game/bossCryo.ts`** — «Крио-Дрон Утилизатор» (Акт I):
+  - две тарелки-турбины по 2 сегмента (`isCryoPart`, `cryoSide`, `cryoSeg`),
+    корпус неуязвим, пока живы обе тарелки (`cryoTurbinesAlive`);
+  - ледяные преграды: раз в `ICE_BARRIER_EVERY` (7 с) дрон роняет капсулу
+    (`isIceCapsule`) под ракетку; за `ICE_BLOOM_TIME` (0.8 с) она раскрывается в
+    столб из `ICE_STACK` (3) единиц (`isIceColumn`, `frozen` — колется с 1 удара);
+    барьеры прекращаются ниже `ICE_STOP_FRAC` (30% HP); в «злой» фазе капсул две
+    (зеркально) и они вдвое чаще.
+  - лёд НЕ входит в `blocksInitial`: `blocksInitial` фиксируется при спавне арены,
+    поэтому вновь созданные единицы не сравниваются с целью уровня.
+- **`src/game/bossLamprey.ts`** — «Глубинная Электрическая Минога» (Акт II):
+  - тело `LAMPREY_SEGMENTS` (8) сегментов-блоков (`isLampreySeg`, `lampreySeg`);
+    единственная функция геометрии `lampreySegments(w, h, top, ang)` — эллипс
+    периметра, хвост отстаёт по фазе `LAMPREY_SPACING`; её же использует рендер;
+  - голова неуязвима, пока не уничтожено `LAMPREY_GUARD_SEGMENTS` (3) сегментов
+    тела (`lampreyHeadExposed`);
+  - раз в `LAMPREY_BOLT_EVERY` (9 с, в ярости 4.5) бьёт в ракетку снарядом `bolt`
+    со скоростью 820 px/с, телеграф — искры и `lampreyCharge`.
+- **Пулы** (`bossVariants.ts`): `ACT_BOSS_POOLS` 0 → king/jellyfish/cryo,
+  1 → octopus/crab/lamprey, 2 → kraken/chrono. `BossVariantKind` расширен до 8.
+- **Углублённые фазы**: `BossVariant.phases`/`rewardMult` + `bossPhasesFor(tier,
+  {modifiers, difficultyRank})` (2 фазы на поздних узлах Акта, при ≥2 мутаторах,
+  ранге ≥2) + `bossPhases()` + `BossSystem.setPhases(variant)`. В `BossSystem.step`
+  `rage` = 0 / `midMix` 0.5 / 1: патруль, орбиты и разряды интерполируются,
+  бомбы на промежуточной фазе идут с интервалом ×0.7, бонусы падают чаще.
+  `campaignFlow.startMapBattle` помечает баннер «// ФАЗА II».
+- **Интеграция**: `levelBuild.buildCryoBossLevel`/`buildLampreyBossLevel`,
+  ветки в `campaignFlow` и `game/debug.ts`, `drawCryoBoss`/`drawLampreyBoss` в
+  `render/boss.ts`, трансляции в `bossDialogs`, «голоса» в `TRANSMISSION_PITCH`
+  (cryo 1580, lamprey 690), SVG-иконки `IconCryo`/`IconLamprey` + `IconBoss`.
+- **Диагностика**: в панели «Отладка» два новых пункта («Крио-Дрон (Акт 1)»,
+  «Эл. Минога (Акт 2)»), `useDebugControls.BOSS_KINDS` расширен.
+- **Тесты**: `src/game/bossCompanions.test.ts` (8), `src/game/game/
+  bossDiagnostics.test.ts` (12 — спавн всех видов пулов через `makeEnv`),
+  `bossVariants.test.ts` (+11), `campaignMap.test.ts` (пулы расширены).
+- **Грабли**: неиспользуемый флаг `SFX.frost` не существует — для льда взят
+  `freeze()`, для сброса капсулы `thud()`; `BossHost` не содержит `balls`,
+  поэтому цель ледяного столба берётся по `g.paddle.x`.
+- **Проверки**: typecheck чист, eslint 0, prettier чист, `npm run test` —
+  70 файлов / 544 теста. Ручной браузерный прогон не выполнялся.
+
+## Предыдущее обновление (24.10.2026, Аудио-оформление сюжета — roadmap 1.1)
+
+# Активный контекст (Active Context)
+
 ## Последнее обновление (24.10.2026, Аудио-оформление сюжета — roadmap 1.1)
 
 - **Задача**: пункт 1.1 роадмапа — сюжетные сцены станции «СФЕРА-1080» шли без

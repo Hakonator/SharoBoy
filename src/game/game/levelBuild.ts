@@ -11,6 +11,8 @@ import { JELLY_SEG_RADII, JELLY_SEG_COUNT, JELLY_TENTACLES, JELLY_BOLT_EVERY } f
 import { updateJellyTentacles } from "../bossJelly"
 import { buildCrabBoss } from "../bossCrab"
 import { buildChronoBoss } from "../bossChrono"
+import { buildCryoDrone } from "../bossCryo"
+import { buildLamprey } from "../bossLamprey"
 import type { LevelSpec } from "../levels"
 import { hasModifier } from "../campaignModifiers"
 
@@ -93,6 +95,7 @@ export function buildOctopusBossLevel(g: Game, variant: BossVariant) {
   resetMiniboss(g)
   g.blocks = []
   const boss = buildOctopusBoss(g, variant.hp, variant)
+  g.bossSys.setPhases(variant)
   g.bossSys.spawn(boss)
   g.blocksInitial = Math.max(1, g.blocks.length)
 }
@@ -103,6 +106,7 @@ export function buildJellyfishBossLevel(g: Game, variant: BossVariant) {
   g.boomQueue = []
   resetMiniboss(g)
   const boss = buildJellyfishBoss(g, variant.hp, variant)
+  g.bossSys.setPhases(variant)
   g.bossSys.spawn(boss)
   g.blocksInitial = Math.max(1, g.blocks.length)
 }
@@ -114,6 +118,7 @@ export function buildCrabBossLevel(g: Game, variant: BossVariant) {
   resetMiniboss(g)
   g.blocks = []
   const { boss, blocks } = buildCrabBoss(g.w, g.h, variant.hp, variant)
+  g.bossSys.setPhases(variant)
   g.bossSys.spawn(boss)
   g.blocks = blocks
   g.blocksInitial = Math.max(1, blocks.length)
@@ -126,6 +131,36 @@ export function buildChronoBossLevel(g: Game, variant: BossVariant) {
   resetMiniboss(g)
   g.blocks = []
   const { boss, blocks } = buildChronoBoss(g.w, g.h, variant.hp, variant)
+  g.bossSys.setPhases(variant)
+  g.bossSys.spawn(boss)
+  g.blocks = blocks
+  g.blocksInitial = Math.max(1, blocks.length)
+}
+
+/** Босс «Крио-Дрон Утилизатор»: корпус + две тарелки-турбины, ледяные преграды. */
+export function buildCryoBossLevel(g: Game, variant: BossVariant) {
+  g.bossSys.clear()
+  g.boomQueue = []
+  resetMiniboss(g)
+  g.blocks = []
+  const { boss, blocks } = buildCryoDrone(g.w, g.h, variant.hp, variant)
+  g.bossSys.setPhases(variant)
+  g.bossSys.spawn(boss)
+  g.blocks = blocks
+  // Лёд, который дрон сбросит в бою, не входит в цели уровня — в blocksInitial
+  // попадают только турбины, существующие при спавне.
+  g.blocksInitial = Math.max(1, blocks.length)
+}
+
+/** Босс «Глубинная Электрическая Минога»: сегментированное тело по периметру. */
+export function buildLampreyBossLevel(g: Game, variant: BossVariant) {
+  g.bossSys.clear()
+  g.boomQueue = []
+  resetMiniboss(g)
+  g.blocks = []
+  const { boss, blocks } = buildLamprey(g.w, g.h, blockTop(g), variant.hp)
+  boss.angryAt = variant.angryAt
+  g.bossSys.setPhases(variant)
   g.bossSys.spawn(boss)
   g.blocks = blocks
   g.blocksInitial = Math.max(1, blocks.length)

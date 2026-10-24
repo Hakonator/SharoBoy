@@ -1,5 +1,75 @@
 # Active Tasks
 
+# Active Tasks
+
+## Приоритет: High
+
+### T-031: Роадмап 1.2 — альтернативные боссы Актов I и II + углубление фаз + диагностика
+
+Status: done
+Priority: high
+Assigned to: none
+
+Comment: Реализовано. «Крио-Дрон Утилизатор» (`src/game/bossCryo.ts`) и
+«Глубинная Электрическая Минога» (`src/game/bossLamprey.ts`) добавлены в пулы
+`ACT_BOSS_POOLS` (Акт I: king/jellyfish/cryo, Акт II: octopus/crab/lamprey).
+Оба поддерживаются трансляциями, «голосом» в эфире, SVG-иконками узлов карты,
+рендером и диагностическим режимом (`spawnDebugBoss` + пункты панели «Отладка»,
+как просил пользователь). Углубление фаз: `bossPhasesFor`/`bossPhases` +
+`BossSystem.setPhases` — промежуточная фаза на поздних узлах Актов, при ≥2
+мутаторах и высоком ранге, баннер «// ФАЗА II».
+Проверки: `npm run typecheck` чист, `npx eslint src` 0 проблем, `npx prettier
+--check src` чист, `npm run test` — 70 файлов / 544 теста.
+
+Описание:
+Закрыть пункт 1.2 дорожной карты: добавить альтернативных боссов Актов I и II,
+углубить фазы боссов при высокой сложности/мутаторах и вывести новых боссов в
+диагностический режим.
+
+Allowed files:
+
+- src/game/bossCryo.ts
+- src/game/bossLamprey.ts
+- src/game/boss.ts
+- src/game/bossVariants.ts
+- src/game/bossDialogs.ts
+- src/game/audio.ts
+- src/game/types.ts
+- src/game/game/levelBuild.ts
+- src/game/game/campaignFlow.ts
+- src/game/game/debug.ts
+- src/game/render/boss.ts
+- src/ui/icons.tsx
+- src/ui/screens/menuPanels.tsx
+- src/ui/useDebugControls.ts
+- тесты рядом с исходниками
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: T-030
+
+Acceptance criteria:
+
+- [x] Крио-Дрон и Электрическая Минога доступны как альтернативы в пулах Актов I и II
+- [x] У боссов свои механики (лёд/турбины и сегментированное тело/разряды)
+- [x] Фазы углубляются при высоком ранге сложности и мутаторах
+- [x] Новые боссы доступны в диагностическом режиме (панель «Отладка»)
+- [x] Все тесты, `typecheck`, `lint` и Prettier проходят
+
+Test plan:
+`src/game/bossCompanions.test.ts` (механики обоих боссов),
+`src/game/game/bossDiagnostics.test.ts` (спавн всех боссов пулов в отладке),
+`src/game/bossVariants.test.ts` (пулы и фазы).
+
+Verification commands:
+npm run typecheck
+npm run lint
+npm run test
+
+
 ## Приоритет: High
 
 ### T-001: Разработать типы Authoring Spec (PlayerMapSpec)
