@@ -189,6 +189,51 @@ describe("Диагностический режим: новые боссы Ак�
     }
   })
 
+  it("снаряды босса без босса не остаются на арене (страховка)", () => {
+    const { game, step, restoreRandom } = makeEnv()
+    try {
+      game.spawnDebugBoss("lamprey")
+      const boss = game.bossSys.boss!
+      // снаряд в полёте, затем босс исчезает не через kill() (смена арены,
+      // отладочный спавн, баг в пути смерти) — так и появлялись «невидимые блоки»
+      boss.lampreyBoltTimer = 0.01
+      step(2)
+      expect(game.blocks.some((b) => b.lampreyBolt)).toBe(true)
+      game.bossSys.clear()
+      step(1)
+      expect(game.blocks.some((b) => b.bomb)).toBe(false)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
+
+  it("снаряд без босса не отражает шар (страховка в коллизиях)", () => {
+    const { game, restoreRandom } = makeEnv()
+    try {
+      game.spawnDebugBoss("lamprey")
+      const boss = game.bossSys.boss!
+      boss.lampreyBoltTimer = 0.01
+      game.bossSys.step(0.02)
+      const bolt = game.blocks.find((b) => b.lampreyBolt)!
+      expect(bolt).toBeTruthy()
+      game.bossSys.clear()
+      // ставим шар точно на снаряд: без страховки он отскочил бы и снял урон
+      const ball = game.balls[0]
+      ball.x = bolt.x
+      ball.y = bolt.y
+      ball.vx = 0
+      ball.vy = 1
+      const hpBefore = bolt.hp
+      game.physics.updateBall(ball, 0.016)
+      expect(bolt.hp).toBe(hpBefore)
+      expect(Math.hypot(ball.vx, ball.vy)).toBeGreaterThan(0)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
+
   it("углублённые фазы: мутаторы делают бой двухфазным", () => {
     const { game, restoreRandom } = makeEnv()
     try {

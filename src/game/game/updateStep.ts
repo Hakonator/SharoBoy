@@ -117,6 +117,14 @@ export function update(g: Game, dt: number) {
      кадрах — раньше filter() аллоцировал два массива на кадр. */
   drainQueue(g.boomQueue, g.time, (q) => g.weaponsSys.explode(q.x, q.y))
   drainQueue(g.sparkQueue, g.time, (q) => strikeSpark(g, q))
+  /* Страховка от «невидимых блоков»: снаряды и орбитальные миньоны принадлежат
+     боссу — двигает и рисует их только он. Если босса уже нет (победа, смена
+     арены, отладочный спавн), такие блоки остаются обычными коллайдерами:
+     шар бьётся о пустоту, а зачистка уровня не наступает. Убираем их сразу. */
+  if (!g.bossSys.boss && g.blocks.some((b) => b.bomb || b.minionOrbit)) {
+    for (const b of g.blocks) if (b.bomb || b.minionOrbit) b.dead = true
+    compactInPlace(g.blocks, (b) => !b.dead)
+  }
 
   const customTargetsCleared =
     g.customWinCondition?.kind === "targets"

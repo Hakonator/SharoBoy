@@ -203,6 +203,11 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
   const fire = g.fireActive()
   for (const b of g.blocks) {
     if (b.dead) continue
+    /* Снаряд босса без босса — «сирота»: двигать его больше некому, а рисует
+       такие блоки только рендер босса. Коллайдер при этом настоящий, поэтому
+       шар бился о невидимые точки арены. Такой блок не должен ни отражать
+       шар, ни получать урон. */
+    if (b.bomb && !g.boss) continue
     if (b.sp?.phase && !isBlockPhaseActive(b, g.time)) continue
     // Порталы на кулдауне после телепорта полностью прозрачны для шара:
     // не отражают его и не получают урон обычным/огненным попаданием.
