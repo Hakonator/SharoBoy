@@ -159,26 +159,24 @@ function makeSegment(x: number, y: number, i: number): LampreySegmentBlock {
 }
 
 /**
- * Реванш головы: голова разбита — минога отращивает голову и продолжает бой
- * (урон в этот момент не проходил, HP не изменилось). Позиции берутся по
+ * Реванш головы: голова разбита — минога отращивает ТОЛЬКО голову и продолжает
+ * бой (урон в этот момент не проходил, HP не изменилось). Позиции берутся по
  * текущему углу, чтобы сегменты не прыгали.
  *
- * `rebuildBody` — тело уничтожено полностью. Тогда одной головы мало: `bo`
- * остаётся в массиве боссов, но без единого сегмента его нельзя ни увидеть
- * (рисунок тела — это сегменты), ни ранить (`lampreyHeadAlive` = false
- * блокирует урон навсегда), ни добить — уровень зависал на невидимом боссе.
- * Поэтому минога регенерирует всё тело разом.
+ * Разбитые сегменты хвоста НЕ возвращаются — это накопленный прогресс игрока.
+ * Отсюда два следствия, и оба работают в плюс:
+ * 1. `lampreyHeadExposed` считает по живым хвостам, поэтому после сноса всего
+ *    тела отрастающая голова сразу открыта для урона — бой гарантированно
+ *    можно закончить (раньше `bo` оставался без единого сегмента: босса нельзя
+ *    ни увидеть, ни ранить, уровень зависал навсегда).
+ * 2. Чем сильнее разобрано тело, тем уязвимее босс: броня не «отрастает»,
+ *    то есть игрок не теряет сделанное.
  */
-function reviveLamprey(g: BossHost, rebuildBody = false) {
+function reviveLamprey(g: BossHost) {
   const bo = g.bossState
   const ang = bo?.lampreyAng ?? -Math.PI / 2
-  const pts = lampreySegments(g.w, g.h, g.blockTop, ang)
-  const count = rebuildBody ? LAMPREY_SEGMENTS : 1
-  for (let i = 0; i < count; i++) {
-    const p = pts[i] ?? pts[0]
-    g.blocks.push(makeSegment(p.x, p.y, i))
-  }
-  const head = pts[0]
+  const head = lampreySegments(g.w, g.h, g.blockTop, ang)[0]
+  g.blocks.push(makeSegment(head.x, head.y, 0))
   if (bo) {
     bo.x = head.x
     bo.y = head.y
@@ -258,11 +256,9 @@ export function stepLamprey(g: BossHost, bo: BossState, angry: boolean, dt: numb
   let headX = bo.x
   let headY = bo.y
   let headAlive = false
-  let bodyAlive = false
   for (const b of g.blocks) {
     const seg = (b as LampreySegmentBlock).lampreySeg
     if (!b.isLampreySeg || b.dead || seg === undefined) continue
-    if (seg > 0) bodyAlive = true
     const p = pts[seg] ?? pts[pts.length - 1]
     b.x = p.x
     b.y = p.y
@@ -284,14 +280,15 @@ export function stepLamprey(g: BossHost, bo: BossState, angry: boolean, dt: numb
   if (!headAlive) {
     bo.lampreyCharge = 0
     bo.lampreyHeadDown = true
-    /* Тело разбито целиком — регенерировать надо не только голову, но и
-       сегменты, иначе босс остаётся невидимым и неуязвимым навсегда. Раньше
-       здесь стоял `return` без таймера: последний живой сегмент разбивался,
-       `lampreyRevive` никогда не тикал, и уровень было нечем закончить. */
+    /* Таймер регена тикает независимо от того, осталось ли тело. Раньше здесь
+       стоял `return` при `!bodyAlive`: последний сегмент разбивался, таймер не
+       тикал, `bo` оставался без единого сегмента — босса не видно и не ранить,
+       уровень непроходим. Теперь голова отрастает всегда, а хвост не
+       восстанавливается, поэтому после сноса всего тела она сразу открыта. */
     bo.lampreyRevive = (bo.lampreyRevive ?? HEAD_REGEN_TIME) - dt
     if (bo.lampreyRevive <= 0) {
       bo.lampreyRevive = 0
-      reviveLamprey(g, !bodyAlive)
+      reviveLamprey(g)
       bo.lampreyHeadDown = false
     }
     return
