@@ -182,6 +182,16 @@ function reviveLamprey(g: BossHost) {
   g.sfx.zap()
 }
 
+/**
+ * Уборка тела после смерти босса. Сегменты — блоки уровня: если оставить их,
+ * зачистка уровня никогда не наступит (шар бьётся о невидимую преграду, потому
+ * что тело рисует рендер босса, а не drawBlocks). Новая голова, отросшая в
+ * кадр смерти, тоже снимается — её остаток уже без хозяина.
+ */
+export function clearLamprey(blocks: Block[]) {
+  for (const b of blocks) if (b.isLampreySeg) b.dead = true
+}
+
 /** Открыта ли голова для урона (тело разбито минимум на LAMPREY_GUARD_SEGMENTS). */
 export function lampreyHeadExposed(blocks: Block[]): boolean {
   const tail = LAMPREY_SEGMENTS - 1

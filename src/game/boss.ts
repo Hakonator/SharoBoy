@@ -11,7 +11,7 @@ import { stepJellyfish } from "./bossJelly"
 import { stepCrab } from "./bossCrab"
 import { stepChrono } from "./bossChrono"
 import { cryoTurbinesAlive, stepCryoDrone } from "./bossCryo"
-import { lampreyHeadAlive, lampreyHeadExposed, stepLamprey } from "./bossLamprey"
+import { clearLamprey, lampreyHeadAlive, lampreyHeadExposed, stepLamprey } from "./bossLamprey"
 import { bossPhases, type BossPhases } from "./bossVariants"
 
 /** Хост-интерфейс: то, что системе босса нужно от движка. */
@@ -304,6 +304,11 @@ export class BossSystem {
     const bo = this.boss
     if (!bo) return
     this.boss = null
+    /* Тело миноги — сегменты-блоки: после смерти босса они остаются на арене и
+       держат уровень «незачищенным» (шар бьётся о невидимую преграду). Снимаем
+       их сразу: рендер тела выключится вместе с `boss`, а взрывы ниже нарисуют
+       цепочку по последним позициям. */
+    if (bo.isLamprey) clearLamprey(this.g.blocks)
     this.g.onBossKilled()
     this.g.addRawScore(1500)
     this.g.hitStop = Math.max(this.g.hitStop, 0.5)
@@ -324,7 +329,7 @@ export class BossSystem {
     // миньоны, бомбы и отростки щупалец/медузы разлетаются цепочкой взрывов
     let i = 0
     for (const b of [...this.g.blocks]) {
-      if (b.minionOrbit || b.bomb || b.isTentacle) {
+      if (b.minionOrbit || b.bomb || b.isTentacle || b.isLampreySeg) {
         this.g.boomQueue.push({ x: b.x, y: b.y, at: this.g.time + 0.12 + i * 0.1 })
         b.hp = 0
         b.dead = true

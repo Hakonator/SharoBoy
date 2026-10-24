@@ -115,6 +115,28 @@ describe("Диагностический режим: новые боссы Ак�
     }
   })
 
+  it("после смерти миноги на арене не остаётся невидимых сегментов", () => {
+    const { game, step, restoreRandom } = makeEnv()
+    try {
+      game.spawnDebugBoss("lamprey")
+      const boss = game.bossSys.boss!
+      // открываем голову и добиваем босса до нуля HP
+      const tail = game.blocks.filter((b) => (b.lampreySeg ?? 0) > 0)
+      for (let i = 0; i < 3; i++) tail[i].dead = true
+      boss.hp = 1
+      game.bossSys.damage(10, false)
+      expect(game.bossSys.boss).toBeNull()
+      // сегменты тела — блоки уровня: после смерти их быть не должно, иначе шар
+      // бьётся о невидимую преграду, а зачистка не наступает
+      step(2)
+      expect(game.blocks.some((b) => b.isLampreySeg)).toBe(false)
+      expect(game.blocks.length).toBe(0)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
+
   it("углублённые фазы: мутаторы делают бой двухфазным", () => {
     const { game, restoreRandom } = makeEnv()
     try {
