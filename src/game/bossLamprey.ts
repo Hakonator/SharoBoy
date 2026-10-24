@@ -159,16 +159,26 @@ function makeSegment(x: number, y: number, i: number): LampreySegmentBlock {
 }
 
 /**
- * Реванш головы: голова разбита, но тело живо — минога отращивает голову
- * и продолжает бой (урон в этот момент не проходил, HP не изменилось).
- * Позиции берутся по текущему углу, чтобы сегменты не прыгали.
+ * Реванш головы: голова разбита — минога отращивает голову и продолжает бой
+ * (урон в этот момент не проходил, HP не изменилось). Позиции берутся по
+ * текущему углу, чтобы сегменты не прыгали.
+ *
+ * `rebuildBody` — тело уничтожено полностью. Тогда одной головы мало: `bo`
+ * остаётся в массиве боссов, но без единого сегмента его нельзя ни увидеть
+ * (рисунок тела — это сегменты), ни ранить (`lampreyHeadAlive` = false
+ * блокирует урон навсегда), ни добить — уровень зависал на невидимом боссе.
+ * Поэтому минога регенерирует всё тело разом.
  */
-function reviveLamprey(g: BossHost) {
+function reviveLamprey(g: BossHost, rebuildBody = false) {
   const bo = g.bossState
   const ang = bo?.lampreyAng ?? -Math.PI / 2
-  const head = lampreySegments(g.w, g.h, g.blockTop, ang)[0]
-  const seg = makeSegment(head.x, head.y, 0)
-  g.blocks.push(seg)
+  const pts = lampreySegments(g.w, g.h, g.blockTop, ang)
+  const count = rebuildBody ? LAMPREY_SEGMENTS : 1
+  for (let i = 0; i < count; i++) {
+    const p = pts[i] ?? pts[0]
+    g.blocks.push(makeSegment(p.x, p.y, i))
+  }
+  const head = pts[0]
   if (bo) {
     bo.x = head.x
     bo.y = head.y
@@ -274,11 +284,14 @@ export function stepLamprey(g: BossHost, bo: BossState, angry: boolean, dt: numb
   if (!headAlive) {
     bo.lampreyCharge = 0
     bo.lampreyHeadDown = true
-    if (!bodyAlive) return // последний сегмент: тело волной не двигаем
+    /* Тело разбито целиком — регенерировать надо не только голову, но и
+       сегменты, иначе босс остаётся невидимым и неуязвимым навсегда. Раньше
+       здесь стоял `return` без таймера: последний живой сегмент разбивался,
+       `lampreyRevive` никогда не тикал, и уровень было нечем закончить. */
     bo.lampreyRevive = (bo.lampreyRevive ?? HEAD_REGEN_TIME) - dt
     if (bo.lampreyRevive <= 0) {
       bo.lampreyRevive = 0
-      reviveLamprey(g)
+      reviveLamprey(g, !bodyAlive)
       bo.lampreyHeadDown = false
     }
     return

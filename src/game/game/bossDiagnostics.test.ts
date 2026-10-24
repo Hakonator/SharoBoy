@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { makeEnv } from "../frameInvariant.helpers"
 import { ACT_BOSS_POOLS } from "../bossVariants"
+import { LAMPREY_SEGMENTS } from "../bossLamprey"
 
 /** Все виды боссов, доступные в диагностическом режиме (панель «Отладка»). */
 const DEBUG_BOSS_KINDS = Object.values(ACT_BOSS_POOLS).flat()
@@ -109,6 +110,34 @@ describe("Диагностический режим: новые боссы Ак�
       const before = boss.hp
       game.bossSys.damage(5, false)
       expect(boss.hp).toBe(before - 5)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
+
+  it("минога с полностью разбитым телом отращивает его заново (бой не зависает)", () => {
+    const { game, step, restoreRandom } = makeEnv()
+    try {
+      game.spawnDebugBoss("lamprey")
+      const boss = game.bossSys.boss!
+      // худший случай из playtest: игрок разбил ВСЕ сегменты вместе с головой.
+      // Раньше `stepLamprey` возвращался по `!bodyAlive` до таймера регена:
+      // `bo` оставался в массиве, но его нельзя было ни увидеть (рисунок тела —
+      // это сегменты), ни ранить — уровень становился непроходимым.
+      for (const b of game.blocks.filter((x) => x.isLampreySeg)) game.physics.damageBlock(b, 99)
+      game.blocks = game.blocks.filter((b) => !b.dead)
+      expect(game.blocks.length).toBe(0)
+      expect(game.bossSys.boss).not.toBeNull()
+
+      // реген идёт ровно HEAD_REGEN_TIME (6 c), запас на кадры таймера
+      step(400)
+      expect(game.blocks.filter((b) => b.isLampreySeg).length).toBe(LAMPREY_SEGMENTS)
+      expect(game.blocks.some((b) => b.lampreySeg === 0)).toBe(true)
+      // тело закрывает голову так же, как в начале боя: сначала надо сбить хвост
+      const hp = boss.hp
+      game.bossSys.damage(5, false)
+      expect(boss.hp).toBe(hp)
     } finally {
       game.destroy()
       restoreRandom()
