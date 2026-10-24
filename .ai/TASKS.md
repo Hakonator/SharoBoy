@@ -4,6 +4,65 @@
 
 ## Приоритет: High
 
+### T-032: Фикс миноги по итогам ручной проверки
+
+Status: done
+Priority: high
+Assigned to: none
+
+Comment: Два дефекта. (1) Невидимые импульсы: снаряд создавался с флагом `bolt`,
+который означает молнию медузы — её рисует только `drawJellyfishBoss`/`drawBolt`,
+а `render/blocks.ts` такие блоки пропускает. Введён `Block.lampreyBolt` и рендер
+`drawLampreyBolt` (ядро, ореол, зигзаг-хвост), собственные эффекты попадания в
+`updateBombs`. (2) Голова исчезала, а минога продолжала двигаться и стрелять:
+`stepLamprey` не проверял, жива ли голова, а `BossSystem.damage` через
+`lampreyHeadExposed` пропускал урон «в пустоту» — бой становился непроходимым.
+Теперь без головы минога стоит и не стреляет (`lampreyHeadAlive`), урон
+заблокирован, через `HEAD_REGEN_TIME` (6 с) голова отрастает (`reviveLamprey`);
+в рендере — кольцо реванша, линия тела начинается с первого живого сегмента.
+`BossHost.bossState` даёт логике доступ к состоянию босса.
+Проверки: typecheck чист, eslint 0, prettier чист, 70 файлов / 546 тестов.
+
+Allowed files:
+
+- src/game/bossLamprey.ts
+- src/game/boss.ts
+- src/game/types.ts
+- src/game/render/boss.ts
+- src/game/render/blocks.ts
+- src/game/physics/destruction.ts
+- src/game/game/hosts.ts
+- тесты рядом с исходниками
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+
+Dependencies: T-031
+
+Acceptance criteria:
+
+- [x] Снаряд миноги виден на арене и эффект попадания отличим от бомб
+- [x] После уничтожения головы босс не двигается и не стреляет
+- [x] Урон по отбитой голове не снимает HP (бой остаётся проходимым)
+- [x] Голова отрастает, бой продолжается
+- [x] Все тесты, `typecheck`, `lint` и Prettier проходят
+
+Test plan:
+`src/game/bossCompanions.test.ts` (видимость снаряда, поведение без головы,
+реванш), `src/game/game/bossDiagnostics.test.ts` (движковый сценарий «без
+головы»).
+
+Verification commands:
+npm run typecheck
+npm run lint
+npm run test
+
+# Active Tasks
+
+## Приоритет: High
+
 ### T-031: Роадмап 1.2 — альтернативные боссы Актов I и II + углубление фаз + диагностика
 
 Status: done
@@ -68,7 +127,6 @@ Verification commands:
 npm run typecheck
 npm run lint
 npm run test
-
 
 ## Приоритет: High
 

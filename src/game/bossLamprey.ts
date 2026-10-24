@@ -38,6 +38,12 @@ export const LAMPREY_BOLT_EVERY_ANGRY = 4.5
 export const LAMPREY_BOLT_CHARGE = 0.8
 /** Скорость разряда, px/с. */
 export const LAMPREY_BOLT_SPEED = 820
+/**
+ * Через сколько секунд после потери головы минога отращивает её заново.
+ * Без этого бой мог «умереть»: голова держала тело закрытым от урона, а
+ * бить её было уже нечем — уровень становился непроходимым.
+ */
+export const HEAD_REGEN_TIME = 6
 
 /** Сегмент тела миноги как блок. */
 export interface LampreySegmentBlock extends Block {
@@ -110,32 +116,7 @@ export function buildLamprey(
     bombEvery: 0,
   }
 
-  const blocks: Block[] = pts.map((p, i) => {
-    const r = segRadius(i)
-    const segHp = LAMPREY_SEG_HP[i] ?? 2
-    return {
-      x: p.x,
-      y: p.y,
-      rx: r,
-      ry: r,
-      rot: 0,
-      circle: true,
-      hp: segHp,
-      maxHp: segHp,
-      tier: 2,
-      flash: 0,
-      seed: Math.random() * 1000 + i * 100,
-      dead: false,
-      x0: p.x,
-      swayAmp: 0,
-      swayFreq: 0,
-      swayPh: 0,
-      bomb: false,
-      splits: false,
-      isLampreySeg: true,
-      lampreySeg: i,
-    } as LampreySegmentBlock
-  })
+  const blocks: Block[] = pts.map((p, i) => makeSegment(p.x, p.y, i))
   return { boss: bo, blocks }
 }
 
@@ -144,13 +125,70 @@ export function lampreyTailAlive(blocks: Block[]): number {
   return blocks.filter((b) => b.isLampreySeg && !b.dead && (b.lampreySeg ?? 0) > 0).length
 }
 
+/** Жива ли голова (сегмент 0). Без головы минога не двигается и не стреляет. */
+export function lampreyHeadAlive(blocks: Block[]): boolean {
+  return blocks.some((b) => b.isLampreySeg && !b.dead && b.lampreySeg === 0)
+}
+
+/** Один сегмент тела миноги как блок (общий конструктор спавна и реванша). */
+function makeSegment(x: number, y: number, i: number): LampreySegmentBlock {
+  const r = segRadius(i)
+  const segHp = LAMPREY_SEG_HP[i] ?? 2
+  return {
+    x,
+    y,
+    rx: r,
+    ry: r,
+    rot: 0,
+    circle: true,
+    hp: segHp,
+    maxHp: segHp,
+    tier: 2,
+    flash: 0,
+    seed: Math.random() * 1000 + i * 100,
+    dead: false,
+    x0: x,
+    swayAmp: 0,
+    swayFreq: 0,
+    swayPh: 0,
+    bomb: false,
+    splits: false,
+    isLampreySeg: true,
+    lampreySeg: i,
+  }
+}
+
+/**
+ * Реванш головы: голова разбита, но тело живо — минога отращивает голову
+ * и продолжает бой (урон в этот момент не проходил, HP не изменилось).
+ * Позиции берутся по текущему углу, чтобы сегменты не прыгали.
+ */
+function reviveLamprey(g: BossHost) {
+  const bo = g.bossState
+  const ang = bo?.lampreyAng ?? -Math.PI / 2
+  const head = lampreySegments(g.w, g.h, g.blockTop, ang)[0]
+  const seg = makeSegment(head.x, head.y, 0)
+  g.blocks.push(seg)
+  if (bo) {
+    bo.x = head.x
+    bo.y = head.y
+    bo.baseY = head.y
+    // после реванша разряд не мгновенный — даём игроку передышку
+    bo.lampreyBoltTimer = LAMPREY_BOLT_EVERY
+    bo.lampreyCharge = 0
+  }
+  g.fx.rings.push({ x: head.x, y: head.y, r: 12, maxR: 120, color: "rgba(157,255,92,0.8)", t: 0 })
+  g.fx.burst(head.x, head.y, "#9dff5c", 16, 240)
+  g.sfx.zap()
+}
+
 /** Открыта ли голова для урона (тело разбито минимум на LAMPREY_GUARD_SEGMENTS). */
 export function lampreyHeadExposed(blocks: Block[]): boolean {
   const tail = LAMPREY_SEGMENTS - 1
   return tail - lampreyTailAlive(blocks) >= LAMPREY_GUARD_SEGMENTS
 }
 
-/** Разряд в ракетку из головы: снаряд с флагом `bolt` (движение как у молнии медузы). */
+/** Разряд в ракетку из головы: плазменный сгусток-снаряд. */
 function fireLampreyBolt(g: BossHost, bo: BossState) {
   const paddle = g.paddle
   const dx = paddle.x - bo.x
@@ -174,12 +212,14 @@ function fireLampreyBolt(g: BossHost, bo: BossState) {
     swayFreq: 0,
     swayPh: 0,
     bomb: true,
-    bolt: true,
+    // Молния медузы идёт «хвостом» (drawBolt) — здесь нужен свой признак:
+    // снаряд миноги рисуется собственной светящейся формой.
+    lampreyBolt: true,
     splits: false,
     bombVx: (dx / dist) * LAMPREY_BOLT_SPEED,
     bombVy: (dy / dist) * LAMPREY_BOLT_SPEED,
     hitsPaddle: true,
-  } as Block & { bolt: true })
+  } as Block & { lampreyBolt: true })
   g.fx.burst(bo.x, bo.y, "#9dff5c", 8, 200)
   g.shake = Math.min(g.shake + 2.5, 14)
   g.sfx.zap()
@@ -195,22 +235,45 @@ export function stepLamprey(g: BossHost, bo: BossState, angry: boolean, dt: numb
   const pts = lampreySegments(g.w, g.h, g.blockTop, bo.lampreyAng)
   let headX = bo.x
   let headY = bo.y
+  let headAlive = false
+  let bodyAlive = false
   for (const b of g.blocks) {
     const seg = (b as LampreySegmentBlock).lampreySeg
     if (!b.isLampreySeg || b.dead || seg === undefined) continue
+    if (seg > 0) bodyAlive = true
     const p = pts[seg] ?? pts[pts.length - 1]
     b.x = p.x
     b.y = p.y
     if (seg === 0) {
       headX = p.x
       headY = p.y
+      headAlive = true
     }
   }
   bo.x = headX
   bo.y = headY
   bo.baseY = headY
 
-  // Разряд: телеграф — искры по телу, затем молния в ракетку.
+  /* Голова разбита — минога теряет управление: тело встаёт, разряды
+     прекращаются. Раньше здесь оставался только невидимый `bo`, и босс
+     продолжал стрелять «из пустоты». Урон в этот момент не идёт (голова
+     держит тело закрытым), поэтому перед реваншем хвост восстанавливается
+     за HEAD_REGEN_TIME и бой продолжается. */
+  if (!headAlive) {
+    bo.lampreyCharge = 0
+    bo.lampreyHeadDown = true
+    if (!bodyAlive) return // последний сегмент: тело волной не двигаем
+    bo.lampreyRevive = (bo.lampreyRevive ?? HEAD_REGEN_TIME) - dt
+    if (bo.lampreyRevive <= 0) {
+      bo.lampreyRevive = 0
+      reviveLamprey(g)
+      bo.lampreyHeadDown = false
+    }
+    return
+  }
+  bo.lampreyHeadDown = false
+
+  // Разряд: телеграф — искры по телу, затем сгусток в ракетку.
   const every = angry ? LAMPREY_BOLT_EVERY_ANGRY : LAMPREY_BOLT_EVERY
   bo.lampreyBoltTimer = (bo.lampreyBoltTimer ?? every) - dt
   if (bo.lampreyBoltTimer <= LAMPREY_BOLT_CHARGE) {

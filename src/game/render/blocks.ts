@@ -122,8 +122,9 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
     // Минибоссы рисуются специализированным рендером (drawMinibosses).
     if (b.isMiniboss) continue
     if (b.bomb) {
-      // Молнию медузы рисует рендер босса (drawBolts) — здесь пропускаем.
-      if (!b.bolt) drawBomb(ctx, b, b.x, b.y, time)
+      // Снаряды боссов рисуются их собственным рендером: молния медузы —
+      // drawBolt, сгусток миноги — drawLampreyBolt. Здесь пропускаем.
+      if (!b.bolt && !b.lampreyBolt) drawBomb(ctx, b, b.x, b.y, time)
       continue
     }
     const isVerticalDrift = b.sp?.drift?.kind === "v"

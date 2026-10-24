@@ -1,6 +1,7 @@
 import { Ball, Block, BossState } from "../types"
 import { clamp } from "../utils"
 import { jellyTentacleBase } from "../bossJelly"
+import { HEAD_REGEN_TIME } from "../bossLamprey"
 
 import { drawJellyDamageFill, drawJellyDomeHp, traceJellyDome } from "./bossJellyDome"
 import { type Ctx } from "./shapes"
@@ -859,6 +860,48 @@ function drawCryoBoss(ctx: Ctx, bo: BossState, blocks: Block[]) {
   }
 }
 
+/** Плазменный сгусток миноги: яркое ядро, ореол и электрический хвост. */
+function drawLampreyBolt(ctx: Ctx, b: Block, time: number) {
+  const vx = b.bombVx ?? 0
+  const vy = b.bombVy ?? 0
+  const len = Math.hypot(vx, vy) || 1
+  const ux = vx / len
+  const uy = vy / len
+  const px = -uy
+  const py = ux
+  const head = "#c8ff7a"
+  ctx.save()
+  // хвост: два зигзага назад по направлению полёта
+  for (const [spread, w, alpha] of [
+    [7, 3, 0.85],
+    [-6, 2, 0.6],
+  ] as const) {
+    ctx.beginPath()
+    ctx.moveTo(b.x, b.y)
+    for (let i = 1; i <= 4; i++) {
+      const t = i / 4
+      const off = (i % 2 ? 1 : -1) * spread * t + Math.sin(time * 50 + i * 2.7) * 2
+      ctx.lineTo(b.x - ux * 28 * t + px * off, b.y - uy * 28 * t + py * off)
+    }
+    ctx.strokeStyle = `rgba(157,255,92,${alpha})`
+    ctx.lineWidth = w
+    ctx.lineCap = "round"
+    ctx.stroke()
+  }
+  // ядро
+  ctx.shadowColor = "#9dff5c"
+  ctx.shadowBlur = 16
+  const g = ctx.createRadialGradient(b.x, b.y, 1, b.x, b.y, b.rx)
+  g.addColorStop(0, "#ffffff")
+  g.addColorStop(0.45, head)
+  g.addColorStop(1, "rgba(46,140,60,0.15)")
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(b.x, b.y, b.rx, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+}
+
 /**
  * «Глубинная Электрическая Минога»: цепочка сегментов по периметру арены.
  * Тело — одна линия по центрам живых сегментов (та же геометрия, что в
@@ -872,21 +915,29 @@ function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[]) {
   if (segs.length === 0) return
   const angry = bo.hp < bo.maxHp * (bo.angryAt ?? 0.5)
   const bodyGlow = angry ? "#ff5ca8" : "#4dff9e"
-  // Тело: тёмная основа + светящаяся линия по центру сегментов
-  ctx.save()
-  ctx.lineCap = "round"
-  ctx.strokeStyle = "rgba(9,48,40,0.85)"
-  ctx.lineWidth = 22
-  ctx.beginPath()
-  ctx.moveTo(segs[0].x, segs[0].y)
-  for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y)
-  ctx.stroke()
-  ctx.shadowColor = bodyGlow
-  ctx.shadowBlur = 24
-  ctx.strokeStyle = bodyGlow
-  ctx.lineWidth = 12
-  ctx.stroke()
-  ctx.restore()
+  const headAlive = (segs[0].lampreySeg ?? 0) === 0
+  // Снаряды миноги — свои: снаряд-«сгусток» не рисуется как молния медузы.
+  for (const b of blocks) {
+    if (b.lampreyBolt && !b.dead) drawLampreyBolt(ctx, b, bo.t)
+  }
+  // Тело: тёмная основа + светящаяся линия. Если голова отбита, линия идёт
+  // от первого живого сегмента — никаких «рваных» отрезков в пустоту.
+  if (segs.length > 1) {
+    ctx.save()
+    ctx.lineCap = "round"
+    ctx.strokeStyle = "rgba(9,48,40,0.85)"
+    ctx.lineWidth = 22
+    ctx.beginPath()
+    ctx.moveTo(segs[0].x, segs[0].y)
+    for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y)
+    ctx.stroke()
+    ctx.shadowColor = bodyGlow
+    ctx.shadowBlur = 24
+    ctx.strokeStyle = bodyGlow
+    ctx.lineWidth = 12
+    ctx.stroke()
+    ctx.restore()
+  }
 
   for (const b of segs) {
     const seg = b.lampreySeg ?? 0
@@ -947,23 +998,44 @@ function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[]) {
 
   // Дуги разрядов вдоль тела — телеграф выстрела (bo.lampreyCharge)
   const charge = clamp(bo.lampreyCharge ?? 0, 0, 1)
-  if (charge <= 0.05) return
-  ctx.save()
-  ctx.shadowColor = "#c8ff7a"
-  ctx.shadowBlur = 10 + charge * 20
-  ctx.strokeStyle = `rgba(200,255,122,${0.4 + charge * 0.5})`
-  ctx.lineWidth = 2
-  for (let i = 1; i < segs.length; i++) {
-    const a = segs[i - 1]
-    const c = segs[i]
-    const off = (i % 2 ? 1 : -1) * (6 + charge * 6)
-    ctx.beginPath()
-    ctx.moveTo(a.x, a.y)
-    ctx.lineTo((a.x + c.x) / 2 + off, (a.y + c.y) / 2 - off)
-    ctx.lineTo(c.x, c.y)
-    ctx.stroke()
+  if (charge > 0.05) {
+    ctx.save()
+    ctx.shadowColor = "#c8ff7a"
+    ctx.shadowBlur = 10 + charge * 20
+    ctx.strokeStyle = `rgba(200,255,122,${0.4 + charge * 0.5})`
+    ctx.lineWidth = 2
+    for (let i = 1; i < segs.length; i++) {
+      const a = segs[i - 1]
+      const c = segs[i]
+      const off = (i % 2 ? 1 : -1) * (6 + charge * 6)
+      ctx.beginPath()
+      ctx.moveTo(a.x, a.y)
+      ctx.lineTo((a.x + c.x) / 2 + off, (a.y + c.y) / 2 - off)
+      ctx.lineTo(c.x, c.y)
+      ctx.stroke()
+    }
+    ctx.restore()
   }
-  ctx.restore()
+
+  // Отбитая голова: тело бьётся в конвульсиях, кольцо показывает срок реванша.
+  if (!headAlive) {
+    const first = segs[0]
+    const k = clamp(1 - (bo.lampreyRevive ?? 0) / HEAD_REGEN_TIME, 0, 1)
+    ctx.save()
+    ctx.translate(first.x, first.y)
+    ctx.strokeStyle = "rgba(157,255,92,0.28)"
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.arc(0, 0, first.rx + 14, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.shadowColor = "#9dff5c"
+    ctx.shadowBlur = 14
+    ctx.strokeStyle = "#c8ff7a"
+    ctx.beginPath()
+    ctx.arc(0, 0, first.rx + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k)
+    ctx.stroke()
+    ctx.restore()
+  }
 }
 
 export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks: Block[]) {

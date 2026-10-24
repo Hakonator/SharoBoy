@@ -75,6 +75,46 @@ describe("Диагностический режим: новые боссы Ак�
     }
   })
 
+  it("минога без головы: не стреляет из пустоты и не теряет HP", () => {
+    const { game, step, restoreRandom } = makeEnv()
+    try {
+      game.spawnDebugBoss("lamprey")
+      const boss = game.bossSys.boss!
+      const hp = boss.hp
+      // разбиваем три сегмента тела и саму голову, как это делает шар
+      const tail = game.blocks.filter((b) => (b.lampreySeg ?? 0) > 0)
+      for (let i = 0; i < 3; i++) tail[i].dead = true
+      const head = game.blocks.find((b) => b.lampreySeg === 0)!
+      head.dead = true
+      game.blocks = game.blocks.filter((b) => !b.dead)
+
+      // раньше здесь босс продолжал бить «невидимыми импульсами» из пустоты
+      boss.lampreyBoltTimer = 0.01
+      step(30)
+      expect(game.blocks.some((b) => b.lampreyBolt)).toBe(false)
+      // урон по отбитой голове не снимает HP
+      game.bossSys.damage(5, false)
+      expect(boss.hp).toBe(hp)
+
+      // через HEAD_REGEN_TIME голова отрастает — бой продолжается
+      boss.lampreyRevive = 0.01
+      step(3)
+      expect(game.blocks.some((b) => b.lampreySeg === 0 && !b.dead)).toBe(true)
+      expect(boss.lampreyHeadDown).toBe(false)
+
+      boss.lampreyBoltTimer = 0.01
+      step(30)
+      expect(game.blocks.filter((b) => b.lampreyBolt).length).toBe(1)
+      // после реванша головы урон снова проходит (сегменты уже разбиты)
+      const before = boss.hp
+      game.bossSys.damage(5, false)
+      expect(boss.hp).toBe(before - 5)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
+
   it("углублённые фазы: мутаторы делают бой двухфазным", () => {
     const { game, restoreRandom } = makeEnv()
     try {

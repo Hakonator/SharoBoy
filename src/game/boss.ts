@@ -11,7 +11,7 @@ import { stepJellyfish } from "./bossJelly"
 import { stepCrab } from "./bossCrab"
 import { stepChrono } from "./bossChrono"
 import { cryoTurbinesAlive, stepCryoDrone } from "./bossCryo"
-import { lampreyHeadExposed, stepLamprey } from "./bossLamprey"
+import { lampreyHeadAlive, lampreyHeadExposed, stepLamprey } from "./bossLamprey"
 import { bossPhases, type BossPhases } from "./bossVariants"
 
 /** Хост-интерфейс: то, что системе босса нужно от движка. */
@@ -30,6 +30,8 @@ export interface BossHost {
   readonly paddle: PaddleState
   fx: Effects
   sfx: SFX
+  /** Состояние босса, которому принадлежит арена (нужно реваншу головы миноги). */
+  readonly bossState?: BossState | null
   /** Начисление очков без попапа и проверки рекорда (как в damageBoss/killBoss). */
   addRawScore(n: number): void
   /** Убийство босса засчитано (статистика партии для достижений). */
@@ -253,8 +255,10 @@ export class BossSystem {
         return
       }
     } else if (bo.isLamprey) {
-      // Тело закрывает голову: урон проходит, когда разбита часть сегментов.
-      if (!lampreyHeadExposed(this.g.blocks)) {
+      // Тело закрывает голову: урон проходит, когда разбита часть сегментов
+      // И голова на месте. Отбитая голова — не уязвимая точка: минога
+      // отращивает новую (иначе HP снимался бы «в пустоту»).
+      if (!lampreyHeadAlive(this.g.blocks) || !lampreyHeadExposed(this.g.blocks)) {
         this.g.sfx.brick(1)
         this.g.fx.burst(bo.x, bo.y, "#9dff5c", 6, 140)
         return

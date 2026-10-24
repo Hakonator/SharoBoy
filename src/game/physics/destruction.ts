@@ -318,7 +318,12 @@ export function updateBombs(g: PhysicsWorld, dt: number) {
       g.onBombHitPaddle()
       g.shake = Math.min(g.shake + 8, 14)
       g.flash = 0.6
-      if (b.bolt) {
+      if (b.lampreyBolt) {
+        // плазменный сгусток миноги: зелёный разряд и искры
+        g.sfx.zap()
+        g.fx.burst(b.x, b.y, "#c8ff7a", 18, 300)
+        g.fx.burst(b.x, b.y, "#9dff5c", 12, 220)
+      } else if (b.bolt) {
         // разряд: электрический треск и голубые искры
         g.sfx.zap()
         g.fx.burst(b.x, b.y, "#ffe95c", 16, 280)

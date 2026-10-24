@@ -196,6 +196,8 @@ export interface Block {
   /** Сегмент тела «Глубинной Электрической Миноги» (0 — голова). */
   isLampreySeg?: boolean
   lampreySeg?: number
+  /** Плазменный сгусток миноги: снаряд с собственными эффектами попадания. */
+  lampreyBolt?: boolean
   /** Блок мини-босса кампании: за уничтожение всех — шанс дропа жизни. */
   isMiniboss?: boolean
   /** Номер существа в уровне (минибоссов может быть несколько) — привязка HP. */
@@ -285,6 +287,10 @@ export interface BossState {
   lampreyBoltTimer?: number
   /** Прогресс телеграфа разряда 0..1. */
   lampreyCharge?: number
+  /** Голова отбита: тела на арене нет, минога отращивает новую (HEAD_REGEN_TIME). */
+  lampreyHeadDown?: boolean
+  /** Секунды до отражения головы, когда `lampreyHeadDown`. */
+  lampreyRevive?: number
   /** Босс «Повелитель Времени»: хроносфера со стрелками времени и временными воронками. */
   isChrono?: boolean
   chronoRifts?: ChronoRift[]

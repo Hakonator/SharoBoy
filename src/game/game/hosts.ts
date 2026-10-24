@@ -58,6 +58,9 @@ export function makeBossHost(g: Game): BossHost {
     get boomQueue() {
       return g.boomQueue
     },
+    get bossState() {
+      return g.bossSys.boss
+    },
     paddle: g.paddle,
     fx: g.fx,
     sfx: g.sfx,
