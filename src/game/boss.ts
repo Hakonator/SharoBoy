@@ -336,11 +336,15 @@ export class BossSystem {
       t: 0,
     })
     this.g.fx.popups.push({ x: bo.x, y: bo.y, text: "+1500", color: "#ffc94d", t: 0, size: 30 })
-    // миньоны, бомбы и отростки щупалец/медузы разлетаются цепочкой взрывов;
-    // тело миноги (`clearLamprey`) уже помечено мёртвыми — взрываем по точкам
+    /* Миньоны, бомбы и всё телесное — разлетается цепочкой взрывов. Правило:
+       блок, который рисует только рендер босса, обязан исчезнуть вместе с ним,
+       иначе остаётся невидимый коллайдер и зачистка уровня не наступает.
+       Турбины крио-дрона (`isCryoPart`) раньше сюда не входили — тарелки
+       переживали победу и держали уровень. Тело миноги (`clearLamprey`) уже
+       помечено мёртвыми — взрываем по точкам. */
     let i = 0
     for (const b of [...this.g.blocks]) {
-      if (b.minionOrbit || b.bomb || b.isTentacle || b.isLampreySeg) {
+      if (b.minionOrbit || b.bomb || b.isTentacle || b.isLampreySeg || b.isCryoPart || b.isClaw) {
         this.g.boomQueue.push({ x: b.x, y: b.y, at: this.g.time + 0.12 + i * 0.1 })
         b.hp = 0
         b.dead = true

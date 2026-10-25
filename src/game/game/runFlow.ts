@@ -113,6 +113,9 @@ export function addRawScore(g: Game, n: number) {
 /** Смерть босса засчитана в статистику партии (для достижений). */
 export function onBossKilled(g: Game) {
   g.runBossKills++
+  /* Победа над боссом сама по себе закрывает уровень: `updateStep` считает
+     `bossDefeated` достаточным условием и не ждёт зачистки остатков арены. */
+  g.bossDefeated = true
 }
 
 /* ---------- переходы ---------- */

@@ -203,6 +203,66 @@ describe("Диагностический режим: новые боссы Ак�
     }
   })
 
+  it("крио-дрон: смерть босса закрывает уровень даже с целыми турбинами", () => {
+    const { game, step, restoreRandom } = makeEnv()
+    try {
+      game.spawnDebugBoss("cryo")
+      const boss = game.bossSys.boss!
+      // корпус дрона защищён, пока живы обе тарелки: сначала сносим их, но
+      // оставляем крепления (seg 0) — именно они раньше «держали» уровень
+      const disks = game.blocks.filter((b) => b.isCryoPart && b.cryoSeg === 1)
+      for (const d of disks) game.physics.damageBlock(d, 99)
+      game.blocks = game.blocks.filter((b) => !b.dead)
+      expect(game.blocks.some((b) => b.isCryoPart)).toBe(true)
+
+      game.bossSys.damage(boss.hp + 10, false)
+      expect(game.bossSys.boss).toBeNull()
+      // турбины уходят вместе с боссом (общая цепочка взрывов, а не «висят»)
+      step(2)
+      expect(game.blocks.some((b) => b.isCryoPart)).toBe(false)
+      expect(game.blocks.length).toBe(0)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
+
+  it("краб: клешни уходят вместе с боссом и не держат уровень", () => {
+    const { game, step, restoreRandom } = makeEnv()
+    try {
+      game.spawnDebugBoss("crab")
+      const boss = game.bossSys.boss!
+      expect(game.blocks.some((b) => b.isClaw)).toBe(true)
+      game.bossSys.kill()
+      step(2)
+      expect(game.blocks.some((b) => b.isClaw)).toBe(false)
+      expect(game.blocks.length).toBe(0)
+      expect(boss.hp).toBeGreaterThan(0)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
+
+  it("гибель босса — достаточное условие победы, блоки добивать не нужно", () => {
+    const { game, step, restoreRandom } = makeEnv()
+    try {
+      game.spawnDebugBoss("cryo")
+      const boss = game.bossSys.boss!
+      game.bossSys.kill()
+      // на арене намеренно оставлен «мусор», который босс рисует сам
+      expect(game.bossDefeated).toBe(true)
+      expect(game.bossSys.boss).toBeNull()
+      // зачистка считается выполненной независимо от остатков арены
+      step(2)
+      expect(game.blocks.length).toBe(0)
+      expect(boss.hp).toBeGreaterThan(0)
+    } finally {
+      game.destroy()
+      restoreRandom()
+    }
+  })
+
   it("после смерти крио-дрона лёд убирается с арены", () => {
     const { game, step, restoreRandom } = makeEnv()
     try {

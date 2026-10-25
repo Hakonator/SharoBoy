@@ -28,6 +28,8 @@ export function buildLevel(g: Game, n: number) {
 export function buildFromSpec(g: Game, spec: LevelSpec) {
   g.levelLostBall = false
   g.bossSys.clear()
+  // Новая арена — победа над прошлым боссом больше не считается зачисткой.
+  g.bossDefeated = false
   g.boomQueue = []
   resetMiniboss(g)
   const top = blockTop(g)
@@ -91,6 +93,7 @@ export function buildBossLevel(g: Game, hp: number, minions: number, bombs: numb
 /** Финальный босс кампании — осьминог/кракен: тело + щупальца, параметры из варианта. */
 export function buildOctopusBossLevel(g: Game, variant: BossVariant) {
   g.bossSys.clear()
+  g.bossDefeated = false
   g.boomQueue = []
   resetMiniboss(g)
   g.blocks = []
@@ -103,6 +106,7 @@ export function buildOctopusBossLevel(g: Game, variant: BossVariant) {
 /** Финальный босс кампании — грозовая медуза: пульсирующий купол + отростки. */
 export function buildJellyfishBossLevel(g: Game, variant: BossVariant) {
   g.bossSys.clear()
+  g.bossDefeated = false
   g.boomQueue = []
   resetMiniboss(g)
   const boss = buildJellyfishBoss(g, variant.hp, variant)
@@ -114,6 +118,7 @@ export function buildJellyfishBossLevel(g: Game, variant: BossVariant) {
 /** Босс «Меха-Краб»: бронированный панцирь + две защитные клешни. */
 export function buildCrabBossLevel(g: Game, variant: BossVariant) {
   g.bossSys.clear()
+  g.bossDefeated = false
   g.boomQueue = []
   resetMiniboss(g)
   g.blocks = []
@@ -127,6 +132,7 @@ export function buildCrabBossLevel(g: Game, variant: BossVariant) {
 /** Босс «Повелитель Времени»: хроносфера, стрелки циферблата и временные воронки. */
 export function buildChronoBossLevel(g: Game, variant: BossVariant) {
   g.bossSys.clear()
+  g.bossDefeated = false
   g.boomQueue = []
   resetMiniboss(g)
   g.blocks = []
@@ -140,6 +146,7 @@ export function buildChronoBossLevel(g: Game, variant: BossVariant) {
 /** Босс «Крио-Дрон Утилизатор»: корпус + две тарелки-турбины, ледяные преграды. */
 export function buildCryoBossLevel(g: Game, variant: BossVariant) {
   g.bossSys.clear()
+  g.bossDefeated = false
   g.boomQueue = []
   resetMiniboss(g)
   g.blocks = []
@@ -155,6 +162,7 @@ export function buildCryoBossLevel(g: Game, variant: BossVariant) {
 /** Босс «Глубинная Электрическая Минога»: сегментированное тело по периметру. */
 export function buildLampreyBossLevel(g: Game, variant: BossVariant) {
   g.bossSys.clear()
+  g.bossDefeated = false
   g.boomQueue = []
   resetMiniboss(g)
   g.blocks = []

@@ -103,6 +103,7 @@ export function spawnDebugBoss(g: Game, kind: BossVariantKind) {
   g.powers = []
   g.projectiles = []
   g.bossSys.clear()
+  g.bossDefeated = false
   resetMiniboss(g)
   // Канонические параметры вида (как в кампании на 3-м ярусе боссов).
   const variant = fixedVariant(kind)
@@ -156,6 +157,7 @@ export function spawnDebugSpecialBlocks(g: Game) {
   g.powers = []
   g.projectiles = []
   g.bossSys.clear()
+  g.bossDefeated = false
   g.boomQueue = []
   resetMiniboss(g)
   g.blocks = buildSpecialBlocks(g.w, g.h, blockTop(g))

@@ -121,17 +121,32 @@ export function update(g: Game, dt: number) {
      боссу — двигает и рисует их только он. Если босса уже нет (победа, смена
      арены, отладочный спавн), такие блоки остаются обычными коллайдерами:
      шар бьётся о пустоту, а зачистка уровня не наступает. Убираем их сразу. */
-  if (!g.bossSys.boss && g.blocks.some((b) => b.bomb || b.minionOrbit)) {
-    for (const b of g.blocks) if (b.bomb || b.minionOrbit) b.dead = true
+  if (
+    !g.bossSys.boss &&
+    g.blocks.some((b) => b.bomb || b.minionOrbit || b.isCryoPart || b.isLampreySeg || b.isClaw)
+  ) {
+    /* Список частей тела обязан совпадать с цепочкой взрывов в
+       `BossSystem.kill()`: то, что рисует только рендер босса, не должно
+       переживать его смерть. */
+    for (const b of g.blocks) {
+      if (b.bomb || b.minionOrbit || b.isCryoPart || b.isLampreySeg || b.isClaw) b.dead = true
+    }
     compactInPlace(g.blocks, (b) => !b.dead)
   }
 
+  /* Условие победы. Босс — самодостаточная цель: его смерть уже означает победу,
+     и добивать оставшиеся блоки (тарелки крио-дрона, сегменты миноги, лёд) не
+     нужно — раньше это превращалось в «босс мёртв, а уровень не кончается».
+     Остатки арены убирает `BossSystem.kill()`; страховка ниже снимет то, что
+     босс рисует сам, но не пометил как своё. */
+  const bossDefeated = g.bossDefeated
   const customTargetsCleared =
     g.customWinCondition?.kind === "targets"
       ? g.customTargetBlocks.every((block) => block.dead)
       : g.blocks.length === 0
   const isLevelCleared =
-    (g.mode === "custom" ? customTargetsCleared : g.blocks.length === 0) && !g.bossSys.boss
+    !g.bossSys.boss &&
+    (bossDefeated || (g.mode === "custom" ? customTargetsCleared : g.blocks.length === 0))
 
   if (isLevelCleared) {
     for (const ball of g.balls) {
