@@ -12,6 +12,7 @@ import {
   IconBoss,
   IconShield,
   IconShop,
+  IconTerminal,
   IconVortex,
 } from "../icons"
 import type { HudData } from "../../game/types"
@@ -494,6 +495,12 @@ export function MapScreen({
                   : clickable
                     ? "border-2 border-[#ff477e] bg-deep text-[#ff477e] shadow-[0_0_14px_rgba(255,71,126,0.8)]"
                     : "border border-[#ff477e]/50 bg-deep/80 text-[#ff477e]/70"
+              } else if (n.isTerminal) {
+                tint = isCurrent
+                  ? "border-2 border-sky-400 bg-sky-400 text-abyss shadow-[0_0_20px_rgba(56,189,248,0.95)]"
+                  : clickable
+                    ? "border-2 border-sky-400 bg-deep text-sky-300 shadow-[0_0_16px_rgba(56,189,248,0.85)]"
+                    : "border border-sky-400/50 bg-deep/80 text-sky-300/70"
               } else if (n.isEvent) {
                 tint = isCurrent
                   ? "border-2 border-amber-400 bg-amber-400 text-abyss shadow-[0_0_18px_rgba(251,191,36,0.9)]"
@@ -529,6 +536,8 @@ export function MapScreen({
                     <IconShop className="h-5 w-5 sm:h-6 sm:w-6" />
                   ) : n.isChallenge ? (
                     <IconChallenge className="h-5 w-5 sm:h-6 sm:w-6" />
+                  ) : n.isTerminal ? (
+                    <IconTerminal className="h-5 w-5 sm:h-6 sm:w-6" />
                   ) : n.isEvent ? (
                     <IconVortex className="h-5 w-5 sm:h-6 sm:w-6" />
                   ) : (
@@ -723,12 +732,38 @@ export function MapScreen({
       {/* Оверлей интерактивного события с выбором */}
       {eventData && !eventDismissed && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-abyss/75 p-3 backdrop-blur-md sm:p-6">
-          <div className="hud-chip flex w-full max-w-lg flex-col items-center border border-amber-400/40 bg-abyss/95 p-4 text-center shadow-[0_0_32px_rgba(251,191,36,0.2)] sm:p-6">
-            <div className="flex items-center gap-2">
-              <IconVortex className="h-5 w-5 text-amber-300" />
-              <div className="hud-label text-amber-300">{eventData.title}</div>
-            </div>
-            <p className="mt-2 font-display text-sm leading-relaxed text-foam sm:text-base">
+          <div
+            className={`hud-chip flex w-full max-w-lg flex-col items-center p-4 text-center sm:p-6 ${
+              eventData.terminalLog
+                ? "border border-sky-400/50 bg-abyss/95 shadow-[0_0_36px_rgba(56,189,248,0.25)]"
+                : "border border-amber-400/40 bg-abyss/95 shadow-[0_0_32px_rgba(251,191,36,0.2)]"
+            }`}
+          >
+            {eventData.terminalLog ? (
+              <div className="flex w-full flex-col items-center gap-1 border-b border-sky-400/30 pb-3">
+                <div className="flex items-center gap-2">
+                  <IconTerminal className="h-5 w-5 text-sky-400" />
+                  <span className="font-mono text-xs font-bold tracking-wider text-sky-300">
+                    🛰 ОРБИТАЛЬНАЯ СТАНЦИЯ «СФЕРА-1080» // {eventData.terminalLog.code}
+                  </span>
+                </div>
+                <div className="text-[11px] font-mono text-sky-200/80">
+                  {eventData.terminalLog.author} • {eventData.terminalLog.date}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <IconVortex className="h-5 w-5 text-amber-300" />
+                <div className="hud-label text-amber-300">{eventData.title}</div>
+              </div>
+            )}
+            <p
+              className={`mt-3 font-display text-sm leading-relaxed sm:text-base ${
+                eventData.terminalLog
+                  ? "rounded-lg border border-sky-500/20 bg-deep/60 p-3 text-left font-sans text-sky-100 shadow-inner"
+                  : "text-foam"
+              }`}
+            >
               {eventData.text}
             </p>
 
@@ -736,6 +771,7 @@ export function MapScreen({
               <div className="mt-4 flex w-full flex-col gap-2.5">
                 {eventData.choices.map((choice, idx) => {
                   const affordable = !choice.cost || crystals >= choice.cost
+                  const isTerminal = !!eventData.terminalLog
                   return (
                     <button
                       key={choice.id}
@@ -743,12 +779,18 @@ export function MapScreen({
                       onClick={() => onEventChoice?.(idx)}
                       className={`flex flex-col items-start rounded-lg border p-3 text-left transition-all ${
                         affordable
-                          ? "cursor-pointer border-amber-400/40 bg-deep/90 hover:border-amber-300 hover:bg-deep active:scale-[0.99]"
+                          ? isTerminal
+                            ? "cursor-pointer border-sky-400/40 bg-deep/90 hover:border-sky-300 hover:bg-deep active:scale-[0.99]"
+                            : "cursor-pointer border-amber-400/40 bg-deep/90 hover:border-amber-300 hover:bg-deep active:scale-[0.99]"
                           : "cursor-not-allowed border-line/30 bg-deep/40 opacity-50"
                       }`}
                     >
                       <div className="flex w-full items-center justify-between">
-                        <span className="font-display text-sm font-bold text-amber-200">
+                        <span
+                          className={`font-display text-sm font-bold ${
+                            isTerminal ? "text-sky-200" : "text-amber-200"
+                          }`}
+                        >
                           {idx + 1}. {choice.label}
                         </span>
                         {choice.cost && (

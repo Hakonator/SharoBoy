@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 
-import { ControlsPanel } from "./icons"
+import { ControlsPanel, IconTerminal } from "./icons"
 
 /** Текст без тегов — чтобы проверять формулировки, а не разметку. */
 const plain = (touch: boolean) =>
@@ -38,5 +38,12 @@ describe("ControlsPanel: справка по управлению под спо�
     // Тач-жестов на десктопе нет.
     expect(text).not.toContain("пальцем")
     expect(text).not.toContain("2 ПАЛЬЦА")
+  })
+
+  it("рендерит IconTerminal с SVG и атрибутами доступности", () => {
+    const html = renderToStaticMarkup(<IconTerminal className="h-5 w-5" />)
+    expect(html).toContain("<svg")
+    expect(html).toContain('aria-hidden="true"')
+    expect(html).toContain('class="h-5 w-5"')
   })
 })

@@ -174,6 +174,18 @@ export function resolveCampaignEvent(g: Game, node: CampaignNode) {
     )
   })
   if (!options.length) {
+    if (node.isTerminal) {
+      g.campaignEventTarget = -1
+      g.campaignEvent = "ТЕРМИНАЛ СВЯЗИ «СФЕРА-1080»"
+      g.campaignEventData = buildCampaignEvent(g, node, -1)
+      g.onBossNode = false
+      g.activeSpec = null
+      g.phase = "map"
+      applyTrack(g)
+      g.sfx.terminalLog()
+      pushHud(g)
+      return
+    }
     // редкий случай: окно из 3 зон съедено цепочкой событий — стихия стихла,
     // игрок остаётся на месте и идёт дальше с этого узла
     g.campaignVisible = visibleFrom(g.campaign, node.id)
@@ -192,9 +204,14 @@ export function resolveCampaignEvent(g: Game, node: CampaignNode) {
   g.activeSpec = null
   g.phase = "map"
   applyTrack(g)
-  // Аномалия перебрасывает игрока — звук гиперпрыжка вместо мягкого блипа.
-  if (to >= 0) g.sfx.anomalyJump()
-  else g.sfx.power()
+  // Сюжетный терминал станции воспроизводит handshake связи, аномалия — гиперпрыжок.
+  if (node.isTerminal || g.campaignEventData?.terminalLog) {
+    g.sfx.terminalLog()
+  } else if (to >= 0) {
+    g.sfx.anomalyJump()
+  } else {
+    g.sfx.power()
+  }
   pushHud(g)
 }
 

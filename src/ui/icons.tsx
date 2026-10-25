@@ -519,6 +519,28 @@ export function IconVortex({ className = "h-4 w-4" }: { className?: string }) {
   )
 }
 
+/** Сюжетный терминал / бортовой компьютер станции «СФЕРА-1080». */
+export function IconTerminal({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className={className}
+      fill="none"
+      stroke="#38bdf8"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="2.5" y="3.5" width="15" height="11" rx="2" stroke="#38bdf8" strokeWidth="1.5" />
+      <path d="M5.5 7.5l2.5 1.8-2.5 1.8" stroke="#35e0ff" strokeWidth="1.7" />
+      <line x1="10.5" y1="11.1" x2="14" y2="11.1" stroke="#35e0ff" strokeWidth="1.7" />
+      <path d="M7 16.5h6" stroke="#38bdf8" strokeWidth="1.5" />
+      <path d="M10 14.5v2" stroke="#38bdf8" strokeWidth="1.5" />
+    </svg>
+  )
+}
+
 /** Боевой узел кампании: скрещенные плазменные орудия / тактический боевой прицел */
 export function IconCombat({ className = "h-4 w-4" }: { className?: string }) {
   return (

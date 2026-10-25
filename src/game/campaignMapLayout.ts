@@ -40,8 +40,15 @@ const NODE_NAMES = [
   "ФАРВАТЕР",
 ]
 
-/** Имена узлов-событий: интерактивные встречи и стихии с выбором риск/награда. */
-export const EVENT_NAMES = [
+/** Имена сюжетных терминалов станции «СФЕРА-1080» по Актам кампании. */
+export const TERMINAL_NAMES = [
+  "АРХИВ КРИО-КОНТУРА", // Акт I: загадка затопления биогелем и карантин
+  "АРХИВ БИОГЕЛЯ", // Акт II: происхождение Хранителей подсетей
+  "КОНСОЛЬ ОПЕРАТОРА", // Акт III: истинная сущность Оператора и миссия
+] as const
+
+/** Имена обычных интерактивных событий глубин. */
+export const GENERAL_EVENT_NAMES = [
   "ВОДОВОРОТ",
   "ТЕЧЕНИЕ",
   "ГРОТ",
@@ -51,6 +58,9 @@ export const EVENT_NAMES = [
   "ОСЬМИНОГ-ШУЛЕР",
   "РАЗВИЛКА ТЕЧЕНИЙ",
 ]
+
+/** Все имена узлов-событий (стихии глубин и сюжетные терминалы станции). */
+export const EVENT_NAMES = [...GENERAL_EVENT_NAMES, ...TERMINAL_NAMES]
 
 /** Имена узлов-магазинов: лавка подводного торговца за монеты. */
 export const SHOP_NAMES = ["ТОРГОВЕЦ", "ЛАВКА ГЛУБИН", "ПОДВОДНЫЙ БАЗАР", "ТАЙНИК КОНТРАБАНДИСТА"]
@@ -86,19 +96,37 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
   const nodes: CampaignNode[] = []
   const perTier: number[][] = []
   let id = 0
+  const actHasTerminal = [false, false, false]
+
   for (let t = 0; t < tiers; t++) {
     const row: number[] = []
     let tierHasShop = false
+    const actIdx = t <= 9 ? 0 : t <= 19 ? 1 : 2
+    // Контрольные ярусы гарантированного спавна терминала, если событие ещё не выпало
+    const isTargetTerminalTier =
+      tiers >= 28 &&
+      ((t === 5 && !actHasTerminal[0]) ||
+        (t === 14 && !actHasTerminal[1]) ||
+        (t === 24 && !actHasTerminal[2]))
+
     for (let i = 0; i < widths[t]; i++) {
       const isBoss = t === tiers - 1 || (tiers >= 28 && (t === 9 || t === 19))
       const bossVariant = isBoss
         ? pickBossVariant(seed + id * 7919, t <= 9 ? 0 : t <= 19 ? 1 : 2)
         : undefined
       const bossKind = bossVariant?.kind
-      // На первом боевом ярусе игрок посещал только старт, поэтому событие
-      // всегда возвращало бы его туда. События начинаются со второго яруса,
-      // где уже есть несколько возможных целей для переноса.
-      const isEvent = !isBoss && t > 1 && rng() < EVENT_NODE_CHANCE
+
+      // Гарантируем появление сюжетного терминала станции «СФЕРА-1080» по одному на Акт
+      const shouldForceTerminal =
+        !isBoss && isTargetTerminalTier && widths[t] > 1 && i === widths[t] - 1
+      const isEvent = !isBoss && t > 1 && (rng() < EVENT_NODE_CHANCE || shouldForceTerminal)
+
+      let isTerminal = false
+      if (isEvent && !actHasTerminal[actIdx] && actIdx < TERMINAL_NAMES.length) {
+        isTerminal = true
+        actHasTerminal[actIdx] = true
+      }
+
       // Магазины начинаются с 4-го яруса и только если в ярусе есть альтернативные узлы
       const canBeShop =
         !isBoss && !isEvent && t >= 4 && t < tiers - 2 && widths[t] > 1 && !tierHasShop
@@ -114,13 +142,15 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
           : t === 19
             ? `БОСС: АКТ II (${bossVariant!.name})`
             : `ФИНАЛЬНЫЙ БОСС: ${bossVariant!.name}`
-        : isEvent
-          ? EVENT_NAMES[Math.floor(rng() * EVENT_NAMES.length)]
-          : isShop
-            ? SHOP_NAMES[Math.floor(rng() * SHOP_NAMES.length)]
-            : isChallenge
-              ? CHALLENGE_NAMES[Math.floor(rng() * CHALLENGE_NAMES.length)]
-              : NODE_NAMES[Math.floor(rng() * NODE_NAMES.length)]
+        : isTerminal
+          ? TERMINAL_NAMES[actIdx]
+          : isEvent
+            ? GENERAL_EVENT_NAMES[Math.floor(rng() * GENERAL_EVENT_NAMES.length)]
+            : isShop
+              ? SHOP_NAMES[Math.floor(rng() * SHOP_NAMES.length)]
+              : isChallenge
+                ? CHALLENGE_NAMES[Math.floor(rng() * CHALLENGE_NAMES.length)]
+                : NODE_NAMES[Math.floor(rng() * NODE_NAMES.length)]
 
       nodes.push({
         id,
@@ -131,6 +161,7 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
         isEvent,
         isShop,
         isChallenge,
+        isTerminal,
         challenge,
         bossKind,
         name,

@@ -326,4 +326,51 @@ describe("MapScreen: маршрут события кампании", () => {
     )
     expect(html).toContain(`left:${canvasX(tierOne[0].x, map.tiers)}px`)
   })
+
+  it("рендерит оверлей сюжетного терминала «СФЕРА-1080» с кодом журнала и автором", () => {
+    const map = generateCampaignMap(541)
+    const player = map.nodes.find((node) => node.id === map.startId)!
+    const hud = {
+      map: {
+        ...map,
+        playerId: player.id,
+        visited: [player.id],
+        visible: [],
+        minibosses: {},
+      },
+      campaignEventData: {
+        id: "event-terminal-1",
+        title: "АРХИВ КРИО-КОНТУРА",
+        text: "Квантовый вычислитель вошёл в термодинамический резонанс. Биогель затопил отсеки.",
+        terminalLog: {
+          code: "LOG #108-A // КРИО-КОНТУР",
+          author: "Д-р Воронов // Главный крио-инженер",
+          date: "2084.11.04 // ОРБИТА 420 КМ",
+          act: 1,
+        },
+        choices: [
+          {
+            id: "choice-1",
+            label: "Сброс давления хладагента",
+            desc: "Восстановить энергощит (+1 ЩИТ).",
+          },
+        ],
+        resolved: false,
+      },
+      score: 0,
+      lives: 3,
+      best: 0,
+      coins: 0,
+      phase: "map",
+    } as unknown as HudData
+
+    const html = renderToStaticMarkup(
+      <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
+    )
+
+    expect(html).toContain("«СФЕРА-1080» // LOG #108-A // КРИО-КОНТУР")
+    expect(html).toContain("Д-р Воронов // Главный крио-инженер")
+    expect(html).toContain("2084.11.04 // ОРБИТА 420 КМ")
+    expect(html).toContain("Сброс давления хладагента")
+  })
 })

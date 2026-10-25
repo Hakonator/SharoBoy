@@ -110,6 +110,13 @@ export interface CampaignEventChoice {
   disabled?: boolean
 }
 
+export interface TerminalStoryLog {
+  code: string
+  author: string
+  date: string
+  act: 1 | 2 | 3
+}
+
 export interface CampaignEventData {
   id: string
   title: string
@@ -117,6 +124,7 @@ export interface CampaignEventData {
   choices: CampaignEventChoice[]
   resolved?: boolean
   outcomeText?: string
+  terminalLog?: TerminalStoryLog
 }
 
 export interface ScoreEntry {

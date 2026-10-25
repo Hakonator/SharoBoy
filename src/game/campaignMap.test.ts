@@ -260,4 +260,30 @@ describe("generateCampaignMap", () => {
     expect(act2Bosses).toEqual(new Set(["octopus", "crab", "lamprey"]))
     expect(act3Bosses).toEqual(new Set(["kraken", "chrono"]))
   }, 15000)
+
+  it("на карте кампании генерируются сюжетные терминалы станции «СФЕРА-1080» по Актам", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const map = generateCampaignMap(seed)
+      const terminals = map.nodes.filter((n) => n.isTerminal)
+
+      // В каждом акте кампании есть сюжетный терминал
+      expect(terminals.length).toBeGreaterThanOrEqual(3)
+
+      const act1Terminal = terminals.find((n) => n.tier <= 9)
+      const act2Terminal = terminals.find((n) => n.tier > 9 && n.tier <= 19)
+      const act3Terminal = terminals.find((n) => n.tier > 19)
+
+      expect(act1Terminal).toBeDefined()
+      expect(act1Terminal!.isEvent).toBe(true)
+      expect(act1Terminal!.name).toBe("АРХИВ КРИО-КОНТУРА")
+
+      expect(act2Terminal).toBeDefined()
+      expect(act2Terminal!.isEvent).toBe(true)
+      expect(act2Terminal!.name).toBe("АРХИВ БИОГЕЛЯ")
+
+      expect(act3Terminal).toBeDefined()
+      expect(act3Terminal!.isEvent).toBe(true)
+      expect(act3Terminal!.name).toBe("КОНСОЛЬ ОПЕРАТОРА")
+    }
+  })
 })

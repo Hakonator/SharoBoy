@@ -20,6 +20,9 @@ export {
   EVENT_NODE_CHANCE,
   EVENT_MAX_BACK_TIERS,
   EVENT_TEXTS,
+  EVENT_NAMES,
+  GENERAL_EVENT_NAMES,
+  TERMINAL_NAMES,
   SHOP_NODE_CHANCE,
   CHALLENGE_NODE_CHANCE,
   SHOP_NAMES,
@@ -54,6 +57,8 @@ export interface CampaignNode {
   isShop?: boolean
   /** Элитный узел-испытание: повышенная сложность и щедрая награда. */
   isChallenge?: boolean
+  /** Сюжетный терминал станции «СФЕРА-1080» с записями бортового журнала. */
+  isTerminal?: boolean
   /** Квестовое боевое условие для узла-испытания. */
   challenge?: CampaignChallenge
   /** Вид босса для узлов боссов Актов и Финала. */

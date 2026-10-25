@@ -536,4 +536,53 @@ describe("сквозной цикл кампании по карте", () => {
 
     g.destroy()
   })
+
+  it("сюжетный терминал станции «СФЕРА-1080» раскрывает лор и даёт уникальные интерактивные выборы", () => {
+    const { game, g, step } = makeEnv()
+    g.startGame()
+    step(2)
+    game.crystals = 30
+    game.coins = 10
+    game.shield = 0
+
+    const terminalNode: CampaignNode = {
+      id: 996,
+      tier: 4,
+      x: 0.2,
+      y: 0.5,
+      isBoss: false,
+      isEvent: true,
+      isTerminal: true,
+      name: "АРХИВ КРИО-КОНТУРА",
+    }
+    const map = game.campaign!
+    map.nodes.push(terminalNode)
+    map.edges.push({ from: game.campaignPlayerId, to: 996 })
+    game.campaignVisible.push(996)
+
+    g.enterMapNode(996)
+    step(1)
+
+    expect(game.campaignEventData).toBeTruthy()
+    expect(game.campaignEventData!.terminalLog).toBeDefined()
+    expect(game.campaignEventData!.terminalLog!.act).toBe(1)
+    expect(game.campaignEventData!.terminalLog!.code).toContain("108-A")
+    expect(game.campaignEventData!.text).toContain("СФЕРА-1080")
+    expect(game.campaignEventData!.choices.length).toBe(3)
+
+    // Выбираем второй вариант: "Дешифровать схемы шлюза" (тратит 15 кристаллов, даёт лазерный старт и +20 монет)
+    game.chooseCampaignEventOption(1)
+
+    expect(game.campaignEventData!.resolved).toBe(true)
+    expect(game.campaignPerks.laserStart).toBe(true)
+    expect(game.crystals).toBe(15)
+    expect(game.coins).toBe(30)
+    expect(game.campaignEventTarget).toBe(-1)
+
+    g.dismissCampaignEvent()
+    expect(game.campaignEventData).toBeNull()
+    expect(game.campaignPlayerId).toBe(996)
+
+    g.destroy()
+  })
 })
