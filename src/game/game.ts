@@ -24,6 +24,7 @@ import type {
   CampaignShopItem,
   CampaignShopState,
   MinibossCreature,
+  RunScoreBreakdown,
 } from "./types"
 import type { Ball, Block, Bubble, HudData, MouthBubble, PaddleShapeKind } from "./types"
 import type { PaddleState, Phase, PowerUp, Projectile, ScoreEntry, SparkHit } from "./types"
@@ -129,6 +130,17 @@ export class Game {
   /** статистика текущей партии — для достижений */
   runBossKills = 0
   runLivesLost = 0
+  /** Детальная статистика забега — для Score Breakdown */
+  runBlocksDestroyed = 0
+  runBlocksScore = 0
+  runBossesScore = 0
+  runMaxCombo = 0
+  runCritHits = 0
+  runClutchSaves = 0
+  runSectorsCleared = 0
+  runFastClears = 0
+  runSectorStartTime = 0
+  scoreBreakdown: RunScoreBreakdown | null = null
   /** очередь открытых достижений до следующей отправки HUD */
   achQueue: string[] = []
   mode: "campaign" | "endless" | "custom" = "campaign"

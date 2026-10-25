@@ -295,6 +295,7 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     set combo(v) {
       g.combo = v
+      if (v > g.runMaxCombo) g.runMaxCombo = v
     },
     get shake() {
       return g.shake
@@ -350,19 +351,22 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     dropPower: (x, y) => g.powersSys.dropPower(x, y),
     damageBoss: (dmg, fromWeapon, isCrit) => {
       g.bossSys.damage(dmg, fromWeapon, isCrit)
-      if (isCrit && g.activeChallenge) {
-        recordChallengeCrit(g.activeChallenge, () => {
-          g.fx.popups.push({
-            x: g.w / 2,
-            y: g.h * 0.45,
-            text: "ЦЕЛЬ КРИТОВ ДОСТИГНУТА! 🎯",
-            color: "#ffd700",
-            t: 0,
-            size: 22,
+      if (isCrit) {
+        g.runCritHits++
+        if (g.activeChallenge) {
+          recordChallengeCrit(g.activeChallenge, () => {
+            g.fx.popups.push({
+              x: g.w / 2,
+              y: g.h * 0.45,
+              text: "ЦЕЛЬ КРИТОВ ДОСТИГНУТА! 🎯",
+              color: "#ffd700",
+              t: 0,
+              size: 22,
+            })
+            g.sfx.win()
           })
-          g.sfx.win()
-        })
-        pushHud(g)
+          pushHud(g)
+        }
       }
     },
     damageMiniboss: (dmg, block) => damageMiniboss(g, dmg, block),
@@ -399,6 +403,7 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
       }
     },
     onClutchSave: () => {
+      g.runClutchSaves++
       if (g.activeChallenge) {
         recordChallengeCrit(g.activeChallenge, () => {
           g.fx.popups.push({
@@ -413,6 +418,9 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
         })
         pushHud(g)
       }
+    },
+    onBlockDestroyed: () => {
+      g.runBlocksDestroyed++
     },
     onCritHit: () => {
       if (g.activeChallenge) {

@@ -19,7 +19,7 @@
 
 ## Готово к работе
 
-Нет.
+Нет активных задач в работе. Следующий шаг — раздел 3 дорожной карты (`docs/ROADMAP.md`: синергии перков и реликвий, ежедневные испытания) либо новые задачи от пользователя.
 
 ## Заблокировано
 
@@ -28,6 +28,82 @@
 ---
 
 ## Последние выполненные задачи (подробные карточки)
+
+### T-035: Прозрачный экран детального подсчёта очков (Score Breakdown) (roadmap 2.3)
+
+Status: done
+Priority: high
+Assigned to: Luna
+
+Описание:
+Пункт 2.3 дорожной карты:
+
+1. Модель детального подсчёта очков `RunScoreBreakdown`:
+   - Очки за блоки и поверженных боссов.
+   - Бонусы за оставшиеся жизни (`500` за жизнь) и щиты (`250` за щит).
+   - Множители за выбранные мутаторы забега (до `+240%`).
+   - Бонусы за серии комбо (`100` за максимальное комбо), критические рикошеты ×3 (`300` за крит) и сэйвы на грани ракетки (`400` за сэйв).
+   - Бонус за скорость зачистки секторов (`600` за сектор под нормативом времени 45 сек).
+2. Накопление статистики забега в движке (`Game`, `hosts.ts`, `runFlow.ts`, `destruction.ts`):
+   - Отслеживание блоков, боссов, секторов, комбо, критических ударов, сэйвов на грани и времени секторов.
+   - Вычисление breakdown и начисление бонусов при завершении забега (победа или поражение).
+   - Проброс `scoreBreakdown` в `HudData`.
+3. UI экрана окончания игры (`src/ui/screens/overlays.tsx`):
+   - Компонент `ScoreBreakdownTable`: неоновая кибер-таблица с детальным разбором каждого источника очков, бейджами активных мутаторов забега и итоговым счётом.
+   - Интеграция в `GameOverScreen` (поражение) и `WinScreen` (победа в кампании и победа в остальных режимах).
+4. Тесты:
+   - Модульные тесты расчёта `ScoreBreakdown` (`src/game/scoreBreakdown.test.ts`).
+   - Регрессионные тесты UI в `src/ui/screens/overlays.test.tsx`.
+   - Прохождение полного набора тестов (`npm test`: 72 файла, 585 тестов), typecheck и линтеров.
+
+Allowed files:
+
+- src/game/types.ts
+- src/game/game.ts
+- src/game/scoreBreakdown.ts
+- src/game/scoreBreakdown.test.ts
+- src/game/game/runFlow.ts
+- src/game/game/hosts.ts
+- src/game/game/hudSync.ts
+- src/game/game/levelBuild.ts
+- src/game/game/modes.ts
+- src/game/game/campaignFlow.ts
+- src/game/physics.ts
+- src/game/physics/destruction.ts
+- src/ui/screens/overlays.tsx
+- src/ui/screens/overlays.test.tsx
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+- package.json
+
+Dependencies: T-034
+
+Acceptance criteria:
+
+- [x] Тип `RunScoreBreakdown` определён в `types.ts` и синхронизируется в `HudData`
+- [x] Статистика забега (блоки, боссы, комбо, криты, сэйвы, время) корректно аккумулируется
+- [x] При победе и поражении начисляются бонусы за жизни, щиты, комбо, криты, сэйвы и скорость
+- [x] Учитываются активные мутаторы кампании (множитель до +240%)
+- [x] Таблица детального расчёта очков встроена в `GameOverScreen` и `WinScreen`
+- [x] Unit-тесты расчёта очков и рендера UI проходят
+- [x] `npm run typecheck`, `npm run lint:check`, `npm run format:check` и `npm test` проходят
+
+Test plan:
+`npm run typecheck`, `npm run lint:check`, `npm run format:check`, `npm test`
+
+Verification commands:
+npm run typecheck
+npm run lint:check
+npm run format:check
+npm test
+
+---
 
 ### T-034: Сюжетные терминалы станции «СФЕРА-1080» в событиях кампании (roadmap 2.2)
 
@@ -146,63 +222,6 @@ npm test
 
 ---
 
-### T-032: Фикс миноги по итогам ручной проверки
-
-Status: done
-Priority: high
-Assigned to: none
-
-Comment: Два дефекта. (1) Невидимые импульсы: снаряд создавался с флагом `bolt`,
-который означает молнию медузы — её рисует только `drawJellyfishBoss`/`drawBolt`,
-а `render/blocks.ts` такие блоки пропускает. Введён `Block.lampreyBolt` и рендер
-`drawLampreyBolt` (ядро, ореол, зигзаг-хвост), собственные эффекты попадания в
-`updateBombs`. (2) Голова исчезала, а минога продолжала двигаться и стрелять:
-`stepLamprey` не проверял, жива ли голова, а `BossSystem.damage` через
-`lampreyHeadExposed` пропускал урон «в пустоту» — бой становился непроходимым.
-Теперь без головы минога стоит и не стреляет (`lampreyHeadAlive`), урон
-заблокирован, через `HEAD_REGEN_TIME` (6 с) голова отрастает (`reviveLamprey`);
-в рендере — кольцо реванша, линия тела начинается с первого живого сегмента.
-`BossHost.bossState` даёт логике доступ к состоянию босса.
-Проверки: typecheck чист, eslint 0, prettier чист, 70 файлов / 546 тестов.
-
-Allowed files:
-
-- src/game/bossLamprey.ts
-- src/game/boss.ts
-- src/game/types.ts
-- src/game/render/boss.ts
-- src/game/render/blocks.ts
-- src/game/physics/destruction.ts
-- src/game/game/hosts.ts
-- тесты рядом с исходниками
-
-Forbidden files:
-
-- vite.config.ts
-- tsconfig.json
-
-Dependencies: T-031
-
-Acceptance criteria:
-
-- [x] Снаряд миноги виден на арене и эффект попадания отличим от бомб
-- [x] После уничтожения головы босс не двигается и не стреляет
-- [x] Урон по отбитой голове не снимает HP (бой остаётся проходимым)
-- [x] Голова отрастает, бой продолжается
-- [x] Все тесты, `typecheck`, `lint` и Prettier проходят
-
-Test plan:
-`src/game/bossCompanions.test.ts` (видимость снаряда, поведение без головы,
-реванш), `src/game/game/bossDiagnostics.test.ts` (движковый сценарий «без
-головы»).
-
-Verification commands:
-npm run typecheck
-npm run lint
-npm run test
-
----
-
 ## Выполнено ранее (архив)
 
 Карточки удалены при чистке файла; подробности каждой задачи — в `.ai/STATE.md`
@@ -210,6 +229,7 @@ npm run test
 
 | Задача | Что сделано                                                                 |
 | ------ | --------------------------------------------------------------------------- |
+| T-032  | Оружейная фаза Миноги (снаряд, потеря/отрастание головы, неуязвимость тела) |
 | T-031  | Роадмап 1.2 — альтернативные боссы Актов I и II + углубление фаз + отладка  |
 | T-030  | Аудио-оформление сюжета станции «СФЕРА-1080» (roadmap 1.1)                  |
 | T-026  | Постоянное расстояние между ярусами карты кампании (2 ширины узла)          |

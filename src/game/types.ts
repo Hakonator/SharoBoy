@@ -11,6 +11,9 @@ import type { CampaignModifierId } from "./campaignModifiers"
 import type { ActiveChallengeHud } from "./campaignChallenges"
 import type { BossVariantKind } from "./bossVariants"
 import type { BossDialogData, BossTransmissionData } from "./bossDialogs"
+import type { RunScoreBreakdown, ScoreBreakdownItem } from "./scoreBreakdown"
+
+export type { RunScoreBreakdown, ScoreBreakdownItem }
 
 export type Phase = "menu" | "playing" | "paused" | "over" | "won" | "map"
 
@@ -83,6 +86,8 @@ export interface HudData {
   bossDialog?: BossDialogData | null
   /** Финальный босс, побеждённый в текущем забеге кампании ("kraken" | "chrono"). */
   finalBossDefeated?: BossVariantKind | null
+  /** Детальный подсчёт очков забега (Score Breakdown). */
+  scoreBreakdown?: RunScoreBreakdown | null
 }
 
 export interface CampaignShopItem {

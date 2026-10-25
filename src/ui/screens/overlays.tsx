@@ -1,8 +1,72 @@
 import { type ReactNode } from "react"
 
 import { IconBall, IconPlay, Key } from "../icons"
-import type { HudData } from "../../game/types"
+import type { HudData, RunScoreBreakdown } from "../../game/types"
 import { getFinalEpilogue } from "../../game/bossDialogs"
+
+/** Прозрачная таблица детализации очков (Score Breakdown). */
+export function ScoreBreakdownTable({ breakdown }: { breakdown: RunScoreBreakdown }) {
+  if (!breakdown || (!breakdown.items.length && breakdown.endBonusTotal === 0)) {
+    return null
+  }
+
+  return (
+    <div
+      data-testid="score-breakdown-table"
+      className="mt-4 w-full rounded-xl border border-cyan-500/20 bg-deep/85 p-3.5 text-left font-mono shadow-xl backdrop-blur-md sm:p-4"
+    >
+      <div className="mb-2.5 flex items-center justify-between border-b border-foam/10 pb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">📊</span>
+          <span className="font-display text-xs font-bold uppercase tracking-wider text-cyan-neon">
+            Детализация очков
+          </span>
+        </div>
+        {breakdown.mutatorBonusPercent > 0 && (
+          <span className="rounded border border-purple-500/30 bg-purple-500/20 px-2 py-0.5 text-[10px] font-bold text-purple-300">
+            +{breakdown.mutatorBonusPercent}% Мутаторы
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1.5 text-xs">
+        {breakdown.items.map((item) => (
+          <div
+            key={item.id}
+            data-testid={`breakdown-row-${item.id}`}
+            className="flex items-center justify-between gap-2 rounded px-2 py-1 transition-colors hover:bg-foam/5"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              {item.icon && <span className="shrink-0 text-xs">{item.icon}</span>}
+              <span className="truncate font-sans text-xs text-foam/90">{item.label}</span>
+              <span className="shrink-0 text-[10px] text-dim">({item.detail})</span>
+            </div>
+            <div className="shrink-0 font-mono text-xs font-bold tabular-nums">
+              {item.isMultiplier ? (
+                <span className="text-purple-300">×{breakdown.mutatorsMultiplier.toFixed(2)}</span>
+              ) : item.points > 0 ? (
+                <span className="text-mint">+{item.points.toLocaleString("ru-RU")}</span>
+              ) : (
+                <span className="text-foam/50">0</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {breakdown.endBonusTotal > 0 && (
+        <div className="mt-2.5 flex items-center justify-between border-t border-foam/10 pt-2 text-xs">
+          <span className="font-sans text-[11px] uppercase tracking-wider text-foam/70">
+            Бонус за завершение:
+          </span>
+          <span className="font-mono font-bold tabular-nums text-gold">
+            +{breakdown.endBonusTotal.toLocaleString("ru-RU")}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 /** Пауза: продолжение, рестарт, выход в меню. */
 export function PauseScreen({
@@ -63,8 +127,8 @@ export function GameOverScreen({
   onMenu: () => void
 }) {
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-abyss/70 p-6">
-      <div className="anim-pop w-full max-w-md text-center">
+    <div className="absolute inset-0 z-40 flex items-center justify-center overflow-y-auto bg-abyss/70 p-6">
+      <div className="anim-pop my-auto w-full max-w-lg text-center">
         <div className="hud-label mb-2 tracking-[0.35em]">Шары уронили тебя</div>
         <h2
           className="font-display text-5xl text-coral sm:text-6xl"
@@ -96,6 +160,7 @@ export function GameOverScreen({
             </div>
           </div>
         </div>
+        {hud.scoreBreakdown && <ScoreBreakdownTable breakdown={hud.scoreBreakdown} />}
         {topSubmit}
         <div className="mt-7 flex flex-wrap justify-center gap-3">
           <button className="btn-arcade px-8 py-3.5 text-lg" onClick={onRestart}>
@@ -375,6 +440,8 @@ export function WinScreen({
             )}
           </div>
 
+          {hud.scoreBreakdown && <ScoreBreakdownTable breakdown={hud.scoreBreakdown} />}
+
           {topSubmit}
 
           <div className="mt-5 flex flex-wrap justify-center gap-3">
@@ -391,8 +458,8 @@ export function WinScreen({
   }
 
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center p-6">
-      <div className="anim-pop w-full max-w-md text-center">
+    <div className="absolute inset-0 z-40 flex items-center justify-center overflow-y-auto p-6">
+      <div className="anim-pop my-auto w-full max-w-lg text-center">
         <div className="hud-label mb-2 tracking-[0.35em]">Все шары лопнули</div>
         <h2
           className="font-display text-6xl text-mint sm:text-7xl"
@@ -424,6 +491,7 @@ export function WinScreen({
             </div>
           </div>
         </div>
+        {hud.scoreBreakdown && <ScoreBreakdownTable breakdown={hud.scoreBreakdown} />}
         {topSubmit}
         <div className="mt-7 flex flex-wrap justify-center gap-3">
           <button className="btn-arcade px-8 py-3.5 text-lg" onClick={onRestart}>

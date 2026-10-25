@@ -118,6 +118,7 @@ export interface PhysicsWorld {
   onPaddleBounce?(): void
   onClutchSave?(): void
   onCritHit?(): void
+  onBlockDestroyed?(): void
   heavyGravityActive?(): boolean
   glassPaddleActive?(): boolean
   invertedControlsActive?(): boolean

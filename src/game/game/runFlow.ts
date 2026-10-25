@@ -4,6 +4,7 @@ import { rand, lsSet } from "../utils"
 import { nodeById } from "../campaignMap"
 import { computeRunMultipliers, hasModifier } from "../campaignModifiers"
 import { recordChallengeBallLost } from "../campaignChallenges"
+import { applyFinalScoreBreakdown, resetRunStats, FAST_CLEAR_PAR_SECONDS } from "../scoreBreakdown"
 
 import { applyTrack } from "./audioControls"
 import { enterMapView } from "./campaignFlow"
@@ -13,6 +14,7 @@ import { blockTop } from "./paddleControl"
 import { addCoins, addMetaCrystals } from "./progress"
 
 export function resetRun(g: Game) {
+  resetRunStats(g)
   g.customWinCondition = null
   g.customTargetBlocks = []
   g.onCustomComplete = null
@@ -95,6 +97,7 @@ export function addScore(g: Game, n: number, x: number, y: number, color: string
   const { scoreMultiplier } = computeRunMultipliers(g.campaignModifiers)
   const finalN = Math.round(n * scoreMultiplier)
   g.score += finalN
+  g.runBlocksScore = (g.runBlocksScore ?? 0) + finalN
   if (g.score > g.best) {
     g.best = g.score
     g.newRecord = true
@@ -108,6 +111,7 @@ export function addScore(g: Game, n: number, x: number, y: number, color: string
 /** Начисление очков без попапа и проверки рекорда (как было в damageBoss/killBoss). */
 export function addRawScore(g: Game, n: number) {
   g.score += n
+  g.runBossesScore = (g.runBossesScore ?? 0) + n
 }
 
 /** Смерть босса засчитана в статистику партии (для достижений). */
@@ -121,6 +125,14 @@ export function onBossKilled(g: Game) {
 /* ---------- переходы ---------- */
 
 export function onLevelCleared(g: Game) {
+  g.runSectorsCleared = (g.runSectorsCleared ?? 0) + 1
+  if (
+    g.runSectorStartTime > 0 &&
+    g.time - g.runSectorStartTime <= FAST_CLEAR_PAR_SECONDS &&
+    !g.levelLostBall
+  ) {
+    g.runFastClears = (g.runFastClears ?? 0) + 1
+  }
   if (!g.levelLostBall) {
     g.score += 500
     if (g.score > g.best) {
@@ -141,6 +153,7 @@ export function onLevelCleared(g: Game) {
   g.flash = 1
   g.hitStop = Math.max(g.hitStop, 0.35)
   if (g.mode === "custom") {
+    applyFinalScoreBreakdown(g)
     finishCustomRun(g, "won")
     return
   }
@@ -167,6 +180,7 @@ export function onLevelCleared(g: Game) {
           g.finalBossDefeated = g.activeBossKind
         }
         // Финальный босс карты повержен — забег пройден.
+        applyFinalScoreBreakdown(g)
         g.phase = "won"
         const mult = g.campaignRelics.relicConverter ? 1.5 : 1.0
         const earnedCoins = Math.round(g.crystalsRunTotal * mult)
@@ -267,6 +281,16 @@ export function onLevelCleared(g: Game) {
     return
   }
   g.sfx.levelClear()
+  if (g.level >= LEVELS.length) {
+    applyFinalScoreBreakdown(g)
+    g.phase = "won"
+    g.input.releaseLock()
+    applyTrack(g)
+    g.sfx.win()
+    saveTop(g)
+    pushHud(g)
+    return
+  }
   g.level++
   buildLevel(g, g.level)
   applyTrack(g) // новый случайный трек на новый уровень
@@ -328,6 +352,7 @@ export function loseLife(g: Game) {
   g.prevLeftDown = false
   g.prevRightDown = false
   if (g.lives <= 0) {
+    applyFinalScoreBreakdown(g)
     if (g.mode === "custom") {
       finishCustomRun(g, "over")
       return

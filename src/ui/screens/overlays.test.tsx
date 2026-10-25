@@ -1,27 +1,138 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 
-import type { HudData } from "../../game/types"
+import type { HudData, RunScoreBreakdown } from "../../game/types"
 
-import { WinScreen } from "./overlays"
+import { GameOverScreen, ScoreBreakdownTable, WinScreen } from "./overlays"
+
+const mockBreakdown: RunScoreBreakdown = {
+  baseScore: 10000,
+  blocksDestroyed: 35,
+  blocksScore: 4500,
+  bossesDefeated: 1,
+  bossesScore: 3000,
+  livesRemaining: 3,
+  livesBonus: 1500,
+  shieldsRemaining: 1,
+  shieldsBonus: 250,
+  maxCombo: 8,
+  comboBonus: 800,
+  critHits: 2,
+  critBonus: 600,
+  clutchSaves: 1,
+  clutchBonus: 400,
+  sectorsCleared: 4,
+  fastClears: 2,
+  speedBonus: 1200,
+  mutatorBonusPercent: 20,
+  mutatorsMultiplier: 1.2,
+  activeMutators: ["fog"],
+  endBonusTotal: 5700,
+  finalScore: 15700,
+  items: [
+    { id: "blocks", label: "Разрушенные блоки", detail: "35 шт.", points: 4500, icon: "🧱" },
+    { id: "bosses", label: "Поверженные боссы", detail: "1 босс(ов)", points: 3000, icon: "👑" },
+    { id: "lives", label: "Сэкономленные жизни", detail: "3 × 500", points: 1800, icon: "💖" },
+    { id: "shields", label: "Защитные энергощиты", detail: "1 × 250", points: 300, icon: "🛡" },
+    { id: "combo", label: "Максимальная серия комбо", detail: "Серия ×8", points: 960, icon: "🔥" },
+    { id: "crits", label: "Критические рикошеты ×3", detail: "2 × 300", points: 720, icon: "🎯" },
+    { id: "clutch", label: "Сэйвы на грани ракетки", detail: "1 × 400", points: 480, icon: "⚡" },
+    {
+      id: "speed",
+      label: "Скоростная зачистка",
+      detail: "2 секторов (< 45 с)",
+      points: 1440,
+      icon: "⏱",
+    },
+    {
+      id: "mutators",
+      label: "Множитель мутаторов",
+      detail: "🌫 +20% к очкам",
+      points: 0,
+      icon: "🧬",
+      isMultiplier: true,
+    },
+  ],
+}
 
 const makeWinHud = (
   mode: HudData["mode"],
-  finalBossDefeated?: HudData["finalBossDefeated"]
+  finalBossDefeated?: HudData["finalBossDefeated"],
+  scoreBreakdown?: RunScoreBreakdown | null
 ): HudData =>
   ({
     phase: "won",
     mode,
     finalBossDefeated,
-    score: 12500,
-    best: 15000,
+    score: 15700,
+    best: 20000,
     coins: 45,
     newRecord: false,
+    scoreBreakdown: scoreBreakdown ?? null,
   }) as unknown as HudData
 
+describe("ScoreBreakdownTable", () => {
+  it("рендерит строки детализации с иконками, очками и множителем мутаторов", () => {
+    const html = renderToStaticMarkup(<ScoreBreakdownTable breakdown={mockBreakdown} />)
+
+    expect(html).toContain("Детализация очков")
+    expect(html).toContain("+20% Мутаторы")
+    expect(html).toContain("Разрушенные блоки")
+    expect(html).toContain("35 шт.")
+    expect(html).toContain("Поверженные боссы")
+    expect(html).toContain("Сэкономленные жизни")
+    expect(html).toContain("Защитные энергощиты")
+    expect(html).toContain("Максимальная серия комбо")
+    expect(html).toContain("Критические рикошеты ×3")
+    expect(html).toContain("Сэйвы на грани ракетки")
+    expect(html).toContain("Скоростная зачистка")
+    expect(html).toContain("×1.20")
+    expect(html).toContain((5700).toLocaleString("ru-RU"))
+    expect(html).toContain("Бонус за завершение:")
+  })
+
+  it("возвращает null для пустого breakdown", () => {
+    const emptyBreakdown: RunScoreBreakdown = {
+      ...mockBreakdown,
+      items: [],
+      endBonusTotal: 0,
+    }
+    const html = renderToStaticMarkup(<ScoreBreakdownTable breakdown={emptyBreakdown} />)
+    expect(html).toBe("")
+  })
+})
+
+describe("GameOverScreen", () => {
+  it("отображает экран поражения и таблицу детализации очков при наличии breakdown", () => {
+    const hud: HudData = {
+      phase: "over",
+      mode: "campaign",
+      score: 15700,
+      best: 20000,
+      newRecord: true,
+      scoreBreakdown: mockBreakdown,
+    } as unknown as HudData
+
+    const html = renderToStaticMarkup(
+      <GameOverScreen
+        hud={hud}
+        topSubmit={<div>[TOP_SUBMIT]</div>}
+        onRestart={() => {}}
+        onMenu={() => {}}
+      />
+    )
+
+    expect(html).toContain("ИГРА ОКОНЧЕНА")
+    expect(html).toContain("НОВЫЙ РЕКОРД!")
+    expect(html).toContain("Детализация очков")
+    expect(html).toContain("Разрушенные блоки")
+    expect(html).toContain("Сэкономленные жизни")
+  })
+})
+
 describe("WinScreen", () => {
-  it("рендерит космический эпилог станции «СФЕРА-1080» для режима кампании", () => {
-    const hud = makeWinHud("campaign", "chrono")
+  it("рендерит космический эпилог станции «СФЕРА-1080» и Score Breakdown для режима кампании", () => {
+    const hud = makeWinHud("campaign", "chrono", mockBreakdown)
     const html = renderToStaticMarkup(
       <WinScreen
         hud={hud}
@@ -36,10 +147,12 @@ describe("WinScreen", () => {
     expect(html).toContain("+150 💠")
     expect(html).toContain("МЕТА-КРИСТАЛЛОВ")
     expect(html).toContain(hud.score.toLocaleString("ru-RU"))
+    expect(html).toContain("Детализация очков")
+    expect(html).toContain("Поверженные боссы")
   })
 
-  it("рендерит классический экран победы для остальных режимов", () => {
-    const hud = makeWinHud("endless")
+  it("рендерит классический экран победы и Score Breakdown для остальных режимов", () => {
+    const hud = makeWinHud("endless", undefined, mockBreakdown)
     const html = renderToStaticMarkup(
       <WinScreen
         hud={hud}
@@ -51,5 +164,7 @@ describe("WinScreen", () => {
     expect(html).toContain("ПОБЕДА!")
     expect(html).toContain("Все шары лопнули")
     expect(html).not.toContain("СФЕРА-1080")
+    expect(html).toContain("Детализация очков")
+    expect(html).toContain("Скоростная зачистка")
   })
 })

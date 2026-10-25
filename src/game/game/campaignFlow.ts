@@ -381,6 +381,7 @@ export function launchNodeBattle(g: Game, label: string) {
   }
 
   g.laserArmedUntil = g.laserArmed ? Number.POSITIVE_INFINITY : 0
+  g.runSectorStartTime = g.time
   serveBall(g)
   g.phase = "playing"
   applyTrack(g)

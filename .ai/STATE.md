@@ -1,11 +1,35 @@
 # Agent State
 
-**Последнее обновление**: 2026-10-25 22:42
+**Последнее обновление**: 2026-10-25 23:45
 
 ## Текущая фаза
 
-Движение по роадмапу — пункт 2.2 «Сюжетные терминалы в событиях кампании» закрыт (T-034),
-далее пункт 2.3 «Прозрачный экран детального подсчёта очков (Score Breakdown)».
+Движение по роадмапу — пункт 2.3 «Прозрачный экран детального подсчёта очков (Score Breakdown)» закрыт (T-035).
+Все пункты раздела 2 дорожной карты (Phase 1) завершены! Следующий шаг — раздел 3 (Phase 2 / Mid-term: дерево синергий перков и реликвий, ежедневные испытания).
+
+**T-035 (25.10.2026) — Прозрачный экран детального подсчёта очков (Score Breakdown)**:
+
+1. **Модель подсчёта очков (`src/game/scoreBreakdown.ts`)**:
+   - `RunScoreBreakdown`, `ScoreBreakdownItem` и константы бонусов:
+     - Очки за разрушенные блоки и поверженных боссов.
+     - Бонус за сэкономленные жизни (`BONUS_PER_LIFE = 500`) и щиты (`BONUS_PER_SHIELD = 250`).
+     - Бонус за максимальную серию комбо (`BONUS_PER_MAX_COMBO = 100` за ступень при $\ge 3$).
+     - Бонус за критические рикошеты по боссам $\times 3$ (`BONUS_PER_CRIT = 300`).
+     - Бонус за сэйвы на грани ракетки (`BONUS_PER_CLUTCH = 400`).
+     - Бонус за скоростную зачистку секторов под нормативом 45 с (`BONUS_PER_FAST_CLEAR = 600`).
+     - Множители активных мутаторов кампании (до $+240\%$), масштабирующие финальный бонус.
+   - Функции `computeScoreBreakdown`, `applyFinalScoreBreakdown` (идемпотентное применение к счёту и рекорду) и `resetRunStats`.
+2. **Аккумуляция игровой статистики в движке**:
+   - Поля `runBlocksDestroyed`, `runBlocksScore`, `runBossesScore`, `runMaxCombo`, `runCritHits`, `runClutchSaves`, `runSectorsCleared`, `runFastClears`, `runSectorStartTime`, `scoreBreakdown`.
+   - Трекинг в `physics/destruction.ts` (`onBlockDestroyed`), `game/hosts.ts` (`combo`, `damageBoss`, `onClutchSave`), `runFlow.ts` (`addScore`, `addRawScore`, `onLevelCleared`, `loseLife`), `levelBuild.ts`, `campaignFlow.ts`, `modes.ts`.
+   - Проброс `scoreBreakdown` в `HudData` через `pushHud`.
+3. **UI кибер-таблицы Score Breakdown (`src/ui/screens/overlays.tsx`)**:
+   - Неоновый компонент `ScoreBreakdownTable`: разбивка по категориям с иконками, деталями, очками, множителем мутаторов и суммарным бонусом за завершение.
+   - Интеграция в `GameOverScreen` (поражение) и `WinScreen` (победа в кампании с эпилогом станции «СФЕРА-1080» и классическая победа).
+   - Поддержка вертикальной прокрутки оверлея на компактных экранах.
+4. **Тесты и верификация**:
+   - Новые тесты `src/game/scoreBreakdown.test.ts` (6 тестов) и дополненные тесты `src/ui/screens/overlays.test.tsx` (5 тестов).
+   - 72 тестовых файла, 585 тестов — 100% green; `typecheck`, `lint:check`, `format:check` — 0 errors, 0 warnings.
 
 **T-034 (25.10.2026) — Сюжетные терминалы станции «СФЕРА-1080» в событиях кампании**:
 

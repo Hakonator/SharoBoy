@@ -113,6 +113,7 @@ export function damageBlock(
     }
   }
   b.dead = true
+  g.onBlockDestroyed?.()
   // Если уничтожен сегмент щупальца, то уничтожаем все сегменты,
   // которые дальше от туловища (с большим номером tentacleSeg).
   if (b.isTentacle) {
