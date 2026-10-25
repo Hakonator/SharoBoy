@@ -287,10 +287,8 @@ export interface BossState {
   lampreyBoltTimer?: number
   /** Прогресс телеграфа разряда 0..1. */
   lampreyCharge?: number
-  /** Голова отбита: тела на арене нет, минога отращивает новую (HEAD_REGEN_TIME). */
+  /** Голова отбита: минога мертва (`stepLamprey` убивает босса в тот же кадр). */
   lampreyHeadDown?: boolean
-  /** Секунды до отражения головы, когда `lampreyHeadDown`. */
-  lampreyRevive?: number
   /** Босс «Повелитель Времени»: хроносфера со стрелками времени и временными воронками. */
   isChrono?: boolean
   chronoRifts?: ChronoRift[]

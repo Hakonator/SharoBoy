@@ -902,12 +902,145 @@ function drawLampreyBolt(ctx: Ctx, b: Block, time: number) {
 }
 
 /**
- * «Глубинная Электрическая Минога»: цепочка сегментов по периметру арены.
- * Тело — одна линия по центрам живых сегментов (та же геометрия, что в
- * bossLamprey), голова с зубастым кольцом рта, а во время телеграфа — дуги
- * разрядов, бегущие вдоль тела.
+ * Объёмный контур тела миноги.
+ *
+ * Раньше тело рисовалось двумя линиями постоянной ширины — получалась «толстая
+ * проволока». Теперь строится настоящий силуэт: вдоль оси (цепочка центров
+ * сегментов) берётся нормаль в каждой точке, и контур описывается как
+ * «ось + нормаль·полуширина» сверху и «ось − нормаль·полуширина» снизу.
+ * Полуширина берётся из радиусов сегментов, поэтому тело сужается к хвосту и
+ * расширяется у головы, а тонкие места между сегментами дают эффект
+ * «сплюснутых» позвонков — силуэт живой, а не труба.
+ *
+ * `edge` масштабирует полуширину: 1 — внешняя кромка, 0.72 — тело, 0.4 —
+ * спинная полоса (блик). Один и тот же путь используется для заливки, обводки
+ * и внутренних слоёв, чтобы слои не «разъезжались».
  */
-function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[]) {
+function lampreyBodyPath(ctx: Ctx, pts: { x: number; y: number }[], radii: number[], edge: number) {
+  const n = pts.length
+  if (n < 2) return
+  // Нормаль в точке: перпендикуляр к усреднённому направлению соседей —
+  // так излом на повороте тела не даёт «шва» в силуэте.
+  const nx: number[] = []
+  const ny: number[] = []
+  for (let i = 0; i < n; i++) {
+    const a = pts[Math.max(0, i - 1)]
+    const b = pts[Math.min(n - 1, i + 1)]
+    const dx = b.x - a.x
+    const dy = b.y - a.y
+    const len = Math.hypot(dx, dy) || 1
+    nx.push(-dy / len)
+    ny.push(dx / len)
+  }
+  const half = (i: number) => Math.max(2, radii[i] * edge)
+
+  ctx.beginPath()
+  // верхняя кромка: голова → хвост (квадратичные сглаживания к серединам)
+  const top: { x: number; y: number }[] = []
+  for (let i = 0; i < n; i++) {
+    const r = half(i)
+    top.push({ x: pts[i].x + nx[i] * r, y: pts[i].y + ny[i] * r })
+  }
+  const bot: { x: number; y: number }[] = []
+  for (let i = n - 1; i >= 0; i--) {
+    const r = half(i)
+    bot.push({ x: pts[i].x - nx[i] * r, y: pts[i].y - ny[i] * r })
+  }
+  const trace = (list: { x: number; y: number }[]) => {
+    ctx.moveTo(list[0].x, list[0].y)
+    for (let i = 1; i < list.length; i++) {
+      const p = list[i - 1]
+      const c = list[i]
+      ctx.quadraticCurveTo(p.x, p.y, (p.x + c.x) / 2, (p.y + c.y) / 2)
+    }
+    const last = list[list.length - 1]
+    ctx.lineTo(last.x, last.y)
+  }
+  trace(top)
+  trace(bot)
+  ctx.closePath()
+}
+
+/**
+ * Глаз миноги: моргает и следит за ближайшим шаром.
+ *
+ * Взгляд — это смещение зрачка внутри склеры по направлению к шару (нормаль
+ * ограничена `pupil*0.45`, чтобы зрачок не вылезал за глаз). Моргание —
+ * периодическое закрытие века: `blinkPeriod` задаётся по индексу головы и
+ * времени, поэтому минога моргает «живо», а не строго по метроному.
+ */
+function drawLampreyEye(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  r: number,
+  lookX: number,
+  lookY: number,
+  time: number,
+  seed: number
+) {
+  const dx = lookX - x
+  const dy = lookY - y
+  const len = Math.hypot(dx, dy) || 1
+  const reach = r * 0.45
+  const px = x + (dx / len) * reach
+  const py = y + (dy / len) * reach
+  // Моргание: 3.6 с цикл со сдвигом по seed; закрыто ~0.13 с.
+  const cycle = 3.6 + (seed % 7) * 0.21
+  const phase = ((time + seed * 0.37) % cycle) / cycle
+  const blink = phase > 0.955 ? 1 - Math.abs((phase - 0.9775) / 0.0225) : 0
+
+  ctx.save()
+  // склера
+  ctx.fillStyle = "#e8fff2"
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.fill()
+  // радужка с зелёным свечением — «электрический» взгляд
+  const g = ctx.createRadialGradient(px, py, r * 0.1, px, py, r * 0.82)
+  g.addColorStop(0, "#c8ff7a")
+  g.addColorStop(0.55, "#4dff9e")
+  g.addColorStop(1, "#0f6b4a")
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(px, py, r * 0.82, 0, Math.PI * 2)
+  ctx.fill()
+  // зрачок
+  ctx.fillStyle = "#04140d"
+  ctx.beginPath()
+  ctx.arc(px, py, r * 0.42, 0, Math.PI * 2)
+  ctx.fill()
+  // блик
+  ctx.fillStyle = "rgba(255,255,255,0.9)"
+  ctx.beginPath()
+  ctx.arc(px - r * 0.22, py - r * 0.26, r * 0.2, 0, Math.PI * 2)
+  ctx.fill()
+
+  if (blink > 0) {
+    // Веко опускается сверху: закрашиваем глаз фоном-«кожей» и рисуем ресницу.
+    ctx.fillStyle = "#0a2b22"
+    ctx.beginPath()
+    ctx.ellipse(x, y, r * 1.02, r * 1.02 * blink, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = "rgba(157,255,92,0.8)"
+    ctx.lineWidth = Math.max(1.2, r * 0.16)
+    ctx.beginPath()
+    ctx.moveTo(x - r, y + r * (1 - blink) * 0.5)
+    ctx.lineTo(x + r, y + r * (1 - blink) * 0.5)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+/**
+ * «Глубинная Электрическая Минога»: цепочка сегментов по периметру арены.
+ *
+ * Тело — объёмный силуэт по центрам живых сегментов (та же геометрия, что в
+ * bossLamprey): тёмный контур, градиентная заливка «от спины к брюху»,
+ * сегментные перетяжки, спинная светящаяся полоса, плавники и хвост. Глаз
+ * моргает и следит за шаром. Во время телеграфа вдоль тела бегут разряды.
+ */
+function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[], balls: Ball[]) {
   const segs = blocks
     .filter((b) => b.isLampreySeg && !b.dead)
     .sort((a, b) => (a.lampreySeg ?? 0) - (b.lampreySeg ?? 0))
@@ -919,22 +1052,92 @@ function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[]) {
   for (const b of blocks) {
     if (b.lampreyBolt && !b.dead) drawLampreyBolt(ctx, b, bo.t)
   }
-  // Тело: тёмная основа + светящаяся линия. Если голова отбита, линия идёт
-  // от первого живого сегмента — никаких «рваных» отрезков в пустоту.
+  /* Тело: объёмный силуэт вместо прежней «толстой линии». Слои снизу вверх —
+     тень на дне, внешняя кромка, тело с градиентом «спина → брюхо», спинная
+     полоса-блик. Полуширина берётся из радиусов сегментов, поэтому тело
+     сужается к хвосту и слегка пережимается между позвонками. */
   if (segs.length > 1) {
+    const pts = segs.map((b) => ({ x: b.x, y: b.y }))
+    // Полуширина силуэта в каждой точке = радиус её сегмента: тело сужается
+    // к хвосту ровно так же, как сужаются хитбоксы.
+    const rads = segs.map((b) => Math.max(6, b.rx))
+
     ctx.save()
-    ctx.lineCap = "round"
-    ctx.strokeStyle = "rgba(9,48,40,0.85)"
-    ctx.lineWidth = 22
-    ctx.beginPath()
-    ctx.moveTo(segs[0].x, segs[0].y)
-    for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y)
+    // 1. Тень на «дне» — тело отрывается от арены, силуэт читается объёмным.
+    ctx.save()
+    ctx.translate(0, 5)
+    lampreyBodyPath(ctx, pts, rads, 1.18)
+    ctx.fillStyle = "rgba(2,18,14,0.45)"
+    ctx.fill()
+    ctx.restore()
+
+    // 2. Внешняя тёмная кромка: контур «шкуры».
+    lampreyBodyPath(ctx, pts, rads, 1.0)
+    ctx.fillStyle = "#08251c"
+    ctx.fill()
+    ctx.strokeStyle = "rgba(157,255,92,0.5)"
+    ctx.lineWidth = 2
     ctx.stroke()
+
+    // 3. Тело с поперечным градиентом: спина светлее, брюхо в тени.
+    lampreyBodyPath(ctx, pts, rads, 0.82)
+    const top = Math.min(...pts.map((p) => p.y))
+    const bot = Math.max(...pts.map((p) => p.y))
+    const shade = ctx.createLinearGradient(0, top - 12, 0, bot + 12)
+    shade.addColorStop(0, angry ? "#7a1030" : "#1c5c3c")
+    shade.addColorStop(0.45, angry ? "#c81f52" : "#2f9a5e")
+    shade.addColorStop(1, angry ? "#2a0a16" : "#0c3227")
+    ctx.fillStyle = shade
+    ctx.fill()
+
+    // 4. Спинная светящаяся полоса: узкий блик вдоль верхней кромки.
+    lampreyBodyPath(ctx, pts, rads, 0.34)
+    ctx.save()
     ctx.shadowColor = bodyGlow
-    ctx.shadowBlur = 24
-    ctx.strokeStyle = bodyGlow
-    ctx.lineWidth = 12
-    ctx.stroke()
+    ctx.shadowBlur = 18
+    ctx.fillStyle = angry ? "rgba(255,92,168,0.55)" : "rgba(77,255,158,0.5)"
+    ctx.fill()
+    ctx.restore()
+
+    // 5. Перетяжки между позвонками: короткие дуги поперёк тела.
+    ctx.save()
+    ctx.strokeStyle = "rgba(6,30,24,0.55)"
+    ctx.lineWidth = 2
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1]
+      const c = pts[i]
+      const dx = c.x - a.x
+      const dy = c.y - a.y
+      const len = Math.hypot(dx, dy) || 1
+      const nx = -dy / len
+      const ny = dx / len
+      const rr = rads[i] * 0.8
+      ctx.beginPath()
+      ctx.moveTo(c.x + nx * rr, c.y + ny * rr)
+      ctx.quadraticCurveTo(c.x, c.y, c.x - nx * rr, c.y - ny * rr)
+      ctx.stroke()
+    }
+    ctx.restore()
+
+    // 6. Хвостовой плавник за последним сегментом.
+    const tl = pts[pts.length - 1]
+    const tp = pts[pts.length - 2]
+    const tdx = tl.x - tp.x
+    const tdy = tl.y - tp.y
+    const tlen = Math.hypot(tdx, tdy) || 1
+    const ux = tdx / tlen
+    const uy = tdy / tlen
+    const span = Math.max(10, segs[segs.length - 1].rx * 1.6)
+    ctx.save()
+    ctx.translate(tl.x, tl.y)
+    ctx.rotate(Math.atan2(uy, ux))
+    ctx.fillStyle = angry ? "rgba(255,92,168,0.75)" : "rgba(77,255,158,0.7)"
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.quadraticCurveTo(span * 0.6, -span * 0.9, span * 1.5, 0)
+    ctx.quadraticCurveTo(span * 0.6, span * 0.9, 0, 0)
+    ctx.fill()
+    ctx.restore()
     ctx.restore()
   }
 
@@ -986,6 +1189,32 @@ function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[]) {
     ctx.beginPath()
     ctx.arc(0, 0, b.rx * 0.32, 0, Math.PI * 2)
     ctx.fill()
+    ctx.restore()
+
+    /* Глаз: моргает и следит за ближайшим шаром. Целимся в шар, который игрок
+       реально видит на арене; если шаров нет — смотрит по направлению движения
+       головы, чтобы взгляд не застывал в пустоту. */
+    const eyeX = b.x + (segs[1] ? (b.x - segs[1].x) * 0.12 : 0) - b.rx * 0.12
+    const eyeY = b.y - b.rx * 0.34
+    let lookX = bo.x + Math.cos((bo.t ?? 0) * 0.9) * 40
+    let lookY = bo.y + Math.sin((bo.t ?? 0) * 0.9) * 40
+    if (balls.length) {
+      let best = balls[0]
+      let bestD = Infinity
+      for (const ball of balls) {
+        const d = Math.hypot(ball.x - eyeX, ball.y - eyeY)
+        if (d < bestD) {
+          bestD = d
+          best = ball
+        }
+      }
+      lookX = best.x
+      lookY = best.y
+    }
+    drawLampreyEye(ctx, eyeX, eyeY, b.rx * 0.34, lookX, lookY, bo.t ?? 0, seg)
+
+    ctx.save()
+    ctx.translate(b.x, b.y)
     if (bo.flash > 0) {
       ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.7})`
       ctx.beginPath()
@@ -1048,7 +1277,7 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
     return
   }
   if (bo.isLamprey) {
-    drawLampreyBoss(ctx, bo, blocks)
+    drawLampreyBoss(ctx, bo, blocks, balls)
     return
   }
   if (bo.isChrono) {
