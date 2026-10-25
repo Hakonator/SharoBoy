@@ -964,28 +964,26 @@ function lampreyBodyPath(ctx: Ctx, pts: { x: number; y: number }[], radii: numbe
 /**
  * Глаз миноги: моргает и следит за ближайшим шаром.
  *
- * Взгляд — это смещение зрачка внутри склеры по направлению к шару (нормаль
- * ограничена `pupil*0.45`, чтобы зрачок не вылезал за глаз). Моргание —
- * периодическое закрытие века: `blinkPeriod` задаётся по индексу головы и
- * времени, поэтому минога моргает «живо», а не строго по метроному.
+ * Рисуется в локальных координатах (центр `0,0`) — вызывается внутри
+ * `translate` к центру головы, поэтому глаз совпадает с существующим кругом
+ * пасти. `dirX/dirY` — направление на цель: зрачок смещается туда, но не
+ * дальше `r*0.32`, чтобы не вылезти на кольцо зубов.
+ * Моргание — периодическое закрытие века; период сдвинут по seed, поэтому
+ * минога моргает «живо», а не по метроному.
  */
 function drawLampreyEye(
   ctx: Ctx,
-  x: number,
-  y: number,
+  dirX: number,
+  dirY: number,
   r: number,
-  lookX: number,
-  lookY: number,
   time: number,
   seed: number
 ) {
-  const dx = lookX - x
-  const dy = lookY - y
-  const len = Math.hypot(dx, dy) || 1
-  const reach = r * 0.45
-  const px = x + (dx / len) * reach
-  const py = y + (dy / len) * reach
-  // Моргание: 3.6 с цикл со сдвигом по seed; закрыто ~0.13 с.
+  const len = Math.hypot(dirX, dirY) || 1
+  const reach = r * 0.32
+  const px = (dirX / len) * reach
+  const py = (dirY / len) * reach
+  // Моргание: ~3.6 с цикл со сдвигом по seed; закрыто ~0.13 с.
   const cycle = 3.6 + (seed % 7) * 0.21
   const phase = ((time + seed * 0.37) % cycle) / cycle
   const blink = phase > 0.955 ? 1 - Math.abs((phase - 0.9775) / 0.0225) : 0
@@ -994,7 +992,7 @@ function drawLampreyEye(
   // склера
   ctx.fillStyle = "#e8fff2"
   ctx.beginPath()
-  ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.arc(0, 0, r, 0, Math.PI * 2)
   ctx.fill()
   // радужка с зелёным свечением — «электрический» взгляд
   const g = ctx.createRadialGradient(px, py, r * 0.1, px, py, r * 0.82)
@@ -1020,13 +1018,13 @@ function drawLampreyEye(
     // Веко опускается сверху: закрашиваем глаз фоном-«кожей» и рисуем ресницу.
     ctx.fillStyle = "#0a2b22"
     ctx.beginPath()
-    ctx.ellipse(x, y, r * 1.02, r * 1.02 * blink, 0, 0, Math.PI * 2)
+    ctx.ellipse(0, 0, r * 1.05, r * 1.05 * blink, 0, 0, Math.PI * 2)
     ctx.fill()
     ctx.strokeStyle = "rgba(157,255,92,0.8)"
     ctx.lineWidth = Math.max(1.2, r * 0.16)
     ctx.beginPath()
-    ctx.moveTo(x - r, y + r * (1 - blink) * 0.5)
-    ctx.lineTo(x + r, y + r * (1 - blink) * 0.5)
+    ctx.moveTo(-r, r * (1 - blink) * 0.5)
+    ctx.lineTo(r, r * (1 - blink) * 0.5)
     ctx.stroke()
   }
   ctx.restore()
@@ -1191,18 +1189,17 @@ function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[], balls: Ball[]
     ctx.fill()
     ctx.restore()
 
-    /* Глаз: моргает и следит за ближайшим шаром. Целимся в шар, который игрок
-       реально видит на арене; если шаров нет — смотрит по направлению движения
-       головы, чтобы взгляд не застывал в пустоту. */
-    const eyeX = b.x + (segs[1] ? (b.x - segs[1].x) * 0.12 : 0) - b.rx * 0.12
-    const eyeY = b.y - b.rx * 0.34
+    /* Глаз — это существующий тёмный круг в центре головы (раньше он был
+       просто чёрным зрачком). Отдельный маленький глаз поверх головы убран:
+       он дублировал этот круг и мешал читать пасть. Круг моргает и следит за
+       ближайшим шаром. */
     let lookX = bo.x + Math.cos((bo.t ?? 0) * 0.9) * 40
     let lookY = bo.y + Math.sin((bo.t ?? 0) * 0.9) * 40
     if (balls.length) {
       let best = balls[0]
       let bestD = Infinity
       for (const ball of balls) {
-        const d = Math.hypot(ball.x - eyeX, ball.y - eyeY)
+        const d = Math.hypot(ball.x - b.x, ball.y - b.y)
         if (d < bestD) {
           bestD = d
           best = ball
@@ -1211,7 +1208,11 @@ function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[], balls: Ball[]
       lookX = best.x
       lookY = best.y
     }
-    drawLampreyEye(ctx, eyeX, eyeY, b.rx * 0.34, lookX, lookY, bo.t ?? 0, seg)
+    const eyeR = b.rx * 0.32
+    ctx.save()
+    ctx.translate(b.x, b.y)
+    drawLampreyEye(ctx, lookX - b.x, lookY - b.y, eyeR, bo.t ?? 0, seg)
+    ctx.restore()
 
     ctx.save()
     ctx.translate(b.x, b.y)
@@ -1224,24 +1225,20 @@ function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[], balls: Ball[]
     ctx.restore()
   }
 
-  // Дуги разрядов вдоль тела — телеграф выстрела (bo.lampreyCharge)
+  /* Телеграф разряда: свечение вдоль спины и дуги ТОЛЬКО между соседними
+     позвонками. Раньше здесь были зигзаги через всё тело — они визуально
+     «сшивали» хвост с головой отдельными линиями поверх силуэта, что выглядело
+     как лишние провода. Теперь электричество читается по свечению тела. */
   const charge = clamp(bo.lampreyCharge ?? 0, 0, 1)
-  if (charge > 0.05) {
+  if (charge > 0.05 && segs.length > 1) {
+    const pts = segs.map((b) => ({ x: b.x, y: b.y }))
+    const rads = segs.map((b) => Math.max(6, b.rx))
     ctx.save()
     ctx.shadowColor = "#c8ff7a"
-    ctx.shadowBlur = 10 + charge * 20
-    ctx.strokeStyle = `rgba(200,255,122,${0.4 + charge * 0.5})`
-    ctx.lineWidth = 2
-    for (let i = 1; i < segs.length; i++) {
-      const a = segs[i - 1]
-      const c = segs[i]
-      const off = (i % 2 ? 1 : -1) * (6 + charge * 6)
-      ctx.beginPath()
-      ctx.moveTo(a.x, a.y)
-      ctx.lineTo((a.x + c.x) / 2 + off, (a.y + c.y) / 2 - off)
-      ctx.lineTo(c.x, c.y)
-      ctx.stroke()
-    }
+    ctx.shadowBlur = 8 + charge * 22
+    lampreyBodyPath(ctx, pts, rads, 0.5)
+    ctx.fillStyle = `rgba(200,255,122,${0.08 + charge * 0.22})`
+    ctx.fill()
     ctx.restore()
   }
 

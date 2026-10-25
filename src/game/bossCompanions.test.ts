@@ -86,6 +86,24 @@ describe("Крио-Дрон Утилизатор: сборка арены", () =
     blocks.filter((b) => b.cryoSeg === 1)[0].dead = true
     expect(cryoTurbinesAlive(blocks)).toBe(1)
   })
+
+  it("крио-дрон: снос любого звена борта снимает защиту — с обеих сторон", () => {
+    // Баг из игры: снос правой турбины открывал корпус, а левой — нет.
+    // Теперь защиту держит только полностью целый борт, симметрично.
+    for (const seg of [0, 1]) {
+      for (const side of ["left", "right"] as const) {
+        const { blocks } = buildCryoDrone(800, 600, 60)
+        expect(cryoTurbinesAlive(blocks)).toBe(2)
+        const target = blocks.find((b) => b.cryoSide === side && b.cryoSeg === seg)!
+        target.dead = true
+        // борт повреждён — он больше не защищает корпус
+        expect(cryoTurbinesAlive(blocks)).toBe(1)
+        // второй борт цел и продолжает защищать сам по себе
+        const other = side === "left" ? "right" : "left"
+        expect(blocks.filter((b) => b.cryoSide === other && !b.dead).length).toBe(CRYO_TURBINE_SEGS)
+      }
+    }
+  })
 })
 
 describe("Крио-Дрон Утилизатор: ледяные преграды", () => {

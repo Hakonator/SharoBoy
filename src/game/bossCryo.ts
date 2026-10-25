@@ -139,9 +139,23 @@ export function updateCryoTurbines(bo: BossState, blocks: Block[]) {
   }
 }
 
-/** Живые тарелки: пока их две, тело дрона неуязвимо. */
+/**
+ * Сколько бортов ещё держат защиту корпуса.
+ *
+ * Ключевая тонкость: функция НЕ должна считать только оставшиеся блоки —
+ * разрушенные звенья вычищаются из `g.blocks`, поэтому `parts.filter(!dead)`
+ * вернул бы «все живые» и защита не снималась бы никогда. Ориентир — общее
+ * число сегментов борта `CRYO_TURBINE_SEGS`: борт защищает корпус, пока на
+ * арене стоят ВСЕ его звенья. Снос любого звена (крепления или тарелки) снимает
+ * защиту с этого борта — симметрично для left/right.
+ */
 export function cryoTurbinesAlive(blocks: Block[]): number {
-  return blocks.filter((b) => b.isCryoPart && !b.dead && b.cryoSeg === CRYO_TURBINE_SEGS - 1).length
+  let sides = 0
+  for (const side of ["left", "right"] as const) {
+    const alive = blocks.filter((b) => b.isCryoPart && b.cryoSide === side && !b.dead).length
+    if (alive >= CRYO_TURBINE_SEGS) sides++
+  }
+  return sides
 }
 
 /** Сколько единиц льда ещё стоит на арене (для HUD/диагностики). */

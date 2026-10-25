@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { makeEnv } from "../frameInvariant.helpers"
 import { ACT_BOSS_POOLS } from "../bossVariants"
+import { cryoTurbinesAlive } from "../bossCryo"
 
 /** Все виды боссов, доступные в диагностическом режиме (панель «Отладка»). */
 const DEBUG_BOSS_KINDS = Object.values(ACT_BOSS_POOLS).flat()
@@ -208,16 +209,25 @@ describe("Диагностический режим: новые боссы Ак�
     try {
       game.spawnDebugBoss("cryo")
       const boss = game.bossSys.boss!
-      // корпус дрона защищён, пока живы обе тарелки: сначала сносим их, но
-      // оставляем крепления (seg 0) — именно они раньше «держали» уровень
-      const disks = game.blocks.filter((b) => b.isCryoPart && b.cryoSeg === 1)
-      for (const d of disks) game.physics.damageBlock(d, 99)
+      /* Корпус защищён, пока ОБА борта целы. Сносим по одному звену с каждого
+         борта — этого достаточно, чтобы снять защиту (симметрично left/right),
+         а остальные звенья борта остаются на арене. */
+      for (const side of ["left", "right"] as const) {
+        const link = game.blocks.find((b) => b.isCryoPart && b.cryoSide === side)
+        expect(link).toBeDefined()
+        link!.hp = 1
+        game.physics.damageBlock(link!, 99)
+        expect(link!.dead).toBe(true)
+      }
       game.blocks = game.blocks.filter((b) => !b.dead)
+      // часть борта жива — значит уровень ещё держится не только боссом
       expect(game.blocks.some((b) => b.isCryoPart)).toBe(true)
+      // защита снята: на каждом борту не хватает звена
+      expect(cryoTurbinesAlive(game.blocks)).toBeLessThan(2)
 
       game.bossSys.damage(boss.hp + 10, false)
       expect(game.bossSys.boss).toBeNull()
-      // турбины уходят вместе с боссом (общая цепочка взрывов, а не «висят»)
+      // остатки борта уходят вместе с боссом (общая цепочка взрывов)
       step(2)
       expect(game.blocks.some((b) => b.isCryoPart)).toBe(false)
       expect(game.blocks.length).toBe(0)
