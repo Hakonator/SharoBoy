@@ -904,17 +904,17 @@ function drawLampreyBolt(ctx: Ctx, b: Block, time: number) {
 /**
  * Объёмный контур тела миноги.
  *
- * Раньше тело рисовалось двумя линиями постоянной ширины — получалась «толстая
- * проволока». Теперь строится настоящий силуэт: вдоль оси (цепочка центров
- * сегментов) берётся нормаль в каждой точке, и контур описывается как
- * «ось + нормаль·полуширина» сверху и «ось − нормаль·полуширина» снизу.
- * Полуширина берётся из радиусов сегментов, поэтому тело сужается к хвосту и
- * расширяется у головы, а тонкие места между сегментами дают эффект
- * «сплюснутых» позвонков — силуэт живой, а не труба.
+ * Строится как единый замкнутый путь без разрывов:
+ * 1. Верхняя кромка: от головы (top[0]) до хвоста (top[n-1]).
+ * 2. Скругление кончика хвоста от top[n-1] к bot[0].
+ * 3. Нижняя кромка: от хвоста (bot[0]) назад к голове (bot[n-1]).
+ * 4. Скругление носа головы от bot[n-1] обратно к начальной точке top[0].
+ * 5. closePath() замыкает контур прямо на голове.
  *
- * `edge` масштабирует полуширину: 1 — внешняя кромка, 0.72 — тело, 0.4 —
- * спинная полоса (блик). Один и тот же путь используется для заливки, обводки
- * и внутренних слоёв, чтобы слои не «разъезжались».
+ * Раньше путь разделялся на два moveTo (для top и bot), из-за чего closePath()
+ * соединял последнюю точку bot (на голове) с первой точкой bot (на хвосте),
+ * прочерчивая прямую хорду через всю арену мимо тела. Теперь контур строго
+ * непрерывен и повторяет анатомическую кривую миноги.
  */
 function lampreyBodyPath(ctx: Ctx, pts: { x: number; y: number }[], radii: number[], edge: number) {
   const n = pts.length
@@ -934,99 +934,195 @@ function lampreyBodyPath(ctx: Ctx, pts: { x: number; y: number }[], radii: numbe
   }
   const half = (i: number) => Math.max(2, radii[i] * edge)
 
-  ctx.beginPath()
-  // верхняя кромка: голова → хвост (квадратичные сглаживания к серединам)
+  // Верхняя кромка: голова → хвост
   const top: { x: number; y: number }[] = []
   for (let i = 0; i < n; i++) {
     const r = half(i)
     top.push({ x: pts[i].x + nx[i] * r, y: pts[i].y + ny[i] * r })
   }
+  // Нижняя кромка: хвост → голова
   const bot: { x: number; y: number }[] = []
   for (let i = n - 1; i >= 0; i--) {
     const r = half(i)
     bot.push({ x: pts[i].x - nx[i] * r, y: pts[i].y - ny[i] * r })
   }
-  const trace = (list: { x: number; y: number }[]) => {
-    ctx.moveTo(list[0].x, list[0].y)
-    for (let i = 1; i < list.length; i++) {
-      const p = list[i - 1]
-      const c = list[i]
-      ctx.quadraticCurveTo(p.x, p.y, (p.x + c.x) / 2, (p.y + c.y) / 2)
-    }
-    const last = list[list.length - 1]
-    ctx.lineTo(last.x, last.y)
+
+  ctx.beginPath()
+  // 1. Начинаем на верхней кромке головы
+  ctx.moveTo(top[0].x, top[0].y)
+  for (let i = 1; i < top.length; i++) {
+    const p = top[i - 1]
+    const c = top[i]
+    ctx.quadraticCurveTo(p.x, p.y, (p.x + c.x) / 2, (p.y + c.y) / 2)
   }
-  trace(top)
-  trace(bot)
+  ctx.lineTo(top[top.length - 1].x, top[top.length - 1].y)
+
+  // 2. Скругляем кончик хвоста к началу нижней кромки (bot[0])
+  const tailDx = pts[n - 1].x - pts[n - 2].x
+  const tailDy = pts[n - 1].y - pts[n - 2].y
+  const tailLen = Math.hypot(tailDx, tailDy) || 1
+  const tipX = pts[n - 1].x + (tailDx / tailLen) * half(n - 1)
+  const tipY = pts[n - 1].y + (tailDy / tailLen) * half(n - 1)
+  ctx.quadraticCurveTo(tipX, tipY, bot[0].x, bot[0].y)
+
+  // 3. Идём по нижней кромке от хвоста к голове
+  for (let i = 1; i < bot.length; i++) {
+    const p = bot[i - 1]
+    const c = bot[i]
+    ctx.quadraticCurveTo(p.x, p.y, (p.x + c.x) / 2, (p.y + c.y) / 2)
+  }
+  ctx.lineTo(bot[bot.length - 1].x, bot[bot.length - 1].y)
+
+  // 4. Скругляем нос головы обратно к top[0]
+  const headDx = pts[0].x - pts[1].x
+  const headDy = pts[0].y - pts[1].y
+  const headLen = Math.hypot(headDx, headDy) || 1
+  const snoutX = pts[0].x + (headDx / headLen) * half(0)
+  const snoutY = pts[0].y + (headDy / headLen) * half(0)
+  ctx.quadraticCurveTo(snoutX, snoutY, top[0].x, top[0].y)
+
+  // 5. Замыкаем путь на голове — никаких хорд через арену к хвосту!
   ctx.closePath()
 }
 
 /**
- * Глаз миноги: моргает и следит за ближайшим шаром.
+ * Глаз миноги: живой хищный орган, анатомически согласованный с телом.
  *
- * Рисуется в локальных координатах (центр `0,0`) — вызывается внутри
- * `translate` к центру головы, поэтому глаз совпадает с существующим кругом
- * пасти. `dirX/dirY` — направление на цель: зрачок смещается туда, но не
- * дальше `r*0.32`, чтобы не вылезти на кольцо зубов.
- * Моргание — периодическое закрытие века; период сдвинут по seed, поэтому
- * минога моргает «живо», а не по метроному.
+ * Рисуется в локальных координатах головы (после rotate по курсу движения):
+ * - Глаз всегда ориентирован вдоль тела, а не плоским стикером на экране.
+ * - Взгляд: зрачок следит за мячом (localLookX/localLookY).
+ * - Удар (bo.flash > 0): мгновенный рефлекс боли — глаз зажмуривается.
+ * - Зарядка молнии (bo.lampreyCharge > 0): агрессивный прищур, вспышка электрического света.
+ * - Спокойное состояние: естественный короткий блинк (~0.14 с) каждые ~3.8 с.
+ * - Веки: смыкаются сверху и снизу вдоль оси головы цветом шкуры миноги.
  */
 function drawLampreyEye(
   ctx: Ctx,
-  dirX: number,
-  dirY: number,
+  localLookX: number,
+  localLookY: number,
   r: number,
   time: number,
-  seed: number
+  bo: BossState,
+  angry: boolean
 ) {
-  const len = Math.hypot(dirX, dirY) || 1
-  const reach = r * 0.32
-  const px = (dirX / len) * reach
-  const py = (dirY / len) * reach
-  // Моргание: ~3.6 с цикл со сдвигом по seed; закрыто ~0.13 с.
-  const cycle = 3.6 + (seed % 7) * 0.21
-  const phase = ((time + seed * 0.37) % cycle) / cycle
-  const blink = phase > 0.955 ? 1 - Math.abs((phase - 0.9775) / 0.0225) : 0
+  // 1. Рефлекс зажмуривания от полученного урона:
+  const hitFlinch = clamp((bo.flash ?? 0) * 2.2, 0, 1)
+
+  // 2. Агрессивный прищур при подготовке электрического удара:
+  const charge = clamp(bo.lampreyCharge ?? 0, 0, 1)
+  const chargeSquint = charge > 0.05 ? clamp(charge * 0.65, 0, 0.65) : 0
+
+  // 3. Естественное моргание в спокойном состоянии (только когда босс не получает урон и не стреляет):
+  let idleBlink = 0
+  if (hitFlinch <= 0.05 && charge <= 0.1) {
+    const cycle = 3.8
+    const phase = (time % cycle) / cycle
+    if (phase > 0.963) {
+      const t = (phase - 0.963) / 0.037
+      idleBlink = Math.sin(t * Math.PI)
+    }
+  }
+
+  // Общий коэффициент закрытия век (0 — распахнут, 1 — полностью сомкнут):
+  const blink = clamp(Math.max(hitFlinch, chargeSquint, idleBlink), 0, 1)
 
   ctx.save()
-  // склера
-  ctx.fillStyle = "#e8fff2"
+
+  // 1. Тёмная впадина глазницы в шкуре головы:
+  ctx.fillStyle = angry ? "#1f050d" : "#03140e"
   ctx.beginPath()
   ctx.arc(0, 0, r, 0, Math.PI * 2)
   ctx.fill()
-  // радужка с зелёным свечением — «электрический» взгляд
-  const g = ctx.createRadialGradient(px, py, r * 0.1, px, py, r * 0.82)
-  g.addColorStop(0, "#c8ff7a")
-  g.addColorStop(0.55, "#4dff9e")
-  g.addColorStop(1, "#0f6b4a")
-  ctx.fillStyle = g
+
+  // 2. Склера
+  const scleraColor = angry ? "#ffd6de" : "#dcfce7"
+  ctx.fillStyle = scleraColor
   ctx.beginPath()
-  ctx.arc(px, py, r * 0.82, 0, Math.PI * 2)
-  ctx.fill()
-  // зрачок
-  ctx.fillStyle = "#04140d"
-  ctx.beginPath()
-  ctx.arc(px, py, r * 0.42, 0, Math.PI * 2)
-  ctx.fill()
-  // блик
-  ctx.fillStyle = "rgba(255,255,255,0.9)"
-  ctx.beginPath()
-  ctx.arc(px - r * 0.22, py - r * 0.26, r * 0.2, 0, Math.PI * 2)
+  ctx.arc(0, 0, r * 0.92, 0, Math.PI * 2)
   ctx.fill()
 
-  if (blink > 0) {
-    // Веко опускается сверху: закрашиваем глаз фоном-«кожей» и рисуем ресницу.
-    ctx.fillStyle = "#0a2b22"
-    ctx.beginPath()
-    ctx.ellipse(0, 0, r * 1.05, r * 1.05 * blink, 0, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.strokeStyle = "rgba(157,255,92,0.8)"
-    ctx.lineWidth = Math.max(1.2, r * 0.16)
-    ctx.beginPath()
-    ctx.moveTo(-r, r * (1 - blink) * 0.5)
-    ctx.lineTo(r, r * (1 - blink) * 0.5)
-    ctx.stroke()
+  // 3. Смещение радужки/зрачка к цели:
+  const len = Math.hypot(localLookX, localLookY) || 1
+  const reach = r * 0.28
+  const px = (localLookX / len) * reach
+  const py = (localLookY / len) * reach
+
+  // 4. Радужка: биолюминесцентное электрическое свечение
+  const irisR = r * 0.72
+  const g = ctx.createRadialGradient(px, py, r * 0.05, px, py, irisR)
+  if (angry) {
+    g.addColorStop(0, charge > 0 ? "#ffffff" : "#ffe4e6")
+    g.addColorStop(0.35, "#ff2a6d")
+    g.addColorStop(1, "#881337")
+  } else {
+    g.addColorStop(0, charge > 0 ? "#ffffff" : "#c8ff7a")
+    g.addColorStop(0.4, charge > 0 ? "#a3e635" : "#4dff9e")
+    g.addColorStop(1, "#064e3b")
   }
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(px, py, irisR, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Если заряжается молния — вокруг зрачка ореол разрядов
+  if (charge > 0.15) {
+    ctx.shadowColor = angry ? "#ff2a6d" : "#c8ff7a"
+    ctx.shadowBlur = 10 + charge * 20
+    ctx.fillStyle = "rgba(255,255,255,0.7)"
+    ctx.beginPath()
+    ctx.arc(px, py, r * 0.28, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.shadowBlur = 0
+  }
+
+  // 5. Зрачок: глубокий чёрный, сужающийся при ярости или прищуре
+  const pupilW = r * (0.32 - chargeSquint * 0.18)
+  const pupilH = r * 0.38
+  ctx.fillStyle = "#020a06"
+  ctx.beginPath()
+  ctx.ellipse(px, py, pupilW, pupilH, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // 6. Блик на роговице (верхний левый край)
+  ctx.fillStyle = "rgba(255,255,255,0.85)"
+  ctx.beginPath()
+  ctx.arc(px - r * 0.18, py - r * 0.22, r * 0.16, 0, Math.PI * 2)
+  ctx.fill()
+
+  // 7. Веки: смыкаются сверху и снизу вдоль оси головы (Y в локальной системе)
+  if (blink > 0) {
+    const lidSkin = angry ? "#4a0a1c" : "#08251c"
+    const lidHighlight = angry ? "rgba(255,92,168,0.7)" : "rgba(157,255,92,0.6)"
+    ctx.fillStyle = lidSkin
+    // Верхнее веко
+    ctx.beginPath()
+    ctx.ellipse(0, -r * (1 - blink * 0.5), r * 1.02, r * blink * 0.55 + 1, 0, 0, Math.PI * 2)
+    ctx.fill()
+    // Нижнее веко
+    ctx.beginPath()
+    ctx.ellipse(0, r * (1 - blink * 0.5), r * 1.02, r * blink * 0.55 + 1, 0, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Линия смыкания век при сильном закрытии
+    if (blink > 0.75) {
+      const seamAlpha = (blink - 0.75) / 0.25
+      ctx.strokeStyle = `rgba(4,18,12,${seamAlpha * 0.9})`
+      ctx.lineWidth = Math.max(1.5, r * 0.14)
+      ctx.beginPath()
+      ctx.moveTo(-r * 0.85, 0)
+      ctx.quadraticCurveTo(0, r * 0.08, r * 0.85, 0)
+      ctx.stroke()
+
+      // Тонкая биолюминесцентная полоска на краю века
+      ctx.strokeStyle = lidHighlight
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(-r * 0.7, 0)
+      ctx.quadraticCurveTo(0, r * 0.06, r * 0.7, 0)
+      ctx.stroke()
+    }
+  }
+
   ctx.restore()
 }
 
@@ -1142,59 +1238,80 @@ function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[], balls: Ball[]
   for (const b of segs) {
     const seg = b.lampreySeg ?? 0
     const frac = clamp(b.hp / Math.max(1, b.maxHp), 0, 1)
-    ctx.save()
-    ctx.fillStyle =
-      frac > 0.6
-        ? "rgba(157,255,92,0.85)"
-        : frac > 0.3
-          ? "rgba(255,201,77,0.85)"
-          : "rgba(255,70,70,0.8)"
-    ctx.beginPath()
-    ctx.arc(b.x, b.y, b.rx * 0.62, 0, Math.PI * 2)
-    ctx.fill()
-    // блик на чешуе
-    ctx.fillStyle = "rgba(255,255,255,0.35)"
-    ctx.beginPath()
-    ctx.arc(b.x - b.rx * 0.16, b.y - b.rx * 0.2, b.rx * 0.22, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.restore()
 
-    if (seg !== 0) continue
-    // Голова: кольцо HP вокруг переднего сегмента + зубастая пасть
+    if (seg !== 0) {
+      // Сегменты тела (позвонки)
+      ctx.save()
+      ctx.fillStyle =
+        frac > 0.6
+          ? "rgba(157,255,92,0.85)"
+          : frac > 0.3
+            ? "rgba(255,201,77,0.85)"
+            : "rgba(255,70,70,0.8)"
+      ctx.beginPath()
+      ctx.arc(b.x, b.y, b.rx * 0.62, 0, Math.PI * 2)
+      ctx.fill()
+      // блик на чешуе
+      ctx.fillStyle = "rgba(255,255,255,0.35)"
+      ctx.beginPath()
+      ctx.arc(b.x - b.rx * 0.16, b.y - b.rx * 0.2, b.rx * 0.22, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+      continue
+    }
+
+    // --- ГОЛОВА МИНОГИ (сегмент 0) ---
+    // 1. Курс головы: вектор движения от 1-го сегмента к голове или касательная траектории
+    const nextPt = segs[1]
+    const headAng = nextPt
+      ? Math.atan2(b.y - nextPt.y, b.x - nextPt.x)
+      : (bo.lampreyAng ?? 0) + Math.PI / 2
+
+    // 2. Кольцо HP вокруг головы (в мировых координатах, 12 o'clock стартует сверху)
     const headFrac = clamp(bo.hp / bo.maxHp, 0, 1)
-    const r = b.rx + 10
+    const hpR = b.rx + 10
     ctx.save()
     ctx.translate(b.x, b.y)
     ctx.strokeStyle = "rgba(4,18,26,0.7)"
     ctx.lineWidth = 5
     ctx.beginPath()
-    ctx.arc(0, 0, r, 0, Math.PI * 2)
+    ctx.arc(0, 0, hpR, 0, Math.PI * 2)
     ctx.stroke()
     ctx.strokeStyle = headFrac > 0.5 ? "#9dff5c" : headFrac > 0.25 ? "#ffc94d" : "#ff5347"
     ctx.beginPath()
-    ctx.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * headFrac)
+    ctx.arc(0, 0, hpR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * headFrac)
     ctx.stroke()
-    ctx.strokeStyle = "rgba(255,255,255,0.8)"
+    ctx.restore()
+
+    // 3. Анатомическая голова, зубы и глаз: в единой системе координат,
+    // повёрнутой по курсу движения (headAng)!
+    ctx.save()
+    ctx.translate(b.x, b.y)
+    ctx.rotate(headAng)
+
+    // Тёмный чешуйчатый воротник головы (гармонирует со шкурой тела)
+    ctx.fillStyle = angry ? "#2a0a16" : "#08251c"
+    ctx.beginPath()
+    ctx.arc(0, 0, b.rx, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = angry ? "rgba(255,92,168,0.5)" : "rgba(157,255,92,0.5)"
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    // Хищные зубы: радиальный венчик шипов, обрамляющий глазницу
+    ctx.strokeStyle = "rgba(240,255,245,0.85)"
     ctx.lineWidth = 2
     for (let i = 0; i < 10; i++) {
       const a = (i * Math.PI * 2) / 10
       ctx.beginPath()
-      ctx.moveTo(Math.cos(a) * b.rx * 0.45, Math.sin(a) * b.rx * 0.45)
-      ctx.lineTo(Math.cos(a) * b.rx * 0.8, Math.sin(a) * b.rx * 0.8)
+      ctx.moveTo(Math.cos(a) * b.rx * 0.5, Math.sin(a) * b.rx * 0.5)
+      ctx.lineTo(Math.cos(a) * b.rx * 0.82, Math.sin(a) * b.rx * 0.82)
       ctx.stroke()
     }
-    ctx.fillStyle = "#06131b"
-    ctx.beginPath()
-    ctx.arc(0, 0, b.rx * 0.32, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.restore()
 
-    /* Глаз — это существующий тёмный круг в центре головы (раньше он был
-       просто чёрным зрачком). Отдельный маленький глаз поверх головы убран:
-       он дублировал этот круг и мешал читать пасть. Круг моргает и следит за
-       ближайшим шаром. */
-    let lookX = bo.x + Math.cos((bo.t ?? 0) * 0.9) * 40
-    let lookY = bo.y + Math.sin((bo.t ?? 0) * 0.9) * 40
+    // Цель взгляда: переводим мировую позицию мяча в локальную систему координат головы
+    let targetWorldX = bo.x + Math.cos((bo.t ?? 0) * 0.9) * 40
+    let targetWorldY = bo.y + Math.sin((bo.t ?? 0) * 0.9) * 40
     if (balls.length) {
       let best = balls[0]
       let bestD = Infinity
@@ -1205,17 +1322,20 @@ function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[], balls: Ball[]
           best = ball
         }
       }
-      lookX = best.x
-      lookY = best.y
+      targetWorldX = best.x
+      targetWorldY = best.y
     }
-    const eyeR = b.rx * 0.32
-    ctx.save()
-    ctx.translate(b.x, b.y)
-    drawLampreyEye(ctx, lookX - b.x, lookY - b.y, eyeR, bo.t ?? 0, seg)
-    ctx.restore()
+    const worldDx = targetWorldX - b.x
+    const worldDy = targetWorldY - b.y
+    const cosA = Math.cos(-headAng)
+    const sinA = Math.sin(-headAng)
+    const localLookX = worldDx * cosA - worldDy * sinA
+    const localLookY = worldDx * sinA + worldDy * cosA
 
-    ctx.save()
-    ctx.translate(b.x, b.y)
+    const eyeR = b.rx * 0.42
+    drawLampreyEye(ctx, localLookX, localLookY, eyeR, bo.t ?? 0, bo, angry)
+
+    // Вспышка от урона по голове (закрытое веко также вспыхивает от удара)
     if (bo.flash > 0) {
       ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.7})`
       ctx.beginPath()

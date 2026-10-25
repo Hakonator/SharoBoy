@@ -161,4 +161,37 @@ describe("минога: объёмный рендер тела и глаз", () 
     const { ctx } = makeRecordingCtx()
     expect(() => drawBoss(ctx as never, boss, [], alive as never[])).not.toThrow()
   })
+
+  it("контур тела единый: каждый слой делает ровно один moveTo без хорд от головы к хвосту", async () => {
+    const { drawBoss } = await import("./render/boss")
+    const { boss, blocks } = buildLamprey(900, 640, 80, 60)
+    const { ctx, calls } = makeRecordingCtx()
+    drawBoss(ctx as never, boss, [], blocks as never[])
+    // В старом коде на каждый вызов lampreyBodyPath приходилось по два moveTo (для top и bot),
+    // из-за чего closePath прочерчивал хорду через экран от головы к хвосту (было 26).
+    // Теперь ровно 1 moveTo на слой:
+    // 4 (слои тела) + 7 (перетяжки позвонков) + 1 (хвостовой плавник) + 10 (лучи зубов) = 22.
+    const moveCount = calls.filter((c) => c === "moveTo").length
+    expect(moveCount).toBe(4 + 7 + 1 + 10)
+  })
+
+  it("глаз реагирует на урон (flash) зажмуриванием век (ellipse)", async () => {
+    const { drawBoss } = await import("./render/boss")
+    const { boss, blocks } = buildLamprey(900, 640, 80, 60)
+    boss.flash = 1.0 // удар мячом
+    const { ctx, calls } = makeRecordingCtx()
+    drawBoss(ctx as never, boss, [], blocks as never[])
+    // При уроне веки зажмуриваются — рисуются верхнее и нижнее веко (ellipse)
+    expect(calls.filter((c) => c === "ellipse").length).toBeGreaterThanOrEqual(2)
+  })
+
+  it("глаз реагирует на зарядку разряда (lampreyCharge) агрессивным прищуром", async () => {
+    const { drawBoss } = await import("./render/boss")
+    const { boss, blocks } = buildLamprey(900, 640, 80, 60)
+    boss.lampreyCharge = 0.8 // подготовка молнии
+    const { ctx, calls } = makeRecordingCtx()
+    drawBoss(ctx as never, boss, [], blocks as never[])
+    // При зарядке веки сужаются в прищур
+    expect(calls.filter((c) => c === "ellipse").length).toBeGreaterThanOrEqual(2)
+  })
 })
