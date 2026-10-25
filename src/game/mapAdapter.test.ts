@@ -91,6 +91,34 @@ describe("mapSpecToBlocks", () => {
     expect(blocks[1].sp?.magnet).toEqual({ radius: 160, force: 2200 })
   })
 
+  it("maps brittle and phase effects into Block.sp", () => {
+    const blocks = mapSpecToBlocks(
+      makeMap([
+        makeBlock({
+          id: "brittle-block",
+          effects: [{ kind: "brittle", radius: 95, damage: 2 }],
+        }),
+        makeBlock({
+          id: "default-brittle",
+          effects: [{ kind: "brittle" }],
+        }),
+        makeBlock({
+          id: "phase-block",
+          effects: [{ kind: "phase", period: 4.5, activeFraction: 0.5, offset: 1.2 }],
+        }),
+        makeBlock({
+          id: "default-phase",
+          effects: [{ kind: "phase" }],
+        }),
+      ])
+    )
+
+    expect(blocks[0].sp?.brittle).toEqual({ radius: 95, damage: 2 })
+    expect(blocks[1].sp?.brittle).toEqual({ radius: 40 * 2.5, damage: 1 })
+    expect(blocks[2].sp?.phase).toEqual({ period: 4.5, active: 0.5, offset: 1.2 })
+    expect(blocks[3].sp?.phase).toEqual({ period: 3.2, active: 0.62, offset: 0 })
+  })
+
   it("intentionally ignores dynamic pulse, spring and cotton values per AD-003", () => {
     const baseline = makeMap([
       makeBlock({

@@ -64,10 +64,11 @@ function assignSpecial(b: Block, rng: () => number) {
   else b.sp = { rotVel: 0, rotDir: rng() < 0.5 ? -1 : 1 }
 }
 
-function assignPrioritySpecial(b: Block, rng: () => number) {
+function assignPrioritySpecial(b: Block, rng: () => number, level = 3) {
   const roll = rng()
   if (roll < 0.25) {
-    const armor = 1 + (rng() < 0.2 ? 1 : 0)
+    // На старших ярусах (level >= 6) броня может быть двух- или трехслойной
+    const armor = level >= 12 ? (rng() < 0.35 ? 3 : 2) : level >= 6 ? (rng() < 0.4 ? 2 : 1) : 1
     b.sp = { armor, armorMax: armor }
   } else if (roll < 0.5) {
     b.sp = { brittle: { radius: Math.max(b.rx, b.ry) * BRITTLE_RADIUS_MULT, damage: 1 } }
@@ -80,10 +81,13 @@ function assignPrioritySpecial(b: Block, rng: () => number) {
       },
     }
   } else {
+    // Магнитные блоки: притяжение и отталкивающие дефлекторы (repel)
+    const mode = rng() < 0.35 ? "repel" : "attract"
     b.sp = {
       magnet: {
         radius: Math.max(b.rx, b.ry) * BLOCK_MAGNET_RADIUS_MULT,
-        force: BLOCK_MAGNET_FORCE,
+        force: BLOCK_MAGNET_FORCE * (mode === "repel" ? 0.85 : 1),
+        mode,
       },
     }
   }
@@ -112,9 +116,11 @@ export function decorateBlocks(blocks: Block[], level: number, rng: () => number
   if (level < 3) return
   const pool = blocks.filter(eligible)
   const intensity = specialIntensity(level)
+  // На старших уровнях (Акт II и III) доля продвинутых спецблоков матрицы растёт от 30% до 60%
+  const priorityShare = clamp(0.3 + (level - 3) * 0.02, 0.3, 0.6)
   for (const b of pool) {
     if (rng() < intensity) {
-      if (rng() < 0.3) assignPrioritySpecial(b, rng)
+      if (rng() < priorityShare) assignPrioritySpecial(b, rng, level)
       else assignSpecial(b, rng)
     }
   }

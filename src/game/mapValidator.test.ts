@@ -230,6 +230,42 @@ describe("validatePlayerMapSpec", () => {
     )
   })
 
+  it("validates brittle and phase effect parameters within acceptable ranges", () => {
+    const valid = makeMap({
+      blocks: [
+        {
+          ...makeMap().blocks[0],
+          effects: [
+            { kind: "brittle", radius: 100, damage: 2 },
+            { kind: "phase", period: 3.5, activeFraction: 0.6, offset: 0.5 },
+          ],
+        },
+      ],
+    })
+    const invalid = makeMap({
+      blocks: [
+        {
+          ...makeMap().blocks[0],
+          effects: [
+            { kind: "brittle", radius: 5, damage: 10 },
+            { kind: "phase", period: 0.1, activeFraction: 1.5, offset: -1 },
+          ],
+        },
+      ],
+    })
+
+    expect(validatePlayerMapSpec(valid)).toEqual([])
+    expect(validatePlayerMapSpec(invalid).map((error) => error.path)).toEqual(
+      expect.arrayContaining([
+        "blocks[0].effects[0].radius",
+        "blocks[0].effects[0].damage",
+        "blocks[0].effects[1].period",
+        "blocks[0].effects[1].activeFraction",
+        "blocks[0].effects[1].offset",
+      ])
+    )
+  })
+
   it("reports non-finite values and maps exceeding the block limit", () => {
     const template = makeMap().blocks[0]
     const map = makeMap({

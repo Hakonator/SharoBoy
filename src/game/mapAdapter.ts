@@ -1,6 +1,12 @@
 import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapSpec } from "./mapSpec"
 import type { Block } from "./types"
-import { BLOCK_MAGNET_FORCE, BLOCK_MAGNET_RADIUS_MULT } from "./blockKinds"
+import {
+  BLOCK_MAGNET_FORCE,
+  BLOCK_MAGNET_RADIUS_MULT,
+  BRITTLE_RADIUS_MULT,
+  PHASE_ACTIVE_FRACTION,
+  PHASE_PERIOD,
+} from "./blockKinds"
 
 /** Converts an already-validated authoring map into fresh runtime blocks. */
 export function mapSpecToBlocks(spec: PlayerMapSpec): Block[] {
@@ -65,6 +71,25 @@ function applyEffect(
       break
     case "armor":
       block.sp = { ...block.sp, armor: effect.amount, armorMax: effect.amount }
+      break
+    case "brittle":
+      block.sp = {
+        ...block.sp,
+        brittle: {
+          radius: effect.radius ?? Math.max(block.rx, block.ry) * BRITTLE_RADIUS_MULT,
+          damage: effect.damage ?? 1,
+        },
+      }
+      break
+    case "phase":
+      block.sp = {
+        ...block.sp,
+        phase: {
+          period: effect.period ?? PHASE_PERIOD,
+          active: effect.activeFraction ?? PHASE_ACTIVE_FRACTION,
+          offset: effect.offset ?? 0,
+        },
+      }
       break
     case "magnet":
       block.sp = {

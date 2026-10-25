@@ -180,4 +180,32 @@ describe("decorateBlocks", () => {
     decorateBlocks(b, 10, mulberry32(99))
     expect(a.map((x) => kindOf(x))).toEqual(b.map((x) => kindOf(x)))
   })
+
+  it("магнитные блоки генерируют как притяжение (attract), так и отталкивание (repel)", () => {
+    let hasAttract = false
+    let hasRepel = false
+    for (let seed = 0; seed < 100 && (!hasAttract || !hasRepel); seed++) {
+      const blocks = Array.from({ length: 60 }, (_, i) => makeBlock({ seed: i }))
+      decorateBlocks(blocks, 15, mulberry32(seed))
+      for (const b of blocks) {
+        if (b.sp?.magnet?.mode === "repel") hasRepel = true
+        if (b.sp?.magnet?.mode === "attract" || (b.sp?.magnet && !b.sp.magnet.mode))
+          hasAttract = true
+      }
+    }
+    expect(hasAttract).toBe(true)
+    expect(hasRepel).toBe(true)
+  })
+
+  it("на старших уровнях броня масштабируется до 2-3 единиц", () => {
+    let maxArmor = 1
+    for (let seed = 0; seed < 60; seed++) {
+      const blocks = Array.from({ length: 80 }, (_, i) => makeBlock({ seed: i }))
+      decorateBlocks(blocks, 15, mulberry32(seed))
+      for (const b of blocks) {
+        if (b.sp?.armor) maxArmor = Math.max(maxArmor, b.sp.armor)
+      }
+    }
+    expect(maxArmor).toBeGreaterThanOrEqual(2)
+  })
 })

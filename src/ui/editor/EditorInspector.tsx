@@ -224,6 +224,78 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
           />
         )}
         <EffectToggle
+          label="Хрупкая цепь"
+          checked={has("brittle")}
+          onChange={(enabled) => setEffect("brittle", enabled)}
+        />
+        {effects.find((effect) => effect.kind === "brittle")?.kind === "brittle" && (
+          <div className="space-y-2 rounded-lg border border-line p-3">
+            <NumberField
+              label="Радиус цепи"
+              min={40}
+              max={400}
+              value={
+                effects.find((effect) => effect.kind === "brittle")?.kind === "brittle"
+                  ? (effects.find((effect) => effect.kind === "brittle")!.radius ?? 120)
+                  : 120
+              }
+              onChange={(radius) =>
+                replaceEffect("brittle", { ...getEffect("brittle", effects), radius })
+              }
+            />
+            <NumberField
+              label="Цепной урон"
+              min={1}
+              max={3}
+              value={
+                effects.find((effect) => effect.kind === "brittle")?.kind === "brittle"
+                  ? (effects.find((effect) => effect.kind === "brittle")!.damage ?? 1)
+                  : 1
+              }
+              onChange={(damage) =>
+                replaceEffect("brittle", { ...getEffect("brittle", effects), damage })
+              }
+            />
+          </div>
+        )}
+        <EffectToggle
+          label="Фазовый блок"
+          checked={has("phase")}
+          onChange={(enabled) => setEffect("phase", enabled)}
+        />
+        {effects.find((effect) => effect.kind === "phase")?.kind === "phase" && (
+          <div className="space-y-2 rounded-lg border border-line p-3">
+            <NumberField
+              label="Период (сек)"
+              min={1}
+              max={10}
+              step={0.2}
+              value={
+                effects.find((effect) => effect.kind === "phase")?.kind === "phase"
+                  ? (effects.find((effect) => effect.kind === "phase")!.period ?? 3.2)
+                  : 3.2
+              }
+              onChange={(period) =>
+                replaceEffect("phase", { ...getEffect("phase", effects), period })
+              }
+            />
+            <NumberField
+              label="Доля активности"
+              min={0.1}
+              max={0.9}
+              step={0.05}
+              value={
+                effects.find((effect) => effect.kind === "phase")?.kind === "phase"
+                  ? (effects.find((effect) => effect.kind === "phase")!.activeFraction ?? 0.6)
+                  : 0.6
+              }
+              onChange={(activeFraction) =>
+                replaceEffect("phase", { ...getEffect("phase", effects), activeFraction })
+              }
+            />
+          </div>
+        )}
+        <EffectToggle
           label="Пружина"
           checked={has("spring")}
           onChange={(enabled) => setEffect("spring", enabled)}
@@ -501,6 +573,10 @@ function defaultEffect(
   switch (kind) {
     case "armor":
       return { kind, amount: 1 }
+    case "brittle":
+      return { kind, radius: 120, damage: 1 }
+    case "phase":
+      return { kind, period: 3.2, activeFraction: 0.62, offset: 0 }
     case "spring":
       return { kind }
     case "cotton":

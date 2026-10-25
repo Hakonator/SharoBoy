@@ -19,9 +19,7 @@
 
 ## Готово к работе
 
-Нет задач со статусом `ready`. Следующий шаг роадмапа — пункт 2.1 «Новые типы
-блоков» (`armor`, `brittle_chain`, `phase`, `magnetic_repel`): задачу должна
-оформить сторона-архитектор (Antigravity + Gemini).
+Нет.
 
 ## Заблокировано
 
@@ -30,6 +28,57 @@
 ---
 
 ## Последние выполненные задачи (подробные карточки)
+
+### T-033: Спецблоки матрицы (armor, brittle, phase, magnet) в кампанию и редактор
+
+Status: done
+Priority: high
+Assigned to: Luna
+
+Comment: Реализация пункта 2.1 роадмапа:
+
+1. MapSpec: добавление `brittle` ({ radius?, damage? }) и `phase` ({ period?, activeFraction?, offset? }) в `PlayerBlockEffect`. Поддержка `mode: "attract" | "repel"` для `magnet`.
+2. MapAdapter & MapValidator: маппинг `brittle`, `phase` и `magnet.mode` в runtime `Block.sp`, валидация допустимых диапазонов параметров.
+3. Редактор карт (`EditorInspector`, `EditorCanvas`, `editorState`): UI-контролы и числовые поля для brittle и phase, переключатель притяжение/отталкивание для магнитов, оверлеи на холсте (хрупкие трещины, фазовый пунктир) и бейджи эффектов (`💥`, `👻`, `🧲-`/`🧲+`).
+4. Кампания (`blockSpawn.ts`): генерация `armor` (масштабирование до 2-3 на старших ярусах), `brittle`, `phase` и `magnet` (с долей `repel`), увеличение доли спецблоков с 30% до 60% к поздним уровням.
+5. Тесты: `mapAdapter.test.ts`, `mapValidator.test.ts`, `editorState.test.ts`, `blockSpawn.test.ts`. Все 71 тестовый файл / 572 теста зелёные, typecheck/lint/prettier чистые.
+
+Allowed files:
+
+- src/game/mapSpec.ts
+- src/game/mapAdapter.ts
+- src/game/mapValidator.ts
+- src/ui/editor/editorState.ts
+- src/ui/editor/EditorInspector.tsx
+- src/ui/editor/EditorCanvas.tsx
+- src/game/game/blockSpawn.ts
+- src/game/mapAdapter.test.ts
+- src/game/mapValidator.test.ts
+- src/ui/editor/editorState.test.ts
+- src/game/game/blockSpawn.test.ts
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Acceptance criteria:
+
+- [x] MapSpec: поддержка `brittle`, `phase` и `magnet.mode`
+- [x] MapAdapter: перенос новых спецэффектов в runtime `Block.sp`
+- [x] MapValidator: проверка границ радиуса, урона, периода, доли активности и фазового сдвига
+- [x] Map Editor: редактирование параметров в инспекторе и визуализация на холсте
+- [x] Кампания: генерация новых блоков и масштабирование брони/спецблоков по уровням
+- [x] Полный набор тестов (71 файл, 572 теста), typecheck, lint и prettier проходят
+
+Test plan:
+`npm run typecheck`, `npm run lint`, `npm test`
+
+Verification commands:
+npm run typecheck
+npm run lint:check
+npm run format:check
+npm test
+
+---
 
 ### T-032: Фикс миноги по итогам ручной проверки
 
@@ -155,104 +204,6 @@ npm run test
 
 ---
 
-### T-030: Аудио-оформление сюжета станции «СФЕРА-1080» (roadmap 1.1)
-
-Status: done
-Priority: high
-Assigned to: luna
-
-Описание:
-Пункт 1.1 роадмапа — сюжетные сцены станции шли без своего звука: трансляция
-босса появлялась в HUD молча, финальный экран победы с раскрытием створок и
-стравливанием крио-биогеля звучал обычным арпеджио `win()`, а смена фазы
-финальных боссов (Кракен, Хронос) не озвучивалась вообще.
-
-Требование роадмапа:
-
-1. Радиопомехи и статика при старте входящей трансляции босса.
-2. Звук раскрытия бронестворок и стравливания давления крио-биогеля на финальном экране победы.
-3. Уникальные акценты фазовых атак финальных боссов (Кракен, Хронос).
-
-Реализация (всё синтезом, без внешних файлов и пакетов):
-
-1. **`src/game/audio.ts`** — пять новых методов `SFX`:
-   - `transmission(kind)`: щелчок реле, наплыв статики (шумовой буфер), гетеродин
-     из двух близких тонов (биения «рации») и хвост помех. Высота — из таблицы
-     `TRANSMISSION_PITCH` (по одному значению на шесть боссов), поэтому у
-     каждого свой голос в эфире.
-   - `stationHatch()`: низкий разгон сервоприводов (сабвуферный слайд вверх),
-     четыре металлических «зуба» скрипа створок и гул разгерметизации.
-   - `gelVent()`: длинный выдох белого шума (1,5 с), свист сопла вниз 2400 → 420 Гц
-     и пять ледяных «звонов» кристаллизующегося геля.
-   - `bossPhase(kind)`: для `chrono` — «тик-так» (два металлических удара и
-     восходящий шлейф), для остальных — гул бездны и обвал вниз.
-   - `anomalyJump()`: разгон вверх, шумовой хлопок и низкий удар прибытия.
-
-2. **Точки вызова**:
-   - `src/game/game/campaignFlow.ts`: `sfx.transmission(...)` в `startLevelBattle`
-     и в `startMapBattle` (узел босса); `sfx.anomalyJump()` вместо `power()`
-     в событии-аномалии, если игрока перебросило на другой узел.
-   - `src/game/game/runFlow.ts`: `stationHatch()` + `gelVent()` на переходе в
-     `phase = "won"` (финальный босс побеждён).
-   - `src/game/boss.ts`: `sfx.bossPhase(...)` при первом переходе в «злую» фазу;
-     флаг `BossState.angryPhase` (`src/game/types.ts`) гарантирует однократность.
-
-3. **Тесты**: `src/game/audioStory.test.ts` (11 тестов) + фейковый
-   `AudioContext` в `src/game/audioStory.helpers.ts`, который записывает тип
-   волны, частоту, слайд, задержку и пиковую громкость каждого осциллятора и
-   шумового источника. `src/game/boss.test.ts`: акцент смены фазы срабатывает
-   один раз и выбирается по виду босса.
-
-Allowed files:
-
-- src/game/audio.ts
-- src/game/audioStory.helpers.ts
-- src/game/audioStory.test.ts
-- src/game/boss.ts
-- src/game/boss.test.ts
-- src/game/game/campaignFlow.ts
-- src/game/game/runFlow.ts
-- src/game/types.ts
-- docs/ROADMAP.md
-- docs/DEVELOPMENT.md
-- memory-bank/activeContext.md
-- memory-bank/systemPatterns.md
-
-Forbidden files:
-
-- vite.config.js
-- tsconfig.json
-- package.json
-
-Dependencies: —
-
-Acceptance criteria:
-
-- [x] Входящая трансляция босса сопровождается радиопомехами и статикой
-- [x] У Кракена и Хроноса разные голоса в эфире (таблица высот)
-- [x] Победа над финальным боссом звучит раскрытием створок и стравливанием геля
-- [x] Смена фазы финальных боссов озвучена своим акцентом и звучит один раз
-- [x] Ничего не добавлено в `package.json` и в `public/` — только синтез
-- [x] Звуки молчат при выключенных эффектах (`muted`)
-- [x] `npm run lint`, `npm run typecheck`, `npm run test` проходят
-
-Comment: Реализовано синтезом на существующем `SFX` (новых пакетов и файлов нет). Звуки подключены в `campaignFlow.ts` (трансляция, аномалия), `runFlow.ts` (эпилог) и `boss.ts` (фаза). Тесты: 11 новых на фейковом `AudioContext` + тест однократности акцента в `boss.test.ts`. Проверки: typecheck чист, eslint 0, тесты — 68 файлов / 520 тестов.
-
-Test plan:
-
-1. `npm run typecheck`, `npm run lint`, `npm run test`.
-2. Запустить бой с любым боссом — в момент баннера трансляции слышны помехи.
-3. Отладка: боссы Кракен и Хронос — разные акценты при переходе в «злую» фазу.
-4. Убить финального босса карты — на экране победы звучат створки и выход геля.
-5. Пройти узел-аномалию с телепортом — слышен гиперпрыжок.
-
-Verification commands:
-npm run typecheck
-npm run lint
-npm run test
-
----
-
 ## Выполнено ранее (архив)
 
 Карточки удалены при чистке файла; подробности каждой задачи — в `.ai/STATE.md`
@@ -260,6 +211,7 @@ npm run test
 
 | Задача | Что сделано                                                                 |
 | ------ | --------------------------------------------------------------------------- |
+| T-030  | Аудио-оформление сюжета станции «СФЕРА-1080» (roadmap 1.1)                  |
 | T-026  | Постоянное расстояние между ярусами карты кампании (2 ширины узла)          |
 | T-025  | Защита от дублей карт и воркфлоу внесения изменений (Этап M5)               |
 | T-024  | Админ-панель модерации кастомных карт (Этап M4)                             |

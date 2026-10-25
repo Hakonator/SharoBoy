@@ -922,6 +922,27 @@ function drawSpecialEffectVisuals(
     context.ellipse(rx * 0.28, ry * 0.25, rx * 0.24, ry * 0.08, 0.2, 0, Math.PI * 2)
     context.fill()
   }
+  if (kinds.has("brittle")) {
+    context.strokeStyle = "rgba(255, 107, 74, 0.85)"
+    context.lineWidth = Math.max(1.8, Math.min(rx, ry) * 0.08)
+    context.beginPath()
+    context.moveTo(-rx * 0.45, -ry * 0.35)
+    context.lineTo(-rx * 0.1, -ry * 0.05)
+    context.lineTo(rx * 0.4, -ry * 0.4)
+    context.moveTo(-rx * 0.1, -ry * 0.05)
+    context.lineTo(rx * 0.15, ry * 0.35)
+    context.lineTo(rx * 0.45, ry * 0.2)
+    context.stroke()
+  }
+  if (kinds.has("phase")) {
+    context.strokeStyle = "rgba(168, 226, 255, 0.85)"
+    context.lineWidth = Math.max(1.5, Math.min(rx, ry) * 0.06)
+    context.setLineDash([4, 4])
+    context.beginPath()
+    context.ellipse(0, 0, rx * 0.82, ry * 0.82, 0, 0, Math.PI * 2)
+    context.stroke()
+    context.setLineDash([])
+  }
   const magnet = effects.find((effect) => effect.kind === "magnet")
   if (magnet?.kind === "magnet") {
     const repel = magnet.mode === "repel" || (magnet.force ?? 0) < 0
@@ -1025,6 +1046,10 @@ function effectMark(effect: PlayerBlockEffect): string | null {
   switch (effect.kind) {
     case "armor":
       return `◆${effect.amount}`
+    case "brittle":
+      return "💥"
+    case "phase":
+      return "👻"
     case "spring":
       return "↟"
     case "cotton":

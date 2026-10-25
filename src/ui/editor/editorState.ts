@@ -342,6 +342,27 @@ function normalizeBlockUpdates(
       ? {
           effects: updates.effects.map((effect) => {
             if (effect.kind === "armor") return { ...effect, amount: Math.round(effect.amount) }
+            if (effect.kind === "brittle") {
+              return {
+                ...effect,
+                ...(effect.radius === undefined ? {} : { radius: Math.round(effect.radius) }),
+                ...(effect.damage === undefined ? {} : { damage: Math.round(effect.damage) }),
+              }
+            }
+            if (effect.kind === "phase") {
+              return {
+                ...effect,
+                ...(effect.period === undefined
+                  ? {}
+                  : { period: Math.round(effect.period * 10) / 10 }),
+                ...(effect.activeFraction === undefined
+                  ? {}
+                  : { activeFraction: Math.round(effect.activeFraction * 100) / 100 }),
+                ...(effect.offset === undefined
+                  ? {}
+                  : { offset: Math.round(effect.offset * 10) / 10 }),
+              }
+            }
             if (effect.kind === "magnet") {
               return {
                 ...effect,

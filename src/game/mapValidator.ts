@@ -225,6 +225,28 @@ function validateEffect(
     case "armor":
       checkNumber(effect.amount, `${path}.amount`, { min: 1, max: 5 })
       break
+    case "brittle":
+      if (effect.radius !== undefined) {
+        checkNumber(effect.radius, `${path}.radius`, {
+          min: 10,
+          max: 1000,
+        })
+      }
+      if (effect.damage !== undefined) {
+        checkNumber(effect.damage, `${path}.damage`, { min: 1, max: 5 })
+      }
+      break
+    case "phase":
+      if (effect.period !== undefined) {
+        checkNumber(effect.period, `${path}.period`, { min: 0.5, max: 20 })
+      }
+      if (effect.activeFraction !== undefined) {
+        checkNumber(effect.activeFraction, `${path}.activeFraction`, { min: 0.05, max: 0.95 })
+      }
+      if (effect.offset !== undefined) {
+        checkNumber(effect.offset, `${path}.offset`, { min: 0, max: 100 })
+      }
+      break
     case "magnet":
       if (effect.radius !== undefined) {
         checkNumber(effect.radius, `${path}.radius`, {

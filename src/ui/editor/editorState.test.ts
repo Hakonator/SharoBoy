@@ -84,6 +84,8 @@ describe("editorReducer", () => {
           { kind: "armor", amount: 2.7 },
           { kind: "pulse", amplitude: 0.56, frequency: 1.24 },
           { kind: "magnet", radius: 120.8, force: -400.7 },
+          { kind: "brittle", radius: 89.6, damage: 1.9 },
+          { kind: "phase", period: 3.24, activeFraction: 0.618, offset: 0.49 },
         ],
       },
     })
@@ -96,6 +98,8 @@ describe("editorReducer", () => {
       { kind: "armor", amount: 3 },
       { kind: "pulse", amplitude: 0.6, frequency: 1.2 },
       { kind: "magnet", radius: 121, force: -401 },
+      { kind: "brittle", radius: 90, damage: 2 },
+      { kind: "phase", period: 3.2, activeFraction: 0.62, offset: 0.5 },
     ])
   })
 
