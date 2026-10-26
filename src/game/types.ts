@@ -120,6 +120,7 @@ export interface TerminalStoryLog {
   author: string
   date: string
   act: 1 | 2 | 3
+  header?: string
 }
 
 export interface CampaignEventData {

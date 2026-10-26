@@ -744,7 +744,8 @@ export function MapScreen({
                 <div className="flex items-center gap-2">
                   <IconTerminal className="h-5 w-5 text-sky-400" />
                   <span className="font-mono text-xs font-bold tracking-wider text-sky-300">
-                    🛰 ОРБИТАЛЬНАЯ СТАНЦИЯ «СФЕРА-1080» // {eventData.terminalLog.code}
+                    {eventData.terminalLog.header ??
+                      `🛰 ОРБИТАЛЬНАЯ СТАНЦИЯ «СФЕРА-1080» // ${eventData.terminalLog.code}`}
                   </span>
                 </div>
                 <div className="text-[11px] font-mono text-sky-200/80">
@@ -760,7 +761,7 @@ export function MapScreen({
             <p
               className={`mt-3 font-display text-sm leading-relaxed sm:text-base ${
                 eventData.terminalLog
-                  ? "rounded-lg border border-sky-500/20 bg-deep/60 p-3 text-left font-sans text-sky-100 shadow-inner"
+                  ? "rounded-lg border border-sky-500/20 bg-deep/60 p-3 text-left font-sans text-sky-100 shadow-inner whitespace-pre-line"
                   : "text-foam"
               }`}
             >
