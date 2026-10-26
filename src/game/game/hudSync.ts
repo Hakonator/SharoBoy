@@ -113,6 +113,7 @@ export function pushHud(g: Game) {
     bossDialog: g.bossTransmission,
     finalBossDefeated: g.finalBossDefeated,
     scoreBreakdown: g.scoreBreakdown,
+    intermediateScore: g.intermediateScore,
     newAchievements: g.achQueue.splice(0),
   })
 }

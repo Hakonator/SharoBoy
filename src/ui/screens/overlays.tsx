@@ -1,7 +1,7 @@
-import { type ReactNode } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { IconBall, IconPlay, Key } from "../icons"
-import type { HudData, RunScoreBreakdown } from "../../game/types"
+import type { HudData, IntermediateScoreData, RunScoreBreakdown } from "../../game/types"
 import { getFinalEpilogue } from "../../game/bossDialogs"
 
 /** Прозрачная таблица детализации очков (Score Breakdown). */
@@ -500,6 +500,247 @@ export function WinScreen({
           <button className="btn-ghost px-6 py-3.5" onClick={onMenu}>
             В меню
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Полупрозрачное окно с подсчётом накапливаемых промежуточных очков после каждого уровня. */
+export function IntermediateScoreModal({
+  data,
+  onContinue,
+}: {
+  data: IntermediateScoreData
+  onContinue: () => void
+}) {
+  const [progress, setProgress] = useState(0)
+  const [isCounting, setIsCounting] = useState(true)
+  const animRef = useRef<number | null>(null)
+  const startTimeRef = useRef<number | null>(null)
+  const duration = 3000 // 3 секунды процесса подсчёта
+
+  const finishCounting = useCallback(() => {
+    if (animRef.current !== null) {
+      cancelAnimationFrame(animRef.current)
+      animRef.current = null
+    }
+    setProgress(1)
+    setIsCounting(false)
+  }, [])
+
+  useEffect(() => {
+    let active = true
+
+    const frame = (timestamp: number) => {
+      if (!active) return
+      if (startTimeRef.current === null) {
+        startTimeRef.current = timestamp
+      }
+      const elapsed = timestamp - startTimeRef.current
+      const currentProgress = Math.min(1, elapsed / duration)
+      setProgress(currentProgress)
+
+      if (currentProgress < 1) {
+        animRef.current = requestAnimationFrame(frame)
+      } else {
+        setIsCounting(false)
+        animRef.current = null
+      }
+    }
+
+    animRef.current = requestAnimationFrame(frame)
+
+    return () => {
+      active = false
+      if (animRef.current !== null) {
+        cancelAnimationFrame(animRef.current)
+      }
+    }
+  }, [duration])
+
+  // Управление с клавиатуры (Space / Enter): во время подсчёта ускоряет его, после — продолжает игру.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === " " || event.key === "Enter") {
+        event.preventDefault()
+        if (isCounting) {
+          finishCounting()
+        } else {
+          onContinue()
+        }
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [finishCounting, isCounting, onContinue])
+
+  // Плавное кубическое замедление к концу 3 секунд
+  const easeOut = (t: number) => 1 - Math.pow(1 - t, 3)
+  const eased = easeOut(progress)
+  const displayedLevelScore = Math.round(data.levelScore * eased)
+  const displayedTotalScore = data.previousScore + displayedLevelScore
+
+  return (
+    <div
+      data-testid="intermediate-score-modal"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-abyss/80 backdrop-blur-md anim-fade-in"
+    >
+      <div className="relative w-full max-w-lg rounded-2xl border border-cyan-500/40 bg-deep/90 p-5 sm:p-6 shadow-[0_0_50px_rgba(34,211,238,0.25)] text-center font-mono max-h-[92vh] overflow-y-auto arcade-scrollbar">
+        {/* Верхний бейдж */}
+        <div className="mb-2 flex items-center justify-between border-b border-foam/10 pb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">⚡</span>
+            <span className="font-display text-xs font-bold uppercase tracking-wider text-cyan-neon">
+              Промежуточный подсчёт очков
+            </span>
+          </div>
+          {data.mutatorBonusPercent > 0 && (
+            <span className="rounded border border-purple-500/30 bg-purple-500/20 px-2 py-0.5 text-[10px] font-bold text-purple-300">
+              +{data.mutatorBonusPercent}% Мутаторы
+            </span>
+          )}
+        </div>
+
+        {/* Заголовок уровня */}
+        <h2 className="font-display text-xl sm:text-2xl font-bold uppercase tracking-wider text-cyan-neon drop-shadow-[0_0_12px_rgba(34,211,238,0.6)]">
+          {data.title}
+        </h2>
+        {data.subtitle && <p className="mt-0.5 text-xs text-foam/60 font-sans">{data.subtitle}</p>}
+
+        {/* Основные блоки очков */}
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-mint/30 bg-mint/10 p-3">
+            <div className="text-[11px] uppercase tracking-wider text-mint/80 font-sans">
+              За уровень
+            </div>
+            <div className="font-display text-2xl sm:text-3xl font-bold text-mint tabular-nums">
+              +{displayedLevelScore.toLocaleString("ru-RU")}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-3">
+            <div className="text-[11px] uppercase tracking-wider text-cyan-neon/80 font-sans">
+              Накоплено всего
+            </div>
+            <div className="font-display text-2xl sm:text-3xl font-bold text-cyan-neon tabular-nums">
+              {displayedTotalScore.toLocaleString("ru-RU")}
+            </div>
+          </div>
+        </div>
+
+        {/* Прогресс-бар процесса подсчёта (3 секунды) */}
+        <div className="mt-4 rounded-xl border border-foam/10 bg-black/40 p-3">
+          <div className="mb-1.5 flex items-center justify-between text-xs">
+            <span className="font-sans text-[11px] text-foam/80">
+              {isCounting ? "⚡ Подсчёт промежуточных очков..." : "✅ Подсчёт завершён"}
+            </span>
+            <span className="font-mono text-xs font-bold text-cyan-neon tabular-nums">
+              {Math.round(progress * 100)}%
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-foam/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-cyan-neon via-purple-500 to-mint shadow-[0_0_10px_rgba(34,211,238,0.7)] transition-all duration-75"
+              style={{ width: `${Math.round(progress * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Сводка достижений и бонусов уровня */}
+        <div className="mt-4 grid grid-cols-2 gap-2 text-left text-xs sm:grid-cols-3">
+          <div className="rounded-lg border border-foam/10 bg-foam/5 px-2.5 py-1.5">
+            <span className="text-[10px] text-foam/50 block font-sans">Блоки уровня</span>
+            <span className="font-bold text-foam tabular-nums">
+              🧱 {data.levelBlocks}{" "}
+              <span className="text-[10px] text-foam/40">({data.totalBlocks})</span>
+            </span>
+          </div>
+
+          <div className="rounded-lg border border-foam/10 bg-foam/5 px-2.5 py-1.5">
+            <span className="text-[10px] text-foam/50 block font-sans">Комбо</span>
+            <span className="font-bold text-amber-400 tabular-nums">
+              🔥 ×{Math.max(1, data.maxCombo)}
+            </span>
+          </div>
+
+          <div className="rounded-lg border border-foam/10 bg-foam/5 px-2.5 py-1.5">
+            <span className="text-[10px] text-foam/50 block font-sans">Жизни / Щиты</span>
+            <span className="font-bold text-pink-400 tabular-nums">
+              💖 {data.lives} <span className="text-cyan-300">🛡 {data.shields}</span>
+            </span>
+          </div>
+
+          {data.isCleanClear && (
+            <div className="col-span-2 sm:col-span-1 rounded-lg border border-mint/20 bg-mint/5 px-2.5 py-1.5">
+              <span className="text-[10px] text-mint/70 block font-sans">Чистая игра</span>
+              <span className="font-bold text-mint">+500 очков</span>
+            </div>
+          )}
+
+          {data.isFastClear && (
+            <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 px-2.5 py-1.5">
+              <span className="text-[10px] text-cyan-300/70 block font-sans">Скорость</span>
+              <span className="font-bold text-cyan-300">⏱ {data.timeSeconds} с (&lt;45 с)</span>
+            </div>
+          )}
+
+          {data.crystalsEarned !== undefined && data.crystalsEarned > 0 && (
+            <div className="rounded-lg border border-purple-400/20 bg-purple-400/5 px-2.5 py-1.5">
+              <span className="text-[10px] text-purple-300/70 block font-sans">Кристаллы</span>
+              <span className="font-bold text-purple-300">💎 +{data.crystalsEarned}</span>
+            </div>
+          )}
+
+          {data.metaCrystalsEarned !== undefined && data.metaCrystalsEarned > 0 && (
+            <div className="rounded-lg border border-sky-400/20 bg-sky-400/5 px-2.5 py-1.5">
+              <span className="text-[10px] text-sky-300/70 block font-sans">Мета-кристаллы</span>
+              <span className="font-bold text-sky-300">💠 +{data.metaCrystalsEarned}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Детализация очков (если доступна) */}
+        {data.items && data.items.length > 0 && (
+          <div className="mt-3 text-left">
+            <div className="space-y-1 text-xs">
+              {data.items.slice(0, 4).map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-2 rounded px-2 py-0.5 text-[11px] text-foam/70 bg-foam/5"
+                >
+                  <span className="truncate">
+                    {item.icon} {item.label}
+                  </span>
+                  <span className="font-mono font-bold text-mint tabular-nums shrink-0">
+                    {item.points > 0 ? `+${item.points.toLocaleString("ru-RU")}` : item.detail}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Кнопка "Продолжить" */}
+        <div className="mt-5">
+          {isCounting ? (
+            <button
+              type="button"
+              className="btn-ghost w-full py-3.5 text-xs sm:text-sm uppercase tracking-wider text-foam/70 hover:text-foam active:scale-95 transition-all"
+              onClick={finishCounting}
+            >
+              Завершить подсчёт ⏭
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-arcade w-full py-3.5 text-base sm:text-lg font-bold uppercase tracking-wider shadow-[0_0_25px_rgba(34,211,238,0.5)] active:scale-95 anim-pulse"
+              onClick={onContinue}
+              autoFocus
+            >
+              Продолжить ➔
+            </button>
+          )}
         </div>
       </div>
     </div>

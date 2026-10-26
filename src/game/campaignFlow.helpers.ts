@@ -68,6 +68,8 @@ export function makeEnv() {
     lineTo: () => {},
     arc: () => {},
     arcTo: () => {},
+    quadraticCurveTo: () => {},
+    bezierCurveTo: () => {},
     ellipse: () => {},
     rect: () => {},
     fill: () => {},

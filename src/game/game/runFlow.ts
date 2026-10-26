@@ -4,7 +4,12 @@ import { rand, lsSet } from "../utils"
 import { nodeById } from "../campaignMap"
 import { computeRunMultipliers, hasModifier } from "../campaignModifiers"
 import { recordChallengeBallLost } from "../campaignChallenges"
-import { applyFinalScoreBreakdown, resetRunStats, FAST_CLEAR_PAR_SECONDS } from "../scoreBreakdown"
+import {
+  applyFinalScoreBreakdown,
+  computeScoreBreakdown,
+  resetRunStats,
+  FAST_CLEAR_PAR_SECONDS,
+} from "../scoreBreakdown"
 
 import { applyTrack } from "./audioControls"
 import { enterMapView } from "./campaignFlow"
@@ -15,6 +20,10 @@ import { addCoins, addMetaCrystals } from "./progress"
 
 export function resetRun(g: Game) {
   resetRunStats(g)
+  g.intermediateScore = null
+  g.intermediateScoreContinue = null
+  g.levelScoreStart = 0
+  g.levelBlocksStart = 0
   g.customWinCondition = null
   g.customTargetBlocks = []
   g.onCustomComplete = null
@@ -219,6 +228,10 @@ export function onLevelCleared(g: Game) {
       })
       g.sfx.levelClear()
       enterMapView(g)
+      showIntermediateScore(g, undefined, {
+        title: `АКТ ${actNumber === 1 ? "I" : "II"} — БОСС ПОВЕРЖЕН!`,
+        metaCrystals: actReward,
+      })
       return
     }
     // Обычный или элитный узел зачищен: награда кристаллами и щитом
@@ -227,11 +240,15 @@ export function onLevelCleared(g: Game) {
     const veinMult = 1 + 0.25 * (g.upgrades.crystalVein ?? 0)
 
     if (challenge) {
-      if (!challenge.failed) {
+      const isSuccess = !challenge.failed
+      const meta = isSuccess ? challenge.def.rewardMeta : undefined
+      const crystals = isSuccess
+        ? Math.round(challenge.def.rewardCrystals * veinMult)
+        : Math.round(15 * veinMult)
+
+      if (isSuccess) {
         // Успешное прохождение квеста-испытания!
-        const meta = challenge.def.rewardMeta
-        const crystals = Math.round(challenge.def.rewardCrystals * veinMult)
-        addMetaCrystals(g, meta)
+        addMetaCrystals(g, meta!)
         g.addCrystals(crystals)
         if (g.shield < 3) g.shield++
         g.fx.popups.push({
@@ -245,7 +262,6 @@ export function onLevelCleared(g: Game) {
         g.sfx.win()
       } else {
         // Испытание провалено
-        const crystals = Math.round(15 * veinMult)
         g.addCrystals(crystals)
         g.fx.popups.push({
           x: g.w / 2,
@@ -259,6 +275,11 @@ export function onLevelCleared(g: Game) {
       }
       g.activeChallenge = null
       enterMapView(g)
+      showIntermediateScore(g, undefined, {
+        title: isSuccess ? "ИСПЫТАНИЕ ПРОЙДЕНО!" : "ИСПЫТАНИЕ ЗАВЕРШЕНО",
+        crystals,
+        metaCrystals: meta,
+      })
       return
     }
 
@@ -278,6 +299,11 @@ export function onLevelCleared(g: Game) {
     })
     g.sfx.levelClear()
     enterMapView(g)
+    showIntermediateScore(g, undefined, {
+      title: currentNode?.isChallenge ? "ИСПЫТАНИЕ ЗАВЕРШЕНО" : "СЕКТОР ЗАЧИЩЕН",
+      subtitle: currentNode?.isChallenge ? "Узел-испытание" : "Боевой сектор",
+      crystals: baseWinCrystals,
+    })
     return
   }
   g.sfx.levelClear()
@@ -291,6 +317,13 @@ export function onLevelCleared(g: Game) {
     pushHud(g)
     return
   }
+  showIntermediateScore(g, () => advanceClassicLevel(g), {
+    title: `УРОВЕНЬ ${g.level} ЗАВЕРШЁН`,
+    subtitle: LEVELS[g.level - 1]?.name,
+  })
+}
+
+export function advanceClassicLevel(g: Game) {
   g.level++
   buildLevel(g, g.level)
   applyTrack(g) // новый случайный трек на новый уровень
@@ -298,6 +331,60 @@ export function onLevelCleared(g: Game) {
   g.balls = []
   serveBall(g)
   setBanner(g, `УРОВЕНЬ ${g.level} — ${LEVELS[g.level - 1].name}`)
+  pushHud(g)
+}
+
+export function showIntermediateScore(
+  g: Game,
+  continueAction?: () => void,
+  context?: {
+    title?: string
+    subtitle?: string
+    crystals?: number
+    metaCrystals?: number
+  }
+) {
+  const breakdown = computeScoreBreakdown(g)
+  const prevScore = g.levelScoreStart ?? 0
+  const currentScore = g.score ?? 0
+  const levelScore = Math.max(0, currentScore - prevScore)
+  const prevBlocks = g.levelBlocksStart ?? 0
+  const currentBlocks = g.runBlocksDestroyed ?? 0
+  const levelBlocks = Math.max(0, currentBlocks - prevBlocks)
+  const isClean = !g.levelLostBall
+  const isFast =
+    g.runSectorStartTime > 0 &&
+    g.time - g.runSectorStartTime <= FAST_CLEAR_PAR_SECONDS &&
+    !g.levelLostBall
+  const elapsed =
+    g.runSectorStartTime > 0 ? Math.max(0, Math.round(g.time - g.runSectorStartTime)) : 0
+  const isDirectLevel = !g.campaign
+
+  g.intermediateScore = {
+    title: context?.title ?? (isDirectLevel ? `УРОВЕНЬ ${g.level} ЗАВЕРШЁН` : "СЕКТОР ЗАЧИЩЕН"),
+    subtitle: context?.subtitle ?? (isDirectLevel ? LEVELS[g.level - 1]?.name : undefined),
+    levelScore,
+    previousScore: prevScore,
+    totalScore: currentScore,
+    levelBlocks,
+    totalBlocks: currentBlocks,
+    maxCombo: g.runMaxCombo ?? 0,
+    lives: Math.max(0, g.lives ?? 0),
+    shields: Math.max(0, g.shield ?? 0),
+    isCleanClear: isClean,
+    isFastClear: isFast,
+    timeSeconds: elapsed,
+    mutatorBonusPercent: breakdown.mutatorBonusPercent,
+    crystalsEarned: context?.crystals,
+    metaCrystalsEarned: context?.metaCrystals,
+    items: breakdown.items,
+  }
+  g.intermediateScoreContinue = continueAction ?? null
+  g.input.releaseLock()
+  g.balls = []
+  g.projectiles = []
+  g.powers = []
+  g.boomQueue = []
   pushHud(g)
 }
 

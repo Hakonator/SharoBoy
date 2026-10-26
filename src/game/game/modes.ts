@@ -137,6 +137,7 @@ export function stopCustomMap(g: Game) {
 }
 
 export function togglePause(g: Game) {
+  if (g.intermediateScore) return
   if (g.phase === "playing") {
     g.phase = "paused"
     g.input.keys.space = false

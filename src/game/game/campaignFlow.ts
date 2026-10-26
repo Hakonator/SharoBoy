@@ -128,6 +128,8 @@ export function enterMapNode(g: Game, id: number) {
   if (!isAdjacent(g.campaign, g.campaignPlayerId, id)) return
   const node = nodeById(g.campaign, id)
   if (!node) return
+  g.intermediateScore = null
+  g.intermediateScoreContinue = null
   g.sfx.ensure()
   g.sfx.ui()
   g.campaignPlayerId = id

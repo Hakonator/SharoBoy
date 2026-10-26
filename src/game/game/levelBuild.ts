@@ -33,6 +33,10 @@ export function buildFromSpec(g: Game, spec: LevelSpec) {
   g.boomQueue = []
   resetMiniboss(g)
   g.runSectorStartTime = g.time
+  g.levelScoreStart = g.score
+  g.levelBlocksStart = g.runBlocksDestroyed ?? 0
+  g.intermediateScore = null
+  g.intermediateScoreContinue = null
   const top = blockTop(g)
   if ("boss" in spec) {
     const { boss, blocks } = buildBossArena(

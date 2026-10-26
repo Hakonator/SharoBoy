@@ -10,6 +10,7 @@ import {
   PauseScreen,
   GameOverScreen,
   WinScreen,
+  IntermediateScoreModal,
   TopSubmit,
   SettingsModal,
 } from "./ui/screens"
@@ -374,6 +375,13 @@ export default function App() {
           topSubmit={topSubmit}
           onRestart={() => g()?.startGame()}
           onMenu={() => g()?.toMenu()}
+        />
+      )}
+
+      {hud.intermediateScore && (
+        <IntermediateScoreModal
+          data={hud.intermediateScore}
+          onContinue={() => g()?.continueFromIntermediateScore()}
         />
       )}
     </div>

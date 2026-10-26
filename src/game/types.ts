@@ -15,6 +15,43 @@ import type { RunScoreBreakdown, ScoreBreakdownItem } from "./scoreBreakdown"
 
 export type { RunScoreBreakdown, ScoreBreakdownItem }
 
+/** Данные промежуточного подсчёта накапливаемых очков после завершения уровня/сектора. */
+export interface IntermediateScoreData {
+  /** Заголовок окна (например, "УРОВЕНЬ 1 ЗАВЕРШЁН", "СЕКТОР ЗАЧИЩЕН", "БОСС ПОВЕРЖЕН"). */
+  readonly title: string
+  /** Подзаголовок / название сектора. */
+  readonly subtitle?: string
+  /** Очки, заработанные на данном уровне. */
+  readonly levelScore: number
+  /** Накопленный счёт до прохождения уровня. */
+  readonly previousScore: number
+  /** Итоговый накопленный счёт с учётом данного уровня. */
+  readonly totalScore: number
+  /** Разрушенные блоки на этом уровне. */
+  readonly levelBlocks: number
+  /** Всего разрушенных блоков за забег. */
+  readonly totalBlocks: number
+  /** Максимальная серия комбо. */
+  readonly maxCombo: number
+  /** Оставшиеся жизни. */
+  readonly lives: number
+  /** Оставшиеся щиты. */
+  readonly shields: number
+  /** Чистая игра (без потери шара). */
+  readonly isCleanClear: boolean
+  /** Скоростная зачистка (< 45 с). */
+  readonly isFastClear: boolean
+  /** Время прохождения уровня в секундах. */
+  readonly timeSeconds: number
+  /** Процент бонуса мутаторов. */
+  readonly mutatorBonusPercent: number
+  /** Награды кристаллами (если кампания). */
+  readonly crystalsEarned?: number
+  readonly metaCrystalsEarned?: number
+  /** Элементы детального подсчёта очков. */
+  readonly items: readonly ScoreBreakdownItem[]
+}
+
 export type Phase = "menu" | "playing" | "paused" | "over" | "won" | "map"
 
 /** Форма верхней поверхности ракетки. Единая формула поверхности —
@@ -88,6 +125,8 @@ export interface HudData {
   finalBossDefeated?: BossVariantKind | null
   /** Детальный подсчёт очков забега (Score Breakdown). */
   scoreBreakdown?: RunScoreBreakdown | null
+  /** Промежуточный подсчёт накапливаемых очков после завершения уровня/сектора. */
+  intermediateScore?: IntermediateScoreData | null
 }
 
 export interface CampaignShopItem {

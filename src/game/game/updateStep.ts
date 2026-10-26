@@ -56,6 +56,8 @@ export function update(g: Game, dt: number) {
 
   g.fx.step(dt)
 
+  if (g.intermediateScore && g.phase === "playing") return
+
   for (const b of g.bubbles) {
     b.y -= b.vy * dt
     b.x += Math.sin(g.time * 0.8 + b.ph) * 12 * dt

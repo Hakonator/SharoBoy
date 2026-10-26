@@ -1,9 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 
-import type { HudData, RunScoreBreakdown } from "../../game/types"
+import type { HudData, IntermediateScoreData, RunScoreBreakdown } from "../../game/types"
 
-import { GameOverScreen, ScoreBreakdownTable, WinScreen } from "./overlays"
+import { GameOverScreen, IntermediateScoreModal, ScoreBreakdownTable, WinScreen } from "./overlays"
 
 const mockBreakdown: RunScoreBreakdown = {
   baseScore: 10000,
@@ -166,5 +166,47 @@ describe("WinScreen", () => {
     expect(html).not.toContain("СФЕРА-1080")
     expect(html).toContain("Детализация очков")
     expect(html).toContain("Скоростная зачистка")
+  })
+})
+
+describe("IntermediateScoreModal", () => {
+  const mockScoreData: IntermediateScoreData = {
+    title: "СЕКТОР ЗАЧИЩЕН",
+    subtitle: "Боевой сектор",
+    levelScore: 2400,
+    previousScore: 5000,
+    totalScore: 7400,
+    levelBlocks: 18,
+    totalBlocks: 42,
+    maxCombo: 6,
+    lives: 3,
+    shields: 2,
+    isCleanClear: true,
+    isFastClear: true,
+    timeSeconds: 32,
+    mutatorBonusPercent: 25,
+    crystalsEarned: 15,
+    metaCrystalsEarned: 5,
+    items: [
+      { id: "blocks", label: "Разрушенные блоки", detail: "18 шт.", points: 1800, icon: "🧱" },
+      { id: "speed", label: "Скоростная зачистка", detail: "1 сектор", points: 600, icon: "⏱" },
+    ],
+  }
+
+  it("рендерит полупрозрачное окно с промежуточным подсчётом очков", () => {
+    const html = renderToStaticMarkup(
+      <IntermediateScoreModal data={mockScoreData} onContinue={() => {}} />
+    )
+    expect(html).toContain("intermediate-score-modal")
+    expect(html).toContain("СЕКТОР ЗАЧИЩЕН")
+    expect(html).toContain("Боевой сектор")
+    expect(html).toContain("За уровень")
+    expect(html).toContain("Накоплено всего")
+    expect(html).toContain("Подсчёт промежуточных очков")
+    expect(html).toContain("Чистая игра")
+    expect(html).toContain("Скорость")
+    expect(html).toContain("+15")
+    expect(html).toContain("+5")
+    expect(html).toContain("+25% Мутаторы")
   })
 })

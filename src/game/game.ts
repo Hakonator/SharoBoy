@@ -23,6 +23,7 @@ import type {
   CampaignEventData,
   CampaignShopItem,
   CampaignShopState,
+  IntermediateScoreData,
   MinibossCreature,
   RunScoreBreakdown,
 } from "./types"
@@ -141,6 +142,11 @@ export class Game {
   runFastClears = 0
   runSectorStartTime = 0
   scoreBreakdown: RunScoreBreakdown | null = null
+  /** Промежуточный подсчёт накапливаемых очков после завершения уровня. */
+  intermediateScore: IntermediateScoreData | null = null
+  intermediateScoreContinue: (() => void) | null = null
+  levelScoreStart = 0
+  levelBlocksStart = 0
   /** очередь открытых достижений до следующей отправки HUD */
   achQueue: string[] = []
   mode: "campaign" | "endless" | "custom" = "campaign"
@@ -522,6 +528,15 @@ export class Game {
   }
   setSfxVolume(v: number) {
     setSfxVolume(this, v)
+  }
+  continueFromIntermediateScore() {
+    if (!this.intermediateScore) return
+    const action = this.intermediateScoreContinue
+    this.intermediateScore = null
+    this.intermediateScoreContinue = null
+    this.sfx.ui()
+    action?.()
+    pushHud(this)
   }
   launch() {
     launch(this)
