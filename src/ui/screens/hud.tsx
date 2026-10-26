@@ -390,8 +390,16 @@ export function HudOverlay({
 
       {hud.phase === "playing" && (
         /* Телефон: подсказки в свободной полосе ниже ракетки (над лентой
-           эффектов); десктоп — как раньше, над ракеткой. */
-        <div className="pointer-events-none absolute inset-x-0 bottom-14 z-20 flex flex-col items-center gap-1.5 sm:bottom-[102px] sm:gap-2">
+           эффектов); десктоп — как раньше, над ракеткой. При активной
+           трансляции босса десктопные подсказки сдвигаются ниже ракетки (sm:bottom-3),
+           чтобы полностью освободить зону над ракеткой для баннера босса. */
+        <div
+          className={`pointer-events-none absolute inset-x-0 z-20 flex flex-col items-center gap-1.5 sm:gap-2 ${
+            (hud.bossTransmission ?? hud.bossDialog)
+              ? "bottom-14 sm:bottom-3"
+              : "bottom-14 sm:bottom-[102px]"
+          }`}
+        >
           {hud.laserArmed && (
             <div className="anim-blink hud-chip px-3 py-1.5 font-display text-xs tracking-wider text-[#9df2ff] sm:px-4 sm:py-2 sm:text-sm">
               ЛАЗЕР ГОТОВ — ПРОБЕЛ / ТАП
@@ -462,7 +470,7 @@ export function BossTransmissionBanner({
   }, [dialog.kind])
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-14 z-30 flex justify-center px-3 sm:top-20 sm:px-4">
+    <div className="pointer-events-none absolute inset-x-0 bottom-20 pointer-coarse:bottom-[136px] z-30 flex justify-center px-2.5 sm:px-4">
       <style>{`
         @keyframes sb-trans-progress {
           from { width: 100%; }
@@ -470,7 +478,7 @@ export function BossTransmissionBanner({
         }
       `}</style>
       <div
-        className="relative w-full max-w-xl overflow-hidden rounded-xl border bg-abyss/95 p-3.5 shadow-2xl backdrop-blur-md transition-all sm:p-5"
+        className="anim-rise relative w-full max-w-sm overflow-hidden rounded-xl border bg-abyss/95 p-2.5 shadow-2xl backdrop-blur-md transition-all sm:max-w-xl sm:p-4"
         style={{
           borderColor: dialog.accentColor,
           boxShadow: `0 0 25px ${dialog.accentColor}35, inset 0 0 15px ${dialog.accentColor}15`,
@@ -483,28 +491,28 @@ export function BossTransmissionBanner({
           }}
         />
 
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="flex items-start justify-between gap-2 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-deep/80 sm:h-12 sm:w-12"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-deep/80 sm:h-11 sm:w-11"
               style={{ borderColor: `${dialog.accentColor}60` }}
             >
-              <IconBoss kind={dialog.kind} className="h-6 w-6 sm:h-7 sm:w-7" />
+              <IconBoss kind={dialog.kind} className="h-5 w-5 sm:h-7 sm:w-7" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <span
-                  className="rounded px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-black"
+                  className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-black sm:text-[10px]"
                   style={{ backgroundColor: dialog.accentColor }}
                 >
                   {dialog.callsign}
                 </span>
-                <span className="font-mono text-[11px] tracking-wider text-foam/60">
+                <span className="truncate font-mono text-[9px] tracking-wider text-foam/60 sm:text-[11px]">
                   {dialog.protocol}
                 </span>
               </div>
               <h3
-                className="font-display text-base font-black tracking-wide sm:text-xl"
+                className="truncate font-display text-sm font-black tracking-wide sm:text-lg"
                 style={{
                   color: dialog.accentColor,
                   textShadow: `0 0 12px ${dialog.accentColor}80`,
@@ -515,20 +523,20 @@ export function BossTransmissionBanner({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-950/40 px-2 py-0.5 text-[10px] font-mono text-red-300">
+          <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-red-500/30 bg-red-950/40 px-2 py-0.5 font-mono text-[9px] text-red-300 sm:text-[10px]">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
             <span>В ЭФИРЕ</span>
           </div>
         </div>
 
-        <div className="mt-2.5 rounded-lg border border-foam/10 bg-deep/60 px-3 py-2 font-mono text-xs leading-relaxed text-foam/90 sm:text-sm">
+        <div className="mt-1.5 rounded-lg border border-foam/10 bg-deep/60 px-2.5 py-1.5 font-mono text-[11px] leading-snug text-foam/90 sm:mt-2.5 sm:px-3 sm:py-2 sm:text-xs sm:leading-relaxed">
           <span className="mr-1.5 font-bold text-cyan-neon">›</span>
           <span>{dialog.introLine}</span>
           <span className="animate-pulse font-bold text-mint">_</span>
         </div>
 
         {/* Шкала авто-закрытия трансляции */}
-        <div className="mt-2.5">
+        <div className="mt-1.5 sm:mt-2">
           <div className="h-1 w-full overflow-hidden rounded bg-foam/10">
             <div
               className="h-full"
@@ -539,7 +547,7 @@ export function BossTransmissionBanner({
               }}
             />
           </div>
-          <div className="mt-1 flex items-center justify-between text-[10px] font-mono text-foam/50">
+          <div className="mt-1 flex items-center justify-between font-mono text-[8px] text-foam/50 sm:text-[10px]">
             <span>🛰 ПЕРЕХВАТ СИСТЕМЫ «СФЕРА-1080»</span>
             <span>АВТО-ЗАКРЫТИЕ</span>
           </div>

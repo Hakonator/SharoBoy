@@ -115,5 +115,13 @@ describe("HudOverlay: кнопка пропуска уровня", () => {
     expect(html).toContain("В ЭФИРЕ")
     expect(html).toContain("АВТО-ЗАКРЫТИЕ")
     expect(html).not.toContain("Закрыть диалог")
+    // Проверка позиционирования над ракеткой и компактности на мобильных экранах
+    expect(html).toContain("bottom-20")
+    expect(html).toContain("pointer-coarse:bottom-[136px]")
+    expect(html).not.toContain("top-14")
+    expect(html).not.toContain("sm:top-20")
+    expect(html).toContain("max-w-sm")
+    expect(html).toContain("sm:max-w-xl")
+    expect(html).toContain("sm:bottom-3")
   })
 })
