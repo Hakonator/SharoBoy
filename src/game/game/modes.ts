@@ -38,6 +38,8 @@ export function startEndless(g: Game) {
   g.laserArmed = (g.upgrades.laser ?? 0) > 0
   g.laserArmedUntil = g.laserArmed ? Number.POSITIVE_INFINITY : 0
   g.runSectorStartTime = g.time
+  g.levelScoreStart = g.score
+  g.levelBlocksStart = g.runBlocksDestroyed ?? 0
   serveBall(g)
   g.phase = "playing"
   applyTrack(g)

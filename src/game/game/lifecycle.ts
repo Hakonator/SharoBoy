@@ -138,6 +138,7 @@ export function createInput(g: Game, canvas: HTMLCanvasElement): InputController
     sfxEnsure: () => g.sfx.ensure(),
     isPlaying: () => g.phase === "playing",
     primaryAction: () => {
+      if (g.intermediateScore) return
       if (g.phase === "menu" || g.phase === "over" || g.phase === "won") startGame(g)
       else if (g.phase === "playing") {
         if (g.balls.some((ball) => ball.stuck)) launch(g)
@@ -145,6 +146,7 @@ export function createInput(g: Game, canvas: HTMLCanvasElement): InputController
       } else if (g.phase === "map") enterNextNodeOnAction(g)
     },
     launchIfPlaying: () => {
+      if (g.intermediateScore) return
       if (g.phase === "playing") launch(g)
     },
     aimWheel: (delta) => {

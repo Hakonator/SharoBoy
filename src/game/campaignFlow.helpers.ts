@@ -30,6 +30,8 @@ export interface GameInternals {
   buyCampaignShopItem: (id: string) => boolean
   closeCampaignShop: () => void
   enterNextNodeOnAction: () => void
+  intermediateScore: unknown
+  continueFromIntermediateScore: () => void
   toMenu: () => void
   destroy: () => void
 }

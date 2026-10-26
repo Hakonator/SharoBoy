@@ -184,6 +184,9 @@ export function debugDamageUp(g: Game) {
 export function debugSkipLevel(g: Game) {
   g.sfx.ensure()
   if (g.phase !== "playing") return
+  g.transition = 0
+  g.bannerTimer = 0
+  g.countdown = 0
   g.minibosses = []
   g.mouthBubbles = []
   g.fishMouth = false

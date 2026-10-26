@@ -201,6 +201,8 @@ describe("Новые апгрейды, мета-кристаллы, боссы �
     game.onBossNode = true
     game.metaCrystals = 0
     onLevelCleared(game)
+    expect(game.intermediateScore).toBeTruthy()
+    game.continueFromIntermediateScore()
     expect(game.phase).toBe("map")
     expect(game.metaCrystals).toBe(25)
 
@@ -208,6 +210,8 @@ describe("Новые апгрейды, мета-кристаллы, боссы �
     game.campaignPlayerId = 20
     game.onBossNode = true
     onLevelCleared(game)
+    expect(game.intermediateScore).toBeTruthy()
+    game.continueFromIntermediateScore()
     expect(game.phase).toBe("map")
     expect(game.metaCrystals).toBe(75) // 25 + 50
 

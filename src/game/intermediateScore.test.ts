@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from "vitest"
 
 import { makeEnv } from "./campaignFlow.helpers"
 import type { Game } from "./game"
-import { advanceClassicLevel, onLevelCleared, showIntermediateScore } from "./game/runFlow"
+import { debugSkipLevel } from "./game/debug"
+import {
+  advanceClassicLevel,
+  advanceEndlessWave,
+  onLevelCleared,
+  showIntermediateScore,
+} from "./game/runFlow"
 
 describe("Промежуточный подсчёт очков после уровня (IntermediateScore)", () => {
   it("showIntermediateScore формирует полные данные для отображения в HUD", () => {
@@ -82,5 +88,83 @@ describe("Промежуточный подсчёт очков после уро
     expect(game.blocks.length).toBeGreaterThan(0)
     expect(game.balls.length).toBe(1)
     expect(game.balls[0].stuck).toBe(true)
+  })
+
+  it("advanceEndlessWave корректно наращивает волну и подаёт шар", () => {
+    const { g } = makeEnv()
+    const game = g as unknown as Game
+    game.startEndless()
+    advanceEndlessWave(game)
+    expect(game.wave).toBe(2)
+    expect(game.balls.length).toBe(1)
+    expect(game.balls[0].stuck).toBe(true)
+  })
+
+  it("в кампании зачистка сектора показывает окно и выходит на карту только по продолжить", () => {
+    const { g } = makeEnv()
+    const game = g as unknown as Game
+    game.startGame()
+    expect(game.phase).toBe("map")
+
+    const map = game.campaign!
+    const firstNode = map.nodes.find((n) => n.id === map.startId)!
+    const nextNodeId = map.edges.find((e) => e.from === firstNode.id)!.to
+    game.enterMapNode(nextNodeId)
+    expect(game.phase).toBe("playing")
+
+    // Зачищаем сектор
+    onLevelCleared(game)
+
+    // Окно открыто, но фаза пока НЕ map (игрок видит экран победы над сектором)
+    expect(game.intermediateScore).toBeTruthy()
+    expect(game.intermediateScore?.title).toBe("СЕКТОР ЗАЧИЩЕН")
+    expect(game.phase).toBe("playing")
+
+    // Нажатие Space/Enter или enterNextNodeOnAction НЕ должно преждевременно переключать узел
+    game.enterNextNodeOnAction()
+    expect(game.intermediateScore).toBeTruthy()
+
+    // Нажимаем "Продолжить"
+    game.continueFromIntermediateScore()
+    expect(game.intermediateScore).toBeNull()
+    expect(game.phase).toBe("map")
+  })
+
+  it("в бесконечном режиме зачистка волны показывает окно и переходит на следующую волну", () => {
+    const { g } = makeEnv()
+    const game = g as unknown as Game
+    game.startEndless()
+    expect(game.phase).toBe("playing")
+    expect(game.wave).toBe(1)
+
+    onLevelCleared(game)
+
+    expect(game.intermediateScore).toBeTruthy()
+    expect(game.intermediateScore?.title).toBe("ВОЛНА 1 ЗАВЕРШЕНА")
+
+    game.continueFromIntermediateScore()
+    expect(game.intermediateScore).toBeNull()
+    expect(game.wave).toBe(2)
+    expect(game.balls.length).toBe(1)
+    expect(game.balls[0].stuck).toBe(true)
+  })
+
+  it("debugSkipLevel сбрасывает transition, bannerTimer и countdown для мгновенного перехода", () => {
+    const { g } = makeEnv()
+    const game = g as unknown as Game
+    game.startGame()
+    const map = game.campaign!
+    const nextNodeId = map.edges.find((e) => e.from === map.startId)!.to
+    game.enterMapNode(nextNodeId)
+
+    expect(game.phase).toBe("playing")
+    expect(game.blocks.length).toBeGreaterThan(0)
+    expect(game.transition).toBeGreaterThan(0)
+
+    debugSkipLevel(game)
+    expect(game.blocks.length).toBe(0)
+    expect(game.transition).toBe(0)
+    expect(game.bannerTimer).toBe(0)
+    expect(game.countdown).toBe(0)
   })
 })

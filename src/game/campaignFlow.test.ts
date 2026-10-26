@@ -170,6 +170,9 @@ describe("сквозной цикл кампании по карте", () => {
         bossFought = true
         expect(g.phase, "после финального босса забег завершён").toBe("won")
       } else {
+        if (g.intermediateScore) {
+          g.continueFromIntermediateScore()
+        }
         expect(g.phase, "обычный узел возвращает на карту").toBe("map")
         expect(raw.campaignPlayerId).toBe(battleNode.id)
         expect(raw.campaignVisited).toContain(battleNode.id)
@@ -217,6 +220,9 @@ describe("сквозной цикл кампании по карте", () => {
       raw.minibosses.length = 0
       raw.powers.length = 0
       step(3)
+      if (g.intermediateScore) {
+        g.continueFromIntermediateScore()
+      }
     }
 
     let guard = 0
@@ -509,6 +515,10 @@ describe("сквозной цикл кампании по карте", () => {
     game.countdown = 0
 
     step(10)
+
+    if (game.intermediateScore) {
+      game.continueFromIntermediateScore()
+    }
 
     // Проверяем, что за победу начислены повышенные кристаллы (+40 за испытание)
     expect(game.crystals).toBeGreaterThanOrEqual(50)

@@ -170,17 +170,13 @@ export function onLevelCleared(g: Game) {
     g.score += 200 + g.wave * 50
     g.lives = Math.min(g.lives + 1, 5)
     g.sfx.levelClear()
-    g.wave++
-    buildWave(g, g.wave)
-    applyTrack(g) // новый случайный трек на новую волну
-    clearAllEffects(g)
-    g.balls = []
-    serveBall(g)
-    setBanner(g, g.wave % 5 === 0 ? `ВОЛНА ${g.wave} — БОСС!` : `ВОЛНА ${g.wave}`)
-    pushHud(g)
+    showIntermediateScore(g, () => advanceEndlessWave(g), {
+      title: `ВОЛНА ${g.wave} ЗАВЕРШЕНА`,
+      subtitle: g.wave % 5 === 0 ? "Волна босса пройдена!" : "Бесконечный режим",
+    })
     return
   }
-  if (g.mode === "campaign") {
+  if (g.mode === "campaign" && g.campaign) {
     if (g.onBossNode) {
       g.onBossNode = false
       const isFinalBoss = !g.campaign || g.campaignPlayerId === g.campaign.bossId
@@ -227,8 +223,7 @@ export function onLevelCleared(g: Game) {
         size: 24,
       })
       g.sfx.levelClear()
-      enterMapView(g)
-      showIntermediateScore(g, undefined, {
+      showIntermediateScore(g, () => enterMapView(g), {
         title: `АКТ ${actNumber === 1 ? "I" : "II"} — БОСС ПОВЕРЖЕН!`,
         metaCrystals: actReward,
       })
@@ -274,8 +269,7 @@ export function onLevelCleared(g: Game) {
         g.sfx.levelClear()
       }
       g.activeChallenge = null
-      enterMapView(g)
-      showIntermediateScore(g, undefined, {
+      showIntermediateScore(g, () => enterMapView(g), {
         title: isSuccess ? "ИСПЫТАНИЕ ПРОЙДЕНО!" : "ИСПЫТАНИЕ ЗАВЕРШЕНО",
         crystals,
         metaCrystals: meta,
@@ -298,10 +292,9 @@ export function onLevelCleared(g: Game) {
       size: 22,
     })
     g.sfx.levelClear()
-    enterMapView(g)
-    showIntermediateScore(g, undefined, {
-      title: currentNode?.isChallenge ? "ИСПЫТАНИЕ ЗАВЕРШЕНО" : "СЕКТОР ЗАЧИЩЕН",
-      subtitle: currentNode?.isChallenge ? "Узел-испытание" : "Боевой сектор",
+    showIntermediateScore(g, () => enterMapView(g), {
+      title: isChallenge ? "ИСПЫТАНИЕ ЗАВЕРШЕНО" : "СЕКТОР ЗАЧИЩЕН",
+      subtitle: isChallenge ? "Узел-испытание" : "Боевой сектор",
       crystals: baseWinCrystals,
     })
     return
@@ -323,8 +316,23 @@ export function onLevelCleared(g: Game) {
   })
 }
 
+export function advanceEndlessWave(g: Game) {
+  g.wave++
+  g.levelScoreStart = g.score
+  g.levelBlocksStart = g.runBlocksDestroyed ?? 0
+  buildWave(g, g.wave)
+  applyTrack(g) // новый случайный трек на новую волну
+  clearAllEffects(g)
+  g.balls = []
+  serveBall(g)
+  setBanner(g, g.wave % 5 === 0 ? `ВОЛНА ${g.wave} — БОСС!` : `ВОЛНА ${g.wave}`)
+  pushHud(g)
+}
+
 export function advanceClassicLevel(g: Game) {
   g.level++
+  g.levelScoreStart = g.score
+  g.levelBlocksStart = g.runBlocksDestroyed ?? 0
   buildLevel(g, g.level)
   applyTrack(g) // новый случайный трек на новый уровень
   clearAllEffects(g)

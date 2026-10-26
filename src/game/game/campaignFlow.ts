@@ -250,6 +250,7 @@ export function dismissCampaignEvent(g: Game) {
 
 /** Space/Enter на экране карты: входим в узел, если выбор однозначен. */
 export function enterNextNodeOnAction(g: Game) {
+  if (g.intermediateScore) return
   if (!g.campaign) return
   const next = outgoingIds(g.campaign, g.campaignPlayerId)
   if (next.length === 1) enterMapNode(g, next[0])
@@ -384,6 +385,8 @@ export function launchNodeBattle(g: Game, label: string) {
 
   g.laserArmedUntil = g.laserArmed ? Number.POSITIVE_INFINITY : 0
   g.runSectorStartTime = g.time
+  g.levelScoreStart = g.score
+  g.levelBlocksStart = g.runBlocksDestroyed ?? 0
   serveBall(g)
   g.phase = "playing"
   applyTrack(g)
