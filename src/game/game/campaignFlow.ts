@@ -4,13 +4,18 @@ import { getBossTransmission } from "../bossDialogs"
 import { minibossHpFor, rollMinibossLive } from "../minibosses"
 import { LEVELS } from "../levels"
 import { generateMotifSpec } from "../levelMotifs"
-import { generateCampaignMap, EVENT_TEXTS, EVENT_MAX_BACK_TIERS } from "../campaignMapLayout"
+import {
+  generateCampaignMap,
+  EVENT_TEXTS,
+  EVENT_MAX_BACK_TIERS,
+  getActTerminalTier,
+} from "../campaignMapLayout"
 import { nodeById, outgoingIds, visibleFrom, isAdjacent } from "../campaignMap"
 import { daySeed } from "../utils"
 import type { LevelSpec } from "../levels"
 import type { CampaignMapView, CampaignNode } from "../campaignMap"
 import { openCampaignShop } from "../campaignShop"
-import { buildCampaignEvent } from "../campaignEvents"
+import { buildCampaignEvent, buildTerminalStoryEvent } from "../campaignEvents"
 import { initActiveChallenge } from "../campaignChallenges"
 
 import { applyTrack } from "./audioControls"
@@ -122,6 +127,57 @@ export function enterMapView(g: Game) {
   pushHud(g)
 }
 
+/** Проверяет, требуется ли показать обязательный сюжетный терминал перед данным боем. */
+export function shouldTriggerActTerminal(g: Game, node: CampaignNode): (1 | 2 | 3) | null {
+  if (!g.campaign) return null
+  const totalTiers = g.campaign.tiers ?? 30
+  const act1Threshold = getActTerminalTier(1, totalTiers)
+  const act2Threshold = getActTerminalTier(2, totalTiers)
+  const act3Threshold = getActTerminalTier(3, totalTiers)
+
+  if (node.tier >= act3Threshold && !g.campaignTerminalsSeen.includes(3)) {
+    return 3
+  }
+  if (
+    node.tier >= act2Threshold &&
+    node.tier < act3Threshold &&
+    !g.campaignTerminalsSeen.includes(2)
+  ) {
+    return 2
+  }
+  if (
+    node.tier >= act1Threshold &&
+    node.tier < act2Threshold &&
+    !g.campaignTerminalsSeen.includes(1)
+  ) {
+    return 1
+  }
+  return null
+}
+
+/**
+ * Перехватывает старт боя: если ближе к концу текущего Акта ещё не просмотрен
+ * обязательный сюжетный терминал станции, открывает его перед зачисткой узла.
+ */
+export function checkAndTriggerStoryTerminal(g: Game, node: CampaignNode): boolean {
+  if (g.campaignPendingBattleNodeId !== null) return false
+  const act = shouldTriggerActTerminal(g, node)
+  if (!act) return false
+
+  g.campaignTerminalsSeen.push(act)
+  g.campaignPendingBattleNodeId = node.id
+  g.campaignEventTarget = -1
+  g.campaignEventData = buildTerminalStoryEvent(g, act, node)
+  g.campaignEvent = g.campaignEventData.title
+  g.onBossNode = false
+  g.activeSpec = null
+  g.phase = "map"
+  applyTrack(g)
+  g.sfx.terminalLog()
+  pushHud(g)
+  return true
+}
+
 /** Клик по узлу карты: переход разрешён только в узел, соседний с текущим. */
 export function enterMapNode(g: Game, id: number) {
   if (g.phase !== "map" || !g.campaign) return
@@ -139,6 +195,7 @@ export function enterMapNode(g: Game, id: number) {
       // стихия уже сработала однажды: повторный вход — обычный бой в этой
       // зоне (иначе узел-«бутылочное горлышко» телепортировал бы вечно)
       g.campaignVisible = visibleFrom(g.campaign, id)
+      if (checkAndTriggerStoryTerminal(g, node)) return
       startMapBattle(g, node)
       return
     }
@@ -155,6 +212,7 @@ export function enterMapNode(g: Game, id: number) {
     return
   }
   g.campaignVisible = visibleFrom(g.campaign, id)
+  if (checkAndTriggerStoryTerminal(g, node)) return
   startMapBattle(g, node)
 }
 
@@ -223,10 +281,24 @@ export function resolveCampaignEvent(g: Game, node: CampaignNode) {
  * на карте для выбора следующего шага.
  */
 export function dismissCampaignEvent(g: Game) {
+  const pendingBattleId = g.campaignPendingBattleNodeId
+  g.campaignPendingBattleNodeId = null
   const target = g.campaignEventTarget
   g.campaignEvent = null
   g.campaignEventData = null
   g.campaignEventTarget = -1
+
+  if (pendingBattleId !== null && g.campaign) {
+    const battleNode = nodeById(g.campaign, pendingBattleId)
+    if (battleNode) {
+      g.campaignPlayerId = pendingBattleId
+      if (!g.campaignVisited.includes(pendingBattleId)) g.campaignVisited.push(pendingBattleId)
+      g.campaignVisible = visibleFrom(g.campaign, pendingBattleId)
+      startMapBattle(g, battleNode)
+      return
+    }
+  }
+
   if (g.phase !== "map" || !g.campaign) {
     pushHud(g)
     return
@@ -245,13 +317,14 @@ export function dismissCampaignEvent(g: Game) {
   g.campaignPlayerId = target
   if (!g.campaignVisited.includes(target)) g.campaignVisited.push(target)
   g.campaignVisible = visibleFrom(g.campaign, target)
+  if (checkAndTriggerStoryTerminal(g, node)) return
   startMapBattle(g, node)
 }
 
 /** Space/Enter на экране карты: входим в узел, если выбор однозначен. */
 export function enterNextNodeOnAction(g: Game) {
   if (g.intermediateScore) return
-  if (!g.campaign) return
+  if (!g.campaign || g.campaignEventData || g.campaignEvent) return
   const next = outgoingIds(g.campaign, g.campaignPlayerId)
   if (next.length === 1) enterMapNode(g, next[0])
 }

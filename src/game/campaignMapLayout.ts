@@ -47,6 +47,23 @@ export const TERMINAL_NAMES = [
   "КОНСОЛЬ ОПЕРАТОРА", // Акт III: истинная сущность Оператора и миссия
 ] as const
 
+/**
+ * Пороговый ярус появления обязательного сюжетного терминала станции «СФЕРА-1080».
+ * Показывается перед боем ближе к концу соответствующего Акта.
+ */
+export function getActTerminalTier(act: 1 | 2 | 3, totalTiers = MAP_TIERS): number {
+  if (totalTiers >= 28) {
+    return act === 1 ? 7 : act === 2 ? 17 : 27
+  }
+  const actEndTier =
+    act === 1
+      ? Math.floor(totalTiers * (1 / 3)) - 1
+      : act === 2
+        ? Math.floor(totalTiers * (2 / 3)) - 1
+        : totalTiers - 1
+  return Math.max(1, actEndTier - 2)
+}
+
 /** Имена обычных интерактивных событий глубин. */
 export const GENERAL_EVENT_NAMES = [
   "ВОДОВОРОТ",
@@ -96,18 +113,10 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
   const nodes: CampaignNode[] = []
   const perTier: number[][] = []
   let id = 0
-  const actHasTerminal = [false, false, false]
 
   for (let t = 0; t < tiers; t++) {
     const row: number[] = []
     let tierHasShop = false
-    const actIdx = t <= 9 ? 0 : t <= 19 ? 1 : 2
-    // Контрольные ярусы гарантированного спавна терминала, если событие ещё не выпало
-    const isTargetTerminalTier =
-      tiers >= 28 &&
-      ((t === 5 && !actHasTerminal[0]) ||
-        (t === 14 && !actHasTerminal[1]) ||
-        (t === 24 && !actHasTerminal[2]))
 
     for (let i = 0; i < widths[t]; i++) {
       const isBoss = t === tiers - 1 || (tiers >= 28 && (t === 9 || t === 19))
@@ -116,16 +125,7 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
         : undefined
       const bossKind = bossVariant?.kind
 
-      // Гарантируем появление сюжетного терминала станции «СФЕРА-1080» по одному на Акт
-      const shouldForceTerminal =
-        !isBoss && isTargetTerminalTier && widths[t] > 1 && i === widths[t] - 1
-      const isEvent = !isBoss && t > 1 && (rng() < EVENT_NODE_CHANCE || shouldForceTerminal)
-
-      let isTerminal = false
-      if (isEvent && !actHasTerminal[actIdx] && actIdx < TERMINAL_NAMES.length) {
-        isTerminal = true
-        actHasTerminal[actIdx] = true
-      }
+      const isEvent = !isBoss && t > 1 && rng() < EVENT_NODE_CHANCE
 
       // Магазины начинаются с 4-го яруса и только если в ярусе есть альтернативные узлы
       const canBeShop =
@@ -142,15 +142,13 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
           : t === 19
             ? `БОСС: АКТ II (${bossVariant!.name})`
             : `ФИНАЛЬНЫЙ БОСС: ${bossVariant!.name}`
-        : isTerminal
-          ? TERMINAL_NAMES[actIdx]
-          : isEvent
-            ? GENERAL_EVENT_NAMES[Math.floor(rng() * GENERAL_EVENT_NAMES.length)]
-            : isShop
-              ? SHOP_NAMES[Math.floor(rng() * SHOP_NAMES.length)]
-              : isChallenge
-                ? CHALLENGE_NAMES[Math.floor(rng() * CHALLENGE_NAMES.length)]
-                : NODE_NAMES[Math.floor(rng() * NODE_NAMES.length)]
+        : isEvent
+          ? GENERAL_EVENT_NAMES[Math.floor(rng() * GENERAL_EVENT_NAMES.length)]
+          : isShop
+            ? SHOP_NAMES[Math.floor(rng() * SHOP_NAMES.length)]
+            : isChallenge
+              ? CHALLENGE_NAMES[Math.floor(rng() * CHALLENGE_NAMES.length)]
+              : NODE_NAMES[Math.floor(rng() * NODE_NAMES.length)]
 
       nodes.push({
         id,
@@ -161,7 +159,6 @@ export function generateCampaignMap(seedIn: number, tiers = MAP_TIERS): Campaign
         isEvent,
         isShop,
         isChallenge,
-        isTerminal,
         challenge,
         bossKind,
         name,

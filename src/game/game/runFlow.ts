@@ -33,6 +33,8 @@ export function resetRun(g: Game) {
   g.campaignPlayerId = -1
   g.campaignVisited = []
   g.campaignVisible = []
+  g.campaignTerminalsSeen = []
+  g.campaignPendingBattleNodeId = null
   g.campaignShop = null
   g.campaignShops = {}
   g.campaignEventData = null

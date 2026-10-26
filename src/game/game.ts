@@ -295,6 +295,10 @@ export class Game {
   campaignEventTarget = -1
   /** Узлы-события, которые уже сработали (повторный вход — обычный бой). */
   campaignSpentEvents: number[] = []
+  /** Просмотренные сюжетные терминалы по номерам Актов (1, 2, 3). */
+  campaignTerminalsSeen: number[] = []
+  /** Ожидаемый узел боя сразу после закрытия сюжетного терминала. */
+  campaignPendingBattleNodeId: number | null = null
   /** Активный открытый магазин на карте забега (null — закрыт). */
   campaignShop: CampaignShopState | null = null
   /** Ассортименты магазинов по id узлов (для сохранения статуса купленных товаров). */

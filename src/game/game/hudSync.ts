@@ -106,6 +106,7 @@ export function pushHud(g: Game) {
     map: currentMapView(g),
     campaignEvent: g.campaignEvent,
     campaignEventData: g.campaignEventData,
+    campaignPendingBattle: g.campaignPendingBattleNodeId !== null,
     campaignShop: g.campaignShop,
     campaignModifiers: g.campaignModifiers?.length ? [...g.campaignModifiers] : undefined,
     activeChallenge: g.activeChallenge ? formatChallengeHud(g.activeChallenge) : null,

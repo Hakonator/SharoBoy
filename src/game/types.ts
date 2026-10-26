@@ -127,6 +127,8 @@ export interface HudData {
   scoreBreakdown?: RunScoreBreakdown | null
   /** Промежуточный подсчёт накапливаемых очков после завершения уровня/сектора. */
   intermediateScore?: IntermediateScoreData | null
+  /** Ожидается ли переход в бой сразу после закрытия события/терминала. */
+  campaignPendingBattle?: boolean
 }
 
 export interface CampaignShopItem {

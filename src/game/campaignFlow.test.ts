@@ -148,6 +148,10 @@ describe("сквозной цикл кампании по карте", () => {
         }
       }
 
+      if (g.campaignEventData) {
+        g.dismissCampaignEvent()
+      }
+
       expect(raw.campaignPlayerId).toBe(battleNode.id)
       expect(g.phase).toBe("playing")
       expect(g.onBossNode).toBe(battleNode.isBoss)
@@ -252,9 +256,9 @@ describe("сквозной цикл кампании по карте", () => {
         continue
       }
 
-      // первое срабатывание события: оверлей → подтверждение → телепорт
+      // первое срабатывание события или терминала: оверлей → подтверждение → старт боя
       const firstTrigger = target.isEvent && g.phase === "map"
-      if (firstTrigger) g.dismissCampaignEvent()
+      if (firstTrigger || g.campaignEventData) g.dismissCampaignEvent()
 
       // любой узел заканчивается боем: телепорт на цель или бой на месте
       // (повторный вход в уже сработавшее событие — обычный бой)
@@ -547,7 +551,7 @@ describe("сквозной цикл кампании по карте", () => {
     g.destroy()
   })
 
-  it("сюжетный терминал станции «СФЕРА-1080» раскрывает лор и даёт уникальные интерактивные выборы", () => {
+  it("сюжетный терминал станции «СФЕРА-1080» появляется перед стартом боя ближе к концу акта и затем запускает бой", () => {
     const { game, g, step } = makeEnv()
     g.startGame()
     step(2)
@@ -555,24 +559,29 @@ describe("сквозной цикл кампании по карте", () => {
     game.coins = 10
     game.shield = 0
 
-    const terminalNode: CampaignNode = {
+    // Создаём узел боя на 7 ярусе (ближе к концу Акта I)
+    const combatNode: CampaignNode = {
       id: 996,
-      tier: 4,
-      x: 0.2,
+      tier: 7,
+      x: 0.7,
       y: 0.5,
       isBoss: false,
-      isEvent: true,
-      isTerminal: true,
-      name: "АРХИВ КРИО-КОНТУРА",
+      isEvent: false,
+      isShop: false,
+      name: "СЕКТОР 7",
     }
     const map = game.campaign!
-    map.nodes.push(terminalNode)
+    map.nodes.push(combatNode)
     map.edges.push({ from: game.campaignPlayerId, to: 996 })
     game.campaignVisible.push(996)
 
+    // Игрок входит в узел боя
     g.enterMapNode(996)
     step(1)
 
+    // Вместо прямого старта боя открывается обязательный сюжетный терминал Акта I
+    expect(game.phase).toBe("map")
+    expect(game.campaignPendingBattleNodeId).toBe(996)
     expect(game.campaignEventData).toBeTruthy()
     expect(game.campaignEventData!.terminalLog).toBeDefined()
     expect(game.campaignEventData!.terminalLog!.act).toBe(1)
@@ -587,11 +596,14 @@ describe("сквозной цикл кампании по карте", () => {
     expect(game.campaignPerks.laserStart).toBe(true)
     expect(game.crystals).toBe(15)
     expect(game.coins).toBe(30)
-    expect(game.campaignEventTarget).toBe(-1)
 
+    // Нажимаем "В бой": терминал закрывается и немедленно стартует бой на этом узле
     g.dismissCampaignEvent()
     expect(game.campaignEventData).toBeNull()
+    expect(game.campaignPendingBattleNodeId).toBeNull()
+    expect(game.phase).toBe("playing")
     expect(game.campaignPlayerId).toBe(996)
+    expect(game.laserArmed).toBe(true)
 
     g.destroy()
   })

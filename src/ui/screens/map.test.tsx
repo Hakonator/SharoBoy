@@ -372,5 +372,28 @@ describe("MapScreen: маршрут события кампании", () => {
     expect(html).toContain("Д-р Воронов // Главный крио-инженер")
     expect(html).toContain("2084.11.04 // ОРБИТА 420 КМ")
     expect(html).toContain("Сброс давления хладагента")
+    expect(html).toContain("arcade-scrollbar")
+    expect(html).toContain("overflow-y-auto")
+
+    // Проверяем кнопку «В БОЙ ➔» при завершении выбора перед боем
+    const resolvedHud = {
+      ...hud,
+      campaignPendingBattle: true,
+      campaignEventData: {
+        ...hud.campaignEventData!,
+        resolved: true,
+        outcomeText: "Щиты усилены!",
+      },
+    }
+    const resolvedHtml = renderToStaticMarkup(
+      <MapScreen
+        hud={resolvedHud}
+        onMapNode={() => {}}
+        onEventDismiss={() => {}}
+        onMenu={() => {}}
+      />
+    )
+    expect(resolvedHtml).toContain("В БОЙ ➔")
+    expect(resolvedHtml).toContain("Щиты усилены!")
   })
 })

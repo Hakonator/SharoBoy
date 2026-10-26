@@ -4,6 +4,7 @@ import {
   MAX_BRANCHES,
   MIN_BRANCHES,
   generateCampaignMap,
+  getActTerminalTier,
   incomingIds,
   isAdjacent,
   nodeById,
@@ -261,29 +262,15 @@ describe("generateCampaignMap", () => {
     expect(act3Bosses).toEqual(new Set(["kraken", "chrono"]))
   }, 15000)
 
-  it("на карте кампании генерируются сюжетные терминалы станции «СФЕРА-1080» по Актам", () => {
-    for (let seed = 1; seed <= 30; seed++) {
-      const map = generateCampaignMap(seed)
-      const terminals = map.nodes.filter((n) => n.isTerminal)
+  it("сюжетные терминалы станции «СФЕРА-1080» имеют валидные пороговые ярусы по каждому Акту", () => {
+    // Для стандартной 30-ярусной кампании терминалы появляются перед боями ближе к концу актов:
+    expect(getActTerminalTier(1, 30)).toBe(7) // Акт 1 (босс на ярусе 9)
+    expect(getActTerminalTier(2, 30)).toBe(17) // Акт 2 (босс на ярусе 19)
+    expect(getActTerminalTier(3, 30)).toBe(27) // Акт 3 (финальный босс на ярусе 29)
 
-      // В каждом акте кампании есть сюжетный терминал
-      expect(terminals.length).toBeGreaterThanOrEqual(3)
-
-      const act1Terminal = terminals.find((n) => n.tier <= 9)
-      const act2Terminal = terminals.find((n) => n.tier > 9 && n.tier <= 19)
-      const act3Terminal = terminals.find((n) => n.tier > 19)
-
-      expect(act1Terminal).toBeDefined()
-      expect(act1Terminal!.isEvent).toBe(true)
-      expect(act1Terminal!.name).toBe("АРХИВ КРИО-КОНТУРА")
-
-      expect(act2Terminal).toBeDefined()
-      expect(act2Terminal!.isEvent).toBe(true)
-      expect(act2Terminal!.name).toBe("АРХИВ БИОГЕЛЯ")
-
-      expect(act3Terminal).toBeDefined()
-      expect(act3Terminal!.isEvent).toBe(true)
-      expect(act3Terminal!.name).toBe("КОНСОЛЬ ОПЕРАТОРА")
-    }
+    // И для карт других размеров ярусы рассчитываются динамически:
+    expect(getActTerminalTier(1, 15)).toBe(2)
+    expect(getActTerminalTier(2, 15)).toBe(7)
+    expect(getActTerminalTier(3, 15)).toBe(12)
   })
 })

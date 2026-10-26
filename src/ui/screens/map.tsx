@@ -733,43 +733,46 @@ export function MapScreen({
       {eventData && !eventDismissed && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-abyss/75 p-3 backdrop-blur-md sm:p-6">
           <div
-            className={`hud-chip flex w-full max-w-lg flex-col items-center p-4 text-center sm:p-6 ${
+            className={`hud-chip flex w-full max-w-lg max-h-[92vh] overflow-y-auto arcade-scrollbar flex-col items-center p-3.5 text-center sm:p-6 ${
               eventData.terminalLog
                 ? "border border-sky-400/50 bg-abyss/95 shadow-[0_0_36px_rgba(56,189,248,0.25)]"
                 : "border border-amber-400/40 bg-abyss/95 shadow-[0_0_32px_rgba(251,191,36,0.2)]"
             }`}
           >
             {eventData.terminalLog ? (
-              <div className="flex w-full flex-col items-center gap-1 border-b border-sky-400/30 pb-3">
+              <div className="flex w-full flex-col items-center gap-1 border-b border-sky-400/30 pb-2.5 sm:pb-3">
                 <div className="flex items-center gap-2">
-                  <IconTerminal className="h-5 w-5 text-sky-400" />
-                  <span className="font-mono text-xs font-bold tracking-wider text-sky-300">
+                  <IconTerminal className="h-5 w-5 shrink-0 text-sky-400" />
+                  <span className="font-mono text-xs font-bold tracking-wider text-sky-300 sm:text-sm">
                     {eventData.terminalLog.header ??
                       `🛰 ОРБИТАЛЬНАЯ СТАНЦИЯ «СФЕРА-1080» // ${eventData.terminalLog.code}`}
                   </span>
                 </div>
-                <div className="text-[11px] font-mono text-sky-200/80">
+                <div className="text-[10px] font-mono text-sky-200/80 sm:text-[11px]">
                   {eventData.terminalLog.author} • {eventData.terminalLog.date}
                 </div>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <IconVortex className="h-5 w-5 text-amber-300" />
+                <IconVortex className="h-5 w-5 shrink-0 text-amber-300" />
                 <div className="hud-label text-amber-300">{eventData.title}</div>
               </div>
             )}
-            <p
-              className={`mt-3 font-display text-sm leading-relaxed sm:text-base ${
-                eventData.terminalLog
-                  ? "rounded-lg border border-sky-500/20 bg-deep/60 p-3 text-left font-sans text-sky-100 shadow-inner whitespace-pre-line"
-                  : "text-foam"
-              }`}
-            >
-              {eventData.text}
-            </p>
+
+            {eventData.terminalLog ? (
+              <div className="mt-2.5 w-full rounded-lg border border-sky-500/25 bg-deep/70 p-2.5 text-left font-sans text-sky-100 shadow-inner sm:mt-3 sm:p-3">
+                <div className="arcade-scrollbar max-h-28 overflow-y-auto pr-2 text-xs leading-relaxed whitespace-pre-line sm:max-h-36 sm:text-sm">
+                  {eventData.text}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 font-display text-sm leading-relaxed text-foam sm:text-base">
+                {eventData.text}
+              </p>
+            )}
 
             {!eventData.resolved ? (
-              <div className="mt-4 flex w-full flex-col gap-2.5">
+              <div className="mt-3 flex w-full flex-col gap-2 sm:mt-4 sm:gap-2.5">
                 {eventData.choices.map((choice, idx) => {
                   const affordable = !choice.cost || crystals >= choice.cost
                   const isTerminal = !!eventData.terminalLog
@@ -778,7 +781,7 @@ export function MapScreen({
                       key={choice.id}
                       disabled={!affordable}
                       onClick={() => onEventChoice?.(idx)}
-                      className={`flex flex-col items-start rounded-lg border p-3 text-left transition-all ${
+                      className={`flex flex-col items-start rounded-lg border p-2.5 text-left transition-all sm:p-3 ${
                         affordable
                           ? isTerminal
                             ? "cursor-pointer border-sky-400/40 bg-deep/90 hover:border-sky-300 hover:bg-deep active:scale-[0.99]"
@@ -788,7 +791,7 @@ export function MapScreen({
                     >
                       <div className="flex w-full items-center justify-between">
                         <span
-                          className={`font-display text-sm font-bold ${
+                          className={`font-display text-xs font-bold sm:text-sm ${
                             isTerminal ? "text-sky-200" : "text-amber-200"
                           }`}
                         >
@@ -804,21 +807,27 @@ export function MapScreen({
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 text-xs text-foam/80">{choice.desc}</p>
+                      <p className="mt-0.5 text-[11px] text-foam/80 sm:mt-1 sm:text-xs">
+                        {choice.desc}
+                      </p>
                     </button>
                   )
                 })}
               </div>
             ) : (
-              <div className="mt-4 w-full">
-                <div className="rounded-lg border border-mint/40 bg-mint/10 p-3 text-sm text-mint">
+              <div className="mt-3.5 w-full sm:mt-4">
+                <div className="rounded-lg border border-mint/40 bg-mint/10 p-2.5 text-xs text-mint sm:p-3 sm:text-sm">
                   {eventData.outcomeText}
                 </div>
                 <button
-                  className="btn-ghost mt-4 px-6 py-2 font-display text-sm text-cyan-neon hover:text-foam"
+                  className={
+                    hud.campaignPendingBattle
+                      ? "btn-arcade mt-4 px-6 py-2.5 font-display text-sm font-bold uppercase tracking-wider text-cyan-neon shadow-[0_0_15px_rgba(34,211,238,0.4)] active:scale-95"
+                      : "btn-ghost mt-4 px-6 py-2 font-display text-sm text-cyan-neon hover:text-foam"
+                  }
                   onClick={handleDismissEvent}
                 >
-                  ПРОДОЛЖИТЬ ПУТЬ
+                  {hud.campaignPendingBattle ? "В БОЙ ➔" : "ПРОДОЛЖИТЬ ПУТЬ"}
                 </button>
               </div>
             )}

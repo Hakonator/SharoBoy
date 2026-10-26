@@ -32,6 +32,8 @@ export interface GameInternals {
   enterNextNodeOnAction: () => void
   intermediateScore: unknown
   continueFromIntermediateScore: () => void
+  campaignTerminalsSeen: number[]
+  campaignPendingBattleNodeId: number | null
   toMenu: () => void
   destroy: () => void
 }

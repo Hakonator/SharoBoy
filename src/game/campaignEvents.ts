@@ -3,11 +3,27 @@ import { pushHud } from "./game/hudSync"
 import { addCoins } from "./game/progress"
 import type { CampaignEventData } from "./types"
 import type { CampaignNode } from "./campaignMap"
-import { nodeById } from "./campaignMap"
+import { nodeById, TERMINAL_NAMES } from "./campaignMap"
 
 export interface EventOutcome {
   targetId: number // >= 0 means teleport to targetId; -1 means stay on current node
   text: string
+}
+
+/**
+ * Создаёт сюжетное событие терминала станции «СФЕРА-1080» по номеру Акта (1, 2, 3).
+ */
+export function buildTerminalStoryEvent(
+  g: Game,
+  actNumber: 1 | 2 | 3,
+  node: CampaignNode
+): CampaignEventData {
+  const terminalName = TERMINAL_NAMES[actNumber - 1]
+  const dummyNode: CampaignNode = {
+    ...node,
+    name: terminalName,
+  }
+  return buildCampaignEvent(g, dummyNode, -1)
 }
 
 /**
@@ -634,9 +650,17 @@ export function chooseCampaignEventChoice(g: Game, choiceIndex: number) {
           text: "Вы успешно извлекли неповреждённый крио-конденсатор (+35 💎)!",
         }
       } else {
-        outcome = {
-          targetId: defaultTarget,
-          text: "Гидроудар сорвал заслонку! Потоком биогеля шар отбросило в пройденную локацию.",
+        if (defaultTarget >= 0) {
+          outcome = {
+            targetId: defaultTarget,
+            text: "Гидроудар сорвал заслонку! Потоком биогеля шар отбросило в пройденную локацию.",
+          }
+        } else {
+          if (g.shield > 0) g.shield--
+          outcome = {
+            targetId: -1,
+            text: "Гидроудар сорвал заслонку! Щиты поглотили волну (-1 ЩИТ), а конденсатор раскололся.",
+          }
         }
       }
       break
