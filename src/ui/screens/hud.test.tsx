@@ -65,21 +65,22 @@ function renderHud(phase: HudData["phase"], debug: boolean) {
   )
 }
 
-describe("HudOverlay: кнопка пропуска уровня", () => {
-  it("показывает удерживаемую кнопку только в активном режиме отладки", () => {
-    expect(renderHud("playing", true)).toContain("Удерживайте, чтобы завершить уровень")
-    expect(renderHud("playing", false)).not.toContain("Удерживайте, чтобы завершить уровень")
+describe("HudOverlay: кнопка быстрого пропуска уровня в режиме отладки", () => {
+  it("показывает кнопку быстрого завершения только в активном режиме отладки", () => {
+    expect(renderHud("playing", true)).toContain("Быстро завершить уровень (Отладка)")
+    expect(renderHud("playing", false)).not.toContain("Быстро завершить уровень (Отладка)")
   })
 
   it("не показывает кнопку на паузе или вне игры", () => {
-    expect(renderHud("paused", true)).not.toContain("Удерживайте, чтобы завершить уровень")
-    expect(renderHud("menu", true)).not.toContain("Удерживайте, чтобы завершить уровень")
+    expect(renderHud("paused", true)).not.toContain("Быстро завершить уровень (Отладка)")
+    expect(renderHud("menu", true)).not.toContain("Быстро завершить уровень (Отладка)")
   })
 
-  it("помечает кнопку как сенсорный контрол", () => {
+  it("кнопка видима и доступна для комфортного нажатия на сенсорных устройствах", () => {
     const html = renderHud("playing", true)
-    expect(html).toContain("pointer-coarse:flex")
-    expect(html).toContain("hidden")
+    expect(html).toContain("pointer-events-auto")
+    expect(html).toContain("⏭")
+    expect(html).not.toContain("Удерживайте, чтобы завершить уровень")
   })
 
   it("рендерит входящую трансляцию босса при наличии bossTransmission во время боя", () => {

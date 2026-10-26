@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 
 import { DEBUG_TOOLS } from "../../config"
 import {
@@ -50,22 +50,7 @@ export function HudOverlay({
   /** Закрыть активный интро-диалог босса. */
   onDismissBossDialog?: () => void
 }) {
-  const [skipArmed, setSkipArmed] = useState(false)
-  const skipTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const canSkipLevel = DEBUG_TOOLS && debug && hud.phase === "playing"
-  useEffect(
-    () => () => {
-      if (skipTimer.current !== null) clearTimeout(skipTimer.current)
-    },
-    []
-  )
-  useEffect(() => {
-    if (!canSkipLevel && skipTimer.current !== null) {
-      clearTimeout(skipTimer.current)
-      skipTimer.current = null
-      setSkipArmed(false)
-    }
-  }, [canSkipLevel])
   useEffect(() => {
     if (hud.mode !== "custom" || (hud.phase !== "playing" && hud.phase !== "paused")) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -77,20 +62,6 @@ export function HudOverlay({
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [hud.mode, hud.phase, onExitCustomMap])
-  const cancelSkip = () => {
-    if (skipTimer.current !== null) clearTimeout(skipTimer.current)
-    skipTimer.current = null
-    setSkipArmed(false)
-  }
-  const startSkip = () => {
-    if (skipTimer.current !== null) return
-    setSkipArmed(true)
-    skipTimer.current = setTimeout(() => {
-      skipTimer.current = null
-      setSkipArmed(false)
-      onDebugSkipLevel()
-    }, 500)
-  }
   /* Портрет: чипы и кнопки компактнее — зона HUD уже (HUD_TOP_PORTRAIT_CSS),
    * и на планшетах в портрете чипы не растут до десктопных размеров. */
   const pad = portrait ? "px-2 py-1" : "px-3 py-1.5 sm:px-3.5 sm:py-2"
@@ -205,27 +176,12 @@ export function HudOverlay({
       {canSkipLevel && (
         <button
           type="button"
-          className={`pointer-coarse:flex pointer-events-auto hidden h-11 w-11 shrink-0 items-center justify-center rounded border font-display text-base leading-tight text-gold ${
-            skipArmed ? "border-gold bg-gold/30" : "border-gold/50 bg-abyss/80"
-          }`}
-          aria-label="Удерживайте, чтобы завершить уровень"
-          onPointerDown={(event) => {
-            event.preventDefault()
-            startSkip()
-          }}
-          onPointerUp={cancelSkip}
-          onPointerCancel={cancelSkip}
-          onPointerLeave={cancelSkip}
-          onKeyDown={(event) => {
-            if (event.key === " " || event.key === "Enter") {
-              event.preventDefault()
-              startSkip()
-            }
-          }}
-          onKeyUp={cancelSkip}
-          onBlur={cancelSkip}
+          className={`icon-btn pointer-events-auto flex ${iconBtn} shrink-0 items-center justify-center rounded-lg border border-gold/70 bg-gold/20 text-gold shadow-[0_0_12px_rgba(255,201,77,0.35)] transition-transform hover:bg-gold/30 active:scale-95 font-display text-sm leading-tight sm:text-base`}
+          aria-label="Быстро завершить уровень (Отладка)"
+          title="Быстро завершить уровень (Отладка)"
+          onClick={onDebugSkipLevel}
         >
-          <span aria-hidden="true">{skipArmed ? "…" : "⏭"}</span>
+          <span aria-hidden="true">⏭</span>
         </button>
       )}
       <div className="flex items-center gap-1.5">
