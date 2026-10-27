@@ -50,6 +50,8 @@ export interface IntermediateScoreData {
   readonly metaCrystalsEarned?: number
   /** Элементы детального подсчёта очков. */
   readonly items: readonly ScoreBreakdownItem[]
+  /** Опциональное описание сюжетного события или последствий боя. */
+  readonly eventDescription?: string
 }
 
 export type Phase = "menu" | "playing" | "paused" | "over" | "won" | "map"

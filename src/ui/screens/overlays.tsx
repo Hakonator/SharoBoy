@@ -607,6 +607,11 @@ export function IntermediateScoreModal({
           {data.title}
         </h2>
         {data.subtitle && <p className="mt-0.5 text-xs text-foam/60 font-sans">{data.subtitle}</p>}
+        {data.eventDescription && (
+          <p className="mt-3 text-sm italic text-foam/80 font-sans border-t border-foam/10 pt-2 px-2">
+            «{data.eventDescription}»
+          </p>
+        )}
 
         {/* Основные блоки очков */}
         <div className="mt-4 grid grid-cols-2 gap-3">

@@ -228,6 +228,10 @@ export function onLevelCleared(g: Game) {
       showIntermediateScore(g, () => enterMapView(g), {
         title: `АКТ ${actNumber === 1 ? "I" : "II"} — БОСС ПОВЕРЖЕН!`,
         metaCrystals: actReward,
+        eventDescription:
+          actNumber === 1
+            ? "Электрический гул утих, и фильтры, перегонявшие густой биогель, замерли. В наступившей тишине слышно лишь, как где-то глубоко внутри станции отсчитывают циклы её спящие системы. Первая преграда пройдена, но воздух — или то, что здесь его заменяет — стал заметно тяжелее."
+            : "Бой окончен, и в глубинах коллектора памяти впервые за эпоху воцарился порядок. Данные, прежде запертые в «стазисе», начинают струиться по каналам, проливая мягкое, пульсирующее сияние на путь впереди. Это больше не просто путь сквозь тьму — это дорога к истине, которая уже совсем близко, и кажется, что даже сами стены станции стали чуть менее враждебными.",
       })
       return
     }
@@ -352,6 +356,7 @@ export function showIntermediateScore(
     subtitle?: string
     crystals?: number
     metaCrystals?: number
+    eventDescription?: string
   }
 ) {
   const breakdown = computeScoreBreakdown(g)
@@ -373,6 +378,7 @@ export function showIntermediateScore(
   g.intermediateScore = {
     title: context?.title ?? (isDirectLevel ? `УРОВЕНЬ ${g.level} ЗАВЕРШЁН` : "СЕКТОР ЗАЧИЩЕН"),
     subtitle: context?.subtitle ?? (isDirectLevel ? LEVELS[g.level - 1]?.name : undefined),
+    eventDescription: context?.eventDescription,
     levelScore,
     previousScore: prevScore,
     totalScore: currentScore,
