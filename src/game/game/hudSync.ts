@@ -95,6 +95,7 @@ export function pushHud(g: Game) {
     fireOn: g.time < g.fireUntil || (Boolean(g.campaignRelics?.relicFire) && g.combo >= 3),
     frostOn: g.time < g.frostUntil,
     sparkOn: g.time < g.sparkUntil,
+    pierceOn: g.time < g.pierceUntil,
     magnetOn: g.time < g.magnetUntil,
     coins: g.coins,
     crystals: g.crystals,

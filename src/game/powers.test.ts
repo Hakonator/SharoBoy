@@ -55,4 +55,16 @@ describe("PowersSystem — неигровая HUD-зона сверху", () => 
     applyPower(g as unknown as Parameters<typeof applyPower>[0], "magneticPaddle")
     expect(g.magneticPaddleUntil).toBe(22)
   })
+
+  it("бонус клинка взводит проникающий шар на 10 секунд", () => {
+    const g = {
+      ...makeWorld({ time: 10 }),
+      pierceUntil: 0,
+      sfx: { power() {} },
+      fx: { popups: [], burst() {} },
+      pushHud() {},
+    }
+    applyPower(g as unknown as Parameters<typeof applyPower>[0], "pierce")
+    expect(g.pierceUntil).toBe(20)
+  })
 })

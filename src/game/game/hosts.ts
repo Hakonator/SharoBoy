@@ -170,6 +170,12 @@ export function makePowersHost(g: Game): PowersWorld {
     set sparkUntil(v) {
       g.sparkUntil = v
     },
+    get pierceUntil() {
+      return g.pierceUntil
+    },
+    set pierceUntil(v) {
+      g.pierceUntil = v
+    },
     get magnetUntil() {
       return g.magnetUntil
     },
@@ -319,6 +325,7 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     sfx: g.sfx,
     fireActive: () =>
       g.time < g.fireUntil || (Boolean(g.campaignRelics?.relicFire) && g.combo >= 3),
+    pierceActive: () => g.time < g.pierceUntil,
     frostActive: () => g.time < g.frostUntil,
     sparkActive: () => g.time < g.sparkUntil,
     get sparkQueue() {

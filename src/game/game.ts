@@ -232,6 +232,8 @@ export class Game {
   fireUntil = 0
   frostUntil = 0
   sparkUntil = 0
+  /** Активность проникающего шара «Кинетический клинок». */
+  pierceUntil = 0
   magnetUntil = 0
   magneticPaddleUntil = 0
   weaponCd = 0

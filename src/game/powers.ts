@@ -47,6 +47,8 @@ export interface PowersWorld {
   fireUntil: number
   frostUntil: number
   sparkUntil: number
+  /** Активность проникающего шара «Кинетический клинок», сек. */
+  pierceUntil: number
   magnetUntil: number
   magneticPaddleUntil: number
   laserArmed: boolean

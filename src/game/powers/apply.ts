@@ -60,6 +60,12 @@ export function applyPower(g: PowersWorld, type: PowerType) {
       g.frostUntil = 0
       popup("ЭЛЕКТРОШАР!")
       break
+    case "pierce":
+      // Клинок не гасит другие стихии: огонь остаётся приоритетнее в коллизии,
+      // но таймер клинка живёт своей жизнью.
+      g.pierceUntil = g.time + 10 * mult
+      popup("КИНЕТИЧЕСКИЙ КЛИНОК!")
+      break
     case "magnet":
       g.magnetUntil = g.time + 7 * mult
       popup("МАГНИТ!")

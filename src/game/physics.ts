@@ -92,6 +92,8 @@ export interface PhysicsWorld {
   fireActive(): boolean
   frostActive(): boolean
   sparkActive(): boolean
+  /** Активен проникающий шар «Кинетический клинок» (до 3 блоков за проход). */
+  pierceActive(): boolean
   slowActive(): boolean
   fastActive(): boolean
   magnetActive(): boolean
@@ -290,6 +292,8 @@ export class Physics {
         ball.vx = Math.abs(ball.vx)
         ball.vy += rand(-1, 1) * speed * 0.06
         ball.squash = 1
+        // отскок от стены закрывает проход клинка: лимит считается заново
+        ball.pierceLeft = undefined
         g.sfx.wall(-0.85)
       }
       if (ball.x + ball.r > g.w) {
@@ -297,12 +301,14 @@ export class Physics {
         ball.vx = -Math.abs(ball.vx)
         ball.vy += rand(-1, 1) * speed * 0.06
         ball.squash = 1
+        ball.pierceLeft = undefined
         g.sfx.wall(0.85)
       }
       if (ball.y - ball.r < g.blockTop) {
         ball.y = g.blockTop + ball.r
         ball.vy = Math.abs(ball.vy)
         ball.squash = 1
+        ball.pierceLeft = undefined
         g.sfx.wall(clamp((ball.x / g.w) * 2 - 1, -0.85, 0.85))
       }
 

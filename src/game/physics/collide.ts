@@ -9,6 +9,13 @@ import { freezeCluster } from "./frost"
 import { queueSparkChain, sparkChainTargets } from "./spark"
 import { onBallHitSpecial } from "./special"
 
+/**
+ * Сколько блоков «Кинетический клинок» пробивает за один проход.
+ * Проход — отрезок между двумя отскоками: счётчик `Ball.pierceLeft`
+ * обнуляется при отскоке от ракетки, стены, блока, минибосса и босса.
+ */
+export const PIERCE_BLOCKS_PER_PASS = 3
+
 /** Ситуативная механика: «Критический сэйв» (Clutch Rebound).
  *  Активируется при отскоке шара от самого края платформы (|rel| >= 0.78),
  *  либо в опасной ситуации при 1 жизни (|rel| >= 0.70).
@@ -135,6 +142,8 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
   ball.squash = 1
   ball.sinceHit = 0
   p.squash = 1
+  // отскок от ракетки закрывает текущий проход клинка
+  ball.pierceLeft = undefined
   g.resetBossCleanHits?.()
   const keepMult = g.comboMasterLevel ? (g.comboMasterLevel >= 2 ? 0.7 : 0.35) : 0
   g.combo = Math.floor(g.combo * keepMult)
@@ -276,6 +285,20 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
       ball.squash = 1
       return
     }
+    /* Кинетический клинок: пробивает до PIERCE_BLOCKS_PER_PASS блоков за
+       проход, нанося каждому обычный урон. Лимит живёт в шаре и обнуляется на
+       каждом отскоке (ракетка, стена, минибосс, босс), поэтому шар награждает
+       за точный угол, а не за подбор. Огонь и мороз приоритетнее: они
+       обработаны выше, и до этой ветви дело доходит только когда они не
+       сработали. */
+    if (g.pierceActive() && !b.isMiniboss && !b.bomb) {
+      const left = ball.pierceLeft ?? PIERCE_BLOCKS_PER_PASS
+      if (left > 0) {
+        ball.pierceLeft = left - 1
+        damageBlock(g, b, g.debugBallDamage, true, Math.atan2(ball.vy, ball.vx))
+        continue
+      }
+    }
     // блоки минибоссов (и любые — у обычного шара) отскакивают: «прожигание»
     // насквозь превращало минибосса в машинку урона; огонь бьёт ×3 от обычного
     const dot = ball.vx * wnx + ball.vy * wny
@@ -283,6 +306,8 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
       ball.vx -= 2 * dot * wnx
       ball.vy -= 2 * dot * wny
     }
+    // любой отскок от блока закрывает текущий проход клинка
+    ball.pierceLeft = undefined
     const impactAngle = Math.atan2(wny, wnx)
     let dmg = g.debugBallDamage * (fire ? FIREBALL_DAMAGE_MULT : 1)
     if (ball.clutchHits && ball.clutchHits > 0) {
@@ -376,6 +401,8 @@ export function collideBoss(g: PhysicsWorld, ball: Ball) {
   const ny = dy / (dist || 1)
   ball.x = bo.x + nx * (min + 1)
   ball.y = bo.y + ny * (min + 1)
+  // отскок от босса закрывает текущий проход клинка (лимит не расходуется)
+  ball.pierceLeft = undefined
   const dot = ball.vx * nx + ball.vy * ny
   if (dot < 0) {
     ball.vx -= 2 * dot * nx

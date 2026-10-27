@@ -46,6 +46,8 @@ export interface BallView extends RenderView {
   fire: boolean
   frost: boolean
   spark: boolean
+  /** Активен «Кинетический клинок» — фиолетовое лезвие вместо ядра. */
+  pierce?: boolean
   slow: boolean
   fast: boolean
   /** Идентификатор экипированного шлейфа/скина шара. */
@@ -54,7 +56,7 @@ export interface BallView extends RenderView {
 
 export function drawBalls(ctx: Ctx, balls: Ball[], v: BallView) {
   if (v.hidden) return
-  const isPowerActive = v.fire || v.frost || v.spark || v.slow || v.fast
+  const isPowerActive = v.fire || v.frost || v.spark || v.pierce || v.slow || v.fast
   const skinDef = getBallTrailDef(v.trailSkin ?? "default")
   const isRainbow = !isPowerActive && skinDef.id === "rainbow"
 
@@ -64,23 +66,25 @@ export function drawBalls(ctx: Ctx, balls: Ball[], v: BallView) {
       ? { trail: "rgba(124,214,255,", mid: "#dff4ff", core: "#5db8e8", glow: "#8fd9ff" }
       : v.spark
         ? { trail: "rgba(255,233,92,", mid: "#fff9c4", core: "#f5c518", glow: "#ffe95c" }
-        : v.slow
-          ? { trail: "rgba(93,255,176,", mid: "#d2ffee", core: "#2fd98a", glow: "#5dffb0" }
-          : v.fast
-            ? { trail: "rgba(255,106,92,", mid: "#ffd9d4", core: "#ff5347", glow: "#ff6a5c" }
-            : isRainbow
-              ? {
-                  trail: "",
-                  mid: `hsl(${(v.time * 180 + 60) % 360}, 100%, 80%)`,
-                  core: `hsl(${(v.time * 180) % 360}, 100%, 55%)`,
-                  glow: `hsl(${(v.time * 180) % 360}, 100%, 60%)`,
-                }
-              : {
-                  trail: skinDef.colors.trail,
-                  mid: skinDef.colors.mid,
-                  core: skinDef.colors.core,
-                  glow: skinDef.colors.glow,
-                }
+        : v.pierce
+          ? { trail: "rgba(201,164,255,", mid: "#efe4ff", core: "#a97bff", glow: "#c9a4ff" }
+          : v.slow
+            ? { trail: "rgba(93,255,176,", mid: "#d2ffee", core: "#2fd98a", glow: "#5dffb0" }
+            : v.fast
+              ? { trail: "rgba(255,106,92,", mid: "#ffd9d4", core: "#ff5347", glow: "#ff6a5c" }
+              : isRainbow
+                ? {
+                    trail: "",
+                    mid: `hsl(${(v.time * 180 + 60) % 360}, 100%, 80%)`,
+                    core: `hsl(${(v.time * 180) % 360}, 100%, 55%)`,
+                    glow: `hsl(${(v.time * 180) % 360}, 100%, 60%)`,
+                  }
+                : {
+                    trail: skinDef.colors.trail,
+                    mid: skinDef.colors.mid,
+                    core: skinDef.colors.core,
+                    glow: skinDef.colors.glow,
+                  }
   for (const b of balls) {
     for (let i = 0; i < b.trail.length; i++) {
       const t = b.trail[i]

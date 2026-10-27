@@ -78,6 +78,7 @@ export function draw(g: Game) {
     fire: g.time < g.fireUntil || (Boolean(g.campaignRelics?.relicFire) && g.combo >= 3),
     frost: g.time < g.frostUntil,
     spark: g.time < g.sparkUntil,
+    pierce: g.time < g.pierceUntil,
     slow: g.time < g.slowUntil,
     fast: g.time < g.fastUntil,
     trailSkin: g.cosmetics?.equipped?.ball,

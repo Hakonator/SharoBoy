@@ -96,6 +96,8 @@ export interface HudData {
   fireOn: boolean
   frostOn: boolean
   sparkOn: boolean
+  /** Активен проникающий шар «Кинетический клинок». */
+  pierceOn: boolean
   magnetOn: boolean
   coins: number
   /** Кристаллы текущего забега в кампании (валюта забега). */
@@ -386,6 +388,8 @@ export interface Ball {
   chronoMult?: number
   /** Заряд критического сэйва (количество следующих ударов с удвоенным уроном). */
   clutchHits?: number
+  /** Остаток пробитий клинком в текущем проходе (undefined — проход не начат). */
+  pierceLeft?: number
 }
 
 export type PowerType =
@@ -402,6 +406,7 @@ export type PowerType =
   | "fire"
   | "frost"
   | "spark"
+  | "pierce"
   | "fast"
   | "shrink"
 
