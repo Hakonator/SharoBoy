@@ -19,65 +19,69 @@
 
 ## Готово к работе
 
-### T-036: Расширение каталога реликвий забега до 8 и индикация активных реликвий (roadmap 3.1, шаг 1)
+### T-036: Проникающий шар «Кинетический клинок» (roadmap 3.1, ингредиент 1)
 
-Status: draft (переводится в ready после утверждения состава реликвий пользователем)
+Status: draft (переводится в ready после утверждения дизайна пользователем)
 Priority: high
 Assigned to: Luna
 
 Описание:
 
-Подготовка фундамента под дерево синергий (§3.1). Сейчас в
-`SHOP_CATALOG` четыре реликвии, и активные реликвии **нигде не видны**
-игроку: UI показывает их только в момент покупки в магазине на карте
-(`src/ui/screens/map.tsx`). С восемью реликвиями без индикации игрок
-не понимает, что у него работает.
+Первый из трёх шаров, без которых примеры синергий из `ROADMAP.md` §3.1
+нереализуемы. Важное уточнение по коду: **огонь уже проходит блоки насквозь**
+(`physics/collide.ts:243-254` — «обычные блоки огонь прожигает насквозь, без
+отскока»), поэтому новый шар обязан отличаться не поведением, а ролью.
 
-1. Четыре новые пассивные реликвии (`category: "relic"`, `relic: true`),
-   каждая на своей оси и без дублирования существующих апгрейдов:
-   - `relic_frost` «Иней бездны» (36 💎) — при потере щита шар получает
-     3 с мороза (`frostUntil`), замораживая блоки при ударе. Ось: урон → контроль.
-   - `relic_combo` «Резонансный камертон» (34 💎) — при потере мяча комбо
-     снижается вдвое, а не сбрасывается в ноль. Ось: страховка серии.
-     Важно: не путать с апгрейдом `comboMaster` — тот сохраняет комбо при
-     **касании ракетки** (`physics/collide.ts`), реликвия — при **потере шара**.
-   - `relic_bulwark` «Панцирь утилизатора» (32 💎) — первая за бой бомба
-     босса не отнимает жизнь. Ось: узкая защита в боссфайтах.
-   - `relic_overdrive` «Аварийный контур» (45 💎) — один раз за забег при
-     нуле жизней остаётся 1 жизнь. Ось: страховка от Game Over.
-2. Состояние: расширить `Game.campaignRelics` новыми флагами и добавить
-   `relicOverdriveUsed` (сбрасывается в `resetRun`). Новые флаги обязаны
-   сбрасываться там же, где сбрасываются существующие четыре
-   (`runFlow.ts:42`, `modes.ts:97`, `campaignFlow.ts:82`).
-3. Магазин: новые записи в `SHOP_CATALOG`, ветки в
-   `canBuyCampaignShopItem` (повторная покупка запрещена) и
-   `buyCampaignShopItem` (установка флага + мгновенный эффект, если он есть).
-4. Индикация в HUD: в `HudData` добавить `activeRelics?: string[]` (id реликвий),
-   в `hud.tsx` — компактный бейдж рядом с существующим `mutatorBadge`
-   (переиспользовать его стиль), список названий в `title`.
-5. Тесты: юнит-тесты на применение каждой реликвии в её точке внедрения
-   и на запрет повторной покупки; регрессионный тест HUD-бейджа.
+1. Новый тип бонуса `pierce` («КЛИН») и таймер `Game.pierceUntil`:
+   - шар проходит сквозь обычные блоки без отскока, нанося **обычный** урон
+     (в отличие от огня, который бьёт ×3);
+   - **снимает броню целиком** за одно попадание: `b.sp.armor` обнуляется перед
+     `damageBlock`, вместо того чтобы поглощать урон слоями. Это и есть роль
+     шара — вскрывать бронированные ряды поздних ярусов (там `armor` до 3 слоёв);
+   - от минибоссов и босса отскакивает как обычный шар — иначе превращается
+     в машину урона, на что уже наступали с огнём (`collide.ts:279-280`);
+   - приоритет в цепочке стихий ниже огня: если активны и огонь, и клинок,
+     побеждает огонь (×3 важнее брони).
+2. Каркас, общий для всех трёх шаров (делается здесь один раз):
+   - `PowerType` += `"pierce"` (`types.ts`), запись в `POWER_META`
+     (`palette.ts`: label, цвет, edge), вес в `buildPowerTable` (`powers/table.ts`),
+     ветка в `applyPower` (`powers/apply.ts`), флаг `pierceActive()` в
+     `PhysicsWorld` (`physics.ts`) и его реализация в `game/hosts.ts`;
+   - сброс таймера в `loseLife` и `clearAllEffects` (`game/runFlow.ts`)
+     рядом с `fireUntil`/`frostUntil`;
+   - цвет шара в `render/projectiles.ts` (`BallView.pierce`), индикатор в
+     `HudData` (`types.ts`) и `hud.tsx` (`pierceOn`), значение в `hudSync.ts`.
+3. Баланс: длительность 8 с, вес в таблице дропа 8 (как у `fire`/`frost`/`spark`).
+4. Тесты: юнит-тест на обнуление брони при попадании клинка и на сохранение
+   отскока от минибосса; тест `applyPower` на установку таймера; тест сброса
+   эффекта в `clearAllEffects`.
 
-Точки внедрения эффектов (проверены по коду):
+Точки внедрения (проверены по коду):
 
-- `relic_frost` → `physics.ts:310` (ветка «щит поглощает удар»).
-- `relic_combo` → `runFlow.ts:434` (`g.combo = 0` в `loseLife`).
-- `relic_bulwark` → `runFlow.ts:528` (`onBombHitPaddle`).
-- `relic_overdrive` → `runFlow.ts:457` (проверка `g.lives <= 0`).
+- пробитие и снятие брони → `physics/collide.ts:243` (перед ветвью огня).
+- флаг активности → `physics.ts:95-100` (рядом с `fireActive`), реализация в
+  `game/hosts.ts:320` (рядом с `fireActive`).
+- таймер и сброс → `game.ts` (рядом с `fireUntil`), `game/runFlow.ts:444,541`.
+- дроп → `powers/table.ts:19-31`, применение → `powers/apply.ts:45`.
+- рендер → `render/projectiles.ts:61-83`.
 
 Allowed files:
 
-- src/game/campaignShop.ts
-- src/game/campaignShop.test.ts
+- src/game/types.ts
+- src/game/palette.ts
+- src/game/physics.ts
+- src/game/physics/collide.ts
+- src/game/physics/collide.test.ts
 - src/game/game.ts
+- src/game/game/hosts.ts
 - src/game/game/runFlow.ts
 - src/game/game/hudSync.ts
-- src/game/game/modes.ts
-- src/game/game/campaignFlow.ts
-- src/game/physics.ts
-- src/game/types.ts
+- src/game/powers.ts
+- src/game/powers/apply.ts
+- src/game/powers/table.ts
+- src/game/powers/table.test.ts
+- src/game/render/projectiles.ts
 - src/ui/screens/hud.tsx
-- src/ui/screens/hud.test.tsx
 - .ai/TASKS.md
 - .ai/STATE.md
 - memory-bank/activeContext.md
@@ -92,14 +96,13 @@ Dependencies: нет
 
 Acceptance criteria:
 
-- [ ] В каталоге 8 реликвий, у каждой уникальный `id`, цена и описание
-- [ ] Повторная покупка любой реликвии запрещена с понятной причиной
-- [ ] Потеря щита при `relic_frost` даёт мороз на 3 с
-- [ ] При `relic_combo` потеря мяча снижает комбо вдвое (не до нуля)
-- [ ] При `relic_bulwark` первая бомба боя не отнимает жизнь, вторая — отнимает
-- [ ] При `relic_overdrive` нулевые жизни один раз превращаются в 1, повторно — нет
-- [ ] Все новые флаги сбрасываются при старте нового забега
-- [ ] Активные реликвии видны в HUD в бою и на карте
+- [ ] Бонус `pierce` выпадает в бою и отображается иконкой «КЛИН»
+- [ ] Шар проходит сквозь обычный блок без отскока, нанося урон 1
+- [ ] Броня блока с `armor` обнуляется одним попаданием клинка
+- [ ] От минибосса и босса клинок отскакивает (урон идёт как обычно)
+- [ ] При одновременных огне и клинке приоритет у огня
+- [ ] Эффект сбрасывается при потере жизни и между уровнями
+- [ ] Индикатор активного клинка виден в HUD
 - [ ] `npm run typecheck`, `npm run lint`, `npm test` проходят
 
 Test plan:
@@ -113,13 +116,185 @@ npm test
 
 ---
 
-## Следующее после T-036 (не начинать без подтверждения)
+### T-037: Взрывной шар «Плазменный заряд» (roadmap 3.1, ингредиент 2)
 
-- **T-037**: движок синергий `src/game/synergies.ts` (чистая логика + кэш
-  активных синергий в `Game`, пересчёт только по событиям) и первые синергии
-  на существующих реликвиях.
-- **T-038+**: остальные синергии из списка §3.1 (7 штук), нарезанные по
-  риску: сначала числовые, затем стихийные, затем правящие физику.
+Status: draft
+Priority: high
+Assigned to: Luna
+
+Описание:
+
+Второй шар. В отличие от клинка не проникает, а бьёт по площади: после
+обычного отскока и урона по блоку удара подрывает соседей в радиусе.
+
+1. Новый тип бонуса `explosive` («ВЗРЫВ») и таймер `Game.explosiveUntil`.
+2. Логика (`physics/collide.ts`, после `damageBlock`): взрыв радиусом 72
+   наносит урон 1 всем живым блокам в радиусе, кроме блока удара.
+   - взрывной урон идёт с `allowBrittle = false`, иначе получаем каскад
+     «взрыв → хрупкий блок → цепная детонация → снова взрыв» и вечный цикл;
+   - лимит 8 целей за взрыв, чтобы не убивать кадр на плотных рядах;
+   - минибоссы, бомбы и фазовые неактивные блоки исключены.
+3. Переиспользовать существующие рычаги: `damageBlock` и `fx.rings`/`fx.burst`
+   (никакой новой системы взрывов не создавать — `boomQueue` занят бомбами).
+4. Каркас по образцу T-036: `PowerType`, `POWER_META`, таблица дропа,
+   `applyPower`, `explosiveActive()` в `PhysicsWorld` и `hosts.ts`,
+   сброс в `loseLife`/`clearAllEffects`, цвет в `render/projectiles.ts`,
+   `explosiveOn` в `HudData` и `hud.tsx`.
+5. Баланс: длительность 8 с, вес в таблице 8, радиус 72, урон 1.
+
+Точки внедрения: `physics/collide.ts:301` (сразу после `damageBlock`),
+`physics/destruction.ts:101-113` (образец взрыва по площади у `brittle`).
+
+Allowed files:
+
+- src/game/types.ts
+- src/game/palette.ts
+- src/game/physics.ts
+- src/game/physics/collide.ts
+- src/game/physics/collide.test.ts
+- src/game/game.ts
+- src/game/game/hosts.ts
+- src/game/game/runFlow.ts
+- src/game/game/hudSync.ts
+- src/game/powers.ts
+- src/game/powers/apply.ts
+- src/game/powers/table.ts
+- src/game/powers/table.test.ts
+- src/game/render/projectiles.ts
+- src/ui/screens/hud.tsx
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+- package.json
+
+Dependencies: T-036 (общий каркас типа бонуса и таймера)
+
+Acceptance criteria:
+
+- [ ] Бонус `explosive` выпадает и отображается иконкой «ВЗРЫВ»
+- [ ] Попадание подрывает соседей в радиусе 72 на урон 1
+- [ ] Блок удара не получает двойной урон
+- [ ] Каскад с хрупкими блоками не зацикливается (лимит целей, `allowBrittle = false`)
+- [ ] Минибоссы, бомбы и неактивные фазовые блоки взрывом не задеваются
+- [ ] Эффект сбрасывается при потере жизни и между уровнями
+- [ ] `npm run typecheck`, `npm run lint`, `npm test` проходят
+
+Test plan:
+`npm run typecheck`, `npm run lint`, `npm test`
+
+Verification commands:
+npm run typecheck
+npm run lint:check
+npm run format:check
+npm test
+
+### T-038: Увеличенный шар «Гравитационное ядро» (roadmap 3.1, ингредиент 3)
+
+Status: draft
+Priority: high
+Assigned to: Luna
+
+Описание:
+
+Третий шар. Единственный из трёх, кто меняет не поведение контакта, а сам
+размер шара, — поэтому он и назван «увеличенным» в роадмапе.
+
+1. Новый тип бонуса `big` («ЯДРО») и таймер `Game.bigUntil`.
+2. Радиус шара ×1.6 (9 → 14.4) на 10 с, скорость −10% как компенсация.
+3. Критично: радиус шара сейчас задаётся жёстко (`serveBall`, `r: 9`), а
+   `multi` клонирует шары с `r: d.r`. Нужна единая функция базового радиуса
+   (`baseBallRadius(g)`) и применение множителя:
+   - при активации — масштабировать `r` у всех шаров в игре;
+   - при подаче нового шара (`serveBall`) — создавать сразу с учётом эффекта;
+   - при окончании эффекта — вернуть базовый радиус всем шарам;
+   - клоны из `multi` наследуют текущий радиус (поведение не меняется).
+4. Рендер не трогаем: `render/projectiles.ts` уже использует `b.r` для тела,
+   шлейфа и кольца «на ракетке» — визуал подхватится сам. Нужен только цвет
+   (`BallView.big`) и индикатор в HUD.
+5. Каркас по образцу T-036: `PowerType`, `POWER_META`, таблица дропа,
+   `applyPower`, `bigActive()` в `PhysicsWorld` и `hosts.ts`, сброс в
+   `loseLife`/`clearAllEffects`, `bigOn` в `HudData` и `hud.tsx`.
+6. Риск и его снятие: изменение `r` на лету может «вдавить» шар в блок.
+   `collideBlocks` уже выталкивает шар по нормали на 0.8 единицы, но тест
+   обязан проверить, что после активации рядом с блоком шар не залипает.
+
+Точки внедрения: `game/levelBuild.ts` (`serveBall`, `r: 9`),
+`powers/apply.ts`, `game/runFlow.ts:444,541` (сбросы), `game/hosts.ts:320`.
+
+Allowed files:
+
+- src/game/types.ts
+- src/game/palette.ts
+- src/game/physics.ts
+- src/game/game.ts
+- src/game/game/hosts.ts
+- src/game/game/levelBuild.ts
+- src/game/game/runFlow.ts
+- src/game/game/hudSync.ts
+- src/game/powers.ts
+- src/game/powers/apply.ts
+- src/game/powers/table.ts
+- src/game/powers/table.test.ts
+- src/game/physics.test.ts
+- src/game/render/projectiles.ts
+- src/ui/screens/hud.tsx
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+- package.json
+
+Dependencies: T-036 (общий каркас)
+
+Acceptance criteria:
+
+- [ ] Бонус `big` выпадает и отображается иконкой «ЯДРО»
+- [ ] Радиус шара растёт до ×1.6, скорость снижается на 10%
+- [ ] Шары, поданные во время эффекта, сразу создаются увеличенными
+- [ ] Клоны `multi` наследуют увеличенный радиус
+- [ ] После окончания эффекта радиус возвращается к базовому
+- [ ] Шар не залипает в блоке при активации вплотную
+- [ ] Эффект сбрасывается при потере жизни и между уровнями
+- [ ] `npm run typecheck`, `npm run lint`, `npm test` проходят
+
+Test plan:
+`npm run typecheck`, `npm run lint`, `npm test`
+
+Verification commands:
+npm run typecheck
+npm run lint:check
+npm run format:check
+npm test
+
+---
+
+## Дальше после шаров (не начинать без подтверждения)
+
+Порядок продиктован зависимостями: шары — новые ингредиенты для синергий, без
+них два из трёх примеров §3.1 нереализуемы.
+
+- **T-039**: расширение каталога реликвий с 4 до 8 + индикация активных
+  реликвий в HUD. Четыре новые пассивки (`relic_frost` — потеря щита даёт мороз,
+  `relic_combo` — комбо падает вдвое, а не в ноль, `relic_bulwark` — первая бомба
+  боя без потери жизни, `relic_overdrive` — один раз за забег спасает от Game
+  Over) с проверенными точками внедрения: `physics.ts:310`, `runFlow.ts:434`,
+  `runFlow.ts:528`, `runFlow.ts:457`.
+- **T-040**: движок синергий `src/game/synergies.ts` (AD-028: чистая логика
+  условий + кэш `Set<SynergyId>` в `Game`, пересчёт только по событиям).
+- **T-041+**: синергии из §3.1 — теперь все три примера реализуемы:
+  «Кинетический Снайпер» (`pierce` + магнитная ракетка), «Цепной Резонанс»
+  (`explosive` + `brittle`), «Гравитационный Джаггернаут» (`big` +
+  `heavy_gravity`). Нарезать по возрастанию риска: сначала числовые, затем
+  стихийные, затем правящие физику.
 
 ## Заблокировано
 
