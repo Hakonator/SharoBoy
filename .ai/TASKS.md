@@ -123,7 +123,7 @@ npm test
 
 ### T-037: Взрывной шар «Плазменный заряд» (roadmap 3.1, ингредиент 2)
 
-Status: draft
+Status: ready
 Priority: high
 Assigned to: Luna
 
@@ -147,8 +147,27 @@ Assigned to: Luna
    `explosiveOn` в `HudData` и `hud.tsx`.
 5. Баланс: длительность 8 с, вес в таблице 8, радиус 72, урон 1.
 
-Точки внедрения: `physics/collide.ts:301` (сразу после `damageBlock`),
-`physics/destruction.ts:101-113` (образец взрыва по площади у `brittle`).
+Точки внедрения (проверены по коду на момент планирования; актуализировать при
+старте задачи): взрыв — в `physics/collide.ts` в ветви обычного отскока сразу
+после `damageBlock` (`collideBlocks`), по образцу взрыва по площади у `brittle`
+(`physics/destruction.ts`, ветка `b.sp.brittle`). Каркас бонуса — по образцу
+уже реализованного `pierce` из T-036 (`pierceActive` в `physics.ts`,
+реализация в `game/hosts.ts`, таймер в `game.ts`, сбросы в `game/runFlow.ts`,
+цвет в `render/projectiles.ts`, `pierceOn` в `HudData` → здесь `explosiveOn`).
+
+Уточнения, выявленные в T-036 и обязательные к учёту:
+
+- примитивы уже существуют: `PowersWorld.explosiveUntil`, геттер/сеттер в
+  `game/hosts.ts` и флаг в `HudData` надо добавить так же, как сделано для
+  `pierceUntil`/`pierceOn`;
+- тестовые фейковые миры (`physics.test.ts`, `physics/spark.test.ts`,
+  `physics/frost.test.ts`, новый `physics/collide.test.ts`) перечисляют методы
+  мира явно — при добавлении `explosiveActive()` их надо дополнить, иначе
+  typecheck упадёт с TS2741;
+- блоки в тестах разносить минимум на 100 единиц по вертикали: зоны контакта
+  соседних эллипсов перекрываются;
+- для проверки отражения ставить шар на границу блока, а не в центр:
+  в центре эллипса нормаль нулевая.
 
 Allowed files:
 
@@ -157,16 +176,24 @@ Allowed files:
 - src/game/physics.ts
 - src/game/physics/collide.ts
 - src/game/physics/collide.test.ts
+- src/game/physics.test.ts
+- src/game/physics/spark.test.ts
+- src/game/physics/frost.test.ts
 - src/game/game.ts
 - src/game/game/hosts.ts
 - src/game/game/runFlow.ts
 - src/game/game/hudSync.ts
+- src/game/game/drawScene.ts
 - src/game/powers.ts
 - src/game/powers/apply.ts
 - src/game/powers/table.ts
 - src/game/powers/table.test.ts
+- src/game/powers.test.ts
 - src/game/render/projectiles.ts
 - src/ui/screens/hud.tsx
+- src/App.tsx
+- src/ui/screens/MenuCosmetics.test.tsx
+- src/ui/screens/SettingsModal.test.tsx
 - .ai/TASKS.md
 - .ai/STATE.md
 - memory-bank/activeContext.md
@@ -200,7 +227,7 @@ npm test
 
 ### T-038: Увеличенный шар «Гравитационное ядро» (roadmap 3.1, ингредиент 3)
 
-Status: draft
+Status: ready
 Priority: high
 Assigned to: Luna
 
@@ -228,26 +255,49 @@ Assigned to: Luna
    `collideBlocks` уже выталкивает шар по нормали на 0.8 единицы, но тест
    обязан проверить, что после активации рядом с блоком шар не залипает.
 
-Точки внедрения: `game/levelBuild.ts` (`serveBall`, `r: 9`),
-`powers/apply.ts`, `game/runFlow.ts:444,541` (сбросы), `game/hosts.ts:320`.
+Точки внедрения (проверены на момент планирования; актуализировать при старте):
+радиус шара задаётся в `game/levelBuild.ts` (`serveBall`, `r: 9`) и клонируется
+в `powers/apply.ts` (`multi`, `r: d.r`); каркас бонуса — по образцу `pierce`
+из T-036.
+
+Уточнения, выявленные в T-036 и обязательные к учёту:
+
+- тестовые фейковые миры перечисляют методы мира явно — добавляя
+  `bigActive()`, дополнить `physics.test.ts`, `physics/spark.test.ts`,
+  `physics/frost.test.ts`, `physics/collide.test.ts`, иначе typecheck упадёт
+  с TS2741;
+- при изменении радиуса зона контакта с блоками расширяется: проверить, что
+  увеличенный шар не «проскакивает» между блоками и не залипает;
+- счётчик прохода клинка (`Ball.pierceLeft`) не связан с радиусом, но при
+  одновременной работе `big` и `pierce` лимит остаётся прежним — это ожидаемо
+  и покрывается тестом на совместную работу.
 
 Allowed files:
 
 - src/game/types.ts
 - src/game/palette.ts
 - src/game/physics.ts
+- src/game/physics/collide.ts
+- src/game/physics/collide.test.ts
+- src/game/physics.test.ts
+- src/game/physics/spark.test.ts
+- src/game/physics/frost.test.ts
 - src/game/game.ts
 - src/game/game/hosts.ts
 - src/game/game/levelBuild.ts
 - src/game/game/runFlow.ts
 - src/game/game/hudSync.ts
+- src/game/game/drawScene.ts
 - src/game/powers.ts
 - src/game/powers/apply.ts
 - src/game/powers/table.ts
 - src/game/powers/table.test.ts
-- src/game/physics.test.ts
+- src/game/powers.test.ts
 - src/game/render/projectiles.ts
 - src/ui/screens/hud.tsx
+- src/App.tsx
+- src/ui/screens/MenuCosmetics.test.tsx
+- src/ui/screens/SettingsModal.test.tsx
 - .ai/TASKS.md
 - .ai/STATE.md
 - memory-bank/activeContext.md
@@ -282,10 +332,11 @@ npm test
 
 ---
 
-## Дальше после шаров (не начинать без подтверждения)
+## Дальше после шаров (карточки ещё не оформлены)
 
 Порядок продиктован зависимостями: шары — новые ингредиенты для синергий, без
-них два из трёх примеров §3.1 нереализуемы.
+них два из трёх примеров §3.1 нереализуемы. Подробные карточки появятся
+по мере продвижения T-037/T-038.
 
 - **T-039**: расширение каталога реликвий с 4 до 8 + индикация активных
   реликвий в HUD. Четыре новые пассивки (`relic_frost` — потеря щита даёт мороз,
