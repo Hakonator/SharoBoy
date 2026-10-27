@@ -22,6 +22,7 @@ import { useDebugControls } from "./ui/useDebugControls"
 import { useLeaderboard } from "./ui/useLeaderboard"
 import { usePlayerStats } from "./ui/usePlayerStats"
 import { usePortrait } from "./ui/usePortrait"
+import { useTouchDevice } from "./ui/useTouchDevice"
 import { MapTesterView } from "./ui/MapTesterView"
 import type { PlayerMapSpec } from "./game/mapSpec"
 import { clearAccountStorage } from "./game/account"
@@ -109,6 +110,7 @@ export default function App() {
   const leaderboard = useLeaderboard(hud, nick, handleNickChange)
   /** Вертикальный экран: HUD живёт в зарезервированной неигровой зоне сверху. */
   const portrait = usePortrait()
+  const isTouch = useTouchDevice()
 
   const handleResetAccount = useCallback(() => {
     clearAccountStorage()
@@ -265,7 +267,13 @@ export default function App() {
             </button>
             <button
               className="rounded-lg border border-mint/50 bg-deep/90 px-2 py-1.5 text-[11px] text-mint shadow-lg hover:bg-mint/10 sm:px-3 sm:py-2 sm:text-sm"
-              onClick={() => setShowEditor(true)}
+              onClick={() => {
+                if (isTouch) {
+                  alert("Для редактирования карт используйте десктоп или планшет.")
+                } else {
+                  setShowEditor(true)
+                }
+              }}
               type="button"
             >
               Редактор карт
@@ -287,9 +295,13 @@ export default function App() {
         <CommunityMaps
           onBack={() => setShowCommunityMaps(false)}
           onEditCopy={(copiedSpec) => {
-            setEditorMap(copiedSpec)
-            setShowCommunityMaps(false)
-            setShowEditor(true)
+            if (isTouch) {
+              alert("Для редактирования карт используйте десктоп или планшет.")
+            } else {
+              setEditorMap(copiedSpec)
+              setShowCommunityMaps(false)
+              setShowEditor(true)
+            }
           }}
           onPlay={startCommunityMap}
         />
