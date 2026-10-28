@@ -19,212 +19,6 @@
 
 ## Готово к работе
 
-### T-036: Проникающий шар «Кинетический клинок» (roadmap 3.1, ингредиент 1)
-
-Status: done
-Priority: high
-Assigned to: Luna
-
-Описание:
-
-Первый из трёх шаров, без которых примеры синергий из `ROADMAP.md` §3.1
-нереализуемы. Важное уточнение по коду: **огонь уже проходит блоки насквозь**
-(`physics/collide.ts:243-254` — «обычные блоки огонь прожигает насквозь, без
-отскока»), поэтому новый шар обязан отличаться не поведением, а ролью.
-
-1. Новый тип бонуса `pierce` («КЛИН») и таймер `Game.pierceUntil`:
-   - шар пробивает **не более 3 блоков за один проход**, нанося каждому
-     обычный урон 1; четвёртый блок он уже отражает как обычно;
-   - «проход» — отрезок между двумя отскоками. Счётчик `Ball.pierceLeft`
-     обнуляется при отскоке от ракетки, стены, минибосса и босса, поэтому
-     тактика шара — выбрать угол, чтобы снять до трёх блоков в ряду;
-   - от минибоссов и босса отскакивает всегда (лимит не расходуется) — иначе
-     превращается в машину урона, на что уже наступали с огнём
-     (`collide.ts:279-280`);
-   - приоритет в цепочке стихий ниже огня: если активны и огонь, и клинок,
-     побеждает огонь (×3 урон и неограниченное пробитие).
-2. Каркас, общий для всех трёх шаров (делается здесь один раз):
-   - `PowerType` += `"pierce"` (`types.ts`), запись в `POWER_META`
-     (`palette.ts`: label, цвет, edge), вес в `buildPowerTable` (`powers/table.ts`),
-     ветка в `applyPower` (`powers/apply.ts`), флаг `pierceActive()` в
-     `PhysicsWorld` (`physics.ts`) и его реализация в `game/hosts.ts`;
-   - сброс таймера в `loseLife` и `clearAllEffects` (`game/runFlow.ts`)
-     рядом с `fireUntil`/`frostUntil`;
-   - цвет шара в `render/projectiles.ts` (`BallView.pierce`), индикатор в
-     `HudData` (`types.ts`) и `hud.tsx` (`pierceOn`), значение в `hudSync.ts`.
-3. Баланс: длительность 10 с (дольше огня — это и есть ниша шара), вес в
-   таблице дропа 8 (как у `fire`/`frost`/`spark`), лимит 3 блока за проход.
-4. Тесты: юнит-тест на пробитие ровно трёх блоков и отскок от четвёртого;
-   тест сброса `pierceLeft` после отскока от ракетки; тест `applyPower` на
-   установку таймера; тест сброса эффекта в `clearAllEffects`.
-
-Точки внедрения (проверены по коду):
-
-- пробитие и лимит → `physics/collide.ts:243` (перед ветвью огня).
-- сброс счётчика → `physics/collide.ts` (отскок от ракетки), `physics.ts`
-  (отражение от стен).
-- флаг активности → `physics.ts:95-100` (рядом с `fireActive`), реализация в
-  `game/hosts.ts:320` (рядом с `fireActive`).
-- таймер и сброс → `game.ts` (рядом с `fireUntil`), `game/runFlow.ts:444,541`.
-- дроп → `powers/table.ts:19-31`, применение → `powers/apply.ts:45`.
-- рендер → `render/projectiles.ts:61-83`.
-
-Allowed files:
-
-- src/game/types.ts
-- src/game/palette.ts
-- src/game/physics.ts
-- src/game/physics/collide.ts
-- src/game/physics/collide.test.ts
-- src/game/game.ts
-- src/game/game/hosts.ts
-- src/game/game/runFlow.ts
-- src/game/game/hudSync.ts
-- src/game/powers.ts
-- src/game/powers/apply.ts
-- src/game/powers/table.ts
-- src/game/powers/table.test.ts
-- src/game/render/projectiles.ts
-- src/ui/screens/hud.tsx
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Forbidden files:
-
-- vite.config.ts
-- tsconfig.json
-- package.json
-
-Dependencies: нет
-
-Acceptance criteria:
-
-- [x] Бонус `pierce` выпадает в бою и отображается иконкой «КЛИН»
-- [x] Шар пробивает ровно 3 блока за проход и отражается от четвёртого
-- [x] Каждому пробитому блоку наносится урон 1
-- [x] Счётчик прохода сбрасывается после отскока от ракетки и от стены
-- [x] От минибосса и босса клинок отскакивает, лимит не расходуется
-- [x] При одновременных огне и клинке приоритет у огня
-- [x] Эффект сбрасывается при потере жизни и между уровнями
-- [x] Индикатор активного клинка виден в HUD
-- [x] `npm run typecheck`, `npm run lint`, `npm test` проходят (74 файла, 599 тестов)
-
-Test plan:
-`npm run typecheck`, `npm run lint`, `npm test`
-
-Verification commands:
-npm run typecheck
-npm run lint:check
-npm run format:check
-npm test
-
----
-
-### T-037: Взрывной шар «Плазменный заряд» (roadmap 3.1, ингредиент 2)
-
-Status: ready
-Priority: high
-Assigned to: Luna
-
-Описание:
-
-Второй шар. В отличие от клинка не проникает, а бьёт по площади: после
-обычного отскока и урона по блоку удара подрывает соседей в радиусе.
-
-1. Новый тип бонуса `explosive` («ВЗРЫВ») и таймер `Game.explosiveUntil`.
-2. Логика (`physics/collide.ts`, после `damageBlock`): взрыв радиусом 72
-   наносит урон 1 всем живым блокам в радиусе, кроме блока удара.
-   - взрывной урон идёт с `allowBrittle = false`, иначе получаем каскад
-     «взрыв → хрупкий блок → цепная детонация → снова взрыв» и вечный цикл;
-   - лимит 8 целей за взрыв, чтобы не убивать кадр на плотных рядах;
-   - минибоссы, бомбы и фазовые неактивные блоки исключены.
-3. Переиспользовать существующие рычаги: `damageBlock` и `fx.rings`/`fx.burst`
-   (никакой новой системы взрывов не создавать — `boomQueue` занят бомбами).
-4. Каркас по образцу T-036: `PowerType`, `POWER_META`, таблица дропа,
-   `applyPower`, `explosiveActive()` в `PhysicsWorld` и `hosts.ts`,
-   сброс в `loseLife`/`clearAllEffects`, цвет в `render/projectiles.ts`,
-   `explosiveOn` в `HudData` и `hud.tsx`.
-5. Баланс: длительность 8 с, вес в таблице 8, радиус 72, урон 1.
-
-Точки внедрения (проверены по коду на момент планирования; актуализировать при
-старте задачи): взрыв — в `physics/collide.ts` в ветви обычного отскока сразу
-после `damageBlock` (`collideBlocks`), по образцу взрыва по площади у `brittle`
-(`physics/destruction.ts`, ветка `b.sp.brittle`). Каркас бонуса — по образцу
-уже реализованного `pierce` из T-036 (`pierceActive` в `physics.ts`,
-реализация в `game/hosts.ts`, таймер в `game.ts`, сбросы в `game/runFlow.ts`,
-цвет в `render/projectiles.ts`, `pierceOn` в `HudData` → здесь `explosiveOn`).
-
-Уточнения, выявленные в T-036 и обязательные к учёту:
-
-- примитивы уже существуют: `PowersWorld.explosiveUntil`, геттер/сеттер в
-  `game/hosts.ts` и флаг в `HudData` надо добавить так же, как сделано для
-  `pierceUntil`/`pierceOn`;
-- тестовые фейковые миры (`physics.test.ts`, `physics/spark.test.ts`,
-  `physics/frost.test.ts`, новый `physics/collide.test.ts`) перечисляют методы
-  мира явно — при добавлении `explosiveActive()` их надо дополнить, иначе
-  typecheck упадёт с TS2741;
-- блоки в тестах разносить минимум на 100 единиц по вертикали: зоны контакта
-  соседних эллипсов перекрываются;
-- для проверки отражения ставить шар на границу блока, а не в центр:
-  в центре эллипса нормаль нулевая.
-
-Allowed files:
-
-- src/game/types.ts
-- src/game/palette.ts
-- src/game/physics.ts
-- src/game/physics/collide.ts
-- src/game/physics/collide.test.ts
-- src/game/physics.test.ts
-- src/game/physics/spark.test.ts
-- src/game/physics/frost.test.ts
-- src/game/game.ts
-- src/game/game/hosts.ts
-- src/game/game/runFlow.ts
-- src/game/game/hudSync.ts
-- src/game/game/drawScene.ts
-- src/game/powers.ts
-- src/game/powers/apply.ts
-- src/game/powers/table.ts
-- src/game/powers/table.test.ts
-- src/game/powers.test.ts
-- src/game/render/projectiles.ts
-- src/ui/screens/hud.tsx
-- src/App.tsx
-- src/ui/screens/MenuCosmetics.test.tsx
-- src/ui/screens/SettingsModal.test.tsx
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Forbidden files:
-
-- vite.config.ts
-- tsconfig.json
-- package.json
-
-Dependencies: T-036 (общий каркас типа бонуса и таймера)
-
-Acceptance criteria:
-
-- [ ] Бонус `explosive` выпадает и отображается иконкой «ВЗРЫВ»
-- [ ] Попадание подрывает соседей в радиусе 72 на урон 1
-- [ ] Блок удара не получает двойной урон
-- [ ] Каскад с хрупкими блоками не зацикливается (лимит целей, `allowBrittle = false`)
-- [ ] Минибоссы, бомбы и неактивные фазовые блоки взрывом не задеваются
-- [ ] Эффект сбрасывается при потере жизни и между уровнями
-- [ ] `npm run typecheck`, `npm run lint`, `npm test` проходят
-
-Test plan:
-`npm run typecheck`, `npm run lint`, `npm test`
-
-Verification commands:
-npm run typecheck
-npm run lint:check
-npm run format:check
-npm test
-
 ### T-038: Увеличенный шар «Гравитационное ядро» (roadmap 3.1, ингредиент 3)
 
 Status: ready
@@ -360,6 +154,201 @@ npm test
 
 ## Последние выполненные задачи (подробные карточки)
 
+### T-037: Взрывной шар «Плазменный заряд» (roadmap 3.1, ингредиент 2)
+
+Status: done
+Priority: high
+Assigned to: Luna
+
+Описание:
+
+Второй шар. В отличие от клинка не проникает, а бьёт по площади: после
+обычного отскока и урона по блоку удара подрывает соседей в радиусе.
+
+1. Новый тип бонуса `explosive` («ВЗРЫВ») и таймер `Game.explosiveUntil`.
+2. Логика (`physics/collide.ts`, после `damageBlock`): взрыв радиусом 72
+   наносит урон 1 всем живым блокам в радиусе, кроме блока удара.
+   - взрывной урон идёт с `allowBrittle = false`, иначе получаем каскад
+     «взрыв → хрупкий блок → цепная детонация → снова взрыв» и вечный цикл;
+   - лимит 8 целей за взрыв, чтобы не убивать кадр на плотных рядах;
+   - минибоссы, бомбы и фазовые неактивные блоки исключены.
+3. Переиспользовать существующие рычаги: `damageBlock` и `fx.rings`/`fx.burst`
+   (никакой новой системы взрывов не создавать — `boomQueue` занят бомбами).
+4. Каркас по образцу T-036: `PowerType`, `POWER_META`, таблица дропа,
+   `applyPower`, `explosiveActive()` в `PhysicsWorld` и `hosts.ts`,
+   сброс в `loseLife`/`clearAllEffects`, цвет в `render/projectiles.ts`,
+   `explosiveOn` в `HudData` и `hud.tsx`.
+5. Баланс: длительность 8 с, вес в таблице 8, радиус 72, урон 1.
+
+Точки внедрения: взрыв — в `physics/collide.ts` в ветви обычного отскока сразу
+после `damageBlock` (`collideBlocks`), по образцу взрыва по площади у `brittle`
+(`physics/destruction.ts`, ветка `b.sp.brittle`). Каркас бонуса — по образцу
+уже реализованного `pierce` из T-036 (`pierceActive` в `physics.ts`,
+реализация в `game/hosts.ts`, таймер в `game.ts`, сбросы в `game/runFlow.ts`,
+цвет в `render/projectiles.ts`, `pierceOn` в `HudData` → здесь `explosiveOn`).
+
+Allowed files:
+
+- src/game/types.ts
+- src/game/palette.ts
+- src/game/physics.ts
+- src/game/physics/collide.ts
+- src/game/physics/collide.test.ts
+- src/game/physics.test.ts
+- src/game/physics/spark.test.ts
+- src/game/physics/frost.test.ts
+- src/game/game.ts
+- src/game/game/hosts.ts
+- src/game/game/runFlow.ts
+- src/game/game/hudSync.ts
+- src/game/game/drawScene.ts
+- src/game/powers.ts
+- src/game/powers/apply.ts
+- src/game/powers/table.ts
+- src/game/powers/table.test.ts
+- src/game/powers.test.ts
+- src/game/render/projectiles.ts
+- src/ui/screens/hud.tsx
+- src/App.tsx
+- src/ui/screens/MenuCosmetics.test.tsx
+- src/ui/screens/SettingsModal.test.tsx
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+- package.json
+
+Dependencies: T-036 (общий каркас типа бонуса и таймера)
+
+Acceptance criteria:
+
+- [x] Бонус `explosive` выпадает и отображается иконкой «ВЗРЫВ»
+- [x] Попадание подрывает соседей в радиусе 72 на урон 1
+- [x] Блок удара не получает двойной урон
+- [x] Каскад с хрупкими блоками не зацикливается (лимит целей, `allowBrittle = false`)
+- [x] Минибоссы, бомбы и неактивные фазовые блоки взрывом не задеваются
+- [x] Эффект сбрасывается при потере жизни и между уровнями
+- [x] `npm run typecheck`, `npm run lint`, `npm test` проходят (74 файла, 607 тестов)
+
+Test plan:
+`npm run typecheck`, `npm run lint`, `npm test`
+
+Verification commands:
+npm run typecheck
+npm run lint:check
+npm run format:check
+npm test
+
+---
+
+### T-036: Проникающий шар «Кинетический клинок» (roadmap 3.1, ингредиент 1)
+
+Status: done
+Priority: high
+Assigned to: Luna
+
+Описание:
+
+Первый из трёх шаров, без которых примеры синергий из `ROADMAP.md` §3.1
+нереализуемы. Важное уточнение по коду: **огонь уже проходит блоки насквозь**
+(`physics/collide.ts:243-254` — «обычные блоки огонь прожигает насквозь, без
+отскока»), поэтому новый шар обязан отличаться не поведением, а ролью.
+
+1. Новый тип бонуса `pierce` («КЛИН») и таймер `Game.pierceUntil`:
+   - шар пробивает **не более 3 блоков за один проход**, нанося каждому
+     обычный урон 1; четвёртый блок он уже отражает как обычно;
+   - «проход» — отрезок между двумя отскоками. Счётчик `Ball.pierceLeft`
+     обнуляется при отскоке от ракетки, стены, минибосса и босса, поэтому
+     тактика шара — выбрать угол, чтобы снять до трёх блоков в ряду;
+   - от минибоссов и босса отскакивает всегда (лимит не расходуется) — иначе
+     превращается в машину урона, на что уже наступали с огнём
+     (`collide.ts:279-280`);
+   - приоритет в цепочке стихий ниже огня: если активны и огонь, и клинок,
+     побеждает огонь (×3 урон и неограниченное пробитие).
+2. Каркас, общий для всех трёх шаров (делается здесь один раз):
+   - `PowerType` += `"pierce"` (`types.ts`), запись в `POWER_META`
+     (`palette.ts`: label, цвет, edge), вес в `buildPowerTable` (`powers/table.ts`),
+     ветка в `applyPower` (`powers/apply.ts`), флаг `pierceActive()` в
+     `PhysicsWorld` (`physics.ts`) и его реализация в `game/hosts.ts`;
+   - сброс таймера в `loseLife` и `clearAllEffects` (`game/runFlow.ts`)
+     рядом с `fireUntil`/`frostUntil`;
+   - цвет шара в `render/projectiles.ts` (`BallView.pierce`), индикатор в
+     `HudData` (`types.ts`) и `hud.tsx` (`pierceOn`), значение в `hudSync.ts`.
+3. Баланс: длительность 10 с (дольше огня — это и есть ниша шара), вес в
+   таблице дропа 8 (как у `fire`/`frost`/`spark`), лимит 3 блока за проход.
+4. Тесты: юнит-тест на пробитие ровно трёх блоков и отскок от четвёртого;
+   тест сброса `pierceLeft` после отскока от ракетки; тест `applyPower` на
+   установку таймера; тест сброса эффекта в `clearAllEffects`.
+
+Точки внедрения (проверены по коду):
+
+- пробитие и лимит → `physics/collide.ts:243` (перед ветвью огня).
+- сброс счётчика → `physics/collide.ts` (отскок от ракетки), `physics.ts`
+  (отражение от стен).
+- флаг активности → `physics.ts:95-100` (рядом с `fireActive`), реализация в
+  `game/hosts.ts:320` (рядом с `fireActive`).
+- таймер и сброс → `game.ts` (рядом с `fireUntil`), `game/runFlow.ts:444,541`.
+- дроп → `powers/table.ts:19-31`, применение → `powers/apply.ts:45`.
+- рендер → `render/projectiles.ts:61-83`.
+
+Allowed files:
+
+- src/game/types.ts
+- src/game/palette.ts
+- src/game/physics.ts
+- src/game/physics/collide.ts
+- src/game/physics/collide.test.ts
+- src/game/game.ts
+- src/game/game/hosts.ts
+- src/game/game/runFlow.ts
+- src/game/game/hudSync.ts
+- src/game/powers.ts
+- src/game/powers/apply.ts
+- src/game/powers/table.ts
+- src/game/powers/table.test.ts
+- src/game/render/projectiles.ts
+- src/ui/screens/hud.tsx
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+- package.json
+
+Dependencies: нет
+
+Acceptance criteria:
+
+- [x] Бонус `pierce` выпадает в бою и отображается иконкой «КЛИН»
+- [x] Шар пробивает ровно 3 блока за проход и отражается от четвёртого
+- [x] Каждому пробитому блоку наносится урон 1
+- [x] Счётчик прохода сбрасывается после отскока от ракетки и от стены
+- [x] От минибосса и босса клинок отскакивает, лимит не расходуется
+- [x] При одновременных огне и клинке приоритет у огня
+- [x] Эффект сбрасывается при потере жизни и между уровнями
+- [x] Индикатор активного клинка виден в HUD
+- [x] `npm run typecheck`, `npm run lint`, `npm test` проходят (74 файла, 599 тестов)
+
+Test plan:
+`npm run typecheck`, `npm run lint`, `npm test`
+
+Verification commands:
+npm run typecheck
+npm run lint:check
+npm run format:check
+npm test
+
+---
+
+## Последние выполненные задачи (подробные карточки)
+
 ### T-035: Прозрачный экран детального подсчёта очков (Score Breakdown) (roadmap 2.3)
 
 Status: done
@@ -436,123 +425,6 @@ npm test
 
 ---
 
-### T-034: Сюжетные терминалы станции «СФЕРА-1080» в событиях кампании (roadmap 2.2)
-
-Status: done
-Priority: high
-Assigned to: Luna
-
-Описание:
-Пункт 2.2 дорожной карты:
-
-1. Интеграция записей бортового журнала станции «СФЕРА-1080» в узлы-события карты кампании по Актам:
-   - Акт I: «АРХИВ КРИО-КОНТУРА» (Журнал #108-A, д-р Воронов) — почему квантовый кластер затоплен крио-биогелем, и как авария активировала защитный карантин (Царь-Шар, Медуза, Крио-Дрон).
-   - Акт II: «АРХИВ БИОГЕЛЯ» (Журнал #442-B, д-р Эмма Чо) — природа биогеля как полимерной нейросети, создание Хранителей глубин из сервисных дроидов и кабелей (Спрут, Краб, Минога), проект импульсного зонда «СФЕРА».
-   - Акт III: «КОНСОЛЬ ОПЕРАТОРА» (Журнал #991-Omega, Директор Ковалёв) — раскрытие статуса Оператора как резервной оцифрованной матрицы сознания экипажа, запущенной для ручного сброса хладагента в космос и спасения станции.
-2. Интерактивные выборы для каждого терминала с осмысленными механиками (калибровка хладагента, дешифровка схем, нейросетевая синхронизация, протокол Оператора).
-3. Визуальное и звуковое оформление:
-   - Особая иконка терминала `IconTerminal` и бирюзово-неоновое выделение на карте узлов.
-   - Оформление модального окна события как неонового бортового журнала станции (бейдж «🛰 ОРБИТАЛЬНАЯ СТАНЦИЯ «СФЕРА-1080» // БОРТОВОЙ ЖУРНАЛ», автор, дата, код записи).
-   - Звуковой эффект входящего дата-пакета/трансляции `terminalLog()` при открытии терминала.
-4. Гарантированный спавн сюжетных терминалов по Актам кампании (при сохранении детерминизма генерации карты).
-
-Allowed files:
-
-- src/game/types.ts
-- src/game/campaignMap.ts
-- src/game/campaignMapLayout.ts
-- src/game/campaignEvents.ts
-- src/game/audio.ts
-- src/ui/icons.tsx
-- src/ui/icons.test.tsx
-- src/ui/screens/map.tsx
-- src/game/campaignMap.test.ts
-- src/game/campaignFlow.test.ts
-- src/ui/screens/map.test.tsx
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Forbidden files:
-
-- vite.config.ts
-- tsconfig.json
-- package.json
-
-Dependencies: T-033
-
-Acceptance criteria:
-
-- [x] Терминалы станции «СФЕРА-1080» интегрированы в события карты для Актов I, II и III
-- [x] Раскрыта предыстория биогеля, Хранителей и истинная сущность Оператора
-- [x] Каждый терминал имеет сбалансированные интерактивные выборы (перки, щиты, кристаллы, риски)
-- [x] На карте кампании терминалы отображаются отдельной иконкой и подсветкой
-- [x] Модалка события стилизована под бортовой компьютер «СФЕРА-1080» с аудио-сопровождением
-- [x] Unit-тесты для генерации терминалов, вариантов выбора и рендера UI проходят
-- [x] `typecheck`, `lint:check`, `format:check` и все тесты проходят без ошибок
-
-Test plan:
-`npm run typecheck`, `npm run lint:check`, `npm test`
-
-Verification commands:
-npm run typecheck
-npm run lint:check
-npm run format:check
-npm test
-
----
-
-### T-033: Спецблоки матрицы (armor, brittle, phase, magnet) в кампанию и редактор
-
-Status: done
-Priority: high
-Assigned to: Luna
-
-Comment: Реализация пункта 2.1 роадмапа:
-
-1. MapSpec: добавление `brittle` ({ radius?, damage? }) и `phase` ({ period?, activeFraction?, offset? }) в `PlayerBlockEffect`. Поддержка `mode: "attract" | "repel"` для `magnet`.
-2. MapAdapter & MapValidator: маппинг `brittle`, `phase` и `magnet.mode` в runtime `Block.sp`, валидация допустимых диапазонов параметров.
-3. Редактор карт (`EditorInspector`, `EditorCanvas`, `editorState`): UI-контролы и числовые поля для brittle и phase, переключатель притяжение/отталкивание для магнитов, оверлеи на холсте (хрупкие трещины, фазовый пунктир) и бейджи эффектов (`💥`, `👻`, `🧲-`/`🧲+`).
-4. Кампания (`blockSpawn.ts`): генерация `armor` (масштабирование до 2-3 на старших ярусах), `brittle`, `phase` и `magnet` (с долей `repel`), увеличение доли спецблоков с 30% до 60% к поздним уровням.
-5. Тесты: `mapAdapter.test.ts`, `mapValidator.test.ts`, `editorState.test.ts`, `blockSpawn.test.ts`. Все 71 тестовый файл / 572 теста зелёные, typecheck/lint/prettier чистые.
-
-Allowed files:
-
-- src/game/mapSpec.ts
-- src/game/mapAdapter.ts
-- src/game/mapValidator.ts
-- src/ui/editor/editorState.ts
-- src/ui/editor/EditorInspector.tsx
-- src/ui/editor/EditorCanvas.tsx
-- src/game/game/blockSpawn.ts
-- src/game/mapAdapter.test.ts
-- src/game/mapValidator.test.ts
-- src/ui/editor/editorState.test.ts
-- src/game/game/blockSpawn.test.ts
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Acceptance criteria:
-
-- [x] MapSpec: поддержка `brittle`, `phase` и `magnet.mode`
-- [x] MapAdapter: перенос новых спецэффектов в runtime `Block.sp`
-- [x] MapValidator: проверка границ радиуса, урона, периода, доли активности и фазового сдвига
-- [x] Map Editor: редактирование параметров в инспекторе и визуализация на холсте
-- [x] Кампания: генерация новых блоков и масштабирование брони/спецблоков по уровням
-- [x] Полный набор тестов (71 файл, 572 теста), typecheck, lint и prettier проходят
-
-Test plan:
-`npm run typecheck`, `npm run lint`, `npm test`
-
-Verification commands:
-npm run typecheck
-npm run lint:check
-npm run format:check
-npm test
-
----
-
 ## Выполнено ранее (архив)
 
 Карточки удалены при чистке файла; подробности каждой задачи — в `.ai/STATE.md`
@@ -560,6 +432,8 @@ npm test
 
 | Задача | Что сделано                                                                 |
 | ------ | --------------------------------------------------------------------------- |
+| T-034  | Сюжетные терминалы станции «СФЕРА-1080» в событиях кампании (roadmap 2.2)   |
+| T-033  | Спецблоки матрицы (armor, brittle, phase, magnet) в кампанию и редактор     |
 | T-032  | Оружейная фаза Миноги (снаряд, потеря/отрастание головы, неуязвимость тела) |
 | T-031  | Роадмап 1.2 — альтернативные боссы Актов I и II + углубление фаз + отладка  |
 | T-030  | Аудио-оформление сюжета станции «СФЕРА-1080» (roadmap 1.1)                  |

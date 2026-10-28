@@ -66,6 +66,11 @@ export function applyPower(g: PowersWorld, type: PowerType) {
       g.pierceUntil = g.time + 10 * mult
       popup("КИНЕТИЧЕСКИЙ КЛИНОК!")
       break
+    case "explosive":
+      // Взрывной шар не гасит другие стихии: таймер живёт своей жизнью.
+      g.explosiveUntil = g.time + 8 * mult
+      popup("ПЛАЗМЕННЫЙ ЗАРЯД!")
+      break
     case "magnet":
       g.magnetUntil = g.time + 7 * mult
       popup("МАГНИТ!")

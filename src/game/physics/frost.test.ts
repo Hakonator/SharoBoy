@@ -119,6 +119,7 @@ function makeWorld(blocks: Block[], frost: boolean) {
     frostActive: () => frost,
     sparkActive: () => false,
     pierceActive: () => false,
+    explosiveActive: () => false,
     sparkQueue: [],
     slowActive: () => false,
     fastActive: () => false,

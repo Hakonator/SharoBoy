@@ -74,6 +74,7 @@ export function resetRun(g: Game) {
   g.frostUntil = 0
   g.sparkUntil = 0
   g.pierceUntil = 0
+  g.explosiveUntil = 0
   g.sparkQueue = []
   g.magnetUntil = 0
   g.magneticPaddleUntil = 0
@@ -446,6 +447,7 @@ export function loseLife(g: Game) {
   g.frostUntil = 0
   g.sparkUntil = 0
   g.pierceUntil = 0
+  g.explosiveUntil = 0
   g.sparkQueue = []
   g.magnetUntil = 0
   g.magneticPaddleUntil = 0
@@ -544,6 +546,7 @@ export function clearAllEffects(g: Game) {
   g.frostUntil = 0
   g.sparkUntil = 0
   g.pierceUntil = 0
+  g.explosiveUntil = 0
   g.sparkQueue = []
   g.magnetUntil = 0
   g.magneticPaddleUntil = 0

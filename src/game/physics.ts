@@ -94,6 +94,8 @@ export interface PhysicsWorld {
   sparkActive(): boolean
   /** Активен проникающий шар «Кинетический клинок» (до 3 блоков за проход). */
   pierceActive(): boolean
+  /** Активен взрывной шар «Плазменный заряд» (урон по площади вокруг точки удара). */
+  explosiveActive(): boolean
   slowActive(): boolean
   fastActive(): boolean
   magnetActive(): boolean

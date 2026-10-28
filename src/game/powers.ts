@@ -49,6 +49,8 @@ export interface PowersWorld {
   sparkUntil: number
   /** Активность проникающего шара «Кинетический клинок», сек. */
   pierceUntil: number
+  /** Активность взрывного шара «Плазменный заряд», сек. */
+  explosiveUntil: number
   magnetUntil: number
   magneticPaddleUntil: number
   laserArmed: boolean

@@ -67,4 +67,16 @@ describe("PowersSystem — неигровая HUD-зона сверху", () => 
     applyPower(g as unknown as Parameters<typeof applyPower>[0], "pierce")
     expect(g.pierceUntil).toBe(20)
   })
+
+  it("бонус плазменного заряда взводит взрывной шар на 8 секунд", () => {
+    const g = {
+      ...makeWorld({ time: 10 }),
+      explosiveUntil: 0,
+      sfx: { power() {} },
+      fx: { popups: [], burst() {} },
+      pushHud() {},
+    }
+    applyPower(g as unknown as Parameters<typeof applyPower>[0], "explosive")
+    expect(g.explosiveUntil).toBe(18)
+  })
 })

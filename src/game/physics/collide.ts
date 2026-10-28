@@ -16,6 +16,21 @@ import { onBallHitSpecial } from "./special"
  */
 export const PIERCE_BLOCKS_PER_PASS = 3
 
+/**
+ * Радиус взрывной волны «Плазменного заряда».
+ */
+export const EXPLOSIVE_BALL_RADIUS = 72
+
+/**
+ * Лимит целей, поражаемых взрывной волной за один взрыв.
+ */
+export const EXPLOSIVE_BALL_MAX_TARGETS = 8
+
+/**
+ * Урон взрывной волны по соседним блокам.
+ */
+export const EXPLOSIVE_BALL_DAMAGE = 1
+
 /** Ситуативная механика: «Критический сэйв» (Clutch Rebound).
  *  Активируется при отскоке шара от самого края платформы (|rel| >= 0.78),
  *  либо в опасной ситуации при 1 жизни (|rel| >= 0.70).
@@ -338,6 +353,9 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
     if (g.sparkActive()) {
       queueSparkChain(g.sparkQueue, sparkChainTargets(g.blocks, b, { exclude: b }), b, g.time)
     }
+    if (g.explosiveActive()) {
+      applyExplosiveBallAoE(g, b)
+    }
     return
   }
 }
@@ -351,6 +369,39 @@ export function isBlockPhaseActive(b: Block, time: number): boolean {
   const active = clamp(phase.active, 0, 1)
   const position = (((time + phase.offset) % phase.period) + phase.period) % phase.period
   return position < phase.period * active
+}
+
+/**
+ * Взрывная волна «Плазменного заряда»: подрывает соседей в радиусе 72
+ * на урон 1. Блок прямого удара исключён (свой урон он уже получил).
+ * Минибоссы, бомбы и неактивные фазовые блоки не затрагиваются.
+ * Урон наносится с `allowBrittle = false`, предотвращая каскадные циклы детонации.
+ */
+export function applyExplosiveBallAoE(g: PhysicsWorld, source: Block) {
+  g.fx.burst(source.x, source.y, "#ff8a3d", 12, 180)
+  g.fx.rings.push({
+    x: source.x,
+    y: source.y,
+    r: 8,
+    maxR: EXPLOSIVE_BALL_RADIUS,
+    color: "rgba(255, 122, 54, 0.85)",
+    t: 0,
+  })
+
+  const candidates: Block[] = []
+  for (const other of g.blocks) {
+    if (other === source || other.dead || other.isMiniboss || other.bomb) continue
+    if (other.sp?.phase && !isBlockPhaseActive(other, g.time)) continue
+    if (Math.hypot(other.x - source.x, other.y - source.y) > EXPLOSIVE_BALL_RADIUS) continue
+    candidates.push(other)
+    if (candidates.length >= EXPLOSIVE_BALL_MAX_TARGETS) break
+  }
+
+  for (const other of candidates) {
+    if (!other.dead) {
+      damageBlock(g, other, EXPLOSIVE_BALL_DAMAGE, false)
+    }
+  }
 }
 
 /** Поле магнита прикладывается после нормализации скорости игровым циклом. */

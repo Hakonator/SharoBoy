@@ -79,6 +79,7 @@ export function draw(g: Game) {
     frost: g.time < g.frostUntil,
     spark: g.time < g.sparkUntil,
     pierce: g.time < g.pierceUntil,
+    explosive: g.time < g.explosiveUntil,
     slow: g.time < g.slowUntil,
     fast: g.time < g.fastUntil,
     trailSkin: g.cosmetics?.equipped?.ball,

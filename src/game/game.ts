@@ -234,6 +234,8 @@ export class Game {
   sparkUntil = 0
   /** Активность проникающего шара «Кинетический клинок». */
   pierceUntil = 0
+  /** Активность взрывного шара «Плазменный заряд». */
+  explosiveUntil = 0
   magnetUntil = 0
   magneticPaddleUntil = 0
   weaponCd = 0

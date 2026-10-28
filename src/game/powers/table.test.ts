@@ -51,4 +51,9 @@ describe("buildPowerTable", () => {
     expect(t).not.toContain("life")
     expect(t).not.toContain("laser")
   })
+
+  it("плазменный заряд доступен в дропах с весом 8", () => {
+    expect(types({})).toContain("explosive")
+    expect(weight({}, "explosive")).toBe(8)
+  })
 })

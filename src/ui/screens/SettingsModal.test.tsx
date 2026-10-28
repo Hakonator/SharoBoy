@@ -54,6 +54,7 @@ const dummyHud: HudData = {
   frostOn: false,
   sparkOn: false,
   pierceOn: false,
+  explosiveOn: false,
   magnetOn: false,
   coins: 0,
   crystals: 0,

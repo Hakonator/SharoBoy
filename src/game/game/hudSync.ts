@@ -96,6 +96,7 @@ export function pushHud(g: Game) {
     frostOn: g.time < g.frostUntil,
     sparkOn: g.time < g.sparkUntil,
     pierceOn: g.time < g.pierceUntil,
+    explosiveOn: g.time < g.explosiveUntil,
     magnetOn: g.time < g.magnetUntil,
     coins: g.coins,
     crystals: g.crystals,
