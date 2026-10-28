@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  BASE_BALL_RADIUS,
+  BIG_BALL_RADIUS,
+  BIG_BALL_RADIUS_MULT,
+  BIG_BALL_SPEED_MULT,
   CLEAR_RAMP_MAX,
   FAST_SPEED_MULT,
   SLOW_SPEED_MULT,
   ballSpeedMult,
+  baseBallRadius,
   isBallSpedUp,
 } from "./speed"
 
@@ -33,6 +38,32 @@ describe("ballSpeedMult", () => {
   it("эффекты и разгон перемножаются", () => {
     const expected = FAST_SPEED_MULT * (1 + 0.5 * CLEAR_RAMP_MAX)
     expect(ballSpeedMult({ slow: false, fast: true, cleared: 0.5 })).toBeCloseTo(expected)
+  })
+
+  it("гравитационное ядро снижает скорость на 10%", () => {
+    expect(ballSpeedMult({ slow: false, fast: false, big: true, cleared: 0 })).toBeCloseTo(
+      BIG_BALL_SPEED_MULT
+    )
+    expect(BIG_BALL_SPEED_MULT).toBe(0.9)
+  })
+})
+
+describe("baseBallRadius (Гравитационное ядро)", () => {
+  it("базовые константы соответствуют роадмапу 3.1", () => {
+    expect(BASE_BALL_RADIUS).toBe(9)
+    expect(BIG_BALL_RADIUS_MULT).toBe(1.6)
+    expect(BIG_BALL_RADIUS).toBeCloseTo(14.4)
+  })
+
+  it("без активного эффекта возвращает базовый радиус 9", () => {
+    expect(baseBallRadius()).toBe(9)
+    expect(baseBallRadius({ bigActive: () => false })).toBe(9)
+    expect(baseBallRadius({ time: 10, bigUntil: 8 })).toBe(9)
+  })
+
+  it("при активном эффекте возвращает увеличенный радиус 14.4", () => {
+    expect(baseBallRadius({ bigActive: () => true })).toBeCloseTo(14.4)
+    expect(baseBallRadius({ time: 5, bigUntil: 10 })).toBeCloseTo(14.4)
   })
 })
 

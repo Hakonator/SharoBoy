@@ -51,6 +51,8 @@ export interface PowersWorld {
   pierceUntil: number
   /** Активность взрывного шара «Плазменный заряд», сек. */
   explosiveUntil: number
+  /** Активность увеличенного шара «Гравитационное ядро», сек. */
+  bigUntil: number
   magnetUntil: number
   magneticPaddleUntil: number
   laserArmed: boolean

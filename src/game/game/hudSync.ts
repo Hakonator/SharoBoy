@@ -41,6 +41,9 @@ export function syncEffectsHud(g: Game) {
     t < g.fireUntil ? 1 : 0,
     t < g.frostUntil ? 1 : 0,
     t < g.sparkUntil ? 1 : 0,
+    t < g.pierceUntil ? 1 : 0,
+    t < g.explosiveUntil ? 1 : 0,
+    t < g.bigUntil ? 1 : 0,
     t < g.magnetUntil ? 1 : 0,
   ].join("")
   if (key !== g.effectsKey) {
@@ -97,6 +100,7 @@ export function pushHud(g: Game) {
     sparkOn: g.time < g.sparkUntil,
     pierceOn: g.time < g.pierceUntil,
     explosiveOn: g.time < g.explosiveUntil,
+    bigOn: g.time < g.bigUntil,
     magnetOn: g.time < g.magnetUntil,
     coins: g.coins,
     crystals: g.crystals,

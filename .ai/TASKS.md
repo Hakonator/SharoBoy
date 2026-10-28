@@ -19,110 +19,7 @@
 
 ## Готово к работе
 
-### T-038: Увеличенный шар «Гравитационное ядро» (roadmap 3.1, ингредиент 3)
-
-Status: ready
-Priority: high
-Assigned to: Luna
-
-Описание:
-
-Третий шар. Единственный из трёх, кто меняет не поведение контакта, а сам
-размер шара, — поэтому он и назван «увеличенным» в роадмапе.
-
-1. Новый тип бонуса `big` («ЯДРО») и таймер `Game.bigUntil`.
-2. Радиус шара ×1.6 (9 → 14.4) на 10 с, скорость −10% как компенсация.
-3. Критично: радиус шара сейчас задаётся жёстко (`serveBall`, `r: 9`), а
-   `multi` клонирует шары с `r: d.r`. Нужна единая функция базового радиуса
-   (`baseBallRadius(g)`) и применение множителя:
-   - при активации — масштабировать `r` у всех шаров в игре;
-   - при подаче нового шара (`serveBall`) — создавать сразу с учётом эффекта;
-   - при окончании эффекта — вернуть базовый радиус всем шарам;
-   - клоны из `multi` наследуют текущий радиус (поведение не меняется).
-4. Рендер не трогаем: `render/projectiles.ts` уже использует `b.r` для тела,
-   шлейфа и кольца «на ракетке» — визуал подхватится сам. Нужен только цвет
-   (`BallView.big`) и индикатор в HUD.
-5. Каркас по образцу T-036: `PowerType`, `POWER_META`, таблица дропа,
-   `applyPower`, `bigActive()` в `PhysicsWorld` и `hosts.ts`, сброс в
-   `loseLife`/`clearAllEffects`, `bigOn` в `HudData` и `hud.tsx`.
-6. Риск и его снятие: изменение `r` на лету может «вдавить» шар в блок.
-   `collideBlocks` уже выталкивает шар по нормали на 0.8 единицы, но тест
-   обязан проверить, что после активации рядом с блоком шар не залипает.
-
-Точки внедрения (проверены на момент планирования; актуализировать при старте):
-радиус шара задаётся в `game/levelBuild.ts` (`serveBall`, `r: 9`) и клонируется
-в `powers/apply.ts` (`multi`, `r: d.r`); каркас бонуса — по образцу `pierce`
-из T-036.
-
-Уточнения, выявленные в T-036 и обязательные к учёту:
-
-- тестовые фейковые миры перечисляют методы мира явно — добавляя
-  `bigActive()`, дополнить `physics.test.ts`, `physics/spark.test.ts`,
-  `physics/frost.test.ts`, `physics/collide.test.ts`, иначе typecheck упадёт
-  с TS2741;
-- при изменении радиуса зона контакта с блоками расширяется: проверить, что
-  увеличенный шар не «проскакивает» между блоками и не залипает;
-- счётчик прохода клинка (`Ball.pierceLeft`) не связан с радиусом, но при
-  одновременной работе `big` и `pierce` лимит остаётся прежним — это ожидаемо
-  и покрывается тестом на совместную работу.
-
-Allowed files:
-
-- src/game/types.ts
-- src/game/palette.ts
-- src/game/physics.ts
-- src/game/physics/collide.ts
-- src/game/physics/collide.test.ts
-- src/game/physics.test.ts
-- src/game/physics/spark.test.ts
-- src/game/physics/frost.test.ts
-- src/game/game.ts
-- src/game/game/hosts.ts
-- src/game/game/levelBuild.ts
-- src/game/game/runFlow.ts
-- src/game/game/hudSync.ts
-- src/game/game/drawScene.ts
-- src/game/powers.ts
-- src/game/powers/apply.ts
-- src/game/powers/table.ts
-- src/game/powers/table.test.ts
-- src/game/powers.test.ts
-- src/game/render/projectiles.ts
-- src/ui/screens/hud.tsx
-- src/App.tsx
-- src/ui/screens/MenuCosmetics.test.tsx
-- src/ui/screens/SettingsModal.test.tsx
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Forbidden files:
-
-- vite.config.ts
-- tsconfig.json
-- package.json
-
-Dependencies: T-036 (общий каркас)
-
-Acceptance criteria:
-
-- [ ] Бонус `big` выпадает и отображается иконкой «ЯДРО»
-- [ ] Радиус шара растёт до ×1.6, скорость снижается на 10%
-- [ ] Шары, поданные во время эффекта, сразу создаются увеличенными
-- [ ] Клоны `multi` наследуют увеличенный радиус
-- [ ] После окончания эффекта радиус возвращается к базовому
-- [ ] Шар не залипает в блоке при активации вплотную
-- [ ] Эффект сбрасывается при потере жизни и между уровнями
-- [ ] `npm run typecheck`, `npm run lint`, `npm test` проходят
-
-Test plan:
-`npm run typecheck`, `npm run lint`, `npm test`
-
-Verification commands:
-npm run typecheck
-npm run lint:check
-npm run format:check
-npm test
+Нет активных задач со статусом ready. Следующий этап — проектирование T-039 (расширение каталога реликвий + индикация в HUD).
 
 ---
 
@@ -153,6 +50,93 @@ npm test
 ---
 
 ## Последние выполненные задачи (подробные карточки)
+
+### T-038: Увеличенный шар «Гравитационное ядро» (roadmap 3.1, ингредиент 3)
+
+Status: done
+Priority: high
+Assigned to: Luna
+
+Описание:
+
+Третий шар. Единственный из трёх, кто меняет не поведение контакта, а сам
+размер шара, — поэтому он и назван «увеличенным» в роадмапе.
+
+1. Новый тип бонуса `big` («ЯДРО») и таймер `Game.bigUntil`.
+2. Радиус шара ×1.6 (9 → 14.4) на 10 с, скорость −10% как компенсация.
+3. Единый расчёт базового радиуса (`baseBallRadius(g)`) и применение множителя:
+   - при активации — масштабировать `r` у всех шаров в игре;
+   - при подаче нового шара (`serveBall`) — создавать сразу с учётом эффекта;
+   - при окончании эффекта — вернуть базовый радиус всем шарам;
+   - клоны из `multi` наследуют текущий радиус.
+4. Рендер: `render/projectiles.ts` подхватывает радиус, добавлен цвет
+   `BallView.big` (голубое гравитационное свечение) и индикатор в HUD.
+5. Каркас по образцу T-036: `PowerType`, `POWER_META`, таблица дропа,
+   `applyPower`, `bigActive()` в `PhysicsWorld` и `hosts.ts`, сброс в
+   `loseLife`/`clearAllEffects`, `bigOn` в `HudData` и `hud.tsx`.
+6. Выталкивание: шар не залипает в блоке при ударе и активации вплотную.
+
+Allowed files:
+
+- src/game/types.ts
+- src/game/palette.ts
+- src/game/physics.ts
+- src/game/physics/collide.ts
+- src/game/physics/collide.test.ts
+- src/game/physics.test.ts
+- src/game/physics/spark.test.ts
+- src/game/physics/frost.test.ts
+- src/game/physics/speed.ts
+- src/game/physics/speed.test.ts
+- src/game/game.ts
+- src/game/game/hosts.ts
+- src/game/game/levelBuild.ts
+- src/game/game/runFlow.ts
+- src/game/game/hudSync.ts
+- src/game/game/drawScene.ts
+- src/game/powers.ts
+- src/game/powers/apply.ts
+- src/game/powers/table.ts
+- src/game/powers/table.test.ts
+- src/game/powers.test.ts
+- src/game/render/projectiles.ts
+- src/ui/screens/hud.tsx
+- src/App.tsx
+- src/ui/screens/MenuCosmetics.test.tsx
+- src/ui/screens/SettingsModal.test.tsx
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+- package.json
+
+Dependencies: T-036 (общий каркас)
+
+Acceptance criteria:
+
+- [x] Бонус `big` выпадает и отображается иконкой «ЯДРО»
+- [x] Радиус шара растёт до ×1.6, скорость снижается на 10%
+- [x] Шары, поданные во время эффекта, сразу создаются увеличенными
+- [x] Клоны `multi` наследуют увеличенный радиус
+- [x] После окончания эффекта радиус возвращается к базовому
+- [x] Шар не залипает в блоке при активации вплотную
+- [x] Эффект сбрасывается при потере жизни и между уровнями
+- [x] `npm run typecheck`, `npm run lint`, `npm test` проходят (74 файла, 615 тестов)
+
+Test plan:
+`npm run typecheck`, `npm run lint`, `npm test`
+
+Verification commands:
+npm run typecheck
+npm run lint:check
+npm run format:check
+npm test
+
+---
 
 ### T-037: Взрывной шар «Плазменный заряд» (roadmap 3.1, ингредиент 2)
 
@@ -347,84 +331,6 @@ npm test
 
 ---
 
-## Последние выполненные задачи (подробные карточки)
-
-### T-035: Прозрачный экран детального подсчёта очков (Score Breakdown) (roadmap 2.3)
-
-Status: done
-Priority: high
-Assigned to: Luna
-
-Описание:
-Пункт 2.3 дорожной карты:
-
-1. Модель детального подсчёта очков `RunScoreBreakdown`:
-   - Очки за блоки и поверженных боссов.
-   - Бонусы за оставшиеся жизни (`500` за жизнь) и щиты (`250` за щит).
-   - Множители за выбранные мутаторы забега (до `+240%`).
-   - Бонусы за серии комбо (`100` за максимальное комбо), критические рикошеты ×3 (`300` за крит) и сэйвы на грани ракетки (`400` за сэйв).
-   - Бонус за скорость зачистки секторов (`600` за сектор под нормативом времени 45 сек).
-2. Накопление статистики забега в движке (`Game`, `hosts.ts`, `runFlow.ts`, `destruction.ts`):
-   - Отслеживание блоков, боссов, секторов, комбо, критических ударов, сэйвов на грани и времени секторов.
-   - Вычисление breakdown и начисление бонусов при завершении забега (победа или поражение).
-   - Проброс `scoreBreakdown` в `HudData`.
-3. UI экрана окончания игры (`src/ui/screens/overlays.tsx`):
-   - Компонент `ScoreBreakdownTable`: неоновая кибер-таблица с детальным разбором каждого источника очков, бейджами активных мутаторов забега и итоговым счётом.
-   - Интеграция в `GameOverScreen` (поражение) и `WinScreen` (победа в кампании и победа в остальных режимах).
-4. Тесты:
-   - Модульные тесты расчёта `ScoreBreakdown` (`src/game/scoreBreakdown.test.ts`).
-   - Регрессионные тесты UI в `src/ui/screens/overlays.test.tsx`.
-   - Прохождение полного набора тестов (`npm test`: 72 файла, 585 тестов), typecheck и линтеров.
-
-Allowed files:
-
-- src/game/types.ts
-- src/game/game.ts
-- src/game/scoreBreakdown.ts
-- src/game/scoreBreakdown.test.ts
-- src/game/game/runFlow.ts
-- src/game/game/hosts.ts
-- src/game/game/hudSync.ts
-- src/game/game/levelBuild.ts
-- src/game/game/modes.ts
-- src/game/game/campaignFlow.ts
-- src/game/physics.ts
-- src/game/physics/destruction.ts
-- src/ui/screens/overlays.tsx
-- src/ui/screens/overlays.test.tsx
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Forbidden files:
-
-- vite.config.ts
-- tsconfig.json
-- package.json
-
-Dependencies: T-034
-
-Acceptance criteria:
-
-- [x] Тип `RunScoreBreakdown` определён в `types.ts` и синхронизируется в `HudData`
-- [x] Статистика забега (блоки, боссы, комбо, криты, сэйвы, время) корректно аккумулируется
-- [x] При победе и поражении начисляются бонусы за жизни, щиты, комбо, криты, сэйвы и скорость
-- [x] Учитываются активные мутаторы кампании (множитель до +240%)
-- [x] Таблица детального расчёта очков встроена в `GameOverScreen` и `WinScreen`
-- [x] Unit-тесты расчёта очков и рендера UI проходят
-- [x] `npm run typecheck`, `npm run lint:check`, `npm run format:check` и `npm test` проходят
-
-Test plan:
-`npm run typecheck`, `npm run lint:check`, `npm run format:check`, `npm test`
-
-Verification commands:
-npm run typecheck
-npm run lint:check
-npm run format:check
-npm test
-
----
-
 ## Выполнено ранее (архив)
 
 Карточки удалены при чистке файла; подробности каждой задачи — в `.ai/STATE.md`
@@ -432,6 +338,7 @@ npm test
 
 | Задача | Что сделано                                                                 |
 | ------ | --------------------------------------------------------------------------- |
+| T-035  | Прозрачный экран детального подсчёта очков (Score Breakdown) (roadmap 2.3)  |
 | T-034  | Сюжетные терминалы станции «СФЕРА-1080» в событиях кампании (roadmap 2.2)   |
 | T-033  | Спецблоки матрицы (armor, brittle, phase, magnet) в кампанию и редактор     |
 | T-032  | Оружейная фаза Миноги (снаряд, потеря/отрастание головы, неуязвимость тела) |

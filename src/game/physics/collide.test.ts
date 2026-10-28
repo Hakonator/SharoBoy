@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest"
 
-import type { PhysicsWorld } from "../physics"
+import { BIG_BALL_RADIUS, type PhysicsWorld } from "../physics"
 import type { Ball, Block } from "../types"
 
 import {
@@ -59,7 +59,13 @@ function makeBall(x: number, y: number): Ball {
   }
 }
 
-function makeWorld(blocks: Block[], pierce: boolean, explosive = false, time = 0): PhysicsWorld {
+function makeWorld(
+  blocks: Block[],
+  pierce: boolean,
+  explosive = false,
+  time = 0,
+  big = false
+): PhysicsWorld {
   const world = {
     w: 400,
     h: 600,
@@ -87,6 +93,7 @@ function makeWorld(blocks: Block[], pierce: boolean, explosive = false, time = 0
     sparkActive: () => false,
     pierceActive: () => pierce,
     explosiveActive: () => explosive,
+    bigActive: () => big,
     sparkQueue: [],
     slowActive: () => false,
     fastActive: () => false,
@@ -284,5 +291,53 @@ describe("Плазменный заряд (взрывной шар)", () => {
     const undamaged = neighbors.filter((b) => b.hp === 5)
     expect(damaged.length).toBe(EXPLOSIVE_BALL_MAX_TARGETS)
     expect(undamaged.length).toBe(2)
+  })
+})
+
+describe("Гравитационное ядро (увеличенный шар)", () => {
+  it("увеличенный шар отражается и не залипает в блоке при ударе", () => {
+    const block = makeBlock(200, 300)
+    const world = makeWorld([block], false, false, 0, true)
+    const ball = makeBall(200, 300 + block.ry + BIG_BALL_RADIUS - 1)
+    ball.r = BIG_BALL_RADIUS
+    ball.vy = -300
+
+    collideBlocks(world, ball)
+
+    // Шар отскочил вниз
+    expect(ball.vy).toBeGreaterThan(0)
+    // Шар вытолкнут наружу
+    expect(ball.y).toBeGreaterThanOrEqual(block.y + block.ry)
+    expect(block.hp).toBe(4)
+  })
+
+  it("совместная работа «big» и «pierce»: клинок пробивает 3 блока увеличенным радиусом", () => {
+    const blocks = [
+      makeBlock(200, 400),
+      makeBlock(200, 300),
+      makeBlock(200, 200),
+      makeBlock(200, 100),
+    ]
+    const world = makeWorld(blocks, true, false, 0, true)
+    const ball = makeBall(200, 100)
+    ball.r = BIG_BALL_RADIUS
+
+    for (let i = 0; i < PIERCE_BLOCKS_PER_PASS; i++) {
+      ball.x = blocks[i].x
+      ball.y = blocks[i].y + blocks[i].ry
+      ball.vy = -300
+      collideBlocks(world, ball)
+      expect(ball.vy).toBeLessThan(0)
+      expect(blocks[i].hp).toBe(4)
+    }
+    expect(ball.pierceLeft).toBe(0)
+
+    // четвёртый блок отражает увеличенный шар
+    ball.x = blocks[3].x
+    ball.y = blocks[3].y + blocks[3].ry
+    ball.vy = -300
+    collideBlocks(world, ball)
+    expect(ball.vy).toBeGreaterThan(0)
+    expect(ball.pierceLeft).toBeUndefined()
   })
 })

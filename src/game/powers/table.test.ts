@@ -56,4 +56,9 @@ describe("buildPowerTable", () => {
     expect(types({})).toContain("explosive")
     expect(weight({}, "explosive")).toBe(8)
   })
+
+  it("гравитационное ядро доступно в дропах с весом 8", () => {
+    expect(types({})).toContain("big")
+    expect(weight({}, "big")).toBe(8)
+  })
 })

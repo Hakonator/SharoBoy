@@ -29,7 +29,7 @@ import {
   spawnScatter as scatterBlocks,
   updateBombs as moveBombs,
 } from "./physics/destruction"
-import { ballSpeedMult } from "./physics/speed"
+import { BASE_BALL_RADIUS, BIG_BALL_RADIUS, ballSpeedMult } from "./physics/speed"
 import { applyBallTimers, specialSpeedMult } from "./physics/special"
 import { spawnBallTrailFx } from "./physics/ballFx"
 
@@ -43,11 +43,16 @@ export {
   sparkChainTargets,
 } from "./physics/spark"
 export {
+  BASE_BALL_RADIUS,
+  BIG_BALL_RADIUS,
+  BIG_BALL_RADIUS_MULT,
+  BIG_BALL_SPEED_MULT,
   CLEAR_RAMP_MAX,
   FAST_SPEED_MULT,
   SLOW_SPEED_MULT,
   SPEEDUP_RATIO,
   ballSpeedMult,
+  baseBallRadius,
   isBallSpedUp,
 } from "./physics/speed"
 
@@ -96,6 +101,8 @@ export interface PhysicsWorld {
   pierceActive(): boolean
   /** Активен взрывной шар «Плазменный заряд» (урон по площади вокруг точки удара). */
   explosiveActive(): boolean
+  /** Активен увеличенный шар «Гравитационное ядро» (радиус ×1.6, скорость −10%). */
+  bigActive(): boolean
   slowActive(): boolean
   fastActive(): boolean
   magnetActive(): boolean
@@ -270,6 +277,14 @@ export class Physics {
   /** Интеграция движения шара с подшагами: стены, щит, потери, столкновения. */
   updateBall(ball: Ball, dt: number) {
     const g = this.g
+    if (this.g.bigActive()) {
+      if (ball.r < BIG_BALL_RADIUS) {
+        ball.r = BIG_BALL_RADIUS
+      }
+    } else if (ball.r === BIG_BALL_RADIUS) {
+      ball.r = BASE_BALL_RADIUS
+    }
+
     if (ball.stuck) {
       this.stickToPaddle(ball)
       return
@@ -361,6 +376,7 @@ export class Physics {
     const mult = ballSpeedMult({
       slow: g.slowActive(),
       fast: g.fastActive(),
+      big: g.bigActive(),
       cleared: 1 - g.blocks.length / g.blocksInitial,
     })
     const cur = Math.hypot(ball.vx, ball.vy) || 1

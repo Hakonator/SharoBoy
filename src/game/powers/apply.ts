@@ -1,4 +1,5 @@
 import { POWER_META } from "../palette"
+import { BIG_BALL_RADIUS } from "../physics"
 import type { PowerType } from "../types"
 import { rand } from "../utils"
 import type { PowersWorld } from "../powers"
@@ -70,6 +71,14 @@ export function applyPower(g: PowersWorld, type: PowerType) {
       // Взрывной шар не гасит другие стихии: таймер живёт своей жизнью.
       g.explosiveUntil = g.time + 8 * mult
       popup("ПЛАЗМЕННЫЙ ЗАРЯД!")
+      break
+    case "big":
+      // Гравитационное ядро увеличивает радиус всех текущих шаров
+      g.bigUntil = g.time + 10 * mult
+      for (const b of g.balls) {
+        b.r = BIG_BALL_RADIUS
+      }
+      popup("ГРАВИТАЦИОННОЕ ЯДРО!")
       break
     case "magnet":
       g.magnetUntil = g.time + 7 * mult

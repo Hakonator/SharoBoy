@@ -236,6 +236,8 @@ export class Game {
   pierceUntil = 0
   /** Активность взрывного шара «Плазменный заряд». */
   explosiveUntil = 0
+  /** Активность увеличенного шара «Гравитационное ядро». */
+  bigUntil = 0
   magnetUntil = 0
   magneticPaddleUntil = 0
   weaponCd = 0

@@ -123,6 +123,7 @@ function makeWorld(blocks: Block[], spark: boolean) {
     sparkActive: () => spark,
     pierceActive: () => false,
     explosiveActive: () => false,
+    bigActive: () => false,
     slowActive: () => false,
     fastActive: () => false,
     magnetActive: () => false,

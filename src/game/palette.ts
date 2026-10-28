@@ -24,6 +24,7 @@ export const POWER_META: Record<
   spark: { label: "ИСКРА", good: true, color: "#ffe14d", edge: "#fff9c4" },
   pierce: { label: "КЛИН", good: true, color: "#c9a4ff", edge: "#efe4ff" },
   explosive: { label: "ВЗРЫВ", good: true, color: "#ff7a36", edge: "#ffe2d6" },
+  big: { label: "ЯДРО", good: true, color: "#38bdf8", edge: "#e0f2fe" },
   fast: { label: "СК↑", good: false, color: "#ff5347", edge: "#ffd0cb" },
   shrink: { label: "УЗК", good: false, color: "#ff5347", edge: "#ffd0cb" },
 }

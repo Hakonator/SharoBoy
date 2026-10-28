@@ -1,4 +1,5 @@
 import type { Game } from "../game"
+import { BASE_BALL_RADIUS, BIG_BALL_RADIUS } from "../physics"
 import { LEVELS } from "../levels"
 import { rand, lsSet } from "../utils"
 import { nodeById } from "../campaignMap"
@@ -75,6 +76,10 @@ export function resetRun(g: Game) {
   g.sparkUntil = 0
   g.pierceUntil = 0
   g.explosiveUntil = 0
+  g.bigUntil = 0
+  for (const b of g.balls) {
+    if (b.r === BIG_BALL_RADIUS) b.r = BASE_BALL_RADIUS
+  }
   g.sparkQueue = []
   g.magnetUntil = 0
   g.magneticPaddleUntil = 0
@@ -448,6 +453,10 @@ export function loseLife(g: Game) {
   g.sparkUntil = 0
   g.pierceUntil = 0
   g.explosiveUntil = 0
+  g.bigUntil = 0
+  for (const b of g.balls) {
+    if (b.r === BIG_BALL_RADIUS) b.r = BASE_BALL_RADIUS
+  }
   g.sparkQueue = []
   g.magnetUntil = 0
   g.magneticPaddleUntil = 0
@@ -547,6 +556,10 @@ export function clearAllEffects(g: Game) {
   g.sparkUntil = 0
   g.pierceUntil = 0
   g.explosiveUntil = 0
+  g.bigUntil = 0
+  for (const b of g.balls) {
+    if (b.r === BIG_BALL_RADIUS) b.r = BASE_BALL_RADIUS
+  }
   g.sparkQueue = []
   g.magnetUntil = 0
   g.magneticPaddleUntil = 0

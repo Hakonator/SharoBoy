@@ -50,6 +50,8 @@ export interface BallView extends RenderView {
   pierce?: boolean
   /** Активен взрывной шар «Плазменный заряд». */
   explosive?: boolean
+  /** Активен увеличенный шар «Гравитационное ядро». */
+  big?: boolean
   slow: boolean
   fast: boolean
   /** Идентификатор экипированного шлейфа/скина шара. */
@@ -58,7 +60,8 @@ export interface BallView extends RenderView {
 
 export function drawBalls(ctx: Ctx, balls: Ball[], v: BallView) {
   if (v.hidden) return
-  const isPowerActive = v.fire || v.frost || v.spark || v.pierce || v.explosive || v.slow || v.fast
+  const isPowerActive =
+    v.fire || v.frost || v.spark || v.pierce || v.explosive || v.big || v.slow || v.fast
   const skinDef = getBallTrailDef(v.trailSkin ?? "default")
   const isRainbow = !isPowerActive && skinDef.id === "rainbow"
 
@@ -72,23 +75,25 @@ export function drawBalls(ctx: Ctx, balls: Ball[], v: BallView) {
           ? { trail: "rgba(201,164,255,", mid: "#efe4ff", core: "#a97bff", glow: "#c9a4ff" }
           : v.explosive
             ? { trail: "rgba(255,122,54,", mid: "#ffe2d6", core: "#ff5c26", glow: "#ff7a36" }
-            : v.slow
-              ? { trail: "rgba(93,255,176,", mid: "#d2ffee", core: "#2fd98a", glow: "#5dffb0" }
-              : v.fast
-                ? { trail: "rgba(255,106,92,", mid: "#ffd9d4", core: "#ff5347", glow: "#ff6a5c" }
-                : isRainbow
-                  ? {
-                      trail: "",
-                      mid: `hsl(${(v.time * 180 + 60) % 360}, 100%, 80%)`,
-                      core: `hsl(${(v.time * 180) % 360}, 100%, 55%)`,
-                      glow: `hsl(${(v.time * 180) % 360}, 100%, 60%)`,
-                    }
-                  : {
-                      trail: skinDef.colors.trail,
-                      mid: skinDef.colors.mid,
-                      core: skinDef.colors.core,
-                      glow: skinDef.colors.glow,
-                    }
+            : v.big
+              ? { trail: "rgba(56,189,248,", mid: "#e0f2fe", core: "#0284c7", glow: "#38bdf8" }
+              : v.slow
+                ? { trail: "rgba(93,255,176,", mid: "#d2ffee", core: "#2fd98a", glow: "#5dffb0" }
+                : v.fast
+                  ? { trail: "rgba(255,106,92,", mid: "#ffd9d4", core: "#ff5347", glow: "#ff6a5c" }
+                  : isRainbow
+                    ? {
+                        trail: "",
+                        mid: `hsl(${(v.time * 180 + 60) % 360}, 100%, 80%)`,
+                        core: `hsl(${(v.time * 180) % 360}, 100%, 55%)`,
+                        glow: `hsl(${(v.time * 180) % 360}, 100%, 60%)`,
+                      }
+                    : {
+                        trail: skinDef.colors.trail,
+                        mid: skinDef.colors.mid,
+                        core: skinDef.colors.core,
+                        glow: skinDef.colors.glow,
+                      }
   for (const b of balls) {
     for (let i = 0; i < b.trail.length; i++) {
       const t = b.trail[i]

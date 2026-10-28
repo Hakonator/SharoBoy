@@ -182,6 +182,12 @@ export function makePowersHost(g: Game): PowersWorld {
     set explosiveUntil(v) {
       g.explosiveUntil = v
     },
+    get bigUntil() {
+      return g.bigUntil
+    },
+    set bigUntil(v) {
+      g.bigUntil = v
+    },
     get magnetUntil() {
       return g.magnetUntil
     },
@@ -333,6 +339,7 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
       g.time < g.fireUntil || (Boolean(g.campaignRelics?.relicFire) && g.combo >= 3),
     pierceActive: () => g.time < g.pierceUntil,
     explosiveActive: () => g.time < g.explosiveUntil,
+    bigActive: () => g.time < g.bigUntil,
     frostActive: () => g.time < g.frostUntil,
     sparkActive: () => g.time < g.sparkUntil,
     get sparkQueue() {

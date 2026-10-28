@@ -79,4 +79,19 @@ describe("PowersSystem — неигровая HUD-зона сверху", () => 
     applyPower(g as unknown as Parameters<typeof applyPower>[0], "explosive")
     expect(g.explosiveUntil).toBe(18)
   })
+
+  it("бонус гравитационного ядра взводит увеличенный шар на 10 секунд и масштабирует шары", () => {
+    const ball = { r: 9, stuck: false, speed: 600 }
+    const g = {
+      ...makeWorld({ time: 10 }),
+      bigUntil: 0,
+      balls: [ball],
+      sfx: { power() {} },
+      fx: { popups: [], burst() {} },
+      pushHud() {},
+    }
+    applyPower(g as unknown as Parameters<typeof applyPower>[0], "big")
+    expect(g.bigUntil).toBe(20)
+    expect(ball.r).toBeCloseTo(14.4)
+  })
 })

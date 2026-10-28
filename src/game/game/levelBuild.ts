@@ -1,5 +1,5 @@
 import type { Game } from "../game"
-import { Physics } from "../physics"
+import { Physics, baseBallRadius } from "../physics"
 import { layoutBlocks, densityFactor, desktopDensity } from "../levelBuilder"
 import { generateMotifSpec } from "../levelMotifs"
 import { gridBlocks, buildBossArena } from "../levelPatterns"
@@ -212,12 +212,13 @@ export function serveBall(g: Game) {
   }
   /* Старт: шар на поверхности ракетки (купол выше грани, чаша — ниже). */
   const bump = Physics.surfaceAt(g.paddle.w / 2, 0, g.paddleShapeKind(), g.paddle.h)
+  const r = baseBallRadius(g)
   const ball: Ball = {
     x: g.paddle.x,
-    y: g.paddle.y - g.paddle.h / 2 - bump - 9 - 2,
+    y: g.paddle.y - g.paddle.h / 2 - bump - r - 2,
     vx: 0,
     vy: 0,
-    r: 9,
+    r,
     speed: speed,
     stuck: true,
     stuckOffset: 0,

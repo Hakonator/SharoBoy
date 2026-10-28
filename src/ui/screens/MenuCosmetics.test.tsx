@@ -38,6 +38,7 @@ const makeMockHud = (metaCrystals = 100): HudData => ({
   sparkOn: false,
   pierceOn: false,
   explosiveOn: false,
+  bigOn: false,
   magnetOn: false,
   coins: 50,
   crystals: 10,

@@ -100,6 +100,8 @@ export interface HudData {
   pierceOn: boolean
   /** Активен взрывной шар «Плазменный заряд». */
   explosiveOn: boolean
+  /** Активен увеличенный шар «Гравитационное ядро». */
+  bigOn: boolean
   magnetOn: boolean
   coins: number
   /** Кристаллы текущего забега в кампании (валюта забега). */
@@ -410,6 +412,7 @@ export type PowerType =
   | "spark"
   | "pierce"
   | "explosive"
+  | "big"
   | "fast"
   | "shrink"
 

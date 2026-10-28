@@ -333,7 +333,8 @@ export function HudOverlay({
           hud.frostOn ||
           hud.sparkOn ||
           hud.pierceOn ||
-          hud.explosiveOn) && (
+          hud.explosiveOn ||
+          hud.bigOn) && (
           <div className="pointer-events-none absolute inset-x-1 bottom-2 z-20 flex flex-wrap justify-center gap-1 sm:inset-x-auto sm:bottom-4 sm:left-4 sm:max-w-[46vw] sm:gap-1.5">
             {hud.wideOn && <EffectChip label="ШИРЕ" good />}
             {hud.fireOn && <EffectChip label="ОГНЬ" good />}
@@ -341,6 +342,7 @@ export function HudOverlay({
             {hud.sparkOn && <EffectChip label="ЭЛЕКТРО" good />}
             {hud.pierceOn && <EffectChip label="КЛИН" good />}
             {hud.explosiveOn && <EffectChip label="ВЗРЫВ" good />}
+            {hud.bigOn && <EffectChip label="ЯДРО" good />}
             {hud.magnetOn && <EffectChip label="МАГНИТ" good />}
             {hud.slowOn && <EffectChip label="МЕДЛЕННЕЕ" good />}
             {hud.fastOn && <EffectChip label="БЫСТРЕЕ" good={false} />}
