@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { IconBall, IconPlay, Key } from "../icons"
 import type { HudData, IntermediateScoreData, RunScoreBreakdown } from "../../game/types"
 import { getFinalEpilogue } from "../../game/bossDialogs"
+import { DEFAULT_TACTICAL_MODULES, type TacticalModulesSettings } from "../../game/tacticalModules"
 
 /** Прозрачная таблица детализации очков (Score Breakdown). */
 export function ScoreBreakdownTable({ breakdown }: { breakdown: RunScoreBreakdown }) {
@@ -68,24 +69,145 @@ export function ScoreBreakdownTable({ breakdown }: { breakdown: RunScoreBreakdow
   )
 }
 
+/** Панель переключаемых тактических модулей платформы. */
+export function TacticalModulesPanel({
+  hud,
+  onToggleModule,
+}: {
+  hud: HudData
+  onToggleModule?: (key: keyof TacticalModulesSettings) => void
+}) {
+  const hasRotation = (hud.upgrades?.paddleRotation ?? 0) > 0
+  const hasAim = (hud.upgrades?.aimGuide ?? 0) > 0
+  const hasMagnet = (hud.upgrades?.magnet ?? 0) > 0
+  if (!hasRotation && !hasAim && !hasMagnet) return null
+
+  const modules = hud.tacticalModules ?? DEFAULT_TACTICAL_MODULES
+
+  return (
+    <div
+      data-testid="tactical-modules-panel"
+      className="mt-4 rounded-lg border border-cyan-500/30 bg-abyss/80 p-3.5 text-left shadow-[0_0_12px_rgba(53,224,255,0.1)]"
+    >
+      <div className="hud-label mb-2.5 text-[10px] tracking-wider text-cyan-neon">
+        ТАКТИЧЕСКИЕ МОДУЛИ
+      </div>
+      <div className="flex flex-col gap-2.5">
+        {hasRotation && (
+          <div className="flex flex-col gap-1.5 border-b border-line/30 pb-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🕹️</span>
+                <div>
+                  <div className="text-xs font-bold text-foam">Штурвал глубин</div>
+                  <div className="text-[10px] text-foam/60">Наклон ракетки на ±30°</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                data-testid="toggle-paddle-rotation"
+                className={`rounded px-2.5 py-1 text-xs font-bold transition-all ${
+                  modules.paddleRotation
+                    ? "bg-cyan-neon text-abyss shadow-[0_0_8px_rgba(53,224,255,0.4)]"
+                    : "border border-line/50 bg-deep/50 text-foam/50"
+                }`}
+                onClick={() => onToggleModule?.("paddleRotation")}
+              >
+                {modules.paddleRotation ? "ВКЛ" : "ВЫКЛ"}
+              </button>
+            </div>
+            {modules.paddleRotation && (
+              <label className="flex cursor-pointer select-none items-center gap-2 pl-7 text-[11px] text-foam/80">
+                <input
+                  type="checkbox"
+                  data-testid="toggle-paddle-impulse"
+                  className="h-3.5 w-3.5 rounded accent-cyan-neon"
+                  checked={modules.paddleImpulse}
+                  onChange={() => onToggleModule?.("paddleImpulse")}
+                />
+                <span>Импульсный щелчок (вместо плавного)</span>
+              </label>
+            )}
+          </div>
+        )}
+        {hasAim && (
+          <div
+            className={`flex items-center justify-between gap-2 ${
+              hasMagnet ? "border-b border-line/30 pb-2" : ""
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-base">🎯</span>
+              <div>
+                <div className="text-xs font-bold text-foam">Траекторный прицел</div>
+                <div className="text-[10px] text-foam/60">Линия наведения и отскока</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              data-testid="toggle-aim-guide"
+              className={`rounded px-2.5 py-1 text-xs font-bold transition-all ${
+                modules.aimGuide
+                  ? "bg-cyan-neon text-abyss shadow-[0_0_8px_rgba(53,224,255,0.4)]"
+                  : "border border-line/50 bg-deep/50 text-foam/50"
+              }`}
+              onClick={() => onToggleModule?.("aimGuide")}
+            >
+              {modules.aimGuide ? "ВКЛ" : "ВЫКЛ"}
+            </button>
+          </div>
+        )}
+        {hasMagnet && (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🧲</span>
+              <div>
+                <div className="text-xs font-bold text-foam">Магнитный старт</div>
+                <div className="text-[10px] text-foam/60">Автозахват мяча в начале</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              data-testid="toggle-magnet-start"
+              className={`rounded px-2.5 py-1 text-xs font-bold transition-all ${
+                modules.magnetStart
+                  ? "bg-cyan-neon text-abyss shadow-[0_0_8px_rgba(53,224,255,0.4)]"
+                  : "border border-line/50 bg-deep/50 text-foam/50"
+              }`}
+              onClick={() => onToggleModule?.("magnetStart")}
+            >
+              {modules.magnetStart ? "ВКЛ" : "ВЫКЛ"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /** Пауза: продолжение, рестарт, выход в меню. */
 export function PauseScreen({
   onResume,
   onRestart,
   onMenu,
   onOpenSettings,
+  hud,
+  onToggleModule,
 }: {
   onResume: () => void
   onRestart: () => void
   onMenu: () => void
   onOpenSettings?: () => void
+  hud?: HudData
+  onToggleModule?: (key: keyof TacticalModulesSettings) => void
 }) {
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-abyss/70 p-6">
-      <div className="anim-pop w-full max-w-sm">
+    <div className="absolute inset-0 z-40 flex items-center justify-center overflow-y-auto bg-abyss/70 p-6">
+      <div className="anim-pop my-auto w-full max-w-sm">
         <div className="hud-chip p-6 sm:p-8">
           <div className="hud-label mb-1">Пауза</div>
           <h2 className="font-display title-glow text-4xl text-foam">СТОП-КАДР</h2>
+          {hud && <TacticalModulesPanel hud={hud} onToggleModule={onToggleModule} />}
           <div className="mt-6 flex flex-col gap-3">
             <button
               className="btn-arcade flex items-center justify-center gap-2 px-6 py-3.5"

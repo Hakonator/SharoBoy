@@ -12,8 +12,9 @@ import type { ActiveChallengeHud } from "./campaignChallenges"
 import type { BossVariantKind } from "./bossVariants"
 import type { BossDialogData, BossTransmissionData } from "./bossDialogs"
 import type { RunScoreBreakdown, ScoreBreakdownItem } from "./scoreBreakdown"
+import type { TacticalModulesSettings } from "./tacticalModules"
 
-export type { RunScoreBreakdown, ScoreBreakdownItem }
+export type { RunScoreBreakdown, ScoreBreakdownItem, TacticalModulesSettings }
 
 /** Данные промежуточного подсчёта накапливаемых очков после завершения уровня/сектора. */
 export interface IntermediateScoreData {
@@ -111,6 +112,8 @@ export interface HudData {
   /** Разблокированная и экипированная косметика (скины ракетки, шлейфы мяча, темы). */
   cosmetics?: PlayerCosmetics
   upgrades: Record<string, number>
+  /** Состояние переключаемых тактических модулей платформы. */
+  tacticalModules: TacticalModulesSettings
   top: ScoreEntry[]
   topEndless: ScoreEntry[]
   /** Рогаликовая карта кампании (null, когда её экран не активен). */

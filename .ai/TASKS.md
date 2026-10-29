@@ -19,7 +19,7 @@
 
 ## Готово к работе
 
-Нет активных задач со статусом ready. Следующий этап — проектирование T-039 (расширение каталога реликвий + индикация в HUD).
+Нет активных задач со статусом ready. Следующий этап — T-039 (расширение каталога реликвий + индикация в HUD).
 
 ---
 
@@ -50,6 +50,60 @@
 ---
 
 ## Последние выполненные задачи (подробные карточки)
+
+### T-038b: Блок тактических модулей платформы (включаемые апгрейды в паузе)
+
+Status: done
+Priority: high
+Assigned to: Luna
+
+Описание:
+Улучшение «Штурвал глубин» (наклон ракетки ±30°) и другие активные апгрейды стали переключаемыми на лету.
+
+1. Модуль `src/game/tacticalModules.ts` с интерфейсом `TacticalModulesSettings`:
+   - `paddleRotation`: boolean (по умолчанию true)
+   - `paddleImpulse`: boolean (false = плавный наклон, true = импульсный щелчок)
+   - `aimGuide`: boolean (по умолчанию true)
+   - `magnetStart`: boolean (по умолчанию true)
+     с хранением в `localStorage` (`sharoboy-tactical-modules`).
+2. Интеграция в движок `Game`:
+   - `paddleRotatable()` учитывает `paddleRotation`.
+   - `impulseActive` активируется при `paddleRotation && paddleImpulse`.
+   - `isAimGuideActive()` учитывает `aimGuide`.
+   - Стартовый магнит в `campaignFlow.ts` и `modes.ts` накладывается только при `magnetStart === true`.
+3. UI в экране паузы (`PauseScreen`) и в настройках (`SettingsModal`):
+   - Блок «ТАКТИЧЕСКИЕ МОДУЛИ» отображает тумблеры ТОЛЬКО для купленных игроком улучшений.
+   - Рядом со «Штурвалом глубин» — чекбокс «Импульсный щелчок».
+4. Тесты: `src/game/tacticalModules.test.ts`, `src/ui/screens/overlays.test.tsx` (624 теста, 100% pass).
+
+Allowed files:
+
+- src/game/tacticalModules.ts
+- src/game/tacticalModules.test.ts
+- src/game/types.ts
+- src/game/game.ts
+- src/game/game/hosts.ts
+- src/game/game/paddleControl.ts
+- src/game/game/hudSync.ts
+- src/game/game/campaignFlow.ts
+- src/game/game/modes.ts
+- src/ui/screens/overlays.tsx
+- src/ui/screens/overlays.test.tsx
+- src/ui/screens/SettingsModal.tsx
+- src/ui/screens/SettingsModal.test.tsx
+- src/App.tsx
+- docs/CHANGELOG.md
+- docs/ROADMAP.md
+- .ai/DECISIONS.md
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Forbidden files:
+
+- vite.config.ts
+- tsconfig.json
+- package.json
 
 ### T-038: Увеличенный шар «Гравитационное ядро» (roadmap 3.1, ингредиент 3)
 
@@ -229,108 +283,6 @@ npm test
 
 ---
 
-### T-036: Проникающий шар «Кинетический клинок» (roadmap 3.1, ингредиент 1)
-
-Status: done
-Priority: high
-Assigned to: Luna
-
-Описание:
-
-Первый из трёх шаров, без которых примеры синергий из `ROADMAP.md` §3.1
-нереализуемы. Важное уточнение по коду: **огонь уже проходит блоки насквозь**
-(`physics/collide.ts:243-254` — «обычные блоки огонь прожигает насквозь, без
-отскока»), поэтому новый шар обязан отличаться не поведением, а ролью.
-
-1. Новый тип бонуса `pierce` («КЛИН») и таймер `Game.pierceUntil`:
-   - шар пробивает **не более 3 блоков за один проход**, нанося каждому
-     обычный урон 1; четвёртый блок он уже отражает как обычно;
-   - «проход» — отрезок между двумя отскоками. Счётчик `Ball.pierceLeft`
-     обнуляется при отскоке от ракетки, стены, минибосса и босса, поэтому
-     тактика шара — выбрать угол, чтобы снять до трёх блоков в ряду;
-   - от минибоссов и босса отскакивает всегда (лимит не расходуется) — иначе
-     превращается в машину урона, на что уже наступали с огнём
-     (`collide.ts:279-280`);
-   - приоритет в цепочке стихий ниже огня: если активны и огонь, и клинок,
-     побеждает огонь (×3 урон и неограниченное пробитие).
-2. Каркас, общий для всех трёх шаров (делается здесь один раз):
-   - `PowerType` += `"pierce"` (`types.ts`), запись в `POWER_META`
-     (`palette.ts`: label, цвет, edge), вес в `buildPowerTable` (`powers/table.ts`),
-     ветка в `applyPower` (`powers/apply.ts`), флаг `pierceActive()` в
-     `PhysicsWorld` (`physics.ts`) и его реализация в `game/hosts.ts`;
-   - сброс таймера в `loseLife` и `clearAllEffects` (`game/runFlow.ts`)
-     рядом с `fireUntil`/`frostUntil`;
-   - цвет шара в `render/projectiles.ts` (`BallView.pierce`), индикатор в
-     `HudData` (`types.ts`) и `hud.tsx` (`pierceOn`), значение в `hudSync.ts`.
-3. Баланс: длительность 10 с (дольше огня — это и есть ниша шара), вес в
-   таблице дропа 8 (как у `fire`/`frost`/`spark`), лимит 3 блока за проход.
-4. Тесты: юнит-тест на пробитие ровно трёх блоков и отскок от четвёртого;
-   тест сброса `pierceLeft` после отскока от ракетки; тест `applyPower` на
-   установку таймера; тест сброса эффекта в `clearAllEffects`.
-
-Точки внедрения (проверены по коду):
-
-- пробитие и лимит → `physics/collide.ts:243` (перед ветвью огня).
-- сброс счётчика → `physics/collide.ts` (отскок от ракетки), `physics.ts`
-  (отражение от стен).
-- флаг активности → `physics.ts:95-100` (рядом с `fireActive`), реализация в
-  `game/hosts.ts:320` (рядом с `fireActive`).
-- таймер и сброс → `game.ts` (рядом с `fireUntil`), `game/runFlow.ts:444,541`.
-- дроп → `powers/table.ts:19-31`, применение → `powers/apply.ts:45`.
-- рендер → `render/projectiles.ts:61-83`.
-
-Allowed files:
-
-- src/game/types.ts
-- src/game/palette.ts
-- src/game/physics.ts
-- src/game/physics/collide.ts
-- src/game/physics/collide.test.ts
-- src/game/game.ts
-- src/game/game/hosts.ts
-- src/game/game/runFlow.ts
-- src/game/game/hudSync.ts
-- src/game/powers.ts
-- src/game/powers/apply.ts
-- src/game/powers/table.ts
-- src/game/powers/table.test.ts
-- src/game/render/projectiles.ts
-- src/ui/screens/hud.tsx
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Forbidden files:
-
-- vite.config.ts
-- tsconfig.json
-- package.json
-
-Dependencies: нет
-
-Acceptance criteria:
-
-- [x] Бонус `pierce` выпадает в бою и отображается иконкой «КЛИН»
-- [x] Шар пробивает ровно 3 блока за проход и отражается от четвёртого
-- [x] Каждому пробитому блоку наносится урон 1
-- [x] Счётчик прохода сбрасывается после отскока от ракетки и от стены
-- [x] От минибосса и босса клинок отскакивает, лимит не расходуется
-- [x] При одновременных огне и клинке приоритет у огня
-- [x] Эффект сбрасывается при потере жизни и между уровнями
-- [x] Индикатор активного клинка виден в HUD
-- [x] `npm run typecheck`, `npm run lint`, `npm test` проходят (74 файла, 599 тестов)
-
-Test plan:
-`npm run typecheck`, `npm run lint`, `npm test`
-
-Verification commands:
-npm run typecheck
-npm run lint:check
-npm run format:check
-npm test
-
----
-
 ## Выполнено ранее (архив)
 
 Карточки удалены при чистке файла; подробности каждой задачи — в `.ai/STATE.md`
@@ -338,6 +290,7 @@ npm test
 
 | Задача | Что сделано                                                                 |
 | ------ | --------------------------------------------------------------------------- |
+| T-036  | Проникающий шар «Кинетический клинок» (roadmap 3.1, ингредиент 1)           |
 | T-035  | Прозрачный экран детального подсчёта очков (Score Breakdown) (roadmap 2.3)  |
 | T-034  | Сюжетные терминалы станции «СФЕРА-1080» в событиях кампании (roadmap 2.2)   |
 | T-033  | Спецблоки матрицы (armor, brittle, phase, magnet) в кампанию и редактор     |

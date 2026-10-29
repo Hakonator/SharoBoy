@@ -10,7 +10,10 @@ import {
   saveSettings,
 } from "../../game/settings"
 import type { HudData } from "../../game/types"
+import type { TacticalModulesSettings } from "../../game/tacticalModules"
 import { IconCoin, IconMusic, IconSettings, IconSound, VolSlider } from "../icons"
+
+import { TacticalModulesPanel } from "./overlays"
 
 interface SettingsModalProps {
   hud: HudData
@@ -20,6 +23,7 @@ interface SettingsModalProps {
   onToggleMusic: () => void
   onToggleMute: () => void
   onResetAccount?: () => void
+  onToggleModule?: (key: keyof TacticalModulesSettings) => void
 }
 
 export function SettingsModal({
@@ -30,6 +34,7 @@ export function SettingsModal({
   onToggleMusic,
   onToggleMute,
   onResetAccount,
+  onToggleModule,
 }: SettingsModalProps) {
   const [settings, setSettings] = useState<GameSettings>(() => loadSettings())
   const [confirmStep, setConfirmStep] = useState<"none" | "step1" | "step2">("none")
@@ -324,6 +329,9 @@ export function SettingsModal({
               </button>
             </div>
           </section>
+
+          {/* СЕКЦИЯ: ТАКТИЧЕСКИЕ МОДУЛИ (если есть купленные) */}
+          <TacticalModulesPanel hud={hud} onToggleModule={onToggleModule} />
 
           {/* СЕКЦИЯ: АККАУНТ И ПРОГРЕСС */}
           <section className="space-y-3.5">

@@ -19,6 +19,11 @@ import {
   particleLimitForQuality,
   subscribeSettings,
 } from "./settings"
+import {
+  type TacticalModulesSettings,
+  loadTacticalModules,
+  saveTacticalModules,
+} from "./tacticalModules"
 import type {
   CampaignEventData,
   CampaignShopItem,
@@ -345,6 +350,7 @@ export class Game {
   sfx = new SFX()
   nick = ""
   settings: GameSettings = loadSettings()
+  tacticalModules: TacticalModulesSettings = loadTacticalModules()
   unsubSettings?: () => void
 
   constructor(canvas: HTMLCanvasElement, onHud: (h: HudData) => void, nick?: string) {
@@ -447,11 +453,22 @@ export class Game {
     return isDebugEffectActive(this, id)
   }
   isAimGuideActive(): boolean {
-    return (this.upgrades.aimGuide ?? 0) > 0 || this.debugEffects.has("aimGuide")
+    const hasUpgrade = (this.upgrades.aimGuide ?? 0) > 0
+    const enabled = this.tacticalModules.aimGuide
+    return (hasUpgrade && enabled) || this.debugEffects.has("aimGuide")
   }
   isBounceGuideActive(): boolean {
+    if (!this.isAimGuideActive()) return false
     if ((this.upgrades.aimGuide ?? 0) > 0 && (this.upgrades.bounceGuide ?? 0) > 0) return true
-    return this.isAimGuideActive() && this.debugEffects.has("bounceGuide")
+    return this.debugEffects.has("bounceGuide")
+  }
+  setTacticalModule(key: keyof TacticalModulesSettings, val: boolean) {
+    this.tacticalModules[key] = val
+    saveTacticalModules(this.tacticalModules)
+    pushHud(this)
+  }
+  toggleTacticalModule(key: keyof TacticalModulesSettings) {
+    this.setTacticalModule(key, !this.tacticalModules[key])
   }
   enterMapNode(id: number) {
     enterMapNode(this, id)

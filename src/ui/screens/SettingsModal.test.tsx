@@ -60,6 +60,12 @@ const dummyHud: HudData = {
   coins: 0,
   crystals: 0,
   upgrades: {},
+  tacticalModules: {
+    paddleRotation: true,
+    paddleImpulse: false,
+    aimGuide: true,
+    magnetStart: true,
+  },
   top: [],
   topEndless: [],
   map: null,

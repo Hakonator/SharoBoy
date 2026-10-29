@@ -350,7 +350,10 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     magnetActive: () => g.time < g.magnetUntil,
     magneticPaddleActive: () => g.time < g.magneticPaddleUntil,
     paddleRotatable: () =>
-      (g.upgrades.paddleRotation ?? 0) > 0 || isDebugEffectActive(g, "paddleRotation"),
+      Boolean(
+        ((g.upgrades.paddleRotation ?? 0) > 0 && g.tacticalModules.paddleRotation) ||
+        isDebugEffectActive(g, "paddleRotation")
+      ),
     aimGuideActive: () => g.isAimGuideActive(),
     bounceGuideActive: () => g.isBounceGuideActive(),
     wideActive: () => g.time < g.wideUntil,

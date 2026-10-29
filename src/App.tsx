@@ -26,6 +26,7 @@ import { useTouchDevice } from "./ui/useTouchDevice"
 import { MapTesterView } from "./ui/MapTesterView"
 import type { PlayerMapSpec } from "./game/mapSpec"
 import { clearAccountStorage } from "./game/account"
+import { DEFAULT_TACTICAL_MODULES } from "./game/tacticalModules"
 import { EditorView } from "./ui/editor"
 
 const INITIAL_HUD: HudData = {
@@ -66,6 +67,7 @@ const INITIAL_HUD: HudData = {
   coins: 0,
   crystals: 0,
   upgrades: {},
+  tacticalModules: { ...DEFAULT_TACTICAL_MODULES },
   top: [],
   topEndless: [],
   map: null,
@@ -356,10 +358,12 @@ export default function App() {
 
       {hud.phase === "paused" && (
         <PauseScreen
+          hud={hud}
           onResume={() => g()?.togglePause()}
           onRestart={() => (hud.mode === "endless" ? g()?.startEndless() : g()?.startGame())}
           onMenu={() => g()?.toMenu()}
           onOpenSettings={() => setShowSettings(true)}
+          onToggleModule={(key) => g()?.toggleTacticalModule(key)}
         />
       )}
 
@@ -372,6 +376,7 @@ export default function App() {
           onToggleMusic={() => g()?.toggleMusic()}
           onToggleMute={() => g()?.toggleMute()}
           onResetAccount={handleResetAccount}
+          onToggleModule={(key) => g()?.toggleTacticalModule(key)}
         />
       )}
 

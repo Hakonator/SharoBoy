@@ -34,7 +34,9 @@ export function startEndless(g: Game) {
   resetRun(g)
   buildWave(g, 1)
   applyUpgrades(g)
-  g.magnetUntil = g.time + 4 * (g.upgrades.magnet ?? 0)
+  if (g.tacticalModules.magnetStart) {
+    g.magnetUntil = g.time + 4 * (g.upgrades.magnet ?? 0)
+  }
   g.laserArmed = (g.upgrades.laser ?? 0) > 0
   g.laserArmedUntil = g.laserArmed ? Number.POSITIVE_INFINITY : 0
   g.runSectorStartTime = g.time

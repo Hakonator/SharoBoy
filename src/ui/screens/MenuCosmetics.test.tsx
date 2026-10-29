@@ -48,6 +48,12 @@ const makeMockHud = (metaCrystals = 100): HudData => ({
     equipped: { paddle: "default", ball: "default", theme: "ocean" },
   },
   upgrades: {},
+  tacticalModules: {
+    paddleRotation: true,
+    paddleImpulse: false,
+    aimGuide: true,
+    magnetStart: true,
+  },
   top: [],
   topEndless: [],
   map: null,

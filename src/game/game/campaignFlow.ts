@@ -430,7 +430,9 @@ export function nodeSpecFor(g: Game, node: CampaignNode): LevelSpec {
 
 /** Общий вход в бой: подача шара, трек, баннер и бонусы прокачки / магазина. */
 export function launchNodeBattle(g: Game, label: string) {
-  g.magnetUntil = g.time + 4 * (g.upgrades.magnet ?? 0)
+  if (g.tacticalModules.magnetStart) {
+    g.magnetUntil = g.time + 4 * (g.upgrades.magnet ?? 0)
+  }
   g.laserArmed = (g.upgrades.laser ?? 0) > 0
 
   // Пассивная реликвия: восстанавливает +1 щит перед боем (до 3)

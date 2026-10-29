@@ -107,6 +107,7 @@ export function pushHud(g: Game) {
     metaCrystals: g.metaCrystals ?? 0,
     cosmetics: g.cosmetics,
     upgrades: { ...g.upgrades },
+    tacticalModules: { ...g.tacticalModules },
     top: g.top,
     topEndless: g.topEndless,
     map: currentMapView(g),

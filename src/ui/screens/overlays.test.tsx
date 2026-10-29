@@ -3,7 +3,13 @@ import { describe, expect, it } from "vitest"
 
 import type { HudData, IntermediateScoreData, RunScoreBreakdown } from "../../game/types"
 
-import { GameOverScreen, IntermediateScoreModal, ScoreBreakdownTable, WinScreen } from "./overlays"
+import {
+  GameOverScreen,
+  IntermediateScoreModal,
+  PauseScreen,
+  ScoreBreakdownTable,
+  WinScreen,
+} from "./overlays"
 
 const mockBreakdown: RunScoreBreakdown = {
   baseScore: 10000,
@@ -208,5 +214,110 @@ describe("IntermediateScoreModal", () => {
     expect(html).toContain("+15")
     expect(html).toContain("+5")
     expect(html).toContain("+25% Мутаторы")
+  })
+})
+
+describe("PauseScreen & TacticalModulesPanel", () => {
+  const baseHud: HudData = {
+    phase: "paused",
+    score: 100,
+    best: 500,
+    lives: 3,
+    level: 1,
+    levelCount: 10,
+    levelName: "Уровень 1",
+    mode: "campaign",
+    wave: 1,
+    combo: 0,
+    blocksLeft: 10,
+    muted: false,
+    musicMuted: false,
+    musicVolume: 0.7,
+    sfxVolume: 0.7,
+    newAchievements: [],
+    banner: null,
+    stuck: false,
+    newRecord: false,
+    shield: 1,
+    wideOn: false,
+    slowOn: false,
+    fastOn: false,
+    shrinkOn: false,
+    laserOn: false,
+    laserArmed: false,
+    rocketOn: false,
+    fireOn: false,
+    frostOn: false,
+    sparkOn: false,
+    pierceOn: false,
+    explosiveOn: false,
+    bigOn: false,
+    magnetOn: false,
+    coins: 50,
+    crystals: 10,
+    upgrades: {},
+    tacticalModules: {
+      paddleRotation: true,
+      paddleImpulse: false,
+      aimGuide: true,
+      magnetStart: true,
+    },
+    top: [],
+    topEndless: [],
+    map: null,
+    campaignEvent: null,
+  }
+
+  it("не отображает блок тактических модулей, если ни один апгрейд не куплен", () => {
+    const html = renderToStaticMarkup(
+      <PauseScreen onResume={() => {}} onRestart={() => {}} onMenu={() => {}} hud={baseHud} />
+    )
+    expect(html).toContain("СТОП-КАДР")
+    expect(html).not.toContain("tactical-modules-panel")
+  })
+
+  it("отображает штурвал глубин и импульсный чекбокс, если куплен paddleRotation", () => {
+    const hud: HudData = {
+      ...baseHud,
+      upgrades: { paddleRotation: 1 },
+    }
+    const html = renderToStaticMarkup(
+      <PauseScreen onResume={() => {}} onRestart={() => {}} onMenu={() => {}} hud={hud} />
+    )
+    expect(html).toContain("tactical-modules-panel")
+    expect(html).toContain("Штурвал глубин")
+    expect(html).toContain("Импульсный щелчок")
+    expect(html).not.toContain("Траекторный прицел")
+    expect(html).not.toContain("Магнитный старт")
+  })
+
+  it("скрывает импульсный чекбокс, если paddleRotation выключен", () => {
+    const hud: HudData = {
+      ...baseHud,
+      upgrades: { paddleRotation: 1 },
+      tacticalModules: {
+        ...baseHud.tacticalModules,
+        paddleRotation: false,
+      },
+    }
+    const html = renderToStaticMarkup(
+      <PauseScreen onResume={() => {}} onRestart={() => {}} onMenu={() => {}} hud={hud} />
+    )
+    expect(html).toContain("Штурвал глубин")
+    expect(html).toContain("ВЫКЛ")
+    expect(html).not.toContain("Импульсный щелчок")
+  })
+
+  it("отображает только купленные модули при разных комбинациях апгрейдов", () => {
+    const hud: HudData = {
+      ...baseHud,
+      upgrades: { aimGuide: 1, magnet: 1 },
+    }
+    const html = renderToStaticMarkup(
+      <PauseScreen onResume={() => {}} onRestart={() => {}} onMenu={() => {}} hud={hud} />
+    )
+    expect(html).toContain("Траекторный прицел")
+    expect(html).toContain("Магнитный старт")
+    expect(html).not.toContain("Штурвал глубин")
   })
 })

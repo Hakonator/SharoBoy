@@ -33,8 +33,11 @@ export function updatePaddleRotation(g: Game, dt: number) {
   const ROT_MAX = (30 * Math.PI) / 180 // 30 градусов
   const ROT_SPEED = 12 // скорость поворота
   const inp = g.input
-  const active = (g.upgrades.paddleRotation ?? 0) > 0 || isDebugEffectActive(g, "paddleRotation")
-  const impulseActive = isDebugEffectActive(g, "paddleImpulse")
+  const active =
+    ((g.upgrades.paddleRotation ?? 0) > 0 && g.tacticalModules.paddleRotation) ||
+    isDebugEffectActive(g, "paddleRotation")
+  const impulseActive =
+    active && (g.tacticalModules.paddleImpulse || isDebugEffectActive(g, "paddleImpulse"))
   // Блокируем поворот при старте мяча (мяч прилип к ракетке)
   const ballStuck = g.balls.some((b) => b.stuck)
 
