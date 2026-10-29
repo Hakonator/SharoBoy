@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { EVENT_MAX_BACK_TIERS, type CampaignMap, type CampaignNode } from "./campaignMap"
 import { makeEnv } from "./campaignFlow.helpers"
 import { nodeSpecFor } from "./game/campaignFlow"
-import { loseLife } from "./game/runFlow"
+import { launch, loseLife } from "./game/runFlow"
 import { LEVEL_MOTIF_NAMES } from "./levelMotifs"
 import type { Game } from "./game"
 
@@ -320,6 +320,37 @@ describe("сквозной цикл кампании по карте", () => {
     step(180)
     expect(laserGame.laserArmed).toBe(true)
 
+    laserGame.weaponsSys.updateLaser(true)
+    expect(laserGame.laserArmed).toBe(false)
+    expect(laserGame.laserUntil).toBeGreaterThan(laserGame.time)
+    g.destroy()
+  })
+
+  it("лазерный старт не активируется при первом запуске шара, а взводится для последующего нажатия", () => {
+    const { game, g, step } = makeEnv()
+    const laserGame = g as typeof g & {
+      upgrades: Record<string, number>
+      laserArmed: boolean
+      laserUntil: number
+      time: number
+      balls: Array<{ stuck: boolean }>
+      weaponsSys: { updateLaser: (fire: boolean) => void }
+    }
+    laserGame.upgrades.laser = 1
+    g.startLevelBattle(1)
+    expect(laserGame.laserArmed).toBe(true)
+    expect(laserGame.balls.some((b) => b.stuck)).toBe(true)
+
+    // Запуск шара
+    launch(game)
+    step(5)
+
+    // Шар в полёте, лазер всё ещё взведён и ждёт последующего нажатия
+    expect(laserGame.balls.some((b) => b.stuck)).toBe(false)
+    expect(laserGame.laserArmed).toBe(true)
+    expect(laserGame.laserUntil).toBe(0)
+
+    // Последующий клик/тап активирует лазерный луч
     laserGame.weaponsSys.updateLaser(true)
     expect(laserGame.laserArmed).toBe(false)
     expect(laserGame.laserUntil).toBeGreaterThan(laserGame.time)

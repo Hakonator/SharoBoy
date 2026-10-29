@@ -193,7 +193,8 @@ export function update(g: Game, dt: number) {
         },
       })
     }
-    const fire = g.input.keys.space || g.input.consumeTapFire()
+    const ballStuck = g.balls.some((b) => b.stuck)
+    const fire = !ballStuck && (g.input.keys.space || g.input.consumeTapFire())
     g.weaponsSys.updateLaser(fire)
     g.weaponsSys.tryFire(dt, fire)
     g.weaponsSys.updateProjectiles(dt)

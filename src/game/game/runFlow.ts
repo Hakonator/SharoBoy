@@ -107,6 +107,8 @@ export function launch(g: Game) {
   }
   if (launched) {
     g.sfx.launch()
+    g.input?.consumeTapFire()
+    if (g.input) g.input.keys.space = false
     pushHud(g)
   }
 }

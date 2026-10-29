@@ -155,8 +155,9 @@ export class InputController {
     if (c === "ArrowLeft" || c === "KeyA") this.keys.left = true
     if (c === "ArrowRight" || c === "KeyD") this.keys.right = true
     if (c === "Space") e.preventDefault()
+    const wasStuck = this.host.ballStuck()
     if (c === "Space" || c === "Enter") this.host.primaryAction()
-    if (c === "Space") this.keys.space = true
+    if (c === "Space" && !wasStuck) this.keys.space = true
     if (c === "KeyP" || c === "Escape") this.host.togglePause()
     if (c === "KeyM") this.host.toggleMute()
     if (c === "KeyN") this.host.toggleMusic()
@@ -277,7 +278,7 @@ export class InputController {
       // поворота, а эмулированный mousedown давал ложный импульс вращения.
       this.suppressMouseUntil = performance.now() + 600
     }
-    this.tapFire = true
+    const wasStuck = this.host.ballStuck()
     // Ракетку в точку касания НЕ перекидываем — палец/мышь могут быть далеко
     // от ракетки, и ракетка «уезжала» к месту тапа.
     if (this.host.isPlaying()) {
@@ -291,7 +292,7 @@ export class InputController {
           this.rightButton = side > 0
           return // палец занят поворотом — шар при отпускании не запускаем
         }
-        if (this.host.aimGuideActive() && this.host.ballStuck()) {
+        if (this.host.aimGuideActive() && wasStuck) {
           if (this.primaryTouchId < 0) {
             this.primaryTouchId = e.pointerId
           } else if (this.touchAimId < 0 && e.pointerId !== this.primaryTouchId) {
@@ -299,9 +300,16 @@ export class InputController {
             this.host.aimFromPointer(e.clientX, e.clientY)
           }
         }
+        // Тап по полю взводит выстрел только если шар уже в воздухе (не на ракетке)
+        if (!wasStuck) {
+          this.tapFire = true
+        }
         return // обычный тач: шар запускается при отпускании (handlePointerUp)
       }
-      // Мышь/стилус: запуск сразу + pointer lock, как раньше.
+      // Мышь/стилус: запуск шара, если прилип; огонь взводится только последующим кликом
+      if (!wasStuck) {
+        this.tapFire = true
+      }
       this.host.launchIfPlaying()
       this.requestLock()
     }

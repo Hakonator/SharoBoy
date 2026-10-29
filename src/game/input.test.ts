@@ -141,4 +141,66 @@ describe("InputController", () => {
 
     controller.destroy()
   })
+
+  it("не взводит tapFire при клике/тапе, если мяч прилип (первый клик только запускает шар)", () => {
+    let stuck = true
+    const host = createMockHost()
+    host.ballStuck = () => stuck
+    const controller = new InputController(canvas as unknown as HTMLCanvasElement, host)
+    controller.attach()
+
+    // 1) Первый клик мыши — мяч прилип, клик запускает шар
+    canvas.emit("pointerdown", {
+      pointerType: "mouse",
+      clientX: 400,
+      clientY: 300,
+    })
+    expect(host.launchIfPlaying).toHaveBeenCalledTimes(1)
+    expect(controller.consumeTapFire()).toBe(false)
+
+    // Мяч полетел
+    stuck = false
+
+    // 2) Последующий клик — мяч в воздухе, клик взводит выстрел
+    canvas.emit("pointerdown", {
+      pointerType: "mouse",
+      clientX: 400,
+      clientY: 300,
+    })
+    expect(controller.consumeTapFire()).toBe(true)
+
+    controller.destroy()
+  })
+
+  it("не устанавливает keys.space при нажатии пробела, если мяч прилип (пробел только запускает шар)", () => {
+    let stuck = true
+    const host = createMockHost()
+    host.ballStuck = () => stuck
+    const controller = new InputController(canvas as unknown as HTMLCanvasElement, host)
+    controller.attach()
+
+    // 1) Первый пробел — мяч прилип
+    win.emit("keydown", {
+      code: "Space",
+      defaultPrevented: false,
+      target: null,
+      preventDefault: vi.fn(),
+    })
+    expect(host.primaryAction).toHaveBeenCalledTimes(1)
+    expect(controller.keys.space).toBe(false)
+
+    // Мяч полетел
+    stuck = false
+
+    // 2) Последующий пробел — мяч в воздухе, пробел взводит стрельбу
+    win.emit("keydown", {
+      code: "Space",
+      defaultPrevented: false,
+      target: null,
+      preventDefault: vi.fn(),
+    })
+    expect(controller.keys.space).toBe(true)
+
+    controller.destroy()
+  })
 })
