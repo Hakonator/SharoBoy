@@ -396,4 +396,90 @@ describe("MapScreen: маршрут события кампании", () => {
     expect(resolvedHtml).toContain("В БОЙ ➔")
     expect(resolvedHtml).toContain("Щиты усилены!")
   })
+
+  it("отображает бейджи активных реликвий на верхнем баре карты кампании", () => {
+    const map = generateCampaignMap(541)
+    const player = map.nodes.find((node) => node.id === map.startId)!
+    const hud = {
+      map: {
+        ...map,
+        playerId: player.id,
+        visited: [player.id],
+        visible: [],
+        minibosses: {},
+      },
+      score: 0,
+      lives: 3,
+      best: 0,
+      coins: 0,
+      phase: "map",
+      activeRelics: ["relic_shield", "relic_overdrive"],
+    } as unknown as HudData
+
+    const html = renderToStaticMarkup(
+      <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
+    )
+
+    expect(html).toContain("РЕЛИКВИИ")
+    expect(html).toContain("🛡️")
+    expect(html).toContain("🔋")
+    expect(html).toContain("Жемчужина глубин:")
+    expect(html).toContain("Аварийный овердрайв:")
+  })
+
+  it("в магазине кампании для уже активной реликвии показывает кнопку «УЖЕ АКТИВНА»", () => {
+    const map = generateCampaignMap(541)
+    const player = map.nodes.find((node) => node.id === map.startId)!
+    const hud = {
+      map: {
+        ...map,
+        playerId: player.id,
+        visited: [player.id],
+        visible: [],
+        minibosses: {},
+      },
+      score: 0,
+      lives: 3,
+      best: 0,
+      coins: 0,
+      crystals: 100,
+      phase: "map",
+      activeRelics: ["relic_frost"],
+      campaignShop: {
+        nodeId: 999,
+        name: "ЛАВКА ГЛУБИН",
+        items: [
+          {
+            id: "relic_frost",
+            name: "Крио-резонатор",
+            desc: "Мороз при поломке щита",
+            price: 36,
+            category: "relic",
+            icon: "crystal",
+            relic: true,
+            sold: false,
+          },
+          {
+            id: "relic_bulwark",
+            name: "Броневой бастион",
+            desc: "Поглощает бомбу",
+            price: 40,
+            category: "relic",
+            icon: "shield",
+            relic: true,
+            sold: false,
+          },
+        ],
+      },
+    } as unknown as HudData
+
+    const html = renderToStaticMarkup(
+      <MapScreen hud={hud} onMapNode={() => {}} onEventDismiss={() => {}} onMenu={() => {}} />
+    )
+
+    expect(html).toContain("Крио-резонатор")
+    expect(html).toContain("УЖЕ АКТИВНА")
+    expect(html).toContain("Броневой бастион")
+    expect(html).toContain("КУПИТЬ (40 💎)")
+  })
 })

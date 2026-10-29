@@ -24,6 +24,7 @@ import {
   loadTacticalModules,
   saveTacticalModules,
 } from "./tacticalModules"
+import type { CampaignRelicsState } from "./campaignRelics"
 import type {
   CampaignEventData,
   CampaignShopItem,
@@ -323,12 +324,11 @@ export class Game {
     coinBoost?: boolean
   } = {}
   /** Постоянные пассивные реликвии текущего забега кампании. */
-  campaignRelics: {
-    relicShield?: boolean
-    relicSpark?: boolean
-    relicFire?: boolean
-    relicConverter?: boolean
-  } = {}
+  campaignRelics: CampaignRelicsState = {}
+  /** Поглотила ли реликвия «Броневой бастион» бомбу на текущем уровне. */
+  bulwarkBlockedThisLevel = false
+  /** Использована ли реликвия «Аварийный овердрайв» в текущем забеге. */
+  overdriveUsedThisRun = false
   campaignSparkBounceCount = 0
   campaignPlayerId = -1
   campaignVisited: number[] = []

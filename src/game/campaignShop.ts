@@ -2,6 +2,7 @@ import type { Game } from "./game"
 import { mulberry32 } from "./utils"
 import { pushHud } from "./game/hudSync"
 import type { CampaignShopItem, CampaignShopState } from "./types"
+import { RELIC_ID_TO_KEY, type CampaignRelicId } from "./campaignRelics"
 
 export interface ShopCatalogEntry {
   id: string
@@ -107,6 +108,42 @@ export const SHOP_CATALOG: ShopCatalogEntry[] = [
     icon: "coin",
     relic: true,
   },
+  {
+    id: "relic_frost",
+    name: "Крио-резонатор",
+    desc: "Реликвия: при потере или срабатывании щита активирует мороз на 6 сек.",
+    basePrice: 36,
+    category: "relic",
+    icon: "crystal",
+    relic: true,
+  },
+  {
+    id: "relic_combo",
+    name: "Нейро-стабилизатор",
+    desc: "Реликвия: сохраняет минимум 50% комбо при касании ракетки и потере мяча.",
+    basePrice: 34,
+    category: "relic",
+    icon: "laser",
+    relic: true,
+  },
+  {
+    id: "relic_bulwark",
+    name: "Броневой бастион",
+    desc: "Реликвия: первая бомба за бой поглощается без потери жизни.",
+    basePrice: 40,
+    category: "relic",
+    icon: "shield",
+    relic: true,
+  },
+  {
+    id: "relic_overdrive",
+    name: "Аварийный овердрайв",
+    desc: "Реликвия: 1 раз за забег спасает от гибели (восстанавливает 1 жизнь и 1 щит).",
+    basePrice: 50,
+    category: "relic",
+    icon: "life",
+    relic: true,
+  },
 ]
 
 /**
@@ -196,17 +233,11 @@ export function canBuyCampaignShopItem(
   if (item.category === "shield" && g.shield >= 5) {
     return { canBuy: false, reason: "Максимум щитов (5)" }
   }
-  if (item.id === "relic_shield" && g.campaignRelics.relicShield) {
-    return { canBuy: false, reason: "Реликвия уже активна" }
-  }
-  if (item.id === "relic_spark" && g.campaignRelics.relicSpark) {
-    return { canBuy: false, reason: "Реликвия уже активна" }
-  }
-  if (item.id === "relic_fire" && g.campaignRelics.relicFire) {
-    return { canBuy: false, reason: "Реликвия уже активна" }
-  }
-  if (item.id === "relic_converter" && g.campaignRelics.relicConverter) {
-    return { canBuy: false, reason: "Реликвия уже активна" }
+  if (item.category === "relic") {
+    const relicKey = RELIC_ID_TO_KEY[item.id as CampaignRelicId]
+    if (relicKey && g.campaignRelics[relicKey]) {
+      return { canBuy: false, reason: "Реликвия уже активна" }
+    }
   }
   return { canBuy: true }
 }
@@ -258,6 +289,18 @@ export function buyCampaignShopItem(g: Game, itemId: string): boolean {
       break
     case "relic_converter":
       g.campaignRelics.relicConverter = true
+      break
+    case "relic_frost":
+      g.campaignRelics.relicFrost = true
+      break
+    case "relic_combo":
+      g.campaignRelics.relicCombo = true
+      break
+    case "relic_bulwark":
+      g.campaignRelics.relicBulwark = true
+      break
+    case "relic_overdrive":
+      g.campaignRelics.relicOverdrive = true
       break
   }
 

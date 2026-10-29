@@ -81,6 +81,8 @@ export function startCampaignMap(g: Game) {
   g.campaignPerks = {}
   g.campaignRelics = {}
   g.campaignSparkBounceCount = 0
+  g.bulwarkBlockedThisLevel = false
+  g.overdriveUsedThisRun = false
   g.crystals = 20
   g.crystalsRunTotal = 20
   g.shield = (g.upgrades.shieldStart ?? 0) > 0 ? 1 : 0
@@ -430,6 +432,7 @@ export function nodeSpecFor(g: Game, node: CampaignNode): LevelSpec {
 
 /** Общий вход в бой: подача шара, трек, баннер и бонусы прокачки / магазина. */
 export function launchNodeBattle(g: Game, label: string) {
+  g.bulwarkBlockedThisLevel = false
   if (g.tacticalModules.magnetStart) {
     g.magnetUntil = g.time + 4 * (g.upgrades.magnet ?? 0)
   }

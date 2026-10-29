@@ -160,7 +160,11 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
   // отскок от ракетки закрывает текущий проход клинка
   ball.pierceLeft = undefined
   g.resetBossCleanHits?.()
-  const keepMult = g.comboMasterLevel ? (g.comboMasterLevel >= 2 ? 0.7 : 0.35) : 0
+  const relicMult = g.relicCombo ? 0.5 : 0
+  const keepMult = Math.max(
+    relicMult,
+    g.comboMasterLevel ? (g.comboMasterLevel >= 2 ? 0.7 : 0.35) : 0
+  )
   g.combo = Math.floor(g.combo * keepMult)
   if (Math.abs(rel) > 0.65) g.hitStop = Math.max(g.hitStop, 0.015)
   applyClutchRebound(g, ball, rel, paddlePan)
@@ -214,7 +218,11 @@ export function collidePaddleShape(
   ball.sinceHit = 0
   p.squash = 1
   g.resetBossCleanHits?.()
-  const keepMult = g.comboMasterLevel ? (g.comboMasterLevel >= 2 ? 0.7 : 0.35) : 0
+  const relicMult = g.relicCombo ? 0.5 : 0
+  const keepMult = Math.max(
+    relicMult,
+    g.comboMasterLevel ? (g.comboMasterLevel >= 2 ? 0.7 : 0.35) : 0
+  )
   g.combo = Math.floor(g.combo * keepMult)
   if (Math.abs(rel) > 0.65) g.hitStop = Math.max(g.hitStop, 0.015)
   const paddlePan = clamp((ball.x / g.w) * 2 - 1, -0.85, 0.85)

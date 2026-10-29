@@ -18,6 +18,7 @@ import {
 import type { HudData } from "../../game/types"
 import { CAMPAIGN_MODIFIERS_MAP } from "../../game/campaignModifiers"
 import { TIER_STEP_NODE_WIDTHS } from "../../game/campaignMap"
+import { CAMPAIGN_RELICS_META, type CampaignRelicId } from "../../game/campaignRelics"
 
 /**
  * Ширина пиктограммы обычного узла: `w-11` на мобильных, `w-12` от `sm`
@@ -282,6 +283,34 @@ export function MapScreen({
                       {CAMPAIGN_MODIFIERS_MAP[m]?.icon} {CAMPAIGN_MODIFIERS_MAP[m]?.title}
                     </span>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {hud.activeRelics && hud.activeRelics.length > 0 && (
+            <div className="hud-chip flex items-center gap-1.5 border-amber-500/30 bg-amber-950/20 px-3 py-1.5 sm:px-3.5 sm:py-2">
+              <span className="text-base sm:text-lg">🏺</span>
+              <div>
+                <div className="hud-label text-amber-300">РЕЛИКВИИ</div>
+                <div className="flex items-center gap-1">
+                  {hud.activeRelics.map((id) => {
+                    const meta = CAMPAIGN_RELICS_META[id]
+                    if (!meta) return null
+                    return (
+                      <span
+                        key={id}
+                        className="inline-flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded border text-xs sm:text-sm cursor-help transition-transform hover:scale-110"
+                        style={{
+                          borderColor: `${meta.color}66`,
+                          backgroundColor: `${meta.color}25`,
+                        }}
+                        title={`${meta.name}: ${meta.desc}`}
+                      >
+                        {meta.icon}
+                      </span>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -658,13 +687,17 @@ export function MapScreen({
                 const isLife = item.category === "life"
                 const isShield = item.category === "shield"
                 const isRelic = item.category === "relic"
+                const isOwnedRelic =
+                  isRelic && Boolean(hud.activeRelics?.includes(item.id as CampaignRelicId))
                 const atMaxLife = isLife && hud.lives >= 5
                 const atMaxShield = isShield && hud.shield >= 5
                 const affordable = crystals >= item.price
-                const canBuy = !item.sold && affordable && !atMaxLife && !atMaxShield
+                const canBuy =
+                  !item.sold && !isOwnedRelic && affordable && !atMaxLife && !atMaxShield
 
                 let btnLabel = `КУПИТЬ (${item.price} 💎)`
                 if (item.sold) btnLabel = "КУПЛЕНО"
+                else if (isOwnedRelic) btnLabel = "УЖЕ АКТИВНА"
                 else if (atMaxLife) btnLabel = "МАКС. ЖИЗНЕЙ (5)"
                 else if (atMaxShield) btnLabel = "МАКС. ЩИТОВ (5)"
                 else if (!affordable) btnLabel = `НУЖНО ${item.price} 💎`
@@ -673,7 +706,7 @@ export function MapScreen({
                   <div
                     key={item.id}
                     className={`flex flex-col justify-between rounded-lg border p-3 text-left transition-all ${
-                      item.sold
+                      item.sold || isOwnedRelic
                         ? "border-line/40 bg-deep/40 opacity-60"
                         : isRelic
                           ? "border-purple-400/50 bg-deep/90 shadow-[0_0_16px_rgba(192,132,252,0.15)] hover:border-purple-300"
@@ -703,7 +736,7 @@ export function MapScreen({
                       disabled={!canBuy}
                       onClick={() => onBuyShopItem?.(item.id)}
                       className={`mt-3 w-full rounded py-1.5 font-display text-xs font-bold transition-all ${
-                        item.sold
+                        item.sold || isOwnedRelic
                           ? "cursor-default bg-line/20 text-foam/40"
                           : canBuy
                             ? isRelic

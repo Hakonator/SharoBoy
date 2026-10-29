@@ -125,4 +125,32 @@ describe("HudOverlay: кнопка быстрого пропуска уровн�
     expect(html).toContain("sm:max-w-xl")
     expect(html).toContain("sm:bottom-3")
   })
+
+  it("отображает бейджи активных реликвий с иконками и подсказками в HUD кампании", () => {
+    const hud = makeHud("playing")
+    hud.mode = "campaign"
+    hud.activeRelics = ["relic_frost", "relic_bulwark"]
+
+    const html = renderToStaticMarkup(
+      <HudOverlay
+        hud={hud}
+        inGame
+        portrait={false}
+        onPause={() => {}}
+        onMute={() => {}}
+        onMusic={() => {}}
+        onMusicVolume={() => {}}
+        onSfxVolume={() => {}}
+        debug={false}
+        onDebugSkipLevel={() => {}}
+        onExitCustomMap={() => {}}
+      />
+    )
+
+    expect(html).toContain("Реликвии")
+    expect(html).toContain("❄️")
+    expect(html).toContain("🏰")
+    expect(html).toContain("Крио-резонатор:")
+    expect(html).toContain("Броневой бастион:")
+  })
 })

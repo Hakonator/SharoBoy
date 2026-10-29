@@ -371,6 +371,9 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     get comboMasterLevel() {
       return g.upgrades.comboMaster ?? 0
     },
+    get relicCombo() {
+      return Boolean(g.campaignRelics?.relicCombo)
+    },
     addScore: (n, x, y, color, size) => addScore(g, n, x, y, color, size),
     dropPower: (x, y) => g.powersSys.dropPower(x, y),
     damageBoss: (dmg, fromWeapon, isCrit) => {
@@ -395,6 +398,22 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     damageMiniboss: (dmg, block) => damageMiniboss(g, dmg, block),
     onBombHitPaddle: () => onBombHitPaddle(g),
+    onShieldBreak: () => {
+      if (g.campaignRelics?.relicFrost) {
+        g.frostUntil = Math.max(g.frostUntil, g.time + 6)
+        g.fireUntil = 0
+        g.sparkUntil = 0
+        g.sfx.power()
+        g.fx.popups.push({
+          x: g.w / 2,
+          y: g.h * 0.42,
+          text: "КРИО-РЕЗОНАТОР: МОРОЗ!",
+          color: "#7dd3fc",
+          t: 0,
+          size: 16,
+        })
+      }
+    },
     onPaddleBounce: () => {
       g.bossCleanHits = 0
       if (hasModifier(g.campaignModifiers, "hyper_speed")) {

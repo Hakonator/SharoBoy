@@ -14,6 +14,7 @@ import {
 import type { HudData } from "../../game/types"
 import type { BossDialogData } from "../../game/bossDialogs"
 import { computeRunMultipliers, CAMPAIGN_MODIFIERS_MAP } from "../../game/campaignModifiers"
+import { CAMPAIGN_RELICS_META } from "../../game/campaignRelics"
 
 /** Наложение во время игры: верхний HUD-бар, цели на мобильных, эффекты, подсказки, баннер. */
 export function HudOverlay({
@@ -136,6 +137,33 @@ export function HudOverlay({
       </div>
     ) : null
   const { crystalMultiplier } = computeRunMultipliers(hud.campaignModifiers ?? [])
+  const relicsChip =
+    hud.mode === "campaign" && (hud.activeRelics?.length ?? 0) > 0 ? (
+      <div
+        className={`hud-chip flex items-center gap-1.5 border-amber-500/30 bg-amber-950/20 ${pad}`}
+      >
+        <div className="hud-label text-amber-300">Реликвии</div>
+        <div className="flex items-center gap-1">
+          {hud.activeRelics?.map((id) => {
+            const meta = CAMPAIGN_RELICS_META[id]
+            if (!meta) return null
+            return (
+              <span
+                key={id}
+                className="inline-flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded border text-xs sm:text-sm cursor-help transition-transform hover:scale-110"
+                style={{
+                  borderColor: `${meta.color}66`,
+                  backgroundColor: `${meta.color}22`,
+                }}
+                title={`${meta.name}: ${meta.desc}`}
+              >
+                {meta.icon}
+              </span>
+            )
+          })}
+        </div>
+      </div>
+    ) : null
   const mutatorBadge =
     (hud.campaignModifiers?.length ?? 0) > 0 ? (
       <div
@@ -237,13 +265,19 @@ export function HudOverlay({
                 </div>
                 {rightControls}
               </div>
-              {(hud.best > 0 || comboChip || coinsChip || shieldChip || crystalsChip) && (
+              {(hud.best > 0 ||
+                comboChip ||
+                coinsChip ||
+                shieldChip ||
+                crystalsChip ||
+                relicsChip) && (
                 <div className="flex flex-wrap items-start gap-1">
                   {bestChip}
                   {comboChip}
                   {coinsChip}
                   {crystalsChip}
                   {shieldChip}
+                  {relicsChip}
                 </div>
               )}
               {hud.activeChallenge && (
@@ -275,6 +309,7 @@ export function HudOverlay({
                 {crystalsChip}
                 {mutatorBadge}
                 {shieldChip}
+                {relicsChip}
               </div>
 
               {/* Ландшафт/десктоп: центральная плашка челленджа или целей */}

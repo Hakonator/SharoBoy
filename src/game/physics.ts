@@ -119,6 +119,7 @@ export interface PhysicsWorld {
   addScore(n: number, x: number, y: number, color: string, size: number): void
   dropPower(x: number, y: number): void
   comboMasterLevel?: number
+  relicCombo?: boolean
   resetBossCleanHits?(): void
   damageBoss(dmg: number, fromWeapon: boolean, isCrit?: boolean): void
   /** Урон в пул HP минибосса, по блоку которого пришёл удар (блоки существа
@@ -126,6 +127,7 @@ export interface PhysicsWorld {
   damageMiniboss(dmg: number, block: Block): void
   /** Попадание бомбы осьминога по ракетке. */
   onBombHitPaddle(): void
+  onShieldBreak?(): void
   onPaddleBounce?(): void
   onClutchSave?(): void
   onCritHit?(): void
@@ -332,6 +334,7 @@ export class Physics {
       // низ — щит или потеря
       if (g.shield > 0 && ball.vy > 0 && ball.y + ball.r >= g.h - 14) {
         g.shield--
+        g.onShieldBreak?.()
         ball.y = g.h - 14 - ball.r
         ball.vy = -Math.abs(ball.vy)
         ball.squash = 1

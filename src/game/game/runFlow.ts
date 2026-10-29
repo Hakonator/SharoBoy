@@ -42,6 +42,8 @@ export function resetRun(g: Game) {
   g.campaignPerks = {}
   g.campaignRelics = {}
   g.campaignSparkBounceCount = 0
+  g.bulwarkBlockedThisLevel = false
+  g.overdriveUsedThisRun = false
   g.activeSpec = null
   g.onBossNode = false
   g.activeChallenge = null
@@ -331,6 +333,7 @@ export function onLevelCleared(g: Game) {
 
 export function advanceEndlessWave(g: Game) {
   g.wave++
+  g.bulwarkBlockedThisLevel = false
   g.levelScoreStart = g.score
   g.levelBlocksStart = g.runBlocksDestroyed ?? 0
   buildWave(g, g.wave)
@@ -344,6 +347,7 @@ export function advanceEndlessWave(g: Game) {
 
 export function advanceClassicLevel(g: Game) {
   g.level++
+  g.bulwarkBlockedThisLevel = false
   g.levelScoreStart = g.score
   g.levelBlocksStart = g.runBlocksDestroyed ?? 0
   buildLevel(g, g.level)
@@ -438,7 +442,11 @@ export function loseLife(g: Game) {
   }
   g.runLivesLost++
   g.levelLostBall = true
-  g.combo = 0
+  if (g.campaignRelics?.relicCombo) {
+    g.combo = Math.floor(g.combo / 2)
+  } else {
+    g.combo = 0
+  }
   g.shake = 10
   g.sfx.loseLife()
   g.wideUntil = 0
@@ -468,6 +476,33 @@ export function loseLife(g: Game) {
   g.prevLeftDown = false
   g.prevRightDown = false
   if (g.lives <= 0) {
+    if (g.campaignRelics?.relicOverdrive && !g.overdriveUsedThisRun) {
+      g.overdriveUsedThisRun = true
+      g.lives = 1
+      g.shield = Math.max(g.shield, 1)
+      g.shake = 16
+      g.flash = 1
+      g.sfx.power()
+      g.fx.rings.push({
+        x: g.paddle.x,
+        y: g.paddle.y,
+        r: 10,
+        color: "#f59e0b",
+        t: 0,
+        maxR: 90,
+      })
+      g.fx.popups.push({
+        x: g.w / 2,
+        y: g.h * 0.45,
+        text: "АВАРИЙНЫЙ ОВЕРДРАЙВ!",
+        color: "#f59e0b",
+        t: 0,
+        size: 26,
+      })
+      serveBall(g)
+      pushHud(g)
+      return
+    }
     applyFinalScoreBreakdown(g)
     if (g.mode === "custom") {
       finishCustomRun(g, "over")
@@ -540,6 +575,29 @@ function finishCustomRun(g: Game, result: "won" | "over") {
 /** Попадание бомбы осьминога по ракетке — отнимает жизнь. */
 export function onBombHitPaddle(g: Game) {
   if (g.phase !== "playing") return
+  if (g.campaignRelics?.relicBulwark && !g.bulwarkBlockedThisLevel) {
+    g.bulwarkBlockedThisLevel = true
+    g.sfx.shieldHit()
+    g.shake = 8
+    g.fx.rings.push({
+      x: g.paddle.x,
+      y: g.paddle.y,
+      r: 10,
+      color: "#67e8f9",
+      t: 0,
+      maxR: 60,
+    })
+    g.fx.popups.push({
+      x: g.w / 2,
+      y: g.h * 0.48,
+      text: "БАСТИОН: БОМБА ПОГЛОЩЕНА!",
+      color: "#67e8f9",
+      t: 0,
+      size: 20,
+    })
+    pushHud(g)
+    return
+  }
   loseLife(g)
 }
 

@@ -5,6 +5,7 @@ import { lsSet } from "../utils"
 import { UPGRADE_DEFS } from "../upgrades"
 import type { ScoreEntry } from "../types"
 import { formatChallengeHud } from "../campaignChallenges"
+import { getActiveRelicIds } from "../campaignRelics"
 
 import { currentMapView } from "./campaignFlow"
 import { levelDisplayName } from "./levelBuild"
@@ -108,6 +109,7 @@ export function pushHud(g: Game) {
     cosmetics: g.cosmetics,
     upgrades: { ...g.upgrades },
     tacticalModules: { ...g.tacticalModules },
+    activeRelics: getActiveRelicIds(g.campaignRelics),
     top: g.top,
     topEndless: g.topEndless,
     map: currentMapView(g),

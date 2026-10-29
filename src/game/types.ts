@@ -13,8 +13,15 @@ import type { BossVariantKind } from "./bossVariants"
 import type { BossDialogData, BossTransmissionData } from "./bossDialogs"
 import type { RunScoreBreakdown, ScoreBreakdownItem } from "./scoreBreakdown"
 import type { TacticalModulesSettings } from "./tacticalModules"
+import type { CampaignRelicId, CampaignRelicsState } from "./campaignRelics"
 
-export type { RunScoreBreakdown, ScoreBreakdownItem, TacticalModulesSettings }
+export type {
+  CampaignRelicId,
+  CampaignRelicsState,
+  RunScoreBreakdown,
+  ScoreBreakdownItem,
+  TacticalModulesSettings,
+}
 
 /** Данные промежуточного подсчёта накапливаемых очков после завершения уровня/сектора. */
 export interface IntermediateScoreData {
@@ -126,6 +133,8 @@ export interface HudData {
   campaignShop?: CampaignShopState | null
   /** Активные модификаторы (мутаторы) текущего забега кампании. */
   campaignModifiers?: CampaignModifierId[]
+  /** Активные реликвии текущего забега кампании. */
+  activeRelics?: CampaignRelicId[]
   /** Активное испытание узла (если бой идёт на узле-челлендже). */
   activeChallenge?: ActiveChallengeHud | null
   /** Активная входящая трансляция/сообщение босса текущего уровня. */
