@@ -31,6 +31,26 @@ export const EXPLOSIVE_BALL_MAX_TARGETS = 8
  */
 export const EXPLOSIVE_BALL_DAMAGE = 1
 
+/**
+ * Лимит сквозных пробитий клинком при активной синергии «Кинетический Снайпер».
+ */
+export const PIERCE_SNIPER_BLOCKS_PER_PASS = 6
+
+/**
+ * Радиус взрыва при активной синергии «Цепной Резонанс».
+ */
+export const CHAIN_RESONANCE_RADIUS = 108
+
+/**
+ * Лимит целей взрыва при активной синергии «Цепной Резонанс».
+ */
+export const CHAIN_RESONANCE_MAX_TARGETS = 14
+
+/**
+ * Урон взрывной волны при активной синергии «Цепной Резонанс».
+ */
+export const CHAIN_RESONANCE_DAMAGE = 2
+
 /** Ситуативная механика: «Критический сэйв» (Clutch Rebound).
  *  Активируется при отскоке шара от самого края платформы (|rel| >= 0.78),
  *  либо в опасной ситуации при 1 жизни (|rel| >= 0.70).
@@ -315,10 +335,16 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
        обработаны выше, и до этой ветви дело доходит только когда они не
        сработали. */
     if (g.pierceActive() && !b.isMiniboss && !b.bomb) {
-      const left = ball.pierceLeft ?? PIERCE_BLOCKS_PER_PASS
+      const isSniper = Boolean(g.isSniperActive?.())
+      const maxPierce = isSniper ? PIERCE_SNIPER_BLOCKS_PER_PASS : PIERCE_BLOCKS_PER_PASS
+      const left = ball.pierceLeft ?? maxPierce
       if (left > 0) {
         ball.pierceLeft = left - 1
-        damageBlock(g, b, g.debugBallDamage, true, Math.atan2(ball.vy, ball.vx))
+        const dmg = isSniper ? Math.ceil(g.debugBallDamage * 1.5) : g.debugBallDamage
+        damageBlock(g, b, dmg, true, Math.atan2(ball.vy, ball.vx))
+        if (isSniper) {
+          g.fx.burst(b.x, b.y, "#00f5d4", 8, 160)
+        }
         continue
       }
     }
@@ -332,7 +358,21 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
     // любой отскок от блока закрывает текущий проход клинка
     ball.pierceLeft = undefined
     const impactAngle = Math.atan2(wny, wnx)
+    const isJuggernaut = Boolean(g.isJuggernautActive?.())
     let dmg = g.debugBallDamage * (fire ? FIREBALL_DAMAGE_MULT : 1)
+    if (isJuggernaut) {
+      dmg += 1
+      g.shake = Math.min(g.shake + 2, 6)
+      g.fx.burst(b.x, b.y, "#c084fc", 10, 180)
+      g.fx.rings.push({
+        x: b.x,
+        y: b.y,
+        r: 6,
+        maxR: 52,
+        color: "rgba(192, 132, 252, 0.8)",
+        t: 0,
+      })
+    }
     if (ball.clutchHits && ball.clutchHits > 0) {
       ball.clutchHits--
       dmg *= 2
@@ -362,7 +402,7 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
       queueSparkChain(g.sparkQueue, sparkChainTargets(g.blocks, b, { exclude: b }), b, g.time)
     }
     if (g.explosiveActive()) {
-      applyExplosiveBallAoE(g, b)
+      applyExplosiveBallAoE(g, b, Boolean(g.isChainResonanceActive?.()))
     }
     return
   }
@@ -381,18 +421,30 @@ export function isBlockPhaseActive(b: Block, time: number): boolean {
 
 /**
  * Взрывная волна «Плазменного заряда»: подрывает соседей в радиусе 72
- * на урон 1. Блок прямого удара исключён (свой урон он уже получил).
- * Минибоссы, бомбы и неактивные фазовые блоки не затрагиваются.
- * Урон наносится с `allowBrittle = false`, предотвращая каскадные циклы детонации.
+ * на урон 1. При активной синергии «Цепной Резонанс» радиус расширяется
+ * до 108 px, урон удваивается до 2, лимит целей вырастает до 14,
+ * а хрупкие цепные блоки детонируют в каскадной реакции.
  */
-export function applyExplosiveBallAoE(g: PhysicsWorld, source: Block) {
-  g.fx.burst(source.x, source.y, "#ff8a3d", 12, 180)
+export function applyExplosiveBallAoE(g: PhysicsWorld, source: Block, isChainResonance = false) {
+  const radius = isChainResonance ? CHAIN_RESONANCE_RADIUS : EXPLOSIVE_BALL_RADIUS
+  const maxTargets = isChainResonance ? CHAIN_RESONANCE_MAX_TARGETS : EXPLOSIVE_BALL_MAX_TARGETS
+  const damage = isChainResonance ? CHAIN_RESONANCE_DAMAGE : EXPLOSIVE_BALL_DAMAGE
+  const burstColor = isChainResonance ? "#ffaa00" : "#ff8a3d"
+  const ringColor = isChainResonance ? "rgba(255, 170, 0, 0.95)" : "rgba(255, 122, 54, 0.85)"
+
+  g.fx.burst(
+    source.x,
+    source.y,
+    burstColor,
+    isChainResonance ? 18 : 12,
+    isChainResonance ? 240 : 180
+  )
   g.fx.rings.push({
     x: source.x,
     y: source.y,
     r: 8,
-    maxR: EXPLOSIVE_BALL_RADIUS,
-    color: "rgba(255, 122, 54, 0.85)",
+    maxR: radius,
+    color: ringColor,
     t: 0,
   })
 
@@ -400,15 +452,19 @@ export function applyExplosiveBallAoE(g: PhysicsWorld, source: Block) {
   for (const other of g.blocks) {
     if (other === source || other.dead || other.isMiniboss || other.bomb) continue
     if (other.sp?.phase && !isBlockPhaseActive(other, g.time)) continue
-    if (Math.hypot(other.x - source.x, other.y - source.y) > EXPLOSIVE_BALL_RADIUS) continue
+    if (Math.hypot(other.x - source.x, other.y - source.y) > radius) continue
     candidates.push(other)
-    if (candidates.length >= EXPLOSIVE_BALL_MAX_TARGETS) break
+    if (candidates.length >= maxTargets) break
   }
 
   for (const other of candidates) {
     if (!other.dead) {
-      damageBlock(g, other, EXPLOSIVE_BALL_DAMAGE, false)
+      damageBlock(g, other, damage, isChainResonance)
     }
+  }
+
+  if (isChainResonance) {
+    g.shake = Math.min(g.shake + 2.5, 6)
   }
 }
 
@@ -480,6 +536,21 @@ export function collideBoss(g: PhysicsWorld, ball: Ball) {
     ball.clutchHits--
     dmg *= 2
     g.fx.burst(bo.x, bo.y, "#ffd700", 16, 240)
+  }
+  const isJuggernaut = Boolean(g.isJuggernautActive?.())
+  if (isJuggernaut) {
+    dmg *= 3
+    g.shake = Math.min(g.shake + 4.5, 9)
+    g.hitStop = Math.max(g.hitStop, 0.05)
+    g.fx.burst(bo.x, bo.y, "#c084fc", 18, 260)
+    g.fx.rings.push({
+      x: bo.x,
+      y: bo.y,
+      r: 12,
+      maxR: 90,
+      color: "rgba(192, 132, 252, 0.85)",
+      t: 0,
+    })
   }
   g.damageBoss(dmg, false, isCrit)
 }

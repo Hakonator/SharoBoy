@@ -136,6 +136,12 @@ export interface PhysicsWorld {
   glassPaddleActive?(): boolean
   invertedControlsActive?(): boolean
   hyperSpeedActive?(): boolean
+  /** Активна синергия «Кинетический Снайпер» (удвоенный лимит пробития, лазерный прицел). */
+  isSniperActive?(): boolean
+  /** Активна синергия «Цепной Резонанс» (расширенный AoE взрыв 108 px, каскадная детонация цепных блоков). */
+  isChainResonanceActive?(): boolean
+  /** Активна синергия «Гравитационный Джаггернаут» (урон по боссам ×3, сокрушение брони). */
+  isJuggernautActive?(): boolean
   pushHud(): void
   /** Множитель урона шара (отладка: увеличивается клавишей NumpadSubtract). */
   readonly debugBallDamage: number

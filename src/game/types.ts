@@ -14,12 +14,14 @@ import type { BossDialogData, BossTransmissionData } from "./bossDialogs"
 import type { RunScoreBreakdown, ScoreBreakdownItem } from "./scoreBreakdown"
 import type { TacticalModulesSettings } from "./tacticalModules"
 import type { CampaignRelicId, CampaignRelicsState } from "./campaignRelics"
+import type { SynergyId } from "./synergies"
 
 export type {
   CampaignRelicId,
   CampaignRelicsState,
   RunScoreBreakdown,
   ScoreBreakdownItem,
+  SynergyId,
   TacticalModulesSettings,
 }
 
@@ -135,6 +137,8 @@ export interface HudData {
   campaignModifiers?: CampaignModifierId[]
   /** Активные реликвии текущего забега кампании. */
   activeRelics?: CampaignRelicId[]
+  /** Активные синергии (взаимно усиливающие комбинации эффектов). */
+  activeSynergies?: SynergyId[]
   /** Активное испытание узла (если бой идёт на узле-челлендже). */
   activeChallenge?: ActiveChallengeHud | null
   /** Активная входящая трансляция/сообщение босса текущего уровня. */

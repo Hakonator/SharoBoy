@@ -12,11 +12,17 @@ import { BIG_BALL_RADIUS, type PhysicsWorld } from "../physics"
 import type { Ball, Block } from "../types"
 
 import {
+  CHAIN_RESONANCE_DAMAGE,
+  CHAIN_RESONANCE_MAX_TARGETS,
+  CHAIN_RESONANCE_RADIUS,
   EXPLOSIVE_BALL_DAMAGE,
   EXPLOSIVE_BALL_MAX_TARGETS,
   EXPLOSIVE_BALL_RADIUS,
   PIERCE_BLOCKS_PER_PASS,
+  PIERCE_SNIPER_BLOCKS_PER_PASS,
+  applyExplosiveBallAoE,
   collideBlocks,
+  collideBoss,
   collidePaddle,
 } from "./collide"
 
@@ -72,6 +78,7 @@ function makeWorld(
     time,
     paddle: { x: 200, y: 560, w: 90, h: 14, vx: 0 },
     blocks,
+    powers: [],
     combo: 0,
     shake: 0,
     hitStop: 0,
@@ -339,5 +346,95 @@ describe("Гравитационное ядро (увеличенный шар)"
     collideBlocks(world, ball)
     expect(ball.vy).toBeGreaterThan(0)
     expect(ball.pierceLeft).toBeUndefined()
+  })
+})
+
+describe("Синергии боевых механик (T-040, §3.1 Roadmap)", () => {
+  describe("«Кинетический Снайпер» (Kinetic Sniper)", () => {
+    it("удваивает лимит пробития до 6 блоков за проход", () => {
+      expect(PIERCE_SNIPER_BLOCKS_PER_PASS).toBe(6)
+
+      const blocks = Array.from({ length: 7 }, (_, i) => makeBlock(200, 700 - i * 100))
+      const world = makeWorld(blocks, true)
+      world.isSniperActive = () => true
+      const ball = makeBall(200, 100)
+
+      for (let i = 0; i < PIERCE_SNIPER_BLOCKS_PER_PASS; i++) {
+        ball.x = blocks[i].x
+        ball.y = blocks[i].y + blocks[i].ry
+        ball.vy = -300
+        collideBlocks(world, ball)
+        expect(ball.vy).toBeLessThan(0)
+        // Снайпер наносит +50% урона (Math.ceil(1 * 1.5) = 2), поэтому 5 - 2 = 3
+        expect(blocks[i].hp).toBe(3)
+      }
+      expect(ball.pierceLeft).toBe(0)
+
+      // 7-й блок уже не пробивается и отражает шар
+      ball.x = blocks[6].x
+      ball.y = blocks[6].y + blocks[6].ry
+      ball.vy = -300
+      collideBlocks(world, ball)
+      expect(ball.vy).toBeGreaterThan(0)
+      expect(ball.pierceLeft).toBeUndefined()
+    })
+  })
+
+  describe("«Цепной Резонанс» (Chain Resonance)", () => {
+    it("соответствует спецификации: радиус 108, лимит целей 14, урон 2", () => {
+      expect(CHAIN_RESONANCE_RADIUS).toBe(108)
+      expect(CHAIN_RESONANCE_MAX_TARGETS).toBe(14)
+      expect(CHAIN_RESONANCE_DAMAGE).toBe(2)
+    })
+
+    it("поражает цели на расстоянии до 108 px с удвоенным уроном", () => {
+      const source = makeBlock(200, 300)
+      const near = makeBlock(200, 350) // расстояние 50 (в радиусе 72 и 108)
+      const mid = makeBlock(200, 395) // расстояние 95 (> 72, но <= 108)
+      const far = makeBlock(200, 420) // расстояние 120 (> 108)
+
+      const blocks = [source, near, mid, far]
+      const world = makeWorld(blocks, false, true)
+
+      // Базовый взрыв: mid не поражается (95 > 72)
+      applyExplosiveBallAoE(world, source, false)
+      expect(near.hp).toBe(4) // 5 - 1
+      expect(mid.hp).toBe(5) // не задет
+
+      // Цепной резонанс: mid поражается, урон 2
+      near.hp = 5
+      mid.hp = 5
+      applyExplosiveBallAoE(world, source, true)
+      expect(near.hp).toBe(3) // 5 - 2
+      expect(mid.hp).toBe(3) // 5 - 2
+      expect(far.hp).toBe(5) // 120 > 108 не задет
+    })
+  })
+
+  describe("«Гравитационный Джаггернаут» (Gravitational Juggernaut)", () => {
+    it("наносит ×3 урон по боссу (с 1 до 3) и генерирует сейсмический импульс", () => {
+      let bossDamageDealt = 0
+      const world = makeWorld([], false)
+      ;(world as unknown as { boss: unknown }).boss = {
+        x: 200,
+        y: 100,
+        r: 40,
+        hp: 100,
+        maxHp: 100,
+        kind: "kraken",
+        state: "idle",
+      } as unknown as PhysicsWorld["boss"]
+      world.damageBoss = (dmg: number) => {
+        bossDamageDealt += dmg
+      }
+      world.isJuggernautActive = () => true
+
+      const ball = makeBall(200, 145)
+      ball.vy = -300
+      collideBoss(world, ball)
+
+      expect(bossDamageDealt).toBe(3)
+      expect(world.shake).toBeGreaterThanOrEqual(4.5)
+    })
   })
 })

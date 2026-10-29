@@ -6,6 +6,7 @@ import { UPGRADE_DEFS } from "../upgrades"
 import type { ScoreEntry } from "../types"
 import { formatChallengeHud } from "../campaignChallenges"
 import { getActiveRelicIds } from "../campaignRelics"
+import { getActiveSynergies, SYNERGIES_META } from "../synergies"
 
 import { currentMapView } from "./campaignFlow"
 import { levelDisplayName } from "./levelBuild"
@@ -31,6 +32,38 @@ export function saveTop(g: Game) {
 
 export function syncEffectsHud(g: Game) {
   const t = g.time
+  const activeSynergies = getActiveSynergies(g)
+
+  // Оповещение игрока при активации новой синергии
+  for (const synId of activeSynergies) {
+    if (!g.notifiedSynergies.has(synId)) {
+      g.notifiedSynergies.add(synId)
+      const meta = SYNERGIES_META[synId]
+      g.fx.popups.push({
+        x: g.w / 2,
+        y: g.h * 0.42,
+        text: `СИНЕРГИЯ: ${meta.name.toUpperCase()}!`,
+        color: meta.color,
+        t: 0,
+        size: 18,
+      })
+      g.fx.rings.push({
+        x: g.w / 2,
+        y: g.h * 0.42,
+        r: 10,
+        maxR: 90,
+        color: meta.glowColor,
+        t: 0,
+      })
+      g.sfx.power()
+    }
+  }
+  for (const synId of g.notifiedSynergies) {
+    if (!activeSynergies.includes(synId)) {
+      g.notifiedSynergies.delete(synId)
+    }
+  }
+
   const key = [
     t < g.wideUntil ? 1 : 0,
     t < g.slowUntil ? 1 : 0,
@@ -46,6 +79,7 @@ export function syncEffectsHud(g: Game) {
     t < g.explosiveUntil ? 1 : 0,
     t < g.bigUntil ? 1 : 0,
     t < g.magnetUntil ? 1 : 0,
+    activeSynergies.join(","),
   ].join("")
   if (key !== g.effectsKey) {
     g.effectsKey = key
@@ -110,6 +144,7 @@ export function pushHud(g: Game) {
     upgrades: { ...g.upgrades },
     tacticalModules: { ...g.tacticalModules },
     activeRelics: getActiveRelicIds(g.campaignRelics),
+    activeSynergies: getActiveSynergies(g),
     top: g.top,
     topEndless: g.topEndless,
     map: currentMapView(g),

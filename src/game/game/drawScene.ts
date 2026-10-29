@@ -26,6 +26,7 @@ import {
   drawTopZone,
 } from "../render"
 import { rand } from "../utils"
+import { isKineticSniperActive } from "../synergies"
 
 import { blockTop } from "./paddleControl"
 
@@ -54,9 +55,10 @@ export function draw(g: Game) {
   drawMinibossBar(ctx, g.minibosses, g.blocks)
   drawBoss(ctx, g.bossSys.boss, g.balls, g.blocks)
   const stuckBall = g.balls.find((ball) => ball.stuck)
-  if (stuckBall && g.isAimGuideActive()) {
+  const sniperOn = isKineticSniperActive(g)
+  if (stuckBall && (g.isAimGuideActive() || sniperOn)) {
     const guide = g.physics.aimGuide(stuckBall)
-    if (guide) drawAimGuide(ctx, guide, g.time, g.isBounceGuideActive())
+    if (guide) drawAimGuide(ctx, guide, g.time, g.isBounceGuideActive(), sniperOn)
   }
   drawRings(ctx, g.fx.rings)
   drawLightnings(ctx, g.fx.lightnings)

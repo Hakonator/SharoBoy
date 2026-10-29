@@ -44,6 +44,7 @@ export function resetRun(g: Game) {
   g.campaignSparkBounceCount = 0
   g.bulwarkBlockedThisLevel = false
   g.overdriveUsedThisRun = false
+  g.notifiedSynergies?.clear()
   g.activeSpec = null
   g.onBossNode = false
   g.activeChallenge = null
@@ -336,6 +337,7 @@ export function onLevelCleared(g: Game) {
 export function advanceEndlessWave(g: Game) {
   g.wave++
   g.bulwarkBlockedThisLevel = false
+  g.notifiedSynergies?.clear()
   g.levelScoreStart = g.score
   g.levelBlocksStart = g.runBlocksDestroyed ?? 0
   buildWave(g, g.wave)
@@ -350,6 +352,7 @@ export function advanceEndlessWave(g: Game) {
 export function advanceClassicLevel(g: Game) {
   g.level++
   g.bulwarkBlockedThisLevel = false
+  g.notifiedSynergies?.clear()
   g.levelScoreStart = g.score
   g.levelBlocksStart = g.runBlocksDestroyed ?? 0
   buildLevel(g, g.level)

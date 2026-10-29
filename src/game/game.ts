@@ -25,6 +25,7 @@ import {
   saveTacticalModules,
 } from "./tacticalModules"
 import type { CampaignRelicsState } from "./campaignRelics"
+import type { SynergyId } from "./synergies"
 import type {
   CampaignEventData,
   CampaignShopItem,
@@ -292,6 +293,8 @@ export class Game {
   countdown = 0
   levelLostBall = false
   effectsKey = ""
+  /** Множество активных синергий, о срабатывании которых игрок уже оповещён. */
+  notifiedSynergies = new Set<SynergyId>()
   /** Карта забега кампании и позиция игрока на ней (для экрана карты). */
   campaign: CampaignMap | null = null
   /** Появлявшиеся минибоссы по узлам текущего забега (для маркеров карты) —

@@ -6,6 +6,11 @@ import type { WeaponsWorld } from "../weapons"
 import { queueSparkChain, sparkChainTargets } from "../physics/spark"
 import { hasModifier } from "../campaignModifiers"
 import { recordChallengeCrit } from "../campaignChallenges"
+import {
+  isChainResonanceActive,
+  isGravitationalJuggernautActive,
+  isKineticSniperActive,
+} from "../synergies"
 
 import { addCoins } from "./progress"
 import { pushHud } from "./hudSync"
@@ -485,6 +490,9 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     glassPaddleActive: () => hasModifier(g.campaignModifiers, "glass_paddle"),
     invertedControlsActive: () => hasModifier(g.campaignModifiers, "inverted_controls"),
     hyperSpeedActive: () => hasModifier(g.campaignModifiers, "hyper_speed"),
+    isSniperActive: () => isKineticSniperActive(g),
+    isChainResonanceActive: () => isChainResonanceActive(g),
+    isJuggernautActive: () => isGravitationalJuggernautActive(g),
     pushHud: () => pushHud(g),
   }
 }

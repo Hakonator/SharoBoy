@@ -27,4 +27,13 @@ describe("drawAimGuide", () => {
     expect(onlyAimPaints.filter((paint) => paint.op === "stroke")).toHaveLength(1)
     expect(bouncePaints.filter((paint) => paint.op === "stroke")).toHaveLength(2)
   })
+
+  it("рисует прицельный луч синергии «Кинетический Снайпер» с бирюзовым цветом", () => {
+    const sniperPaints: PaintEvent[] = []
+    drawAimGuide(makeRecordingCtx(sniperPaints).ctx, guide, 1, false, true)
+    const strokeEvents = sniperPaints.filter((p) => p.op === "stroke")
+    expect(strokeEvents).toHaveLength(1)
+    expect(strokeEvents[0].strokeStyle).toBe("#00f5d4")
+    expect(strokeEvents[0].lineWidth).toBe(3.2)
+  })
 })

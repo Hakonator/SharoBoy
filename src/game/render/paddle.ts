@@ -20,29 +20,43 @@ export interface PaddleView extends RenderView {
   skin?: PaddleSkinId
 }
 
-export function drawAimGuide(ctx: Ctx, guide: AimGuide, time: number, bounce: boolean) {
-  const stroke = (x: number, y: number, dx: number, dy: number, color: string) => {
+export function drawAimGuide(
+  ctx: Ctx,
+  guide: AimGuide,
+  time: number,
+  bounce: boolean,
+  sniper = false
+) {
+  const stroke = (x: number, y: number, dx: number, dy: number, color: string, width = 2.4) => {
     ctx.save()
     ctx.strokeStyle = color
-    ctx.lineWidth = 2.4
+    ctx.lineWidth = width
     ctx.lineCap = "round"
-    ctx.setLineDash([8, 8])
-    ctx.lineDashOffset = -time * 42
+    ctx.setLineDash(sniper ? [12, 6] : [8, 8])
+    ctx.lineDashOffset = -time * (sniper ? 64 : 42)
     ctx.beginPath()
     ctx.moveTo(x, y)
     ctx.lineTo(x + dx, y + dy)
     ctx.stroke()
     ctx.restore()
   }
-  stroke(guide.x, guide.y, guide.hitX - guide.x, guide.hitY - guide.y, "rgba(174,247,255,0.9)")
+  stroke(
+    guide.x,
+    guide.y,
+    guide.hitX - guide.x,
+    guide.hitY - guide.y,
+    sniper ? "#00f5d4" : "rgba(174,247,255,0.9)",
+    sniper ? 3.2 : 2.4
+  )
   if (bounce) {
-    const length = 180
+    const length = sniper ? 260 : 180
     stroke(
       guide.hitX,
       guide.hitY,
       guide.bounceDx * length,
       guide.bounceDy * length,
-      "rgba(255,201,77,0.9)"
+      sniper ? "#38bdf8" : "rgba(255,201,77,0.9)",
+      sniper ? 2.8 : 2.4
     )
   }
 }
