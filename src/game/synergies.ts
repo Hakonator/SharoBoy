@@ -7,7 +7,13 @@
 
 import type { CampaignRelicsState } from "./campaignRelics"
 
-export type SynergyId = "kinetic_sniper" | "chain_resonance" | "gravitational_juggernaut"
+export type SynergyId =
+  | "kinetic_sniper"
+  | "chain_resonance"
+  | "gravitational_juggernaut"
+  | "thermal_shock"
+  | "supernova"
+  | "absolute_bulwark"
 
 export interface SynergyMeta {
   readonly id: SynergyId
@@ -51,26 +57,64 @@ export const SYNERGIES_META: Record<SynergyId, SynergyMeta> = {
     color: "#c084fc",
     glowColor: "rgba(192, 132, 252, 0.4)",
   },
+  thermal_shock: {
+    id: "thermal_shock",
+    name: "Термический Шок",
+    shortName: "ТЕРМОШОК",
+    desc: "Огонь + Мороз: паровой взрыв замороженных блоков, колоссальный урон по боссам ×4.",
+    ingredients: ["Огненный шар", "Морозный шар"],
+    icon: "🌡️",
+    color: "#06b6d4",
+    glowColor: "rgba(6, 182, 212, 0.45)",
+  },
+  supernova: {
+    id: "supernova",
+    name: "Сверхновая",
+    shortName: "СВЕРХНОВАЯ",
+    desc: "Огонь + Взрыв: огненный взрыв сверхновой радиусом 96 px с огромным уроном 3 по всем целям.",
+    ingredients: ["Огненный шар", "Плазменный заряд"],
+    icon: "☀️",
+    color: "#ef4444",
+    glowColor: "rgba(239, 68, 68, 0.45)",
+  },
+  absolute_bulwark: {
+    id: "absolute_bulwark",
+    name: "Абсолютный Бастион",
+    shortName: "БАСТИОН",
+    desc: "Щит + Широкая платформа / Бастион: гарантированный крит-сэйв ×2 на каждый отскок и поглощение бомб.",
+    ingredients: ["Энергощит", "Широкая платформа / Бастион"],
+    icon: "🛡️",
+    color: "#10b981",
+    glowColor: "rgba(16, 185, 129, 0.45)",
+  },
 }
 
 /** Состояние игры, достаточное для детекции активных синергий. */
 export interface SynergyDetectorState {
   time?: number
+  combo?: number
+  shield?: number
   pierceUntil?: number
   magnetUntil?: number
   magneticPaddleUntil?: number
   explosiveUntil?: number
   sparkUntil?: number
   bigUntil?: number
+  fireUntil?: number
+  frostUntil?: number
+  wideUntil?: number
   campaignRelics?:
     | CampaignRelicsState
     | {
         relicSpark?: boolean
         relicBulwark?: boolean
+        relicShield?: boolean
+        relicFire?: boolean
+        relicFrost?: boolean
       }
     | null
   campaignModifiers?: readonly string[] | null
-  blocks?: Array<{ dead?: boolean; sp?: { brittle?: unknown } }>
+  blocks?: Array<{ dead?: boolean; frozen?: boolean; sp?: { brittle?: unknown } }>
   // Функциональные геттеры из PhysicsWorld или Game (при наличии)
   pierceActive?: () => boolean
   magnetActive?: () => boolean
@@ -79,6 +123,9 @@ export interface SynergyDetectorState {
   sparkActive?: () => boolean
   bigActive?: () => boolean
   heavyGravityActive?: () => boolean
+  fireActive?: () => boolean
+  frostActive?: () => boolean
+  wideActive?: () => boolean
 }
 
 /**
@@ -128,11 +175,58 @@ export function isGravitationalJuggernautActive(g: SynergyDetectorState): boolea
   return Boolean(heavyGravity || hasBulwarkRelic)
 }
 
+/**
+ * 4. «Термический Шок»:
+ * Огненный шар (бонус, перк или реликвия «Огненная амбра» при комбо >= 3) +
+ * Морозный шар (бонус «Мороз» или реликвия «Крио-резонатор»).
+ */
+export function isThermalShockActive(g: SynergyDetectorState): boolean {
+  const fire = g.fireActive
+    ? g.fireActive()
+    : (g.fireUntil ?? 0) > (g.time ?? 0) ||
+      Boolean(g.campaignRelics?.relicFire && (g.combo ?? 0) >= 3)
+  const frost = g.frostActive
+    ? g.frostActive()
+    : (g.frostUntil ?? 0) > (g.time ?? 0) || Boolean(g.campaignRelics?.relicFrost)
+  return Boolean(fire && frost)
+}
+
+/**
+ * 5. «Сверхновая»:
+ * Огненный шар + Взрывной шар («Плазменный заряд»).
+ */
+export function isSupernovaActive(g: SynergyDetectorState): boolean {
+  const fire = g.fireActive
+    ? g.fireActive()
+    : (g.fireUntil ?? 0) > (g.time ?? 0) ||
+      Boolean(g.campaignRelics?.relicFire && (g.combo ?? 0) >= 3)
+  const explosive = g.explosiveActive
+    ? g.explosiveActive()
+    : (g.explosiveUntil ?? 0) > (g.time ?? 0)
+  return Boolean(fire && explosive)
+}
+
+/**
+ * 6. «Абсолютный Бастион»:
+ * Энергощит (запас щита > 0 или реликвия «Жемчужина глубин») +
+ * (Широкая ракетка или реликвия «Броневой бастион»).
+ */
+export function isAbsoluteBulwarkActive(g: SynergyDetectorState): boolean {
+  const hasShield = (g.shield ?? 0) > 0 || Boolean(g.campaignRelics?.relicShield)
+  const hasWideOrBulwark =
+    (g.wideActive ? g.wideActive() : (g.wideUntil ?? 0) > (g.time ?? 0)) ||
+    Boolean(g.campaignRelics?.relicBulwark)
+  return Boolean(hasShield && hasWideOrBulwark)
+}
+
 /** Возвращает список идентификаторов всех синергий, активных в текущий момент. */
 export function getActiveSynergies(g: SynergyDetectorState): SynergyId[] {
   const active: SynergyId[] = []
   if (isKineticSniperActive(g)) active.push("kinetic_sniper")
   if (isChainResonanceActive(g)) active.push("chain_resonance")
   if (isGravitationalJuggernautActive(g)) active.push("gravitational_juggernaut")
+  if (isThermalShockActive(g)) active.push("thermal_shock")
+  if (isSupernovaActive(g)) active.push("supernova")
+  if (isAbsoluteBulwarkActive(g)) active.push("absolute_bulwark")
   return active
 }

@@ -272,6 +272,7 @@ describe("campaignRelics: механики в бою", () => {
   it("relic_bulwark: первая бомба за бой поглощается без потери жизни", () => {
     const g = makeMockGame({
       lives: 3,
+      shield: 0,
       campaignRelics: { relicBulwark: true },
       bulwarkBlockedThisLevel: false,
     })
@@ -286,6 +287,29 @@ describe("campaignRelics: механики в бою", () => {
     // Второй удар бомбы в том же бою — наносит урон
     onBombHitPaddle(g)
     expect(g.lives).toBe(2)
+  })
+
+  it("absolute_bulwark: при активной синергии (щит + бастион) бомбы поглощаются без лимита", () => {
+    const g = makeMockGame({
+      lives: 3,
+      shield: 1,
+      campaignRelics: { relicBulwark: true },
+      bulwarkBlockedThisLevel: false,
+    })
+
+    onBombHitPaddle(g)
+    expect(g.lives).toBe(3)
+    // bulwarkBlockedThisLevel не тратится, так как сработал Абсолютный Бастион
+    expect(g.bulwarkBlockedThisLevel).toBe(false)
+    expect(
+      g.fx.popups.some((p: { text: string }) =>
+        p.text.includes("АБСОЛЮТНЫЙ БАСТИОН: БОМБА ОТРАЖЕНА")
+      )
+    ).toBe(true)
+
+    // Второй удар бомбы — также поглощается!
+    onBombHitPaddle(g)
+    expect(g.lives).toBe(3)
   })
 
   it("relic_bulwark: флаг сбрасывается при старте нового боя на карте", () => {

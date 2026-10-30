@@ -7,9 +7,12 @@ import { queueSparkChain, sparkChainTargets } from "../physics/spark"
 import { hasModifier } from "../campaignModifiers"
 import { recordChallengeCrit } from "../campaignChallenges"
 import {
+  isAbsoluteBulwarkActive,
   isChainResonanceActive,
   isGravitationalJuggernautActive,
   isKineticSniperActive,
+  isSupernovaActive,
+  isThermalShockActive,
 } from "../synergies"
 
 import { addCoins } from "./progress"
@@ -493,6 +496,9 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     isSniperActive: () => isKineticSniperActive(g),
     isChainResonanceActive: () => isChainResonanceActive(g),
     isJuggernautActive: () => isGravitationalJuggernautActive(g),
+    isThermalShockActive: () => isThermalShockActive(g),
+    isSupernovaActive: () => isSupernovaActive(g),
+    isAbsoluteBulwarkActive: () => isAbsoluteBulwarkActive(g),
     pushHud: () => pushHud(g),
   }
 }

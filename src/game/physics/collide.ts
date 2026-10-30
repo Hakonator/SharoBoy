@@ -51,38 +51,71 @@ export const CHAIN_RESONANCE_MAX_TARGETS = 14
  */
 export const CHAIN_RESONANCE_DAMAGE = 2
 
+/**
+ * Радиус взрыва при активной синергии «Сверхновая».
+ */
+export const SUPERNOVA_RADIUS = 96
+
+/**
+ * Лимит целей взрыва при активной синергии «Сверхновая».
+ */
+export const SUPERNOVA_MAX_TARGETS = 12
+
+/**
+ * Урон взрывной волны при активной синергии «Сверхновая».
+ */
+export const SUPERNOVA_DAMAGE = 3
+
+/**
+ * Радиус парового взрыва при синергии «Термический Шок».
+ */
+export const THERMAL_SHOCK_STEAM_RADIUS = 80
+
+/**
+ * Лимит целей парового взрыва «Термический Шок».
+ */
+export const THERMAL_SHOCK_STEAM_MAX_TARGETS = 8
+
+/**
+ * Урон парового взрыва при синергии «Термический Шок».
+ */
+export const THERMAL_SHOCK_STEAM_DAMAGE = 2
+
 /** Ситуативная механика: «Критический сэйв» (Clutch Rebound).
  *  Активируется при отскоке шара от самого края платформы (|rel| >= 0.78),
- *  либо в опасной ситуации при 1 жизни (|rel| >= 0.70).
- *  Даёт короткий стоп-кадр, мощный золотой взрыв и заряжает шар удвоенным уроном на 2 попадания.
+ *  либо в опасной ситуации при 1 жизни (|rel| >= 0.70), либо гарантированно
+ *  при активной синергии «Абсолютный Бастион».
+ *  Даёт стоп-кадр, мощный взрыв и заряжает шар удвоенным уроном на 2 попадания.
  */
 export function applyClutchRebound(g: PhysicsWorld, ball: Ball, rel: number, paddlePan: number) {
+  const isBulwark = Boolean(g.isAbsoluteBulwarkActive?.())
   const isEdge = Math.abs(rel) >= 0.78
   const isLowLives = (g.lives ?? 3) <= 1
-  const isHighDanger = isLowLives ? Math.abs(rel) >= 0.7 : isEdge
+  const isHighDanger = isBulwark || (isLowLives ? Math.abs(rel) >= 0.7 : isEdge)
   const now = g.time
   const lastClutch = g.lastClutchTime ?? -999
-  if (isHighDanger && now - lastClutch >= 2.5) {
+  if (isBulwark || (isHighDanger && now - lastClutch >= 2.5)) {
     if (g.lastClutchTime !== undefined) g.lastClutchTime = now
     ball.clutchHits = 2
-    g.hitStop = Math.max(g.hitStop, 0.08)
-    g.shake = Math.min(g.shake + 3.5, 7)
+    g.hitStop = Math.max(g.hitStop, isBulwark ? 0.05 : 0.08)
+    g.shake = Math.min(g.shake + (isBulwark ? 2 : 3.5), 7)
     g.sfx.paddle(1, paddlePan)
     g.sfx.power()
-    g.fx.burst(ball.x, ball.y, "#ffd700", 14, 220)
+    const color = isBulwark ? "#10b981" : "#ffd700"
+    g.fx.burst(ball.x, ball.y, color, 14, 220)
     g.fx.rings.push({
       x: ball.x,
       y: ball.y,
       r: 8,
       maxR: 85,
-      color: "rgba(255, 215, 0, 0.85)",
+      color: isBulwark ? "rgba(16, 185, 129, 0.85)" : "rgba(255, 215, 0, 0.85)",
       t: 0,
     })
     g.fx.popups.push({
       x: ball.x,
       y: ball.y - 28,
-      text: "КРИТИЧЕСКИЙ СЭЙВ! ×2",
-      color: "#ffd700",
+      text: isBulwark ? "БАСТИОН: СЭЙВ ×2! 🛡️" : "КРИТИЧЕСКИЙ СЭЙВ! ×2",
+      color,
       t: 0,
       size: 18,
     })
@@ -294,6 +327,7 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
     const blockPan = clamp((b.x / g.w) * 2 - 1, -0.85, 0.85)
     if (fire && !b.isMiniboss && !(g.frostActive() && !b.frozen)) {
       // обычные блоки огонь прожигает насквозь (без отскока)
+      const wasFrozen = Boolean(b.frozen)
       g.sfx.burn(blockPan)
       damageBlock(
         g,
@@ -302,6 +336,9 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
         true,
         Math.atan2(ball.vy, ball.vx)
       )
+      if (wasFrozen || Boolean(g.isThermalShockActive?.())) {
+        applyThermalShockSteamAoE(g, b)
+      }
       continue
     }
     // морозный мяч: живой блок и соседи замораживаются вместо урона,
@@ -402,7 +439,12 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
       queueSparkChain(g.sparkQueue, sparkChainTargets(g.blocks, b, { exclude: b }), b, g.time)
     }
     if (g.explosiveActive()) {
-      applyExplosiveBallAoE(g, b, Boolean(g.isChainResonanceActive?.()))
+      applyExplosiveBallAoE(
+        g,
+        b,
+        Boolean(g.isChainResonanceActive?.()),
+        Boolean(g.isSupernovaActive?.())
+      )
     }
     return
   }
@@ -420,24 +462,94 @@ export function isBlockPhaseActive(b: Block, time: number): boolean {
 }
 
 /**
- * Взрывная волна «Плазменного заряда»: подрывает соседей в радиусе 72
- * на урон 1. При активной синергии «Цепной Резонанс» радиус расширяется
- * до 108 px, урон удваивается до 2, лимит целей вырастает до 14,
- * а хрупкие цепные блоки детонируют в каскадной реакции.
+ * Паровой взрыв синергии «Термический Шок»:
+ * Срабатывает при контакте огненного шара с замороженным блоком или при одновременной
+ * активности огня и мороза. Высвобождает перегретый пар радиусом 80 px на урон 2.
  */
-export function applyExplosiveBallAoE(g: PhysicsWorld, source: Block, isChainResonance = false) {
-  const radius = isChainResonance ? CHAIN_RESONANCE_RADIUS : EXPLOSIVE_BALL_RADIUS
-  const maxTargets = isChainResonance ? CHAIN_RESONANCE_MAX_TARGETS : EXPLOSIVE_BALL_MAX_TARGETS
-  const damage = isChainResonance ? CHAIN_RESONANCE_DAMAGE : EXPLOSIVE_BALL_DAMAGE
-  const burstColor = isChainResonance ? "#ffaa00" : "#ff8a3d"
-  const ringColor = isChainResonance ? "rgba(255, 170, 0, 0.95)" : "rgba(255, 122, 54, 0.85)"
+export function applyThermalShockSteamAoE(g: PhysicsWorld, source: Block) {
+  const pan = clamp((source.x / g.w) * 2 - 1, -0.85, 0.85)
+  g.sfx.burn(pan)
+  g.fx.burst(source.x, source.y, "#06b6d4", 16, 200)
+  g.fx.burst(source.x, source.y, "#ffffff", 12, 160)
+  g.fx.rings.push({
+    x: source.x,
+    y: source.y,
+    r: 6,
+    maxR: THERMAL_SHOCK_STEAM_RADIUS,
+    color: "rgba(6, 182, 212, 0.85)",
+    t: 0,
+  })
+  g.fx.rings.push({
+    x: source.x,
+    y: source.y,
+    r: 4,
+    maxR: THERMAL_SHOCK_STEAM_RADIUS * 0.75,
+    color: "rgba(255, 255, 255, 0.9)",
+    t: 0,
+  })
+
+  const candidates: Block[] = []
+  for (const other of g.blocks) {
+    if (other === source || other.dead || other.isMiniboss || other.bomb) continue
+    if (other.sp?.phase && !isBlockPhaseActive(other, g.time)) continue
+    if (Math.hypot(other.x - source.x, other.y - source.y) > THERMAL_SHOCK_STEAM_RADIUS) continue
+    candidates.push(other)
+    if (candidates.length >= THERMAL_SHOCK_STEAM_MAX_TARGETS) break
+  }
+
+  for (const other of candidates) {
+    if (!other.dead) {
+      damageBlock(g, other, THERMAL_SHOCK_STEAM_DAMAGE, true)
+    }
+  }
+}
+
+/**
+ * Взрывная волна «Плазменного заряда»: подрывает соседей в радиусе 72 на урон 1.
+ * При активной синергии «Цепной Резонанс» радиус расширяется до 108 px,
+ * урон удваивается до 2, лимит целей вырастает до 14, а цепные блоки детонируют.
+ * При активной синергии «Сверхновая» радиус 96 px, урон 3 по 12 целям с магма-взрывом.
+ */
+export function applyExplosiveBallAoE(
+  g: PhysicsWorld,
+  source: Block,
+  isChainResonance = false,
+  isSupernova = false
+) {
+  const radius =
+    isChainResonance && isSupernova
+      ? Math.max(CHAIN_RESONANCE_RADIUS, SUPERNOVA_RADIUS)
+      : isSupernova
+        ? SUPERNOVA_RADIUS
+        : isChainResonance
+          ? CHAIN_RESONANCE_RADIUS
+          : EXPLOSIVE_BALL_RADIUS
+  const maxTargets =
+    isChainResonance && isSupernova
+      ? Math.max(CHAIN_RESONANCE_MAX_TARGETS, SUPERNOVA_MAX_TARGETS)
+      : isSupernova
+        ? SUPERNOVA_MAX_TARGETS
+        : isChainResonance
+          ? CHAIN_RESONANCE_MAX_TARGETS
+          : EXPLOSIVE_BALL_MAX_TARGETS
+  const damage = isSupernova
+    ? SUPERNOVA_DAMAGE
+    : isChainResonance
+      ? CHAIN_RESONANCE_DAMAGE
+      : EXPLOSIVE_BALL_DAMAGE
+  const burstColor = isSupernova ? "#ef4444" : isChainResonance ? "#ffaa00" : "#ff8a3d"
+  const ringColor = isSupernova
+    ? "rgba(239, 68, 68, 0.95)"
+    : isChainResonance
+      ? "rgba(255, 170, 0, 0.95)"
+      : "rgba(255, 122, 54, 0.85)"
 
   g.fx.burst(
     source.x,
     source.y,
     burstColor,
-    isChainResonance ? 18 : 12,
-    isChainResonance ? 240 : 180
+    isSupernova ? 20 : isChainResonance ? 18 : 12,
+    isSupernova ? 260 : isChainResonance ? 240 : 180
   )
   g.fx.rings.push({
     x: source.x,
@@ -463,7 +575,9 @@ export function applyExplosiveBallAoE(g: PhysicsWorld, source: Block, isChainRes
     }
   }
 
-  if (isChainResonance) {
+  if (isSupernova) {
+    g.shake = Math.min(g.shake + 3.5, 7)
+  } else if (isChainResonance) {
     g.shake = Math.min(g.shake + 2.5, 6)
   }
 }
@@ -549,6 +663,29 @@ export function collideBoss(g: PhysicsWorld, ball: Ball) {
       r: 12,
       maxR: 90,
       color: "rgba(192, 132, 252, 0.85)",
+      t: 0,
+    })
+  }
+  const isThermalShock = Boolean(g.isThermalShockActive?.())
+  if (isThermalShock) {
+    dmg *= 4
+    g.shake = Math.min(g.shake + 5, 10)
+    g.hitStop = Math.max(g.hitStop, 0.06)
+    g.fx.burst(bo.x, bo.y, "#06b6d4", 20, 280)
+    g.fx.rings.push({
+      x: bo.x,
+      y: bo.y,
+      r: 12,
+      maxR: 96,
+      color: "rgba(6, 182, 212, 0.9)",
+      t: 0,
+    })
+    g.fx.rings.push({
+      x: bo.x,
+      y: bo.y,
+      r: 6,
+      maxR: 70,
+      color: "rgba(255, 122, 54, 0.9)",
       t: 0,
     })
   }

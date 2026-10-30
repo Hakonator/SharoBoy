@@ -142,6 +142,12 @@ export interface PhysicsWorld {
   isChainResonanceActive?(): boolean
   /** Активна синергия «Гравитационный Джаггернаут» (урон по боссам ×3, сокрушение брони). */
   isJuggernautActive?(): boolean
+  /** Активна синергия «Термический Шок» (паровой взрыв замороженных блоков, урон по боссам ×4). */
+  isThermalShockActive?(): boolean
+  /** Активна синергия «Сверхновая» (огненный взрыв сверхновой радиусом 96 px, урон 3). */
+  isSupernovaActive?(): boolean
+  /** Активна синергия «Абсолютный Бастион» (гарантированный крит-сэйв ×2 на каждый отскок и поглощение бомб). */
+  isAbsoluteBulwarkActive?(): boolean
   pushHud(): void
   /** Множитель урона шара (отладка: увеличивается клавишей NumpadSubtract). */
   readonly debugBallDamage: number

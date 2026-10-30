@@ -20,7 +20,15 @@ import {
   EXPLOSIVE_BALL_RADIUS,
   PIERCE_BLOCKS_PER_PASS,
   PIERCE_SNIPER_BLOCKS_PER_PASS,
+  SUPERNOVA_DAMAGE,
+  SUPERNOVA_MAX_TARGETS,
+  SUPERNOVA_RADIUS,
+  THERMAL_SHOCK_STEAM_DAMAGE,
+  THERMAL_SHOCK_STEAM_MAX_TARGETS,
+  THERMAL_SHOCK_STEAM_RADIUS,
+  applyClutchRebound,
   applyExplosiveBallAoE,
+  applyThermalShockSteamAoE,
   collideBlocks,
   collideBoss,
   collidePaddle,
@@ -435,6 +443,92 @@ describe("Синергии боевых механик (T-040, §3.1 Roadmap)", 
 
       expect(bossDamageDealt).toBe(3)
       expect(world.shake).toBeGreaterThanOrEqual(4.5)
+    })
+  })
+
+  describe("«Термический Шок» (Thermal Shock)", () => {
+    it("соответствует спецификации: радиус пара 80, лимит целей 8, урон 2", () => {
+      expect(THERMAL_SHOCK_STEAM_RADIUS).toBe(80)
+      expect(THERMAL_SHOCK_STEAM_MAX_TARGETS).toBe(8)
+      expect(THERMAL_SHOCK_STEAM_DAMAGE).toBe(2)
+    })
+
+    it("паровой взрыв поражает блоки в радиусе 80 px на урон 2", () => {
+      const source = makeBlock(200, 300)
+      const near = makeBlock(200, 350) // расстояние 50 (<= 80)
+      const far = makeBlock(200, 390) // расстояние 90 (> 80)
+
+      const world = makeWorld([source, near, far], false)
+      applyThermalShockSteamAoE(world, source)
+
+      expect(near.hp).toBe(3) // 5 - 2
+      expect(far.hp).toBe(5) // не задет
+    })
+
+    it("наносит ×4 урон по боссу при активной синергии", () => {
+      let bossDamageDealt = 0
+      const world = makeWorld([], false)
+      ;(world as unknown as { boss: unknown }).boss = {
+        x: 200,
+        y: 100,
+        r: 40,
+        hp: 100,
+        maxHp: 100,
+        kind: "kraken",
+        state: "idle",
+      } as unknown as PhysicsWorld["boss"]
+      world.damageBoss = (dmg: number) => {
+        bossDamageDealt += dmg
+      }
+      world.isThermalShockActive = () => true
+
+      const ball = makeBall(200, 145)
+      ball.vy = -300
+      collideBoss(world, ball)
+
+      expect(bossDamageDealt).toBe(4)
+      expect(world.shake).toBeGreaterThanOrEqual(5)
+    })
+  })
+
+  describe("«Сверхновая» (Supernova)", () => {
+    it("соответствует спецификации: радиус 96, лимит целей 12, урон 3", () => {
+      expect(SUPERNOVA_RADIUS).toBe(96)
+      expect(SUPERNOVA_MAX_TARGETS).toBe(12)
+      expect(SUPERNOVA_DAMAGE).toBe(3)
+    })
+
+    it("взрыв сверхновой поражает блоки в радиусе 96 px с огромным уроном 3", () => {
+      const source = makeBlock(200, 300)
+      const near = makeBlock(200, 360) // расстояние 60 (<= 96)
+      const far = makeBlock(200, 410) // расстояние 110 (> 96)
+
+      const world = makeWorld([source, near, far], false, true)
+      applyExplosiveBallAoE(world, source, false, true)
+
+      expect(near.hp).toBe(2) // 5 - 3
+      expect(far.hp).toBe(5) // не задет
+      expect(world.shake).toBeGreaterThanOrEqual(3.5)
+    })
+  })
+
+  describe("«Абсолютный Бастион» (Absolute Bulwark)", () => {
+    it("гарантирует критический сэйв ×2 на ракетке даже при ударе по центру", () => {
+      const world = makeWorld([], false)
+      world.isAbsoluteBulwarkActive = () => true
+      let clutchCalled = false
+      world.onClutchSave = () => {
+        clutchCalled = true
+      }
+
+      const ball = makeBall(200, 560)
+      expect(ball.clutchHits).toBeUndefined()
+
+      // rel = 0 (удар в самый центр платформы, обычно не дающий сэйв)
+      applyClutchRebound(world, ball, 0, 0)
+
+      expect(ball.clutchHits).toBe(2)
+      expect(clutchCalled).toBe(true)
     })
   })
 })

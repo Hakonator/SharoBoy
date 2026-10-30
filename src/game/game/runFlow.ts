@@ -5,6 +5,7 @@ import { rand, lsSet } from "../utils"
 import { nodeById } from "../campaignMap"
 import { computeRunMultipliers, hasModifier } from "../campaignModifiers"
 import { recordChallengeBallLost } from "../campaignChallenges"
+import { isAbsoluteBulwarkActive } from "../synergies"
 import {
   applyFinalScoreBreakdown,
   computeScoreBreakdown,
@@ -580,6 +581,29 @@ function finishCustomRun(g: Game, result: "won" | "over") {
 /** Попадание бомбы осьминога по ракетке — отнимает жизнь. */
 export function onBombHitPaddle(g: Game) {
   if (g.phase !== "playing") return
+  if (isAbsoluteBulwarkActive(g)) {
+    g.sfx.shieldHit()
+    g.shake = 6
+    g.fx.burst(g.paddle.x, g.paddle.y, "#10b981", 16, 200)
+    g.fx.rings.push({
+      x: g.paddle.x,
+      y: g.paddle.y,
+      r: 10,
+      color: "#10b981",
+      t: 0,
+      maxR: 70,
+    })
+    g.fx.popups.push({
+      x: g.w / 2,
+      y: g.h * 0.48,
+      text: "АБСОЛЮТНЫЙ БАСТИОН: БОМБА ОТРАЖЕНА! 🛡️",
+      color: "#10b981",
+      t: 0,
+      size: 20,
+    })
+    pushHud(g)
+    return
+  }
   if (g.campaignRelics?.relicBulwark && !g.bulwarkBlockedThisLevel) {
     g.bulwarkBlockedThisLevel = true
     g.sfx.shieldHit()

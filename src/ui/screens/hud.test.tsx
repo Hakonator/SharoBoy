@@ -156,7 +156,14 @@ describe("HudOverlay: кнопка быстрого пропуска уровн�
 
   it("отображает бейджи активных синергий с иконками, названиями и подсказками", () => {
     const hud = makeHud("playing")
-    hud.activeSynergies = ["kinetic_sniper", "chain_resonance", "gravitational_juggernaut"]
+    hud.activeSynergies = [
+      "kinetic_sniper",
+      "chain_resonance",
+      "gravitational_juggernaut",
+      "thermal_shock",
+      "supernova",
+      "absolute_bulwark",
+    ]
 
     const html = renderToStaticMarkup(
       <HudOverlay
@@ -178,11 +185,20 @@ describe("HudOverlay: кнопка быстрого пропуска уровн�
     expect(html).toContain("🎯")
     expect(html).toContain("⚡")
     expect(html).toContain("💥")
+    expect(html).toContain("🌡️")
+    expect(html).toContain("☀️")
+    expect(html).toContain("🛡️")
     expect(html).toContain("СНАЙПЕР")
     expect(html).toContain("РЕЗОНАНС")
     expect(html).toContain("ДЖАГГЕРНАУТ")
+    expect(html).toContain("ТЕРМОШОК")
+    expect(html).toContain("СВЕРХНОВАЯ")
+    expect(html).toContain("БАСТИОН")
     expect(html).toContain("Кинетический Снайпер")
     expect(html).toContain("Цепной Резонанс")
     expect(html).toContain("Гравитационный Джаггернаут")
+    expect(html).toContain("Термический Шок")
+    expect(html).toContain("Сверхновая")
+    expect(html).toContain("Абсолютный Бастион")
   })
 })
