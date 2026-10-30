@@ -23,6 +23,7 @@ export function createEditorState(map: PlayerMapSpec): EditorState {
     singleCloneGap: 0,
     groupCloneGap: 0,
     history: { past: [], future: [] },
+    historySession: null,
     isDirty: false,
   }
 }
@@ -36,6 +37,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         selectedBlockId: null,
         selectedBlockIds: [],
         history: action.preserveHistory ? state.history : { past: [], future: [] },
+        historySession: null,
         isDirty: action.preserveHistory ? true : false,
       }
     case "SELECT_BLOCK":
@@ -104,6 +106,29 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           ? mergeBlock(block, normalizeBlockUpdates(block, action.updates))
           : block
       )
+      const isPureSizeUpdate =
+        action.updates.size !== undefined && Object.keys(action.updates).every((k) => k === "size")
+
+      if (isPureSizeUpdate) {
+        const isSameSession =
+          state.historySession?.kind === "resize" &&
+          state.historySession.blockIds.length === 1 &&
+          state.historySession.blockIds[0] === action.blockId
+
+        if (isSameSession) {
+          return {
+            ...state,
+            map: { ...state.map, blocks },
+            isDirty: true,
+          }
+        }
+
+        return {
+          ...updateMap(state, { ...state.map, blocks }),
+          historySession: { kind: "resize", blockIds: [action.blockId] },
+        }
+      }
+
       return updateMap(state, { ...state.map, blocks })
     }
     case "UPDATE_BLOCKS": {
@@ -114,6 +139,30 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         const normalized = normalizeBlockUpdates(block, action.updates)
         return mergeBlock(block, normalized)
       })
+
+      const isPureSizeUpdate =
+        action.updates.size !== undefined && Object.keys(action.updates).every((k) => k === "size")
+
+      if (isPureSizeUpdate) {
+        const isSameSession =
+          state.historySession?.kind === "resize" &&
+          state.historySession.blockIds.length === action.blockIds.length &&
+          state.historySession.blockIds.every((id) => selectedIds.has(id))
+
+        if (isSameSession) {
+          return {
+            ...state,
+            map: { ...state.map, blocks },
+            isDirty: true,
+          }
+        }
+
+        return {
+          ...updateMap(state, { ...state.map, blocks }),
+          historySession: { kind: "resize", blockIds: [...action.blockIds] },
+        }
+      }
+
       return updateMap(state, { ...state.map, blocks })
     }
     case "SET_BLOCKS_EFFECT": {
@@ -821,6 +870,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           past: state.history.past.slice(0, -1),
           future: [cloneMap(state.map), ...state.history.future],
         },
+        historySession: null,
         isDirty: true,
       }
     }
@@ -837,6 +887,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           past: [...state.history.past, cloneMap(state.map)].slice(-HISTORY_LIMIT),
           future: state.history.future.slice(1),
         },
+        historySession: null,
         isDirty: true,
       }
     }
@@ -881,6 +932,7 @@ function updateMap(
       past: [...state.history.past, cloneMap(state.map)].slice(-HISTORY_LIMIT),
       future: [],
     },
+    historySession: null,
     isDirty: true,
   }
 }
@@ -888,7 +940,12 @@ function updateMap(
 function setSelection(state: EditorState, blockIds: string[]): EditorState {
   const available = new Set(state.map.blocks.map((block) => block.id))
   const selectedBlockIds = [...new Set(blockIds)].filter((id) => available.has(id))
-  return { ...state, selectedBlockIds, selectedBlockId: selectedBlockIds[0] ?? null }
+  return {
+    ...state,
+    selectedBlockIds,
+    selectedBlockId: selectedBlockIds[0] ?? null,
+    historySession: null,
+  }
 }
 
 function deleteBlocks(state: EditorState, blockIds: string[]): EditorState {

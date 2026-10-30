@@ -26,6 +26,7 @@ interface DragState {
   startY: number
   originals: PlayerBlockSpec[]
   handle?: number
+  resizeCursor?: string
   clonePositions?: { x: number; y: number }[]
   groupDeltas?: { x: number; y: number }[]
   source?: PlayerBlockSpec
@@ -515,6 +516,10 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       }
       const handle = hitTestTransformHandle(selected[0]!, point)
       if (handle) {
+        const resizeCursor =
+          handle.kind === "resize"
+            ? getResizeCursor(selected[0]!.position, blockCorners(selected[0]!)[handle.index]!)
+            : undefined
         dragRef.current = {
           kind: handle.kind,
           blockIds: [selected[0]!.id],
@@ -522,6 +527,7 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
           startX: point.x,
           startY: point.y,
           handle: handle.index,
+          resizeCursor,
           moved: false,
         }
         return
@@ -614,16 +620,16 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       if (isCtrl) {
         event.currentTarget.style.cursor = hoveredBlock ? "pointer" : "crosshair"
       } else {
+        const resizeCursor =
+          handle?.kind === "resize"
+            ? getResizeCursor(selected[0]!.position, blockCorners(selected[0]!)[handle.index]!)
+            : null
         event.currentTarget.style.cursor =
           isGroupClone || isSingleClone
             ? "copy"
             : isGroupRotate || handle?.kind === "rotate"
               ? "grab"
-              : handle
-                ? "nwse-resize"
-                : hoveredBlock
-                  ? "pointer"
-                  : "default"
+              : (resizeCursor ?? (hoveredBlock ? "pointer" : "default"))
       }
       return
     }
@@ -684,6 +690,7 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       const delta = clampGroupPreview(drag.originals, snapped)
       setGroupPreview({ blocks: drag.originals, delta })
     } else if (drag.kind === "resize") {
+      if (drag.resizeCursor) event.currentTarget.style.cursor = drag.resizeCursor
       const handle = drag.handle ?? 2
       const sx = handle === 0 || handle === 3 ? -1 : 1
       const sy = handle === 0 || handle === 1 ? -1 : 1
@@ -1246,6 +1253,24 @@ function hitTestTransformHandle(
   return Math.hypot(point.x - rotatePoint.x, point.y - rotatePoint.y) <= 16
     ? { kind: "rotate", index: -1 }
     : null
+}
+
+export function getResizeCursor(
+  center: { x: number; y: number },
+  corner: { x: number; y: number }
+): string {
+  const angle = Math.atan2(corner.y - center.y, corner.x - center.x)
+  let deg = ((angle * 180) / Math.PI) % 180
+  if (deg < 0) deg += 180
+  if (deg >= 22.5 && deg < 67.5) {
+    return "nwse-resize"
+  } else if (deg >= 67.5 && deg < 112.5) {
+    return "ns-resize"
+  } else if (deg >= 112.5 && deg < 157.5) {
+    return "nesw-resize"
+  } else {
+    return "ew-resize"
+  }
 }
 
 function isCloneHandle(block: PlayerBlockSpec, point: { x: number; y: number }) {

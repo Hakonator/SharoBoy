@@ -7,6 +7,11 @@ export interface EditorHistory {
   future: PlayerMapSpec[]
 }
 
+export interface HistorySession {
+  kind: "resize"
+  blockIds: string[]
+}
+
 export interface EditorState {
   map: PlayerMapSpec
   selectedBlockId: string | null
@@ -20,6 +25,7 @@ export interface EditorState {
   singleCloneGap: number
   groupCloneGap: number
   history: EditorHistory
+  historySession?: HistorySession | null
   isDirty: boolean
 }
 

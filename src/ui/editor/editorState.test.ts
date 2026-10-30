@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import type { PlayerMapSpec } from "../../game/mapSpec"
 
 import { createEditorState, editorReducer, loadEditorDraft, saveEditorDraft } from "./editorState"
+import { getResizeCursor } from "./EditorCanvas"
+import { blockCorners } from "./geometry"
 
 function makeMap(): PlayerMapSpec {
   return {
@@ -757,6 +759,86 @@ describe("editorReducer", () => {
     )
     expect(inverted.selectedBlockIds.sort()).toEqual(["b", "c"])
   })
+
+  it("coalesces consecutive group resize updates so all size tweaks undo in a single step", () => {
+    let state = createEditorState(makeMap())
+    const initialMap = state.map
+    state = editorReducer(state, { type: "SELECT_BLOCKS", blockIds: ["a", "b"] })
+
+    // Multiple consecutive size adjustments on the group (tweaking width and height like a slider)
+    for (let w = 45; w <= 75; w += 1) {
+      state = editorReducer(state, {
+        type: "UPDATE_BLOCKS",
+        blockIds: ["a", "b"],
+        updates: { size: { width: w } },
+      })
+    }
+    // Trying a preset
+    state = editorReducer(state, {
+      type: "UPDATE_BLOCKS",
+      blockIds: ["a", "b"],
+      updates: { size: { width: 80, height: 40 } },
+    })
+
+    // Only 1 snapshot was created for the entire resize sequence
+    expect(state.history.past).toHaveLength(1)
+    expect(state.map.blocks[0]!.size.width).toBe(80)
+
+    // Undoing once completely restores the original sizes before the session began
+    state = editorReducer(state, { type: "UNDO" })
+    expect(state.map.blocks[0]!.size).toEqual(initialMap.blocks[0]!.size)
+    expect(state.map.blocks[1]!.size).toEqual(initialMap.blocks[1]!.size)
+  })
+
+  it("coalesces consecutive single block resize updates into one undo step", () => {
+    let state = createEditorState(makeMap())
+    const initialSize = state.map.blocks[0]!.size
+
+    for (let w = 41; w <= 70; w += 1) {
+      state = editorReducer(state, {
+        type: "UPDATE_BLOCK",
+        blockId: "a",
+        updates: { size: { width: w } },
+      })
+    }
+
+    expect(state.history.past).toHaveLength(1)
+    expect(state.map.blocks[0]!.size.width).toBe(70)
+
+    state = editorReducer(state, { type: "UNDO" })
+    expect(state.map.blocks[0]!.size).toEqual(initialSize)
+  })
+
+  it("ends the resize session when a non-size edit occurs", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, {
+      type: "UPDATE_BLOCKS",
+      blockIds: ["a", "b"],
+      updates: { size: { width: 60 } },
+    })
+    state = editorReducer(state, {
+      type: "UPDATE_BLOCKS",
+      blockIds: ["a", "b"],
+      updates: { size: { width: 70 } },
+    })
+    expect(state.history.past).toHaveLength(1)
+
+    // Move blocks (different operation)
+    state = editorReducer(state, {
+      type: "MOVE_BLOCKS",
+      blockIds: ["a", "b"],
+      delta: { x: 10, y: 0 },
+    })
+    expect(state.history.past).toHaveLength(2)
+
+    // First undo undos move
+    state = editorReducer(state, { type: "UNDO" })
+    expect(state.map.blocks[0]!.size.width).toBe(70)
+
+    // Second undo undos the entire resize session back to initial
+    state = editorReducer(state, { type: "UNDO" })
+    expect(state.map.blocks[0]!.size.width).not.toBe(70)
+  })
 })
 
 describe("editor draft storage", () => {
@@ -783,5 +865,47 @@ describe("editor draft storage", () => {
     const storage = new Map<string, string>([["sharoboy_custom_map_draft", "not json"]])
     vi.stubGlobal("localStorage", { getItem: (key: string) => storage.get(key) ?? null })
     expect(loadEditorDraft()).toBeNull()
+  })
+})
+
+describe("resize handle cursors", () => {
+  it("determines correct cursor for all 4 corners of a non-rotated block", () => {
+    const block = {
+      id: "test",
+      position: { x: 500, y: 500 },
+      shape: "rect" as const,
+      size: { width: 60, height: 40 },
+      hp: 1,
+    }
+    const corners = blockCorners(block)
+
+    // Corner 0: top-left (NW) -> nwse-resize
+    expect(getResizeCursor(block.position, corners[0]!)).toBe("nwse-resize")
+
+    // Corner 1: top-right (NE) -> nesw-resize
+    expect(getResizeCursor(block.position, corners[1]!)).toBe("nesw-resize")
+
+    // Corner 2: bottom-right (SE) -> nwse-resize
+    expect(getResizeCursor(block.position, corners[2]!)).toBe("nwse-resize")
+
+    // Corner 3: bottom-left (SW) -> nesw-resize
+    expect(getResizeCursor(block.position, corners[3]!)).toBe("nesw-resize")
+  })
+
+  it("adjusts cursor for rotated block corners according to screen direction", () => {
+    const block = {
+      id: "test-rotated",
+      position: { x: 500, y: 500 },
+      shape: "rect" as const,
+      size: { width: 60, height: 40 },
+      rotation: Math.PI / 2, // 90 degrees rotation
+      hp: 1,
+    }
+    const corners = blockCorners(block)
+
+    // With 90 deg rotation, corner 0 (top-left) rotated by 90 deg is at top-right -> nesw-resize
+    expect(getResizeCursor(block.position, corners[0]!)).toBe("nesw-resize")
+    // Corner 1 (top-right) rotated by 90 deg is at bottom-right -> nwse-resize
+    expect(getResizeCursor(block.position, corners[1]!)).toBe("nwse-resize")
   })
 })
