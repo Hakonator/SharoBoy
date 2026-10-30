@@ -7,7 +7,7 @@ import { TIER } from "../palette"
 import type { Block } from "../types"
 
 import { gradient } from "./gradCache"
-import { type Ctx } from "./shapes"
+import { type Ctx, roundRect } from "./shapes"
 
 /** Пружинный блок: жёлтое тело с витками; при ударе сжимается (flash). */
 function drawSpringBody(ctx: Ctx, b: Block, x: number, y: number) {
@@ -24,16 +24,30 @@ function drawSpringBody(ctx: Ctx, b: Block, x: number, y: number) {
     rg.addColorStop(1, tier.dark)
     return rg
   })
-  ctx.beginPath()
-  ctx.arc(0, 0, 1, 0, Math.PI * 2)
+  const isRect = b.shape === "rect"
+  const isRoundRect = b.shape === "round_rect"
+  const rr = isRoundRect
+    ? Math.min(12, b.rx * 0.5, b.ry * 0.5) / Math.max(1, Math.min(b.rx, b.ry))
+    : 0
+
+  if (isRect) {
+    ctx.beginPath()
+    ctx.rect(-1, -1, 2, 2)
+  } else if (isRoundRect) {
+    roundRect(ctx, -1, -1, 2, 2, rr)
+  } else {
+    ctx.beginPath()
+    ctx.arc(0, 0, 1, 0, Math.PI * 2)
+  }
   ctx.fill()
-  // витки пружины: три дуги поперёк тела
+  // витки пружины: дуги поперёк тела
   ctx.lineWidth = 2.2 / Math.max(b.rx, b.ry)
   ctx.strokeStyle = "rgba(90,50,0,0.6)"
+  const spanY = isRect ? 0.75 : isRoundRect ? 0.65 : 0.5
   for (let i = -1; i <= 1; i++) {
     ctx.beginPath()
-    ctx.moveTo(i * 0.45 - 0.18, -0.5)
-    ctx.quadraticCurveTo(i * 0.45 + 0.28, 0, i * 0.45 - 0.18, 0.5)
+    ctx.moveTo(i * 0.45 - 0.18, -spanY)
+    ctx.quadraticCurveTo(i * 0.45 + 0.28, 0, i * 0.45 - 0.18, spanY)
     ctx.stroke()
   }
   ctx.restore()
@@ -47,8 +61,21 @@ function drawCottonBody(ctx: Ctx, b: Block, x: number, y: number, time: number) 
   ctx.rotate(b.rot)
   ctx.scale(b.rx, b.ry)
   ctx.fillStyle = "rgba(246,243,255,0.95)"
-  ctx.beginPath()
-  ctx.ellipse(0, wobble * 0.2, 1, 0.76, 0, 0, Math.PI * 2)
+  const isRect = b.shape === "rect"
+  const isRoundRect = b.shape === "round_rect"
+  const rr = isRoundRect
+    ? Math.min(12, b.rx * 0.5, b.ry * 0.5) / Math.max(1, Math.min(b.rx, b.ry))
+    : 0
+
+  if (isRect) {
+    ctx.beginPath()
+    ctx.rect(-0.95, -0.85 + wobble * 0.1, 1.9, 1.7)
+  } else if (isRoundRect) {
+    roundRect(ctx, -0.95, -0.85 + wobble * 0.1, 1.9, 1.7, rr * 0.95)
+  } else {
+    ctx.beginPath()
+    ctx.ellipse(0, wobble * 0.2, 1, 0.76, 0, 0, Math.PI * 2)
+  }
   ctx.fill()
   ctx.fillStyle = "rgba(255,255,255,0.34)"
   ctx.beginPath()
@@ -148,9 +175,13 @@ function drawSpinArrows(ctx: Ctx, b: Block, x: number, y: number) {
   ctx.restore()
 }
 
-/** Телепорт «чёрная дыра»: тёмное ядро + вращающееся аккреционное кольцо. */
+/** Телепорт «чёрная дыра»: тёмное ядро + вращающееся аккреционное кольцо / квантовый контур. */
 function drawPortalBody(ctx: Ctx, b: Block, x: number, y: number, time: number) {
-  const r = Math.max(b.rx, b.ry)
+  const isRect = b.shape === "rect"
+  const isRoundRect = b.shape === "round_rect"
+  const cr = Math.min(12, b.rx * 0.5, b.ry * 0.5)
+  const rr = isRoundRect ? cr / Math.max(1, Math.min(b.rx, b.ry)) : 0
+
   ctx.save()
   ctx.translate(x, y)
   ctx.rotate(b.rot)
@@ -162,22 +193,59 @@ function drawPortalBody(ctx: Ctx, b: Block, x: number, y: number, time: number) 
     rg.addColorStop(1, "#12082a")
     return rg
   })
-  ctx.beginPath()
-  ctx.arc(0, 0, 1, 0, Math.PI * 2)
+  if (isRect) {
+    ctx.beginPath()
+    ctx.rect(-0.92, -0.92, 1.84, 1.84)
+  } else if (isRoundRect) {
+    roundRect(ctx, -0.92, -0.92, 1.84, 1.84, rr * 0.92)
+  } else {
+    ctx.beginPath()
+    ctx.arc(0, 0, 1, 0, Math.PI * 2)
+  }
   ctx.fill()
   ctx.restore()
-  // кольцо: тускнеет на кулдауне пары
+
+  // Аккреционный контур / кольца: тускнеют на кулдауне пары
   const ready = (b.sp?.portalCd ?? 0) <= 0
   const spin = time * 2.4 + b.seed
   ctx.lineWidth = 2.4
-  ctx.strokeStyle = ready ? "rgba(176,108,255,0.85)" : "rgba(176,108,255,0.3)"
-  ctx.beginPath()
-  ctx.arc(x, y, r * 1.12, spin, spin + Math.PI * 0.9)
-  ctx.stroke()
-  ctx.strokeStyle = ready ? "rgba(220,180,255,0.6)" : "rgba(220,180,255,0.2)"
-  ctx.beginPath()
-  ctx.arc(x, y, r * 1.28, -spin * 0.7, -spin * 0.7 + Math.PI * 0.7)
-  ctx.stroke()
+
+  if (isRect || isRoundRect) {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.rotate(b.rot)
+    const stroke1 = ready ? "rgba(176,108,255,0.85)" : "rgba(176,108,255,0.3)"
+    const stroke2 = ready ? "rgba(220,180,255,0.6)" : "rgba(220,180,255,0.2)"
+    ctx.strokeStyle = stroke1
+    ctx.setLineDash([10, 8])
+    ctx.lineDashOffset = -spin * 16
+    if (isRect) {
+      ctx.strokeRect(-b.rx * 1.08, -b.ry * 1.08, b.rx * 2.16, b.ry * 2.16)
+    } else {
+      roundRect(ctx, -b.rx * 1.08, -b.ry * 1.08, b.rx * 2.16, b.ry * 2.16, cr + 3)
+      ctx.stroke()
+    }
+    ctx.strokeStyle = stroke2
+    ctx.setLineDash([7, 10])
+    ctx.lineDashOffset = spin * 12
+    if (isRect) {
+      ctx.strokeRect(-b.rx * 1.2, -b.ry * 1.2, b.rx * 2.4, b.ry * 2.4)
+    } else {
+      roundRect(ctx, -b.rx * 1.2, -b.ry * 1.2, b.rx * 2.4, b.ry * 2.4, cr + 6)
+      ctx.stroke()
+    }
+    ctx.restore()
+  } else {
+    const r = Math.max(b.rx, b.ry)
+    ctx.strokeStyle = ready ? "rgba(176,108,255,0.85)" : "rgba(176,108,255,0.3)"
+    ctx.beginPath()
+    ctx.arc(x, y, r * 1.12, spin, spin + Math.PI * 0.9)
+    ctx.stroke()
+    ctx.strokeStyle = ready ? "rgba(220,180,255,0.6)" : "rgba(220,180,255,0.2)"
+    ctx.beginPath()
+    ctx.arc(x, y, r * 1.28, -spin * 0.7, -spin * 0.7 + Math.PI * 0.7)
+    ctx.stroke()
+  }
 }
 
 /** Полностью кастомные тела спецблоков (пружина/вата/портал). */
@@ -205,22 +273,45 @@ export function drawPriorityMarks(ctx: Ctx, b: Block, x: number, y: number, time
     const removedArmor = maxArmor - currentArmor
     const rx = b.rx
     const ry = b.ry
+    const isRect = b.shape === "rect"
+    const isRoundRect = b.shape === "round_rect"
+    const cr = Math.min(12, rx * 0.5, ry * 0.5)
     const ringGap = Math.max(3.5, Math.min(rx, ry) * 0.1)
+
     for (let i = removedArmor; i < maxArmor; i++) {
       const offset = ringGap * (maxArmor - i)
       const ringRx = rx + offset
       const ringRy = ry + offset
       ctx.lineWidth = Math.max(3, Math.min(rx, ry) * 0.14)
       ctx.strokeStyle = "#080808"
-      ctx.beginPath()
-      ctx.ellipse(0, 0, ringRx, ringRy, 0, 0, Math.PI * 2)
-      ctx.stroke()
+
+      if (isRect) {
+        ctx.strokeRect(-ringRx, -ringRy, ringRx * 2, ringRy * 2)
+      } else if (isRoundRect) {
+        roundRect(ctx, -ringRx, -ringRy, ringRx * 2, ringRy * 2, cr + offset)
+        ctx.stroke()
+      } else {
+        ctx.beginPath()
+        ctx.ellipse(0, 0, ringRx, ringRy, 0, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+
       if (i + 1 >= maxArmor) continue
       ctx.strokeStyle = TIER[b.tier].base
       ctx.lineWidth = Math.max(1.2, Math.min(rx, ry) * 0.04)
-      ctx.beginPath()
-      ctx.ellipse(0, 0, ringRx - ringGap / 2, ringRy - ringGap / 2, 0, 0, Math.PI * 2)
-      ctx.stroke()
+
+      const innerRx = ringRx - ringGap / 2
+      const innerRy = ringRy - ringGap / 2
+      if (isRect) {
+        ctx.strokeRect(-innerRx, -innerRy, innerRx * 2, innerRy * 2)
+      } else if (isRoundRect) {
+        roundRect(ctx, -innerRx, -innerRy, innerRx * 2, innerRy * 2, cr + offset - ringGap / 2)
+        ctx.stroke()
+      } else {
+        ctx.beginPath()
+        ctx.ellipse(0, 0, innerRx, innerRy, 0, 0, Math.PI * 2)
+        ctx.stroke()
+      }
     }
   }
   if (sp.brittle) {

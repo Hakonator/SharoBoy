@@ -169,6 +169,7 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
     if (b.sp?.portalId || b.sp?.spring || b.sp?.cotton) {
       drawSpecialBody(ctx, b, x, y, time)
       drawDebugLabel(ctx, b, x, y)
+      drawPriorityMarks(ctx, b, x, y, time)
       ctx.restore()
       continue
     }

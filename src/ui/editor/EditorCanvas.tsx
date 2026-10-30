@@ -1754,8 +1754,8 @@ function drawBlock(
   context.lineWidth = selected ? 5 : 2
   context.stroke()
 
-  drawSpecialEffectVisuals(context, block.effects ?? [], rx, ry)
-  drawArmorRings(context, block.effects ?? [], rx, ry, tier.base)
+  drawSpecialEffectVisuals(context, block.effects ?? [], rx, ry, block.shape)
+  drawArmorRings(context, block.effects ?? [], rx, ry, tier.base, block.shape)
 
   context.fillStyle = "rgba(4, 18, 26, 0.78)"
   context.font = `bold ${Math.max(18, Math.min(32, ry * 0.8))}px sans-serif`
@@ -1784,59 +1784,169 @@ function drawSpecialEffectVisuals(
   context: CanvasRenderingContext2D,
   effects: PlayerBlockEffect[],
   rx: number,
-  ry: number
+  ry: number,
+  shape: PlayerBlockSpec["shape"] = "circle"
 ) {
   const kinds = new Set(effects.map((effect) => effect.kind))
+  const isRect = shape === "rect"
+  const isRoundRect = shape === "round_rect"
+  const cr = Math.min(12, rx * 0.5, ry * 0.5)
+
   if (kinds.has("portal")) {
     const gradient = context.createRadialGradient(-rx * 0.25, -ry * 0.3, 2, 0, 0, Math.max(rx, ry))
     gradient.addColorStop(0, "#2a1244")
     gradient.addColorStop(1, "#0b0518")
     context.fillStyle = gradient
-    context.beginPath()
-    context.ellipse(0, 0, rx * 0.82, ry * 0.82, 0, 0, Math.PI * 2)
-    context.fill()
-    context.strokeStyle = "rgba(176,108,255,0.85)"
-    context.lineWidth = Math.max(2, Math.min(rx, ry) * 0.08)
-    for (let i = 0; i < 3; i += 1) {
+
+    if (isRect) {
       context.beginPath()
-      context.ellipse(
-        0,
-        0,
-        rx * (0.45 + i * 0.16),
-        ry * (0.35 + i * 0.16),
-        i * 0.45,
-        0.2,
-        Math.PI * 1.55
-      )
-      context.stroke()
+      context.rect(-rx * 0.86, -ry * 0.84, rx * 1.72, ry * 1.68)
+      context.fill()
+      context.strokeStyle = "rgba(176,108,255,0.85)"
+      context.lineWidth = Math.max(2, Math.min(rx, ry) * 0.08)
+      context.setLineDash([8, 6])
+      for (let i = 0; i < 3; i += 1) {
+        const factor = 0.45 + i * 0.16
+        context.strokeRect(-rx * factor, -ry * factor, rx * factor * 2, ry * factor * 2)
+      }
+      context.setLineDash([])
+    } else if (isRoundRect) {
+      context.beginPath()
+      if (typeof context.roundRect === "function") {
+        context.roundRect(-rx * 0.86, -ry * 0.84, rx * 1.72, ry * 1.68, cr * 0.84)
+      } else {
+        context.rect(-rx * 0.86, -ry * 0.84, rx * 1.72, ry * 1.68)
+      }
+      context.fill()
+      context.strokeStyle = "rgba(176,108,255,0.85)"
+      context.lineWidth = Math.max(2, Math.min(rx, ry) * 0.08)
+      context.setLineDash([8, 6])
+      for (let i = 0; i < 3; i += 1) {
+        const factor = 0.45 + i * 0.16
+        if (typeof context.roundRect === "function") {
+          context.beginPath()
+          context.roundRect(
+            -rx * factor,
+            -ry * factor,
+            rx * factor * 2,
+            ry * factor * 2,
+            cr * factor
+          )
+          context.stroke()
+        } else {
+          context.strokeRect(-rx * factor, -ry * factor, rx * factor * 2, ry * factor * 2)
+        }
+      }
+      context.setLineDash([])
+    } else {
+      context.beginPath()
+      context.ellipse(0, 0, rx * 0.82, ry * 0.82, 0, 0, Math.PI * 2)
+      context.fill()
+      context.strokeStyle = "rgba(176,108,255,0.85)"
+      context.lineWidth = Math.max(2, Math.min(rx, ry) * 0.08)
+      for (let i = 0; i < 3; i += 1) {
+        context.beginPath()
+        context.ellipse(
+          0,
+          0,
+          rx * (0.45 + i * 0.16),
+          ry * (0.35 + i * 0.16),
+          i * 0.45,
+          0.2,
+          Math.PI * 1.55
+        )
+        context.stroke()
+      }
     }
   }
+
   if (kinds.has("spring")) {
     context.fillStyle = "rgba(255,201,77,0.9)"
-    context.beginPath()
-    context.ellipse(0, 0, rx * 0.88, ry * 0.8, 0, 0, Math.PI * 2)
-    context.fill()
-    context.strokeStyle = "rgba(92,55,0,0.85)"
-    context.lineWidth = Math.max(2, Math.min(rx, ry) * 0.06)
-    for (let i = -1; i <= 1; i += 1) {
+    if (isRect) {
       context.beginPath()
-      context.moveTo(i * rx * 0.35 - rx * 0.12, -ry * 0.55)
-      context.quadraticCurveTo(i * rx * 0.35 + rx * 0.2, 0, i * rx * 0.35 - rx * 0.12, ry * 0.55)
-      context.stroke()
+      context.rect(-rx * 0.88, -ry * 0.84, rx * 1.76, ry * 1.68)
+      context.fill()
+      context.strokeStyle = "rgba(92,55,0,0.85)"
+      context.lineWidth = Math.max(2, Math.min(rx, ry) * 0.06)
+      for (let i = -1; i <= 1; i += 1) {
+        context.beginPath()
+        context.moveTo(i * rx * 0.42 - rx * 0.14, -ry * 0.68)
+        context.quadraticCurveTo(i * rx * 0.42 + rx * 0.22, 0, i * rx * 0.42 - rx * 0.14, ry * 0.68)
+        context.stroke()
+      }
+    } else if (isRoundRect) {
+      context.beginPath()
+      if (typeof context.roundRect === "function") {
+        context.roundRect(-rx * 0.88, -ry * 0.84, rx * 1.76, ry * 1.68, cr * 0.84)
+      } else {
+        context.rect(-rx * 0.88, -ry * 0.84, rx * 1.76, ry * 1.68)
+      }
+      context.fill()
+      context.strokeStyle = "rgba(92,55,0,0.85)"
+      context.lineWidth = Math.max(2, Math.min(rx, ry) * 0.06)
+      for (let i = -1; i <= 1; i += 1) {
+        context.beginPath()
+        context.moveTo(i * rx * 0.42 - rx * 0.14, -ry * 0.6)
+        context.quadraticCurveTo(i * rx * 0.42 + rx * 0.22, 0, i * rx * 0.42 - rx * 0.14, ry * 0.6)
+        context.stroke()
+      }
+    } else {
+      context.beginPath()
+      context.ellipse(0, 0, rx * 0.88, ry * 0.8, 0, 0, Math.PI * 2)
+      context.fill()
+      context.strokeStyle = "rgba(92,55,0,0.85)"
+      context.lineWidth = Math.max(2, Math.min(rx, ry) * 0.06)
+      for (let i = -1; i <= 1; i += 1) {
+        context.beginPath()
+        context.moveTo(i * rx * 0.35 - rx * 0.12, -ry * 0.55)
+        context.quadraticCurveTo(i * rx * 0.35 + rx * 0.2, 0, i * rx * 0.35 - rx * 0.12, ry * 0.55)
+        context.stroke()
+      }
     }
   }
+
   if (kinds.has("cotton")) {
     context.fillStyle = "rgba(246,243,255,0.95)"
-    context.beginPath()
-    context.ellipse(0, 0, rx * 0.9, ry * 0.78, 0, 0, Math.PI * 2)
-    context.fill()
-    context.fillStyle = "rgba(255,255,255,0.55)"
-    context.beginPath()
-    context.ellipse(-rx * 0.25, -ry * 0.32, rx * 0.32, ry * 0.1, -0.18, 0, Math.PI * 2)
-    context.fill()
-    context.beginPath()
-    context.ellipse(rx * 0.28, ry * 0.25, rx * 0.24, ry * 0.08, 0.2, 0, Math.PI * 2)
-    context.fill()
+    if (isRect) {
+      context.beginPath()
+      context.rect(-rx * 0.9, -ry * 0.84, rx * 1.8, ry * 1.68)
+      context.fill()
+      context.fillStyle = "rgba(255,255,255,0.55)"
+      context.beginPath()
+      context.ellipse(-rx * 0.32, -ry * 0.28, rx * 0.36, ry * 0.16, -0.15, 0, Math.PI * 2)
+      context.fill()
+      context.fillStyle = "rgba(190,180,220,0.28)"
+      context.beginPath()
+      context.ellipse(rx * 0.32, ry * 0.25, rx * 0.34, ry * 0.14, 0.2, 0, Math.PI * 2)
+      context.fill()
+    } else if (isRoundRect) {
+      context.beginPath()
+      if (typeof context.roundRect === "function") {
+        context.roundRect(-rx * 0.9, -ry * 0.84, rx * 1.8, ry * 1.68, cr * 0.84)
+      } else {
+        context.rect(-rx * 0.9, -ry * 0.84, rx * 1.8, ry * 1.68)
+      }
+      context.fill()
+      context.fillStyle = "rgba(255,255,255,0.55)"
+      context.beginPath()
+      context.ellipse(-rx * 0.3, -ry * 0.28, rx * 0.34, ry * 0.15, -0.15, 0, Math.PI * 2)
+      context.fill()
+      context.fillStyle = "rgba(190,180,220,0.28)"
+      context.beginPath()
+      context.ellipse(rx * 0.3, ry * 0.25, rx * 0.32, ry * 0.13, 0.2, 0, Math.PI * 2)
+      context.fill()
+    } else {
+      context.beginPath()
+      context.ellipse(0, 0, rx * 0.9, ry * 0.78, 0, 0, Math.PI * 2)
+      context.fill()
+      context.fillStyle = "rgba(255,255,255,0.55)"
+      context.beginPath()
+      context.ellipse(-rx * 0.25, -ry * 0.32, rx * 0.32, ry * 0.1, -0.18, 0, Math.PI * 2)
+      context.fill()
+      context.beginPath()
+      context.ellipse(rx * 0.28, ry * 0.25, rx * 0.24, ry * 0.08, 0.2, 0, Math.PI * 2)
+      context.fill()
+    }
   }
   if (kinds.has("brittle")) {
     context.strokeStyle = "rgba(255, 107, 74, 0.85)"
@@ -1855,8 +1965,19 @@ function drawSpecialEffectVisuals(
     context.lineWidth = Math.max(1.5, Math.min(rx, ry) * 0.06)
     context.setLineDash([4, 4])
     context.beginPath()
-    context.ellipse(0, 0, rx * 0.82, ry * 0.82, 0, 0, Math.PI * 2)
-    context.stroke()
+    if (isRect) {
+      context.strokeRect(-rx * 0.82, -ry * 0.82, rx * 1.64, ry * 1.64)
+    } else if (isRoundRect) {
+      if (typeof context.roundRect === "function") {
+        context.roundRect(-rx * 0.82, -ry * 0.82, rx * 1.64, ry * 1.64, cr * 0.82)
+      } else {
+        context.rect(-rx * 0.82, -ry * 0.82, rx * 1.64, ry * 1.64)
+      }
+      context.stroke()
+    } else {
+      context.ellipse(0, 0, rx * 0.82, ry * 0.82, 0, 0, Math.PI * 2)
+      context.stroke()
+    }
     context.setLineDash([])
   }
   const magnet = effects.find((effect) => effect.kind === "magnet")
@@ -1893,8 +2014,27 @@ function drawSpecialEffectVisuals(
     context.lineWidth = Math.max(1.5, Math.min(rx, ry) * 0.05)
     for (let i = 1; i <= 2; i += 1) {
       context.beginPath()
-      context.ellipse(0, 0, rx * (0.3 + i * 0.22), ry * (0.3 + i * 0.22), 0, 0, Math.PI * 2)
-      context.stroke()
+      if (isRect) {
+        const factor = 0.3 + i * 0.22
+        context.strokeRect(-rx * factor, -ry * factor, rx * factor * 2, ry * factor * 2)
+      } else if (isRoundRect) {
+        const factor = 0.3 + i * 0.22
+        if (typeof context.roundRect === "function") {
+          context.roundRect(
+            -rx * factor,
+            -ry * factor,
+            rx * factor * 2,
+            ry * factor * 2,
+            cr * factor
+          )
+          context.stroke()
+        } else {
+          context.strokeRect(-rx * factor, -ry * factor, rx * factor * 2, ry * factor * 2)
+        }
+      } else {
+        context.ellipse(0, 0, rx * (0.3 + i * 0.22), ry * (0.3 + i * 0.22), 0, 0, Math.PI * 2)
+        context.stroke()
+      }
     }
   }
   if (kinds.has("spin")) {
@@ -1916,28 +2056,62 @@ function drawArmorRings(
   effects: PlayerBlockEffect[],
   rx: number,
   ry: number,
-  tierColor: string
+  tierColor: string,
+  shape: PlayerBlockSpec["shape"] = "circle"
 ) {
   const armor = effects.find((effect) => effect.kind === "armor")
   if (!armor || armor.amount <= 0) return
 
   const amount = Math.floor(armor.amount)
   const ringGap = Math.max(3.5, Math.min(rx, ry) * 0.1)
+  const isRect = shape === "rect"
+  const isRoundRect = shape === "round_rect"
+  const cr = Math.min(12, rx * 0.5, ry * 0.5)
+
   for (let i = 0; i < amount; i += 1) {
     const offset = ringGap * (amount - i)
     const ringRx = rx + offset
     const ringRy = ry + offset
     context.lineWidth = Math.max(3, Math.min(rx, ry) * 0.14)
     context.strokeStyle = "#080808"
-    context.beginPath()
-    context.ellipse(0, 0, ringRx, ringRy, 0, 0, Math.PI * 2)
-    context.stroke()
+
+    if (isRect) {
+      context.strokeRect(-ringRx, -ringRy, ringRx * 2, ringRy * 2)
+    } else if (isRoundRect) {
+      context.beginPath()
+      if (typeof context.roundRect === "function") {
+        context.roundRect(-ringRx, -ringRy, ringRx * 2, ringRy * 2, cr + offset)
+      } else {
+        context.rect(-ringRx, -ringRy, ringRx * 2, ringRy * 2)
+      }
+      context.stroke()
+    } else {
+      context.beginPath()
+      context.ellipse(0, 0, ringRx, ringRy, 0, 0, Math.PI * 2)
+      context.stroke()
+    }
+
     if (i + 1 >= amount) continue
     context.strokeStyle = tierColor
     context.lineWidth = Math.max(1.2, Math.min(rx, ry) * 0.04)
-    context.beginPath()
-    context.ellipse(0, 0, ringRx - ringGap / 2, ringRy - ringGap / 2, 0, 0, Math.PI * 2)
-    context.stroke()
+    const innerRx = ringRx - ringGap / 2
+    const innerRy = ringRy - ringGap / 2
+
+    if (isRect) {
+      context.strokeRect(-innerRx, -innerRy, innerRx * 2, innerRy * 2)
+    } else if (isRoundRect) {
+      context.beginPath()
+      if (typeof context.roundRect === "function") {
+        context.roundRect(-innerRx, -innerRy, innerRx * 2, innerRy * 2, cr + offset - ringGap / 2)
+      } else {
+        context.rect(-innerRx, -innerRy, innerRx * 2, innerRy * 2)
+      }
+      context.stroke()
+    } else {
+      context.beginPath()
+      context.ellipse(0, 0, innerRx, innerRy, 0, 0, Math.PI * 2)
+      context.stroke()
+    }
   }
 }
 
