@@ -134,6 +134,24 @@ describe("GameOverScreen", () => {
     expect(html).toContain("Разрушенные блоки")
     expect(html).toContain("Сэкономленные жизни")
   })
+
+  it("отображает бейдж ежедневного испытания при mode === daily", () => {
+    const hud: HudData = {
+      phase: "over",
+      mode: "daily",
+      level: 3,
+      levelCount: 4,
+      score: 5000,
+      best: 10000,
+      newRecord: false,
+    } as unknown as HudData
+
+    const html = renderToStaticMarkup(
+      <GameOverScreen hud={hud} topSubmit={null} onRestart={() => {}} onMenu={() => {}} />
+    )
+    expect(html).toContain("ЕЖЕДНЕВНОЕ ИСПЫТАНИЕ")
+    expect(html).toContain("УРОВЕНЬ 3/4")
+  })
 })
 
 describe("WinScreen", () => {
@@ -172,6 +190,14 @@ describe("WinScreen", () => {
     expect(html).not.toContain("СФЕРА-1080")
     expect(html).toContain("Детализация очков")
     expect(html).toContain("Скоростная зачистка")
+  })
+
+  it("отображает бейдж ежедневного испытания при mode === daily", () => {
+    const hud = makeWinHud("daily", "chrono", mockBreakdown)
+    const html = renderToStaticMarkup(
+      <WinScreen hud={hud} topSubmit={null} onRestart={() => {}} onMenu={() => {}} />
+    )
+    expect(html).toContain("ЕЖЕДНЕВНОЕ ИСПЫТАНИЕ")
   })
 })
 

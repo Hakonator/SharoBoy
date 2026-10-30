@@ -72,6 +72,27 @@ describe("scores Edge Function — POST /submit", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it("принимает запись для режима daily (200)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("[]", { status: 200 }))
+    globalThis.fetch = fetchMock
+
+    await callIndex()
+    const res = await handler!(
+      makeRequest("POST", "/", {
+        nick: "Оператор",
+        score: 4567,
+        mode: "daily",
+        wave: 0,
+        screen_class: "fhd",
+      })
+    )
+
+    expect(res.status).toBe(200)
+    const json = (await res.json()) as { ok: boolean }
+    expect(json.ok).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it("отклоняет ник с матом (400)", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("[]", { status: 200 }))
     globalThis.fetch = fetchMock

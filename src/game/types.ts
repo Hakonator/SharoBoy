@@ -71,6 +71,8 @@ export type Phase = "menu" | "playing" | "paused" | "over" | "won" | "map"
  *  подхватывают форму автоматически. */
 export type PaddleShapeKind = "flat" | "convex" | "concave"
 
+export type GameMode = "campaign" | "endless" | "custom" | "daily"
+
 export interface HudData {
   phase: Phase
   score: number
@@ -79,7 +81,7 @@ export interface HudData {
   level: number
   levelCount: number
   levelName: string
-  mode: "campaign" | "endless" | "custom"
+  mode: GameMode
   wave: number
   combo: number
   blocksLeft: number
@@ -125,6 +127,7 @@ export interface HudData {
   tacticalModules: TacticalModulesSettings
   top: ScoreEntry[]
   topEndless: ScoreEntry[]
+  topDaily?: ScoreEntry[]
   /** Рогаликовая карта кампании (null, когда её экран не активен). */
   map: CampaignMapView | null
   /** Текст активного события на карте (null — события нет / уже закрыто). */

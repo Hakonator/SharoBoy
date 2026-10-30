@@ -2,6 +2,7 @@ import type { Game } from "../game"
 import type { PlayerMapSpec } from "../mapSpec"
 import { mapSpecToBlocks } from "../mapAdapter"
 import type { CampaignModifierId } from "../campaignModifiers"
+import { getDailyRunInfo, markTodayDailyPlayed } from "../daily"
 
 import { applyTrack } from "./audioControls"
 import { startCampaignMap } from "./campaignFlow"
@@ -23,6 +24,26 @@ export function startGame(g: Game, modifiers?: CampaignModifierId[]) {
     g.lives = 1
   }
   startCampaignMap(g)
+}
+
+/** Старт ежедневного испытания (Daily Run): единый суточный сид, фиксированные мутаторы. */
+export function startDaily(g: Game, date = new Date()) {
+  g.sfx.ensure()
+  g.sfx.ui()
+  g.mode = "daily"
+  g.wave = 0
+  g.waveSpec = null
+  resetRun(g)
+  const daily = getDailyRunInfo(date)
+  g.campaignModifiers = [...daily.modifiers]
+  if (g.campaignModifiers.includes("ironman")) {
+    g.lives = 1
+  }
+  g.campaignSeed = daily.campaignSeed
+  markTodayDailyPlayed(date)
+  startCampaignMap(g)
+  setBanner(g, `ЕЖЕДНЕВНОЕ ИСПЫТАНИЕ — ${daily.dateFormatted}`)
+  pushHud(g)
 }
 
 export function startEndless(g: Game) {
@@ -87,7 +108,7 @@ export function toMenu(g: Game) {
   g.sfx.ui()
   g.input.releaseLock()
   if (g.mode !== "custom") saveTop(g)
-  if (g.mode === "campaign" && g.crystalsRunTotal > 0) {
+  if ((g.mode === "campaign" || g.mode === "daily") && g.crystalsRunTotal > 0) {
     const mult = g.campaignRelics.relicConverter ? 1.5 : 1.0
     const earnedCoins = Math.round(g.crystalsRunTotal * mult)
     if (earnedCoins > 0) {

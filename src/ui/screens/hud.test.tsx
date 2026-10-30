@@ -201,4 +201,47 @@ describe("HudOverlay: кнопка быстрого пропуска уровн�
     expect(html).toContain("Сверхновая")
     expect(html).toContain("Абсолютный Бастион")
   })
+
+  it("отображает бейдж ежедневного испытания в HUD при mode === daily", () => {
+    const hud = makeHud("playing")
+    hud.mode = "daily"
+    hud.level = 2
+    hud.levelCount = 4
+    hud.crystals = 10
+
+    const htmlPortrait = renderToStaticMarkup(
+      <HudOverlay
+        hud={hud}
+        inGame
+        portrait
+        onPause={() => {}}
+        onMute={() => {}}
+        onMusic={() => {}}
+        onMusicVolume={() => {}}
+        onSfxVolume={() => {}}
+        debug={false}
+        onDebugSkipLevel={() => {}}
+        onExitCustomMap={() => {}}
+      />
+    )
+    expect(htmlPortrait).toContain("📅 УР. 2/4")
+    expect(htmlPortrait).toContain("Кристаллы")
+
+    const htmlLandscape = renderToStaticMarkup(
+      <HudOverlay
+        hud={hud}
+        inGame
+        portrait={false}
+        onPause={() => {}}
+        onMute={() => {}}
+        onMusic={() => {}}
+        onMusicVolume={() => {}}
+        onSfxVolume={() => {}}
+        debug={false}
+        onDebugSkipLevel={() => {}}
+        onExitCustomMap={() => {}}
+      />
+    )
+    expect(htmlLandscape).toContain("📅 День · Уровень 2/4")
+  })
 })

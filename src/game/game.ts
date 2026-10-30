@@ -73,6 +73,7 @@ import {
 } from "./game/lifecycle"
 import {
   startGame,
+  startDaily,
   startEndless,
   startCustomMap,
   stopCustomMap,
@@ -156,7 +157,7 @@ export class Game {
   levelBlocksStart = 0
   /** очередь открытых достижений до следующей отправки HUD */
   achQueue: string[] = []
-  mode: "campaign" | "endless" | "custom" = "campaign"
+  mode: "campaign" | "endless" | "custom" | "daily" = "campaign"
   customWinCondition: PlayerMapSpec["winCondition"] | null = null
   customTargetBlocks: Block[] = []
   onCustomComplete: ((result: "won" | "over") => void) | null = null
@@ -350,6 +351,7 @@ export class Game {
   campaignSeed = 0
   top: ScoreEntry[] = []
   topEndless: ScoreEntry[] = []
+  topDaily: ScoreEntry[] = []
   sfx = new SFX()
   nick = ""
   settings: GameSettings = loadSettings()
@@ -376,6 +378,7 @@ export class Game {
     this.best = Number(lsGet("sharoboy-best") || 0) || 0
     this.top = loadScoreEntries(this, "sharoboy-top")
     this.topEndless = loadScoreEntries(this, "sharoboy-top-endless")
+    this.topDaily = loadScoreEntries(this, "sharoboy-top-daily")
     loadProgress(this)
   }
 
@@ -404,6 +407,9 @@ export class Game {
   }
   startGame(modifiers?: CampaignModifierId[]) {
     startGame(this, modifiers)
+  }
+  startDaily(date = new Date()) {
+    startDaily(this, date)
   }
   startLevelBattle(n: number) {
     startLevelBattle(this, n)

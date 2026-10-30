@@ -22,6 +22,11 @@ export function saveTop(g: Game) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
     lsSet("sharoboy-top-endless", JSON.stringify(g.topEndless))
+  } else if (g.mode === "daily") {
+    g.topDaily = withNick([...g.topDaily, entry])
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+    lsSet("sharoboy-top-daily", JSON.stringify(g.topDaily))
   } else {
     g.top = withNick([...g.top, entry])
       .sort((a, b) => b.score - a.score)
@@ -147,6 +152,7 @@ export function pushHud(g: Game) {
     activeSynergies: getActiveSynergies(g),
     top: g.top,
     topEndless: g.topEndless,
+    topDaily: g.topDaily,
     map: currentMapView(g),
     campaignEvent: g.campaignEvent,
     campaignEventData: g.campaignEventData,

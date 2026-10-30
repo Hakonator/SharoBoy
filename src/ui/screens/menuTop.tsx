@@ -9,7 +9,8 @@ import { MenuSection, screenTag } from "./shared"
 /** Локальные рекорды: кампания и бесконечный режим (из localStorage). */
 /** Локальные рекорды: кампания и бесконечный режим (из localStorage). */
 export function MenuRecords({ hud, asSection = false }: { hud: HudData; asSection?: boolean }) {
-  if (hud.top.length === 0 && hud.topEndless.length === 0) {
+  const hasDaily = (hud.topDaily?.length ?? 0) > 0
+  if (hud.top.length === 0 && hud.topEndless.length === 0 && !hasDaily) {
     return asSection ? null : (
       <div className="text-xs text-dim">Рекордов пока нет — сыграйте партию!</div>
     )
@@ -17,6 +18,33 @@ export function MenuRecords({ hud, asSection = false }: { hud: HudData; asSectio
 
   const content = (
     <div className="space-y-3">
+      {hasDaily && (
+        <div className="mb-2">
+          <div className="hud-label mb-1.5 text-cyan-neon">📅 Ежедневное</div>
+          <ol className="space-y-1">
+            {hud.topDaily!.map((s, i) => (
+              <li key={`d-${s.score}-${i}`} className="flex items-center font-display text-sm">
+                <span
+                  className={
+                    i === 0
+                      ? "text-gold"
+                      : i === 1
+                        ? "text-foam"
+                        : i === 2
+                          ? "text-coral"
+                          : "text-dim"
+                  }
+                >
+                  {i + 1}.
+                </span>
+                <span className="ml-2 min-w-0 truncate text-foam">{s.nick || "—"}</span>
+                <span className="mx-3 flex-1 border-b border-dotted border-line" />
+                <span className="text-foam tabular-nums">{s.score.toLocaleString("ru-RU")}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
       {hud.top.length > 0 && (
         <div className="mb-2">
           <div className="hud-label mb-1.5">Кампания</div>
@@ -94,6 +122,7 @@ export function MenuGlobalTop({
   screen,
   globalTop,
   globalTopEndless,
+  globalTopDaily,
   onPeriod,
   onScreen,
   asSection = false,
@@ -102,6 +131,7 @@ export function MenuGlobalTop({
   screen: ScreenFilter
   globalTop: GlobalScore[]
   globalTopEndless: GlobalScore[]
+  globalTopDaily?: GlobalScore[]
   onPeriod: (p: LeadPeriod) => void
   onScreen: (s: ScreenFilter) => void
   asSection?: boolean
@@ -152,6 +182,38 @@ export function MenuGlobalTop({
           ))}
         </div>
       </div>
+      {globalTopDaily && globalTopDaily.length > 0 && (
+        <div className="mb-3">
+          <div className="hud-label mb-2 text-cyan-neon">📅 Ежедневное испытание</div>
+          <ol className="space-y-1.5">
+            {globalTopDaily.map((s, i) => (
+              <li key={`gd-${i}`} className="flex items-center font-display text-sm">
+                <span
+                  className={
+                    i === 0
+                      ? "text-gold"
+                      : i === 1
+                        ? "text-foam"
+                        : i === 2
+                          ? "text-coral"
+                          : "text-dim"
+                  }
+                >
+                  {i + 1}.
+                </span>
+                <span className="ml-2 min-w-0 truncate text-foam">{s.nick}</span>
+                {screen === "all" && screenTag(s.screen_class) && (
+                  <span className="ml-1.5 shrink-0 text-[10px] text-dim">
+                    {screenTag(s.screen_class)}
+                  </span>
+                )}
+                <span className="mx-3 flex-1 border-b border-dotted border-line" />
+                <span className="text-foam tabular-nums">{s.score.toLocaleString("ru-RU")}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
       {globalTop.length > 0 && (
         <div className="mb-3">
           <div className="hud-label mb-2">Кампания</div>
@@ -217,9 +279,13 @@ export function MenuGlobalTop({
           </ol>
         </div>
       )}
-      {globalTop.length === 0 && globalTopEndless.length === 0 && (
-        <div className="text-xs text-dim">Записей пока нет — сыграйте партию и попадите в топ!</div>
-      )}
+      {globalTop.length === 0 &&
+        globalTopEndless.length === 0 &&
+        (!globalTopDaily || globalTopDaily.length === 0) && (
+          <div className="text-xs text-dim">
+            Записей пока нет — сыграйте партию и попадите в топ!
+          </div>
+        )}
     </div>
   )
 

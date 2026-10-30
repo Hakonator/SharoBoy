@@ -53,12 +53,14 @@ const menuProps = {
   screen: "mobile" as const,
   globalTop: [],
   globalTopEndless: [],
+  globalTopDaily: [],
   unlocked: {},
   topSubmit: null,
   onNickChange: () => {},
   onPeriod: () => {},
   onScreen: () => {},
   onCampaign: () => {},
+  onDaily: () => {},
   onEndless: () => {},
   onCommunityMaps: () => {},
   onAdmin: () => {},
@@ -193,5 +195,10 @@ describe("MenuScreen: справка по управлению под спосо
 
     expect(touchHtml).toContain("🎮 Справка")
     expect(desktopHtml).toContain("🎮 Справка")
+  })
+
+  it("отображает кнопку запуска ежедневного испытания", () => {
+    const html = renderMenu()
+    expect(html).toContain("📅 Ежедневное")
   })
 })

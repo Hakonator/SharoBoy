@@ -19,6 +19,7 @@ import type { HudData } from "../game/types"
 export function useLeaderboard(hud: HudData, nick: string, onNickChange: (v: string) => void) {
   const [globalTop, setGlobalTop] = useState<GlobalScore[]>([])
   const [globalTopEndless, setGlobalTopEndless] = useState<GlobalScore[]>([])
+  const [globalTopDaily, setGlobalTopDaily] = useState<GlobalScore[]>([])
   const [period, setPeriod] = useState<LeadPeriod>("all")
   /* По умолчанию «Все»: рекорды других категорий (например, мобильный рекорд,
      открытый с компьютера) видны сразу. Запись при отправке всё равно
@@ -31,12 +32,14 @@ export function useLeaderboard(hud: HudData, nick: string, onNickChange: (v: str
 
   const refreshTop = useCallback(async (p: LeadPeriod, s: ScreenFilter) => {
     const filter = s === "all" ? undefined : s
-    const [c, e] = await Promise.all([
+    const [c, e, d] = await Promise.all([
       fetchTop("campaign", p, 10, filter),
       fetchTop("endless", p, 10, filter),
+      fetchTop("daily", "day", 10, filter),
     ])
     setGlobalTop(c)
     setGlobalTopEndless(e)
+    setGlobalTopDaily(d)
   }, [])
 
   useEffect(() => {
@@ -129,6 +132,7 @@ export function useLeaderboard(hud: HudData, nick: string, onNickChange: (v: str
     setScreen,
     globalTop,
     globalTopEndless,
+    globalTopDaily,
     submitState,
     submitError,
     handleTopSubmit,

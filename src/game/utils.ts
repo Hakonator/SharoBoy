@@ -45,9 +45,16 @@ export function mulberry32(a: number) {
   }
 }
 
-export function daySeed() {
-  const d = new Date()
-  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate()
+export function daySeed(d = new Date()): number {
+  return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate()
+}
+
+/** Форматирует дату дня в виде "DD.MM.YYYY" (по календарю UTC). */
+export function formatDayDate(d = new Date()): string {
+  const day = String(d.getUTCDate()).padStart(2, "0")
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0")
+  const year = d.getUTCFullYear()
+  return `${day}.${month}.${year}`
 }
 
 /** Подбор угла наклона эллипса, при котором он укладывается в ячейку. */

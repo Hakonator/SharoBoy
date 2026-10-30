@@ -85,7 +85,11 @@ export function HudOverlay({
       } font-display text-[11px] leading-tight text-cyan-neon ${hidden ? "md:hidden" : ""}`}
     >
       <span className="text-dim">
-        {hud.mode === "endless" ? `ВОЛНА ${hud.wave}` : `УР. ${hud.level}/${hud.levelCount}`}
+        {hud.mode === "endless"
+          ? `ВОЛНА ${hud.wave}`
+          : hud.mode === "daily"
+            ? `📅 УР. ${hud.level}/${hud.levelCount}`
+            : `УР. ${hud.level}/${hud.levelCount}`}
       </span>
       <span>
         ЦЕЛИ: <span className="tabular-nums">{hud.blocksLeft}</span>
@@ -129,7 +133,7 @@ export function HudOverlay({
       </div>
     ) : null
   const crystalsChip =
-    hud.mode === "campaign" && (hud.crystals ?? 0) > 0 ? (
+    (hud.mode === "campaign" || hud.mode === "daily") && (hud.crystals ?? 0) > 0 ? (
       <div className={`hud-chip ${pad} border-purple-500/20 bg-purple-950/20`}>
         <div className="hud-label text-purple-300">Кристаллы</div>
         <div className={`font-display ${val} leading-none text-purple-200 tabular-nums`}>
@@ -139,7 +143,7 @@ export function HudOverlay({
     ) : null
   const { crystalMultiplier } = computeRunMultipliers(hud.campaignModifiers ?? [])
   const relicsChip =
-    hud.mode === "campaign" && (hud.activeRelics?.length ?? 0) > 0 ? (
+    (hud.mode === "campaign" || hud.mode === "daily") && (hud.activeRelics?.length ?? 0) > 0 ? (
       <div
         className={`hud-chip flex items-center gap-1.5 border-amber-500/30 bg-amber-950/20 ${pad}`}
       >
@@ -376,7 +380,9 @@ export function HudOverlay({
                   <div className="hud-label">
                     {hud.mode === "endless"
                       ? `Волна ${hud.wave} · ∞`
-                      : `Уровень ${hud.level}/${hud.levelCount} · ${hud.levelName}`}
+                      : hud.mode === "daily"
+                        ? `📅 День · Уровень ${hud.level}/${hud.levelCount} · ${hud.levelName}`
+                        : `Уровень ${hud.level}/${hud.levelCount} · ${hud.levelName}`}
                   </div>
                   <div className="font-display text-lg leading-tight text-cyan-neon">
                     ЦЕЛИ: <span className="text-foam tabular-nums">{hud.blocksLeft}</span>

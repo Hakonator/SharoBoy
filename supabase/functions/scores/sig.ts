@@ -5,7 +5,7 @@
  * зафиксирован тестами с обеих сторон.
  */
 
-export type ScoreMode = "campaign" | "endless"
+export type ScoreMode = "campaign" | "endless" | "daily"
 export type SigScreen = "mobile" | "fhd" | "4k"
 
 /** Простой 32-битный FNV-1a хеш строки — для подписи очков. */

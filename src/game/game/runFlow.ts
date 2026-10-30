@@ -514,7 +514,7 @@ export function loseLife(g: Game) {
       finishCustomRun(g, "over")
       return
     }
-    if (g.mode === "campaign") {
+    if (g.mode === "campaign" || g.mode === "daily") {
       const mult = g.campaignRelics.relicConverter ? 1.5 : 1.0
       const earnedCoins = Math.round(g.crystalsRunTotal * mult)
       if (earnedCoins > 0) {

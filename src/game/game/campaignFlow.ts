@@ -68,7 +68,7 @@ export function startLevelBattle(g: Game, n: number) {
 
 /** Генерирует карту забега и ставит игрока на стартовый узел (экран карты). */
 export function startCampaignMap(g: Game) {
-  g.campaignSeed = (daySeed() * 31 + g.runSeq++) | 0
+  g.campaignSeed = g.mode === "daily" ? g.campaignSeed : (daySeed() * 31 + g.runSeq++) | 0
   g.campaign = generateCampaignMap(g.campaignSeed)
   g.campaignMbSeen = {}
   g.minibossPity = 0

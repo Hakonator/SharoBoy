@@ -28,7 +28,7 @@ declare const Deno: {
 import { validateNick } from "./profanity.ts"
 import { sigFor, sigMatches, type ScoreMode, type SigRow, type SigScreen } from "./sig.ts"
 
-const MODES: ScoreMode[] = ["campaign", "endless"]
+const MODES: ScoreMode[] = ["campaign", "endless", "daily"]
 const SCREENS: SigScreen[] = ["mobile", "fhd", "4k"]
 
 /** Таймаут на исходящие запросы к PostgREST — чтобы функция не висла дольше
@@ -140,7 +140,7 @@ async function fetchTop(req: Request): Promise<Response> {
   const limit = Number.isInteger(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 30
 
   if (!mode || !MODES.includes(mode as ScoreMode)) {
-    return json({ error: "Нужен параметр mode: campaign|endless" }, 400)
+    return json({ error: "Нужен параметр mode: campaign|endless|daily" }, 400)
   }
   if (screenParam && !SCREENS.includes(screenParam as SigScreen)) {
     return json({ error: "Некорректная категория экрана" }, 400)

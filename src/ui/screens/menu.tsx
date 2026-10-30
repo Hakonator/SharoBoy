@@ -25,12 +25,14 @@ export function MenuScreen({
   screen,
   globalTop,
   globalTopEndless,
+  globalTopDaily,
   unlocked,
   topSubmit,
   onNickChange,
   onPeriod,
   onScreen,
   onCampaign,
+  onDaily,
   onEndless,
   onCommunityMaps,
   onAdmin,
@@ -57,12 +59,14 @@ export function MenuScreen({
   screen: ScreenFilter
   globalTop: GlobalScore[]
   globalTopEndless: GlobalScore[]
+  globalTopDaily?: GlobalScore[]
   unlocked: Record<string, number>
   topSubmit: ReactNode
   onNickChange: (v: string) => void
   onPeriod: (p: LeadPeriod) => void
   onScreen: (s: ScreenFilter) => void
   onCampaign: () => void
+  onDaily: () => void
   onEndless: () => void
   onCommunityMaps: () => void
   onAdmin: () => void
@@ -148,6 +152,13 @@ export function MenuScreen({
               onClick={onCampaign}
             >
               Кампания
+            </button>
+            <button
+              className="btn-ghost px-3 py-2.5 font-display text-xs sm:px-5 sm:py-3.5 sm:text-base border-cyan-neon/40 text-cyan-neon hover:border-cyan-neon hover:bg-cyan-neon/10"
+              onClick={onDaily}
+              type="button"
+            >
+              📅 Ежедневное
             </button>
             <button
               className="btn-ghost px-3 py-2.5 font-display text-xs sm:px-5 sm:py-3.5 sm:text-base"
@@ -373,6 +384,7 @@ export function MenuScreen({
                         screen={screen}
                         globalTop={globalTop}
                         globalTopEndless={globalTopEndless}
+                        globalTopDaily={globalTopDaily}
                         onPeriod={onPeriod}
                         onScreen={onScreen}
                       />

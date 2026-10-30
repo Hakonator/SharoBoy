@@ -268,6 +268,11 @@ export function GameOverScreen({
             ДОСТИГНУТА ВОЛНА {hud.wave}
           </div>
         )}
+        {hud.mode === "daily" && (
+          <div className="mt-4 font-display text-sm tracking-wider text-purple-300">
+            📅 ЕЖЕДНЕВНОЕ ИСПЫТАНИЕ · УРОВЕНЬ {hud.level}/{hud.levelCount}
+          </div>
+        )}
         <div className="mt-6 flex justify-center gap-3">
           <div className="hud-chip px-6 py-3">
             <div className="hud-label">Счёт</div>
@@ -482,13 +487,19 @@ export function WinScreen({
   onRestart: () => void
   onMenu: () => void
 }) {
-  const isCampaign = hud.mode === "campaign"
+  const isCampaign = hud.mode === "campaign" || hud.mode === "daily"
   const epilogue = isCampaign ? getFinalEpilogue(hud.finalBossDefeated) : null
 
   if (isCampaign && epilogue) {
     return (
       <div className="absolute inset-0 z-40 flex items-center justify-center overflow-y-auto p-4 sm:p-6">
         <div className="anim-pop my-auto w-full max-w-xl text-center">
+          {hud.mode === "daily" && (
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-950/40 px-3 py-1 text-xs font-display font-bold text-purple-300">
+              <span>📅</span>
+              <span>ЕЖЕДНЕВНОЕ ИСПЫТАНИЕ</span>
+            </div>
+          )}
           {/* Статус телеметрии станции */}
           <div className="mb-2 flex items-center justify-center gap-2">
             <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
@@ -582,6 +593,12 @@ export function WinScreen({
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center overflow-y-auto p-6">
       <div className="anim-pop my-auto w-full max-w-lg text-center">
+        {hud.mode === "daily" && (
+          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-950/40 px-3 py-1 text-xs font-display font-bold text-purple-300">
+            <span>📅</span>
+            <span>ЕЖЕДНЕВНОЕ ИСПЫТАНИЕ</span>
+          </div>
+        )}
         <div className="hud-label mb-2 tracking-[0.35em]">Все шары лопнули</div>
         <h2
           className="font-display text-6xl text-mint sm:text-7xl"

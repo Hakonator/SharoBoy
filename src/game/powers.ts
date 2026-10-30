@@ -35,7 +35,7 @@ export interface PowersWorld {
   readonly boss: BossState | null
   readonly blocksInitial: number
   /** Текущий режим партии: в кампании жизни выпадают только с минибоссов. */
-  readonly mode: "campaign" | "endless" | "custom"
+  readonly mode: "campaign" | "endless" | "custom" | "daily"
   powers: PowerUp[]
   spawnTimer: number
   skyDropTimer: number
@@ -149,7 +149,7 @@ export class PowersSystem {
     const g = this.g
     const table = buildPowerTable({
       boss: g.boss !== null,
-      campaign: g.mode === "campaign",
+      campaign: g.mode === "campaign" || g.mode === "daily",
       fewBlocks: g.blocks.length <= Math.max(5, g.blocksInitial * 0.3),
       // «Замедление» выпадает только когда шар разогнан ≥1.5× номинала
       // (эффект ускорения + перманентный разгон зачистки).

@@ -47,6 +47,7 @@ describe("sigFor — серверная подпись очков", () => {
     expect(sigFor("Другой", 777, "endless", 2, undefined, SECRET)).not.toBe(base)
     expect(sigFor("Шарик", 778, "endless", 2, undefined, SECRET)).not.toBe(base)
     expect(sigFor("Шарик", 777, "campaign", 2, undefined, SECRET)).not.toBe(base)
+    expect(sigFor("Шарик", 777, "daily", 2, undefined, SECRET)).not.toBe(base)
     expect(sigFor("Шарик", 777, "endless", 3, undefined, SECRET)).not.toBe(base)
     expect(sigFor("Шарик", 777, "endless", 2, undefined, "другой-секрет")).not.toBe(base)
   })

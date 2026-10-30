@@ -13,6 +13,7 @@ import {
   IntermediateScoreModal,
   TopSubmit,
   SettingsModal,
+  DailyRunModal,
 } from "./ui/screens"
 import { CommunityMaps } from "./ui/screens/communityMaps"
 import { AdminPanel } from "./ui/screens/AdminPanel"
@@ -88,6 +89,7 @@ export default function App() {
   const [showAdminPanel, setShowAdminPanel] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showModifiersModal, setShowModifiersModal] = useState(false)
+  const [showDailyModal, setShowDailyModal] = useState(false)
 
   const onHud = useCallback((h: HudData) => setHud(h), [])
 
@@ -235,12 +237,14 @@ export default function App() {
             screen={leaderboard.screen}
             globalTop={leaderboard.globalTop}
             globalTopEndless={leaderboard.globalTopEndless}
+            globalTopDaily={leaderboard.globalTopDaily}
             unlocked={unlocked}
             topSubmit={topSubmit}
             onNickChange={handleNickChange}
             onPeriod={leaderboard.setPeriod}
             onScreen={leaderboard.setScreen}
             onCampaign={() => setShowModifiersModal(true)}
+            onDaily={() => setShowDailyModal(true)}
             onEndless={() => g()?.startEndless()}
             onCommunityMaps={() => setShowCommunityMaps(true)}
             onAdmin={() => setShowAdminPanel(true)}
@@ -291,6 +295,15 @@ export default function App() {
                 g()?.startGame(modifiers)
               }}
               onClose={() => setShowModifiersModal(false)}
+            />
+          )}
+          {showDailyModal && (
+            <DailyRunModal
+              onStart={() => {
+                setShowDailyModal(false)
+                g()?.startDaily()
+              }}
+              onClose={() => setShowDailyModal(false)}
             />
           )}
         </>
@@ -360,7 +373,13 @@ export default function App() {
         <PauseScreen
           hud={hud}
           onResume={() => g()?.togglePause()}
-          onRestart={() => (hud.mode === "endless" ? g()?.startEndless() : g()?.startGame())}
+          onRestart={() =>
+            hud.mode === "endless"
+              ? g()?.startEndless()
+              : hud.mode === "daily"
+                ? g()?.startDaily()
+                : g()?.startGame()
+          }
           onMenu={() => g()?.toMenu()}
           onOpenSettings={() => setShowSettings(true)}
           onToggleModule={(key) => g()?.toggleTacticalModule(key)}
@@ -384,7 +403,13 @@ export default function App() {
         <GameOverScreen
           hud={hud}
           topSubmit={topSubmit}
-          onRestart={() => (hud.mode === "endless" ? g()?.startEndless() : g()?.startGame())}
+          onRestart={() =>
+            hud.mode === "endless"
+              ? g()?.startEndless()
+              : hud.mode === "daily"
+                ? g()?.startDaily()
+                : g()?.startGame()
+          }
           onMenu={() => g()?.toMenu()}
         />
       )}
@@ -393,7 +418,7 @@ export default function App() {
         <WinScreen
           hud={hud}
           topSubmit={topSubmit}
-          onRestart={() => g()?.startGame()}
+          onRestart={() => (hud.mode === "daily" ? g()?.startDaily() : g()?.startGame())}
           onMenu={() => g()?.toMenu()}
         />
       )}

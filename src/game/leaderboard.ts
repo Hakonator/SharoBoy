@@ -12,6 +12,7 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, LEADERBOARD_ENABLED } from "../config"
 
 export type LeadPeriod = "all" | "day" | "month"
+export type ScoreMode = "campaign" | "endless" | "daily"
 
 /** Категория экрана для разделения мирового топа: очки сравнимы только внутри категории. */
 export type ScreenClass = "mobile" | "fhd" | "4k"
@@ -74,10 +75,10 @@ function periodFromIso(period: LeadPeriod): string | null {
   if (period === "all") return null
   const now = new Date()
   if (period === "day") {
-    now.setHours(0, 0, 0, 0)
+    now.setUTCHours(0, 0, 0, 0)
   } else if (period === "month") {
-    now.setDate(1)
-    now.setHours(0, 0, 0, 0)
+    now.setUTCDate(1)
+    now.setUTCHours(0, 0, 0, 0)
   }
   return now.toISOString()
 }
@@ -107,7 +108,7 @@ export function dedupeTop(rows: GlobalScore[]): GlobalScore[] {
  * Ошибки не роняют игру — возвращаем [].
  */
 export async function fetchTop(
-  mode: "campaign" | "endless",
+  mode: ScoreMode,
   period: LeadPeriod = "all",
   limit = 10,
   screen?: ScreenClass
@@ -140,7 +141,7 @@ export async function fetchTop(
 export async function submitScore(
   nick: string,
   score: number,
-  mode: "campaign" | "endless",
+  mode: ScoreMode,
   wave: number,
   screen: ScreenClass
 ): Promise<string | null> {
