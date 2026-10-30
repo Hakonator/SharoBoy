@@ -1,77 +1,20 @@
 import { TIER } from "../../game/palette"
 import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapWinCondition } from "../../game/mapSpec"
 
-import type { EditorInspectorProps } from "./types"
+import { defaultEffect } from "./editorState"
+import type { EditorAction, EditorInspectorProps, EditorState, PlayerBlockUpdates } from "./types"
 
 export function EditorInspector({ state, dispatch, author }: EditorInspectorProps) {
   const block =
     state.selectedBlockIds.length === 1
       ? state.map.blocks.find((item) => item.id === state.selectedBlockIds[0])
       : state.map.blocks.find((item) => item.id === state.selectedBlockId)
-  const updateBlock = (updates: Partial<PlayerBlockSpec>) => {
+  const updateBlock = (updates: PlayerBlockUpdates) => {
     if (block) dispatch({ type: "UPDATE_BLOCK", blockId: block.id, updates })
   }
 
   if (state.selectedBlockIds.length > 1) {
-    return (
-      <aside className="rounded-xl border border-line bg-deep/95 p-4 text-foam flex flex-col gap-3">
-        <div>
-          <h2 className="font-display text-lg text-cyan-neon">Множественный выбор</h2>
-          <p className="mt-1 text-sm text-dim">Выбрано блоков: {state.selectedBlockIds.length}</p>
-          <p className="mt-1 text-xs text-dim">
-            Перетаскивайте мышью любой блок, чтобы переместить всю группу.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2 pt-2 border-t border-line/50">
-          <button
-            type="button"
-            className="btn-ghost flex items-center justify-between px-3 py-2 text-xs text-foam hover:border-cyan-neon"
-            onClick={() => dispatch({ type: "COPY_SELECTED" })}
-            title="Скопировать выделенную группу (Ctrl+C)"
-          >
-            <span>📋 Копировать группу</span>
-            <kbd className="rounded bg-abyss px-1.5 py-0.5 text-[10px] text-dim">Ctrl+C</kbd>
-          </button>
-          <button
-            type="button"
-            className="btn-ghost flex items-center justify-between px-3 py-2 text-xs text-cyan-neon hover:border-cyan-neon"
-            onClick={() => dispatch({ type: "START_PASTE" })}
-            title="Вставить с фантомом под курсором (Ctrl+V)"
-          >
-            <span>✨ Вставить (фантом)</span>
-            <kbd className="rounded bg-abyss px-1.5 py-0.5 text-[10px] text-dim">Ctrl+V</kbd>
-          </button>
-          <button
-            type="button"
-            className="btn-ghost flex items-center justify-between px-3 py-2 text-xs text-punch hover:border-punch/60"
-            onClick={() => dispatch({ type: "DELETE_SELECTED_BLOCKS" })}
-            title="Удалить выделенные блоки (Delete / Backspace)"
-          >
-            <span>🗑 Удалить группу</span>
-            <kbd className="rounded bg-abyss px-1.5 py-0.5 text-[10px] text-dim">Del</kbd>
-          </button>
-          <button
-            type="button"
-            className="btn-ghost flex items-center justify-between px-3 py-2 text-xs text-dim hover:text-foam"
-            onClick={() => dispatch({ type: "SELECT_BLOCKS", blockIds: [] })}
-            title="Снять выделение со всех блоков (Escape)"
-          >
-            <span>✖ Снять выделение</span>
-            <kbd className="rounded bg-abyss px-1.5 py-0.5 text-[10px] text-dim">Esc</kbd>
-          </button>
-        </div>
-
-        <div className="pt-2 border-t border-line/40 text-[11px] text-dim space-y-1">
-          <p>
-            • <span className="text-foam">Ctrl+Z</span> — отмена перемещения / вставки
-          </p>
-          <p>
-            • <span className="text-foam">Ctrl+Y</span> — повтор операции
-          </p>
-        </div>
-      </aside>
-    )
+    return <GroupInspector state={state} dispatch={dispatch} />
   }
 
   if (!block) {
@@ -165,7 +108,12 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
   const hpTier = TIER[Math.min(3, Math.max(1, Math.round(block.hp))) as 1 | 2 | 3]
   const has = (kind: PlayerBlockEffect["kind"]) => effects.some((effect) => effect.kind === kind)
   const setEffect = (kind: PlayerBlockEffect["kind"], enabled: boolean) => {
-    const next = effects.filter((effect) => effect.kind !== kind)
+    let next = effects.filter((effect) => effect.kind !== kind)
+    if (enabled && kind === "spring") {
+      next = next.filter((effect) => effect.kind !== "cotton")
+    } else if (enabled && kind === "cotton") {
+      next = next.filter((effect) => effect.kind !== "spring")
+    }
     const added = defaultEffect(kind, block)
     updateBlock({
       effects: enabled && added ? [...next, added] : next.length > 0 ? next : undefined,
@@ -618,34 +566,6 @@ function Stat({ label, value }: { label: string; value: number }) {
   )
 }
 
-function defaultEffect(
-  kind: PlayerBlockEffect["kind"],
-  _block: PlayerBlockSpec
-): PlayerBlockEffect | null {
-  switch (kind) {
-    case "armor":
-      return { kind, amount: 1 }
-    case "brittle":
-      return { kind, radius: 120, damage: 1 }
-    case "phase":
-      return { kind, period: 3.2, activeFraction: 0.62, offset: 0 }
-    case "spring":
-      return { kind }
-    case "cotton":
-      return { kind }
-    case "pulse":
-      return { kind, amplitude: 0.5, frequency: 1 }
-    case "magnet":
-      return { kind, mode: "attract", radius: 240, force: 2200 }
-    case "portal":
-      return { kind, pairId: "portal-pair" }
-    case "spin":
-      return { kind, direction: "clockwise" }
-    case "normal":
-      return { kind }
-  }
-}
-
 function getEffect<K extends PlayerBlockEffect["kind"]>(
   kind: K,
   effects: PlayerBlockEffect[]
@@ -691,6 +611,615 @@ function EffectTuning({
         value={effect.duration ?? 2}
         onChange={(duration) => onChange({ ...effect, duration })}
       />
+    </div>
+  )
+}
+
+function GroupInspector({
+  state,
+  dispatch,
+}: {
+  state: EditorState
+  dispatch: (action: EditorAction) => void
+}) {
+  const selectedBlocks = state.map.blocks.filter((item) => state.selectedBlockIds.includes(item.id))
+  const count = selectedBlocks.length
+  const totalHp = selectedBlocks.reduce((sum, item) => sum + item.hp, 0)
+  const avgHp = Math.round(totalHp / (count || 1))
+
+  const allSameHp = selectedBlocks.every((item) => item.hp === selectedBlocks[0]!.hp)
+  const commonHp = allSameHp ? selectedBlocks[0]!.hp : avgHp
+  const hpTier = TIER[Math.min(3, Math.max(1, Math.round(commonHp))) as 1 | 2 | 3]
+
+  const allSameShape = selectedBlocks.every((item) => item.shape === selectedBlocks[0]!.shape)
+  const commonShape = allSameShape ? selectedBlocks[0]!.shape : "mixed"
+
+  const allSameWidth = selectedBlocks.every(
+    (item) => item.size.width === selectedBlocks[0]!.size.width
+  )
+  const commonWidth = allSameWidth
+    ? selectedBlocks[0]!.size.width
+    : Math.round(selectedBlocks.reduce((sum, item) => sum + item.size.width, 0) / (count || 1))
+
+  const allSameHeight = selectedBlocks.every(
+    (item) => item.size.height === selectedBlocks[0]!.size.height
+  )
+  const commonHeight = allSameHeight
+    ? selectedBlocks[0]!.size.height
+    : Math.round(selectedBlocks.reduce((sum, item) => sum + item.size.height, 0) / (count || 1))
+
+  const allSameRot = selectedBlocks.every(
+    (item) => Math.abs((item.rotation ?? 0) - (selectedBlocks[0]!.rotation ?? 0)) < 0.01
+  )
+  const commonRot = allSameRot
+    ? Math.round(((selectedBlocks[0]!.rotation ?? 0) * 180) / Math.PI / 5) * 5
+    : 0
+
+  const updateSelected = (updates: PlayerBlockUpdates) => {
+    dispatch({ type: "UPDATE_BLOCKS", blockIds: state.selectedBlockIds, updates })
+  }
+
+  const setGroupEffect = (
+    kind: PlayerBlockEffect["kind"],
+    enabled: boolean,
+    effect?: PlayerBlockEffect
+  ) => {
+    dispatch({
+      type: "SET_BLOCKS_EFFECT",
+      blockIds: state.selectedBlockIds,
+      kind,
+      enabled,
+      effect,
+    })
+  }
+
+  const getEffectCount = (kind: PlayerBlockEffect["kind"]) =>
+    selectedBlocks.filter((item) => item.effects?.some((e) => e.kind === kind)).length
+
+  const portalBlocks = selectedBlocks.filter((item) =>
+    item.effects?.some((e) => e.kind === "portal")
+  )
+  const isLinkedPortalPair =
+    count === 2 &&
+    portalBlocks.length === 2 &&
+    portalBlocks[0]!.effects?.find((e) => e.kind === "portal")?.kind === "portal" &&
+    portalBlocks[1]!.effects?.find((e) => e.kind === "portal")?.kind === "portal" &&
+    (portalBlocks[0]!.effects?.find((e) => e.kind === "portal") as { pairId: string }).pairId ===
+      (portalBlocks[1]!.effects?.find((e) => e.kind === "portal") as { pairId: string }).pairId
+
+  return (
+    <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-xl border border-line bg-deep/95 p-4 text-foam">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h2 className="font-display text-lg text-cyan-neon">Множественный выбор</h2>
+          <p className="text-xs text-dim">Выбрано блоков: {count}</p>
+        </div>
+        <span className="rounded-full bg-cyan-neon/20 border border-cyan-neon/40 px-2.5 py-0.5 text-xs text-cyan-neon font-bold">
+          {count} бл.
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-line/40">
+        <button
+          type="button"
+          className="btn-ghost flex items-center justify-between px-2.5 py-1.5 text-xs text-foam hover:border-cyan-neon"
+          onClick={() => dispatch({ type: "COPY_SELECTED" })}
+          title="Скопировать выделенную группу (Ctrl+C)"
+        >
+          <span>📋 Копия</span>
+          <kbd className="rounded bg-abyss px-1 py-0.5 text-[10px] text-dim">Ctrl+C</kbd>
+        </button>
+        <button
+          type="button"
+          className="btn-ghost flex items-center justify-between px-2.5 py-1.5 text-xs text-cyan-neon hover:border-cyan-neon"
+          onClick={() => dispatch({ type: "START_PASTE" })}
+          title="Вставить с фантомом под курсором (Ctrl+V)"
+        >
+          <span>✨ Фантом</span>
+          <kbd className="rounded bg-abyss px-1 py-0.5 text-[10px] text-dim">Ctrl+V</kbd>
+        </button>
+        <button
+          type="button"
+          className="btn-ghost flex items-center justify-between px-2.5 py-1.5 text-xs text-punch hover:border-punch/60"
+          onClick={() => dispatch({ type: "DELETE_SELECTED_BLOCKS" })}
+          title="Удалить выделенные блоки (Delete / Backspace)"
+        >
+          <span>🗑 Удалить</span>
+          <kbd className="rounded bg-abyss px-1 py-0.5 text-[10px] text-dim">Del</kbd>
+        </button>
+        <button
+          type="button"
+          className="btn-ghost flex items-center justify-between px-2.5 py-1.5 text-xs text-dim hover:text-foam"
+          onClick={() => dispatch({ type: "SELECT_BLOCKS", blockIds: [] })}
+          title="Снять выделение со всех блоков (Escape)"
+        >
+          <span>✖ Снять</span>
+          <kbd className="rounded bg-abyss px-1 py-0.5 text-[10px] text-dim">Esc</kbd>
+        </button>
+      </div>
+
+      <div className="rounded-lg bg-abyss/40 border border-emerald-400/25 px-3 py-2 text-[11px] text-emerald-300 flex items-start gap-2">
+        <span className="text-base leading-none">✨</span>
+        <span>
+          <strong>Копирование протяжкой:</strong> потяните мышью за маркер <strong>«+»</strong> в
+          правом нижнем углу рамки на поле.
+        </span>
+      </div>
+
+      <section className="space-y-3 border-t border-line pt-3">
+        <div className="flex items-center justify-between">
+          <span className="hud-label">Здоровье (HP)</span>
+          <span
+            className="rounded-full px-2 py-0.5 text-xs font-bold"
+            style={{ backgroundColor: hpTier.base, color: "#07131b" }}
+          >
+            {allSameHp ? `HP ${commonHp}` : `~ HP ${commonHp}`}
+          </span>
+        </div>
+        <input
+          className="w-full accent-cyan-neon"
+          max="8"
+          min="1"
+          onChange={(event) => updateSelected({ hp: Number(event.target.value) })}
+          style={{ accentColor: hpTier.base }}
+          type="range"
+          value={commonHp}
+        />
+        <div className="flex justify-between font-mono text-[11px] text-dim">
+          <span>1</span>
+          <span>4</span>
+          <span>8</span>
+        </div>
+        <div className="flex gap-1.5 pt-0.5">
+          {[1, 2, 3, 5, 8].map((h) => (
+            <button
+              key={h}
+              type="button"
+              className={`flex-1 rounded border border-line py-1 text-xs transition-colors hover:border-cyan-neon ${
+                allSameHp && commonHp === h
+                  ? "bg-cyan-neon/20 text-cyan-neon font-bold"
+                  : "bg-abyss text-foam"
+              }`}
+              onClick={() => updateSelected({ hp: h })}
+            >
+              {h}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <Field label="Форма (для всех)">
+        <select
+          className={INPUT_CLASS}
+          onChange={(event) => {
+            const shape = event.target.value as PlayerBlockSpec["shape"]
+            updateSelected({ shape })
+          }}
+          value={commonShape}
+        >
+          {!allSameShape && (
+            <option value="mixed" disabled>
+              — Смешанные формы (
+              {Array.from(new Set(selectedBlocks.map((b) => b.shape))).join(", ")}) —
+            </option>
+          )}
+          <option value="circle">Круг (круглые блоки)</option>
+          <option value="ellipse">Эллипс</option>
+          <option value="rect">Прямоугольник</option>
+          <option value="round_rect">Скруглённый прямоугольник</option>
+        </select>
+        {commonShape === "circle" && (
+          <p className="mt-1 text-[11px] text-dim">
+            ✓ У круга ширина и высота автоматически приравниваются.
+          </p>
+        )}
+      </Field>
+
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-3">
+          <NumberField
+            label="Ширина"
+            min={20}
+            max={100}
+            value={commonWidth}
+            onChange={(width) => updateSelected({ size: { width } })}
+          />
+          <NumberField
+            label="Высота"
+            min={20}
+            max={100}
+            value={commonHeight}
+            onChange={(height) => updateSelected({ size: { height } })}
+          />
+        </div>
+        <div className="flex gap-1 pt-0.5">
+          {[
+            { w: 32, h: 32, label: "32×32" },
+            { w: 40, h: 40, label: "40×40" },
+            { w: 64, h: 40, label: "64×40" },
+            { w: 80, h: 40, label: "80×40" },
+            { w: 90, h: 45, label: "90×45" },
+          ].map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              className="flex-1 rounded border border-line bg-abyss py-1 text-[10px] text-dim hover:text-foam hover:border-cyan-neon"
+              onClick={() => updateSelected({ size: { width: preset.w, height: preset.h } })}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="hud-label">Поворот (°)</span>
+          {commonRot !== 0 && (
+            <button
+              type="button"
+              className="text-[11px] text-cyan-neon hover:underline"
+              onClick={() => updateSelected({ rotation: 0 })}
+            >
+              Сброс на 0°
+            </button>
+          )}
+        </div>
+        <NumberField
+          label=""
+          min={-360}
+          max={360}
+          step={5}
+          value={commonRot}
+          onChange={(deg) => updateSelected({ rotation: (deg * Math.PI) / 180 })}
+        />
+      </div>
+
+      <section className="space-y-3 border-t border-line pt-3">
+        <div>
+          <h3 className="hud-label">Массовые эффекты</h3>
+          <p className="mt-0.5 text-[11px] text-dim">
+            Включение и параметры применяются ко всем выбранным блокам.
+          </p>
+        </div>
+
+        <GroupEffectRow
+          label="Броня"
+          kind="armor"
+          count={getEffectCount("armor")}
+          total={count}
+          onToggle={(enabled) => setGroupEffect("armor", enabled)}
+        >
+          <NumberField
+            label="Очки брони"
+            min={1}
+            max={5}
+            value={
+              selectedBlocks
+                .find((b) => b.effects?.some((e) => e.kind === "armor"))
+                ?.effects?.find((e) => e.kind === "armor")?.kind === "armor"
+                ? (
+                    selectedBlocks
+                      .find((b) => b.effects?.some((e) => e.kind === "armor"))!
+                      .effects!.find((e) => e.kind === "armor") as { amount: number }
+                  ).amount
+                : 1
+            }
+            onChange={(amount) => setGroupEffect("armor", true, { kind: "armor", amount })}
+          />
+        </GroupEffectRow>
+
+        <GroupEffectRow
+          label="Хрупкая цепь"
+          kind="brittle"
+          count={getEffectCount("brittle")}
+          total={count}
+          onToggle={(enabled) => setGroupEffect("brittle", enabled)}
+        >
+          <div className="space-y-2 rounded-lg border border-line p-3">
+            <NumberField
+              label="Радиус цепи"
+              min={40}
+              max={400}
+              value={120}
+              onChange={(radius) =>
+                setGroupEffect("brittle", true, { kind: "brittle", radius, damage: 1 })
+              }
+            />
+            <NumberField
+              label="Цепной урон"
+              min={1}
+              max={3}
+              value={1}
+              onChange={(damage) =>
+                setGroupEffect("brittle", true, { kind: "brittle", radius: 120, damage })
+              }
+            />
+          </div>
+        </GroupEffectRow>
+
+        <GroupEffectRow
+          label="Фазовый блок"
+          kind="phase"
+          count={getEffectCount("phase")}
+          total={count}
+          onToggle={(enabled) => setGroupEffect("phase", enabled)}
+        >
+          <div className="space-y-2 rounded-lg border border-line p-3">
+            <NumberField
+              label="Период (сек)"
+              min={1}
+              max={10}
+              step={0.2}
+              value={3.2}
+              onChange={(period) =>
+                setGroupEffect("phase", true, {
+                  kind: "phase",
+                  period,
+                  activeFraction: 0.6,
+                  offset: 0,
+                })
+              }
+            />
+            <NumberField
+              label="Доля активности"
+              min={0.1}
+              max={0.9}
+              step={0.05}
+              value={0.6}
+              onChange={(activeFraction) =>
+                setGroupEffect("phase", true, {
+                  kind: "phase",
+                  period: 3.2,
+                  activeFraction,
+                  offset: 0,
+                })
+              }
+            />
+          </div>
+        </GroupEffectRow>
+
+        <GroupEffectRow
+          label="Пружина (ускоритель)"
+          kind="spring"
+          count={getEffectCount("spring")}
+          total={count}
+          mutualNotice="Взаимоисключение: автоматически снимает «Вату»"
+          onToggle={(enabled) => setGroupEffect("spring", enabled)}
+        >
+          <EffectTuning
+            effect={{ kind: "spring", speedMultiplier: 1.3, duration: 2 }}
+            kind="spring"
+            onChange={(effect) => setGroupEffect("spring", true, effect)}
+          />
+        </GroupEffectRow>
+
+        <GroupEffectRow
+          label="Вата (замедлитель)"
+          kind="cotton"
+          count={getEffectCount("cotton")}
+          total={count}
+          mutualNotice="Взаимоисключение: автоматически снимает «Пружину»"
+          onToggle={(enabled) => setGroupEffect("cotton", enabled)}
+        >
+          <EffectTuning
+            effect={{ kind: "cotton", speedMultiplier: 0.5, duration: 2 }}
+            kind="cotton"
+            onChange={(effect) => setGroupEffect("cotton", true, effect)}
+          />
+        </GroupEffectRow>
+
+        <GroupEffectRow
+          label="Пульсация"
+          kind="pulse"
+          count={getEffectCount("pulse")}
+          total={count}
+          onToggle={(enabled) => setGroupEffect("pulse", enabled)}
+        >
+          <div className="space-y-2 rounded-lg border border-line p-3">
+            <NumberField
+              label="Амплитуда"
+              min={0.1}
+              max={2}
+              step={0.1}
+              value={0.5}
+              onChange={(amplitude) =>
+                setGroupEffect("pulse", true, { kind: "pulse", amplitude, frequency: 1 })
+              }
+            />
+            <NumberField
+              label="Частота"
+              min={0.1}
+              max={5}
+              step={0.1}
+              value={1}
+              onChange={(frequency) =>
+                setGroupEffect("pulse", true, { kind: "pulse", amplitude: 0.5, frequency })
+              }
+            />
+          </div>
+        </GroupEffectRow>
+
+        <GroupEffectRow
+          label="Магнит"
+          kind="magnet"
+          count={getEffectCount("magnet")}
+          total={count}
+          onToggle={(enabled) => setGroupEffect("magnet", enabled)}
+        >
+          <MagnetFields
+            effect={{ kind: "magnet", mode: "attract", radius: 240, force: 2200 }}
+            onChange={(effect) => setGroupEffect("magnet", true, effect)}
+          />
+        </GroupEffectRow>
+
+        <div className="rounded-lg border border-line/70 bg-abyss/40 p-3 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-foam">Порталы</span>
+            {count === 2 ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isLinkedPortalPair ? "bg-emerald-400/20 text-emerald-300" : "bg-cyan-neon/20 text-cyan-neon"}`}
+              >
+                {isLinkedPortalPair ? "✓ Пара связана" : "Выбрано ровно 2 блока"}
+              </span>
+            ) : (
+              <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] text-amber-300 font-semibold">
+                Требуется 2 блока (сейчас: {count})
+              </span>
+            )}
+          </div>
+
+          {count === 2 ? (
+            isLinkedPortalPair ? (
+              <div className="space-y-2">
+                <p className="text-[11px] text-emerald-300">
+                  Выделенные 2 блока образуют согласованную пару порталов.
+                </p>
+                <button
+                  type="button"
+                  className="btn-ghost w-full py-1.5 text-xs text-punch hover:border-punch/60"
+                  onClick={() =>
+                    dispatch({ type: "UNLINK_PORTALS", blockIds: state.selectedBlockIds })
+                  }
+                >
+                  Разорвать связь порталов
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[11px] text-dim">
+                  Свяжите два блока в парный телепорт, чтобы шар переносился между ними.
+                </p>
+                <button
+                  type="button"
+                  className="btn-ghost w-full py-1.5 text-xs text-cyan-neon hover:border-cyan-neon"
+                  onClick={() =>
+                    dispatch({
+                      type: "LINK_PORTAL_PAIR",
+                      blockIds: [state.selectedBlockIds[0]!, state.selectedBlockIds[1]!],
+                    })
+                  }
+                >
+                  🔗 Связать в пару порталов
+                </button>
+              </div>
+            )
+          ) : (
+            <div className="space-y-2">
+              <p className="text-[11px] text-dim">
+                Порталы на карте обязаны быть строго парными (ровно 2 блока на ID пары). Массовое
+                добавление порталов на произвольное число блоков заблокировано для сохранения
+                валидности карты.
+              </p>
+              {portalBlocks.length > 0 && (
+                <button
+                  type="button"
+                  className="btn-ghost w-full py-1 text-xs text-punch hover:border-punch/60"
+                  onClick={() =>
+                    dispatch({ type: "UNLINK_PORTALS", blockIds: state.selectedBlockIds })
+                  }
+                >
+                  Очистить порталы из группы ({portalBlocks.length} бл.)
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <div className="pt-2 border-t border-line/40 text-[11px] text-dim space-y-1">
+        <p>
+          • <span className="text-foam">Ctrl+Z</span> — отмена изменений / перемещений
+        </p>
+        <p>
+          • <span className="text-foam">Ctrl+Y</span> — повтор операции
+        </p>
+      </div>
+    </aside>
+  )
+}
+
+function GroupEffectRow({
+  label,
+  kind: _kind,
+  count,
+  total,
+  mutualNotice,
+  onToggle,
+  children,
+}: {
+  label: string
+  kind: PlayerBlockEffect["kind"]
+  count: number
+  total: number
+  mutualNotice?: string
+  onToggle: (enabled: boolean) => void
+  children?: React.ReactNode
+}) {
+  const all = count === total
+  const some = count > 0 && count < total
+  const none = count === 0
+
+  return (
+    <div className="rounded-lg border border-line bg-abyss/40 p-2.5 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-foam">{label}</span>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              all
+                ? "bg-emerald-400/20 text-emerald-300"
+                : some
+                  ? "bg-amber-400/20 text-amber-300"
+                  : "bg-abyss text-dim"
+            }`}
+          >
+            {all ? "✓ У всех" : some ? `~ ${count}/${total}` : "Выкл"}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          {none && (
+            <button
+              type="button"
+              className="rounded border border-cyan-neon/40 bg-cyan-neon/10 px-2 py-0.5 text-[11px] text-cyan-neon hover:bg-cyan-neon/20"
+              onClick={() => onToggle(true)}
+            >
+              Включить
+            </button>
+          )}
+          {some && (
+            <>
+              <button
+                type="button"
+                className="rounded border border-cyan-neon/40 bg-cyan-neon/10 px-2 py-0.5 text-[11px] text-cyan-neon hover:bg-cyan-neon/20"
+                onClick={() => onToggle(true)}
+              >
+                Все
+              </button>
+              <button
+                type="button"
+                className="rounded border border-punch/40 bg-punch/10 px-2 py-0.5 text-[11px] text-punch hover:bg-punch/20"
+                onClick={() => onToggle(false)}
+              >
+                Снять
+              </button>
+            </>
+          )}
+          {all && (
+            <button
+              type="button"
+              className="rounded border border-line bg-abyss px-2 py-0.5 text-[11px] text-dim hover:text-punch hover:border-punch/50"
+              onClick={() => onToggle(false)}
+            >
+              Снять
+            </button>
+          )}
+        </div>
+      </div>
+      {mutualNotice && (all || some) && (
+        <p className="text-[10px] text-amber-300/90">{mutualNotice}</p>
+      )}
+      {(all || some) && children}
     </div>
   )
 }

@@ -366,6 +366,168 @@ describe("editorReducer", () => {
     })
     expect(limited.map.blocks).toHaveLength(200)
   })
+
+  it("mass updates properties of selected blocks with validation and circle constraint", () => {
+    let state = createEditorState(makeMap())
+    // Make first block rect, second circle
+    state = editorReducer(state, {
+      type: "UPDATE_BLOCKS",
+      blockIds: ["a", "b"],
+      updates: { hp: 7, size: { width: 60, height: 40 } },
+    })
+    expect(state.map.blocks[0]!.hp).toBe(7)
+    expect(state.map.blocks[1]!.hp).toBe(7)
+    // Block "a" is ellipse -> 60x40
+    expect(state.map.blocks[0]!.size).toEqual({ width: 60, height: 40 })
+    // Block "b" is circle -> constraint: width === height -> 40x40 (min side)
+    expect(state.map.blocks[1]!.size).toEqual({ width: 40, height: 40 })
+
+    // Change shape to rect on all selected
+    state = editorReducer(state, {
+      type: "UPDATE_BLOCKS",
+      blockIds: ["a", "b"],
+      updates: { shape: "rect", size: { width: 80, height: 50 } },
+    })
+    expect(state.map.blocks[0]!.shape).toBe("rect")
+    expect(state.map.blocks[1]!.shape).toBe("rect")
+    expect(state.map.blocks[0]!.size).toEqual({ width: 80, height: 50 })
+    expect(state.map.blocks[1]!.size).toEqual({ width: 80, height: 50 })
+
+    // HP is clamped to [1, 8]
+    state = editorReducer(state, {
+      type: "UPDATE_BLOCKS",
+      blockIds: ["a"],
+      updates: { hp: 12 },
+    })
+    expect(state.map.blocks[0]!.hp).toBe(8)
+  })
+
+  it("handles mass effect toggling with mutual exclusion between spring and cotton", () => {
+    let state = createEditorState(makeMap())
+    // Enable spring on both blocks
+    state = editorReducer(state, {
+      type: "SET_BLOCKS_EFFECT",
+      blockIds: ["a", "b"],
+      kind: "spring",
+      enabled: true,
+    })
+    expect(state.map.blocks[0]!.effects?.some((e) => e.kind === "spring")).toBe(true)
+    expect(state.map.blocks[1]!.effects?.some((e) => e.kind === "spring")).toBe(true)
+
+    // Now enable cotton -> spring MUST be automatically removed (mutual exclusion)
+    state = editorReducer(state, {
+      type: "SET_BLOCKS_EFFECT",
+      blockIds: ["a", "b"],
+      kind: "cotton",
+      enabled: true,
+    })
+    expect(state.map.blocks[0]!.effects?.some((e) => e.kind === "cotton")).toBe(true)
+    expect(state.map.blocks[0]!.effects?.some((e) => e.kind === "spring")).toBe(false)
+    expect(state.map.blocks[1]!.effects?.some((e) => e.kind === "cotton")).toBe(true)
+    expect(state.map.blocks[1]!.effects?.some((e) => e.kind === "spring")).toBe(false)
+
+    // Disable cotton
+    state = editorReducer(state, {
+      type: "SET_BLOCKS_EFFECT",
+      blockIds: ["a", "b"],
+      kind: "cotton",
+      enabled: false,
+    })
+    expect(state.map.blocks[0]!.effects).toBeUndefined()
+    expect(state.map.blocks[1]!.effects).toBeUndefined()
+  })
+
+  it("links and unlinks portal pairs between selected blocks", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, {
+      type: "LINK_PORTAL_PAIR",
+      blockIds: ["a", "b"],
+    })
+    const effA = state.map.blocks[0]!.effects?.find((e) => e.kind === "portal")
+    const effB = state.map.blocks[1]!.effects?.find((e) => e.kind === "portal")
+    expect(effA?.kind).toBe("portal")
+    expect(effB?.kind).toBe("portal")
+    if (effA?.kind === "portal" && effB?.kind === "portal") {
+      expect(effA.pairId).toBeTruthy()
+      expect(effA.pairId).toBe(effB.pairId)
+    }
+
+    // Unlink portals
+    state = editorReducer(state, {
+      type: "UNLINK_PORTALS",
+      blockIds: ["a", "b"],
+    })
+    expect(state.map.blocks[0]!.effects).toBeUndefined()
+    expect(state.map.blocks[1]!.effects).toBeUndefined()
+  })
+
+  it("clones a group sequence preserving relative offsets and remapping complete portal pairs", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, { type: "SET_SNAP_TO_GRID", enabled: false })
+    // Move initial blocks safely below HUD (y >= 155)
+    state = editorReducer(state, {
+      type: "UPDATE_BLOCKS",
+      blockIds: ["a", "b"],
+      updates: { position: { x: 100, y: 200 } },
+    })
+    // Position b at x: 200, y: 200
+    state = editorReducer(state, {
+      type: "UPDATE_BLOCK",
+      blockId: "b",
+      updates: { position: { x: 200, y: 200 } },
+    })
+
+    // Add portal pair between a and b
+    state = editorReducer(state, {
+      type: "LINK_PORTAL_PAIR",
+      blockIds: ["a", "b"],
+    })
+    const initialPairId = (
+      state.map.blocks[0]!.effects!.find((e) => e.kind === "portal") as { pairId: string }
+    ).pairId
+
+    // Clone group with 2 steps
+    state = editorReducer(state, {
+      type: "CLONE_GROUP_SEQUENCE",
+      blockIds: ["a", "b"],
+      deltas: [
+        { x: 128, y: 0 },
+        { x: 256, y: 0 },
+      ],
+    })
+    expect(state.map.blocks).toHaveLength(6) // 2 originals + 2 in step 1 + 2 in step 2
+    // New blocks are selected
+    expect(state.selectedBlockIds).toHaveLength(4)
+
+    // Check positions for step 1
+    expect(state.map.blocks[2]!.position).toEqual({ x: 100 + 128, y: 200 })
+    expect(state.map.blocks[3]!.position).toEqual({ x: 200 + 128, y: 200 })
+
+    // Check portal pair remapping for step 1
+    const p1A = state.map.blocks[2]!.effects?.find((e) => e.kind === "portal") as {
+      pairId: string
+    }
+    const p1B = state.map.blocks[3]!.effects?.find((e) => e.kind === "portal") as {
+      pairId: string
+    }
+    expect(p1A.pairId).not.toBe(initialPairId)
+    expect(p1A.pairId).toBe(p1B.pairId)
+
+    // Check portal pair remapping for step 2
+    const p2A = state.map.blocks[4]!.effects?.find((e) => e.kind === "portal") as {
+      pairId: string
+    }
+    const p2B = state.map.blocks[5]!.effects?.find((e) => e.kind === "portal") as {
+      pairId: string
+    }
+    expect(p2A.pairId).not.toBe(initialPairId)
+    expect(p2A.pairId).not.toBe(p1A.pairId)
+    expect(p2A.pairId).toBe(p2B.pairId)
+
+    // Undo restores the 2 blocks
+    const undone = editorReducer(state, { type: "UNDO" })
+    expect(undone.map.blocks).toHaveLength(2)
+  })
 })
 
 describe("editor draft storage", () => {

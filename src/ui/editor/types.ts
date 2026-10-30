@@ -1,4 +1,4 @@
-import type { PlayerBlockSpec, PlayerMapSpec } from "../../game/mapSpec"
+import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapSpec } from "../../game/mapSpec"
 
 export type EditorTool = "select" | "add" | "delete"
 
@@ -45,6 +45,10 @@ export interface EditorInspectorProps {
   author: string
 }
 
+export type PlayerBlockUpdates = Partial<Omit<PlayerBlockSpec, "size">> & {
+  size?: Partial<PlayerBlockSpec["size"]>
+}
+
 export type EditorAction =
   | { type: "SET_MAP"; map: PlayerMapSpec; preserveHistory?: boolean }
   | { type: "SELECT_BLOCK"; blockId: string | null }
@@ -55,7 +59,17 @@ export type EditorAction =
   | { type: "SET_GRID_SIZE"; gridSize: number }
   | { type: "SET_SNAP_TO_GRID"; enabled: boolean }
   | { type: "ADD_BLOCK"; block?: Partial<PlayerBlockSpec>; position: { x: number; y: number } }
-  | { type: "UPDATE_BLOCK"; blockId: string; updates: Partial<PlayerBlockSpec> }
+  | { type: "UPDATE_BLOCK"; blockId: string; updates: PlayerBlockUpdates }
+  | { type: "UPDATE_BLOCKS"; blockIds: string[]; updates: PlayerBlockUpdates }
+  | {
+      type: "SET_BLOCKS_EFFECT"
+      blockIds: string[]
+      kind: PlayerBlockEffect["kind"]
+      enabled: boolean
+      effect?: PlayerBlockEffect
+    }
+  | { type: "LINK_PORTAL_PAIR"; blockIds: [string, string] }
+  | { type: "UNLINK_PORTALS"; blockIds: string[] }
   | { type: "DELETE_BLOCK"; blockId?: string }
   | { type: "DELETE_SELECTED_BLOCKS" }
   | {
@@ -71,6 +85,7 @@ export type EditorAction =
   | { type: "CANCEL_PASTE" }
   | { type: "COMMIT_PASTE"; blocks: PlayerBlockSpec[] }
   | { type: "CLONE_SEQUENCE"; blockId: string; positions: { x: number; y: number }[] }
+  | { type: "CLONE_GROUP_SEQUENCE"; blockIds: string[]; deltas: { x: number; y: number }[] }
   | {
       type: "UPDATE_METADATA"
       metadata?: Partial<PlayerMapSpec["metadata"]>

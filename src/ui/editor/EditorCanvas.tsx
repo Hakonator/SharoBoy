@@ -18,6 +18,7 @@ interface DragState {
   originals: PlayerBlockSpec[]
   handle?: number
   clonePositions?: { x: number; y: number }[]
+  groupDeltas?: { x: number; y: number }[]
   source?: PlayerBlockSpec
   limitReached?: boolean
   moved: boolean
@@ -150,6 +151,17 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
             }
           : selectedBlock
       drawTransformHandles(context, previewBlock)
+    } else if (selected.length > 1) {
+      const previewBlocks = groupPreview
+        ? selected.map((b) => ({
+            ...b,
+            position: {
+              x: b.position.x + groupPreview.delta.x,
+              y: b.position.y + groupPreview.delta.y,
+            },
+          }))
+        : selected
+      drawGroupSelectionFrame(context, previewBlocks)
     }
     for (const block of clonePreview) drawBlock(context, block, false, 0.42)
     if (marquee) drawMarquee(context, marquee.start, marquee.end)
@@ -268,6 +280,40 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     if (!point || !isInsideWorld(point)) return
     event.currentTarget.setPointerCapture(event.pointerId)
     const selected = state.map.blocks.filter((item) => state.selectedBlockIds.includes(item.id))
+    if (selected.length > 1 && isGroupCloneHandle(selected, point)) {
+      const portalCounts = new Map<string, number>()
+      for (const b of selected) {
+        for (const eff of b.effects ?? []) {
+          if (eff.kind === "portal") {
+            portalCounts.set(eff.pairId, (portalCounts.get(eff.pairId) ?? 0) + 1)
+          }
+        }
+      }
+      let hasIncompletePortal = false
+      for (const count of portalCounts.values()) {
+        if (count !== 2) {
+          hasIncompletePortal = true
+          break
+        }
+      }
+      if (hasIncompletePortal) {
+        showNotice(
+          "Группы с непарными порталами нельзя копировать протяжкой: порталы требуют парной связи внутри группы."
+        )
+        return
+      }
+
+      dragRef.current = {
+        kind: "clone",
+        blockIds: selected.map((b) => b.id),
+        originals: selected,
+        startX: point.x,
+        startY: point.y,
+        moved: false,
+      }
+      return
+    }
+
     if (selected.length === 1) {
       if (isCloneHandle(selected[0]!, point)) {
         if (selected[0]!.effects?.some((effect) => effect.kind === "portal")) {
@@ -357,9 +403,11 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     const drag = dragRef.current
     if (!drag) {
       const selected = state.map.blocks.filter((item) => state.selectedBlockIds.includes(item.id))
+      const isGroupClone = selected.length > 1 && isGroupCloneHandle(selected, point)
+      const isSingleClone = selected.length === 1 && isCloneHandle(selected[0]!, point)
       const handle = selected.length === 1 ? hitTestTransformHandle(selected[0]!, point) : null
       event.currentTarget.style.cursor =
-        selected.length === 1 && isCloneHandle(selected[0]!, point)
+        isGroupClone || isSingleClone
           ? "copy"
           : handle?.kind === "rotate"
             ? "grab"
@@ -374,6 +422,19 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       return
     }
     if (drag.kind === "clone") {
+      if (drag.originals.length > 1) {
+        const sequence = createGroupCloneSequence(
+          drag.originals,
+          point,
+          state,
+          drag.startX,
+          drag.startY
+        )
+        drag.groupDeltas = sequence.deltas
+        drag.limitReached = sequence.limitReached
+        setClonePreview(sequence.previewBlocks)
+        return
+      }
       const source = drag.source
       if (!source) return
       const sequence = createCloneSequence(source, point, state, drag.startX, drag.startY)
@@ -447,14 +508,28 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
           .map((block) => block.id),
       })
     } else if (drag.kind === "clone") {
-      if (drag.clonePositions?.length) {
-        dispatch({
-          type: "CLONE_SEQUENCE",
-          blockId: drag.blockIds[0]!,
-          positions: drag.clonePositions,
-        })
+      if (drag.originals.length > 1) {
+        if (drag.groupDeltas?.length) {
+          dispatch({
+            type: "CLONE_GROUP_SEQUENCE",
+            blockIds: drag.blockIds,
+            deltas: drag.groupDeltas,
+          })
+          showNotice(
+            `Скопировано повторений группы: ${drag.groupDeltas.length} (+${drag.groupDeltas.length * drag.originals.length} блоков).`
+          )
+        }
+        if (drag.limitReached) showNotice("Достигнут лимит карты: не более 200 блоков.")
+      } else {
+        if (drag.clonePositions?.length) {
+          dispatch({
+            type: "CLONE_SEQUENCE",
+            blockId: drag.blockIds[0]!,
+            positions: drag.clonePositions,
+          })
+        }
+        if (drag.limitReached) showNotice("Достигнут лимит карты: не более 200 блоков.")
       }
-      if (drag.limitReached) showNotice("Достигнут лимит карты: не более 200 блоков.")
     } else if (drag.kind === "move") {
       const rawDelta = { x: point.x - drag.startX, y: point.y - drag.startY }
       const delta = state.snapToGrid
@@ -910,6 +985,186 @@ function createCloneSequence(
     positions.push(position)
   }
   return { positions, limitReached: steps > freeSlots }
+}
+
+function getBlocksBoundingBox(blocks: PlayerBlockSpec[]) {
+  if (blocks.length === 0) {
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0 }
+  }
+  let minX = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  for (const b of blocks) {
+    const corners = blockCorners(b)
+    for (const c of corners) {
+      minX = Math.min(minX, c.x)
+      maxX = Math.max(maxX, c.x)
+      minY = Math.min(minY, c.y)
+      maxY = Math.max(maxY, c.y)
+    }
+  }
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    width: Math.max(20, maxX - minX),
+    height: Math.max(20, maxY - minY),
+  }
+}
+
+function drawGroupSelectionFrame(context: CanvasRenderingContext2D, blocks: PlayerBlockSpec[]) {
+  if (blocks.length <= 1) return
+  const bbox = getBlocksBoundingBox(blocks)
+  const pad = 8
+  const x = bbox.minX - pad
+  const y = bbox.minY - pad
+  const w = bbox.width + pad * 2
+  const h = bbox.height + pad * 2
+
+  context.save()
+  // Dashed neon frame
+  context.strokeStyle = "#52f5ff"
+  context.lineWidth = 2
+  context.setLineDash([8, 6])
+  context.strokeRect(x, y, w, h)
+  context.setLineDash([])
+
+  // Corner anchor points (top-left, top-right, bottom-left)
+  context.fillStyle = "#07131b"
+  context.strokeStyle = "#52f5ff"
+  context.lineWidth = 1.5
+  const corners = [
+    [x, y],
+    [x + w, y],
+    [x, y + h],
+  ] as const
+  for (const [cx, cy] of corners) {
+    context.fillRect(cx - 3.5, cy - 3.5, 7, 7)
+    context.strokeRect(cx - 3.5, cy - 3.5, 7, 7)
+  }
+
+  // Clone handle at bottom-right corner
+  const hx = x + w
+  const hy = y + h
+  context.beginPath()
+  context.arc(hx, hy, 12, 0, Math.PI * 2)
+  context.fillStyle = "#42ffb0"
+  context.shadowColor = "#42ffb0"
+  context.shadowBlur = 10
+  context.fill()
+  context.shadowBlur = 0
+  context.strokeStyle = "#05241c"
+  context.lineWidth = 2.5
+  context.stroke()
+
+  // "+" sign
+  context.fillStyle = "#05241c"
+  context.font = "bold 16px sans-serif"
+  context.textAlign = "center"
+  context.textBaseline = "middle"
+  context.fillText("+", hx, hy)
+
+  // Floating label with count
+  const label = `Группа: ${blocks.length} бл.`
+  context.font = "bold 12px sans-serif"
+  const textWidth = context.measureText(label).width
+  const lw = textWidth + 14
+  const lh = 20
+  const lx = x + (w - lw) / 2
+  const ly = y - lh - 4
+  if (ly >= HUD_BOTTOM) {
+    context.fillStyle = "rgba(7, 19, 27, 0.88)"
+    context.beginPath()
+    if (typeof context.roundRect === "function") {
+      context.roundRect(lx, ly, lw, lh, 4)
+    } else {
+      context.rect(lx, ly, lw, lh)
+    }
+    context.fill()
+    context.strokeStyle = "rgba(82, 245, 255, 0.5)"
+    context.lineWidth = 1
+    context.stroke()
+
+    context.fillStyle = "#52f5ff"
+    context.fillText(label, lx + lw / 2, ly + lh / 2)
+  }
+
+  context.restore()
+}
+
+function isGroupCloneHandle(blocks: PlayerBlockSpec[], point: { x: number; y: number }) {
+  if (blocks.length <= 1) return false
+  const bbox = getBlocksBoundingBox(blocks)
+  const pad = 8
+  const hx = bbox.maxX + pad
+  const hy = bbox.maxY + pad
+  return Math.hypot(point.x - hx, point.y - hy) <= 16
+}
+
+function createGroupCloneSequence(
+  originals: PlayerBlockSpec[],
+  point: { x: number; y: number },
+  state: EditorState,
+  startX: number,
+  startY: number
+): { deltas: { x: number; y: number }[]; limitReached: boolean; previewBlocks: PlayerBlockSpec[] } {
+  const dx = point.x - startX
+  const dy = point.y - startY
+  const horizontal = Math.abs(dx) >= Math.abs(dy)
+  const rawDistance = horizontal ? dx : dy
+  const bbox = getBlocksBoundingBox(originals)
+
+  const minDim = horizontal ? bbox.width : bbox.height
+  const stepSize = state.snapToGrid
+    ? Math.max(state.gridSize, Math.ceil(minDim / state.gridSize) * state.gridSize)
+    : Math.max(20, Math.round(minDim))
+
+  const maxSteps = Math.floor(Math.abs(rawDistance) / stepSize)
+  const blocksPerStep = originals.length
+  const freeSlots = Math.max(0, MAX_BLOCKS - state.map.blocks.length)
+  const maxAllowedSteps = Math.floor(freeSlots / blocksPerStep)
+  const steps = Math.min(maxSteps, maxAllowedSteps)
+  const limitReached = maxSteps > maxAllowedSteps
+
+  const deltas: { x: number; y: number }[] = []
+  const previewBlocks: PlayerBlockSpec[] = []
+
+  const direction = Math.sign(rawDistance)
+  for (let step = 1; step <= steps; step++) {
+    const delta = {
+      x: horizontal ? direction * step * stepSize : 0,
+      y: !horizontal ? direction * step * stepSize : 0,
+    }
+    const stepBlocks: PlayerBlockSpec[] = []
+    let allValid = true
+    for (const [idx, b] of originals.entries()) {
+      const hw = b.size.width / 2
+      const hh = b.size.height / 2
+      const newPos = { x: b.position.x + delta.x, y: b.position.y + delta.y }
+      if (
+        newPos.x - hw < 0 ||
+        newPos.x + hw > WORLD_WIDTH ||
+        newPos.y - hh < HUD_BOTTOM ||
+        newPos.y + hh > PADDLE_ZONE_TOP
+      ) {
+        allValid = false
+        break
+      }
+      stepBlocks.push({
+        ...b,
+        id: `preview-grp-${step}-${idx}`,
+        position: newPos,
+      })
+    }
+    if (allValid) {
+      deltas.push(delta)
+      previewBlocks.push(...stepBlocks)
+    }
+  }
+
+  return { deltas, limitReached, previewBlocks }
 }
 
 function drawBlock(

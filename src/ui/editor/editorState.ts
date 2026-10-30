@@ -1,7 +1,7 @@
-import type { PlayerBlockSpec, PlayerMapSpec } from "../../game/mapSpec"
+import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapSpec } from "../../game/mapSpec"
 import { PADDLE_ZONE_TOP } from "../../game/mapValidator"
 
-import type { EditorAction, EditorState } from "./types"
+import type { EditorAction, EditorState, PlayerBlockUpdates } from "./types"
 
 export const EDITOR_DRAFT_STORAGE_KEY = "sharoboy_custom_map_draft"
 const HISTORY_LIMIT = 30
@@ -93,6 +93,66 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           ? mergeBlock(block, normalizeBlockUpdates(block, action.updates))
           : block
       )
+      return updateMap(state, { ...state.map, blocks })
+    }
+    case "UPDATE_BLOCKS": {
+      const selectedIds = new Set(action.blockIds)
+      if (selectedIds.size === 0) return state
+      const blocks = state.map.blocks.map((block) => {
+        if (!selectedIds.has(block.id)) return block
+        const normalized = normalizeBlockUpdates(block, action.updates)
+        return mergeBlock(block, normalized)
+      })
+      return updateMap(state, { ...state.map, blocks })
+    }
+    case "SET_BLOCKS_EFFECT": {
+      const selectedIds = new Set(action.blockIds)
+      if (selectedIds.size === 0) return state
+      const blocks = state.map.blocks.map((block) => {
+        if (!selectedIds.has(block.id)) return block
+        let effects = [...(block.effects ?? [])]
+        effects = effects.filter((e) => e.kind !== action.kind)
+        if (action.enabled) {
+          if (action.kind === "spring") effects = effects.filter((e) => e.kind !== "cotton")
+          if (action.kind === "cotton") effects = effects.filter((e) => e.kind !== "spring")
+          const toAdd = action.effect ?? defaultEffect(action.kind, block)
+          if (toAdd) effects.push(toAdd)
+        }
+        return {
+          ...block,
+          effects: effects.length > 0 ? sanitizeEffects(effects) : undefined,
+        }
+      })
+      return updateMap(state, { ...state.map, blocks })
+    }
+    case "LINK_PORTAL_PAIR": {
+      const [id1, id2] = action.blockIds
+      if (!id1 || !id2 || id1 === id2) return state
+      const b1 = state.map.blocks.find((b) => b.id === id1)
+      const b2 = state.map.blocks.find((b) => b.id === id2)
+      if (!b1 || !b2) return state
+      const pairId = `portal-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      const blocks = state.map.blocks.map((block) => {
+        if (block.id !== id1 && block.id !== id2) return block
+        const filtered = (block.effects ?? []).filter((e) => e.kind !== "portal")
+        return {
+          ...block,
+          effects: [...filtered, { kind: "portal" as const, pairId }],
+        }
+      })
+      return updateMap(state, { ...state.map, blocks })
+    }
+    case "UNLINK_PORTALS": {
+      const targetIds = new Set(action.blockIds)
+      if (targetIds.size === 0) return state
+      const blocks = state.map.blocks.map((block) => {
+        if (!targetIds.has(block.id)) return block
+        const filtered = (block.effects ?? []).filter((e) => e.kind !== "portal")
+        return {
+          ...block,
+          effects: filtered.length > 0 ? filtered : undefined,
+        }
+      })
       return updateMap(state, { ...state.map, blocks })
     }
     case "DELETE_BLOCK": {
@@ -245,6 +305,74 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         const mapWithCopies = { ...state.map, blocks: [...state.map.blocks, ...additions] }
         additions.push({ ...cloneBlocks([source])[0]!, id: createBlockId(mapWithCopies), position })
       }
+      return updateMap(
+        state,
+        { ...state.map, blocks: [...state.map.blocks, ...additions] },
+        additions.map((block) => block.id)
+      )
+    }
+    case "CLONE_GROUP_SEQUENCE": {
+      const sources = state.map.blocks.filter((block) => action.blockIds.includes(block.id))
+      if (sources.length === 0 || action.deltas.length === 0) return state
+
+      const portalMap = new Map<string, string[]>()
+      for (const block of sources) {
+        for (const effect of block.effects ?? []) {
+          if (effect.kind === "portal") {
+            const list = portalMap.get(effect.pairId) ?? []
+            list.push(block.id)
+            portalMap.set(effect.pairId, list)
+          }
+        }
+      }
+      for (const list of portalMap.values()) {
+        if (list.length !== 2) return state
+      }
+
+      const available = Math.max(0, MAX_BLOCKS - state.map.blocks.length)
+      const additions: PlayerBlockSpec[] = []
+      let slotsLeft = available
+
+      for (const delta of action.deltas) {
+        if (slotsLeft < sources.length) break
+        const stepPortalMap = new Map<string, string>()
+        for (const pairId of portalMap.keys()) {
+          stepPortalMap.set(
+            pairId,
+            `portal-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+          )
+        }
+
+        const stepBlocks: PlayerBlockSpec[] = []
+        for (const source of sources) {
+          const mapWithCopies = {
+            ...state.map,
+            blocks: [...state.map.blocks, ...additions, ...stepBlocks],
+          }
+          const newId = createBlockId(mapWithCopies)
+          const newPosition = clampPosition(
+            snapPosition({ x: source.position.x + delta.x, y: source.position.y + delta.y }, state),
+            source.size.width,
+            source.size.height
+          )
+          const newEffects = source.effects?.map((effect) => {
+            if (effect.kind === "portal" && stepPortalMap.has(effect.pairId)) {
+              return { ...effect, pairId: stepPortalMap.get(effect.pairId)! }
+            }
+            return { ...effect }
+          })
+          stepBlocks.push({
+            ...cloneBlocks([source])[0]!,
+            id: newId,
+            position: newPosition,
+            ...(newEffects ? { effects: newEffects } : {}),
+          })
+        }
+        additions.push(...stepBlocks)
+        slotsLeft -= sources.length
+      }
+
+      if (additions.length === 0) return state
       return updateMap(
         state,
         { ...state.map, blocks: [...state.map.blocks, ...additions] },
@@ -412,79 +540,162 @@ function clampPosition(position: { x: number; y: number }, width: number, height
   }
 }
 
+export function defaultEffect(
+  kind: PlayerBlockEffect["kind"],
+  _block?: PlayerBlockSpec
+): PlayerBlockEffect | null {
+  switch (kind) {
+    case "armor":
+      return { kind, amount: 1 }
+    case "brittle":
+      return { kind, radius: 120, damage: 1 }
+    case "phase":
+      return { kind, period: 3.2, activeFraction: 0.62, offset: 0 }
+    case "spring":
+      return { kind }
+    case "cotton":
+      return { kind }
+    case "pulse":
+      return { kind, amplitude: 0.5, frequency: 1 }
+    case "magnet":
+      return { kind, mode: "attract", radius: 240, force: 2200 }
+    case "portal":
+      return { kind, pairId: "portal-pair" }
+    case "spin":
+      return { kind, direction: "clockwise" }
+    case "normal":
+      return { kind }
+  }
+}
+
+function findLastEffectIndex(list: PlayerBlockEffect[], kind: PlayerBlockEffect["kind"]): number {
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i]!.kind === kind) return i
+  }
+  return -1
+}
+
+export function sanitizeEffects(effects: PlayerBlockEffect[]): PlayerBlockEffect[] {
+  // Mutual exclusion: spring vs cotton
+  const hasSpring = effects.some((e) => e.kind === "spring")
+  const hasCotton = effects.some((e) => e.kind === "cotton")
+  let list = effects
+  if (hasSpring && hasCotton) {
+    const lastSpring = findLastEffectIndex(list, "spring")
+    const lastCotton = findLastEffectIndex(list, "cotton")
+    list =
+      lastSpring > lastCotton
+        ? list.filter((e) => e.kind !== "cotton")
+        : list.filter((e) => e.kind !== "spring")
+  }
+
+  return list.map((effect) => {
+    if (effect.kind === "armor") {
+      return { ...effect, amount: Math.max(1, Math.min(5, Math.round(effect.amount))) }
+    }
+    if (effect.kind === "brittle") {
+      return {
+        ...effect,
+        ...(effect.radius === undefined
+          ? {}
+          : { radius: Math.max(10, Math.min(1000, Math.round(effect.radius))) }),
+        ...(effect.damage === undefined
+          ? {}
+          : { damage: Math.max(1, Math.min(5, Math.round(effect.damage))) }),
+      }
+    }
+    if (effect.kind === "phase") {
+      return {
+        ...effect,
+        ...(effect.period === undefined
+          ? {}
+          : { period: Math.max(0.5, Math.min(20, Math.round(effect.period * 10) / 10)) }),
+        ...(effect.activeFraction === undefined
+          ? {}
+          : {
+              activeFraction: Math.max(
+                0.05,
+                Math.min(0.95, Math.round(effect.activeFraction * 100) / 100)
+              ),
+            }),
+        ...(effect.offset === undefined
+          ? {}
+          : { offset: Math.max(0, Math.min(100, Math.round(effect.offset * 10) / 10)) }),
+      }
+    }
+    if (effect.kind === "magnet") {
+      return {
+        ...effect,
+        ...(effect.radius === undefined
+          ? {}
+          : { radius: Math.max(50, Math.min(500, Math.round(effect.radius))) }),
+        ...(effect.force === undefined
+          ? {}
+          : { force: Math.max(-5000, Math.min(5000, Math.round(effect.force))) }),
+      }
+    }
+    if (effect.kind === "pulse") {
+      return {
+        ...effect,
+        amplitude: Math.max(0.1, Math.min(2, Math.round(effect.amplitude * 10) / 10)),
+        frequency: Math.max(0.1, Math.min(5, Math.round(effect.frequency * 10) / 10)),
+      }
+    }
+    if (effect.kind === "spring" || effect.kind === "cotton") {
+      const minMult = effect.kind === "spring" ? 1.1 : 0.1
+      const maxMult = effect.kind === "spring" ? 3 : 0.9
+      return {
+        ...effect,
+        ...(effect.speedMultiplier === undefined
+          ? {}
+          : {
+              speedMultiplier: Math.max(
+                minMult,
+                Math.min(maxMult, Math.round(effect.speedMultiplier * 10) / 10)
+              ),
+            }),
+        ...(effect.duration === undefined
+          ? {}
+          : { duration: Math.max(1, Math.min(10, Math.round(effect.duration * 10) / 10)) }),
+      }
+    }
+    return effect
+  })
+}
+
 function normalizeBlockUpdates(
   block: PlayerBlockSpec,
-  updates: Partial<PlayerBlockSpec>
+  updates: PlayerBlockUpdates
 ): Partial<PlayerBlockSpec> {
+  const nextSize = updates.size
+    ? {
+        width:
+          updates.size.width !== undefined
+            ? Math.max(20, Math.min(100, Math.round(updates.size.width)))
+            : block.size.width,
+        height:
+          updates.size.height !== undefined
+            ? Math.max(20, Math.min(100, Math.round(updates.size.height)))
+            : block.size.height,
+      }
+    : undefined
+
+  const restUpdates = { ...updates }
+  delete (restUpdates as { size?: unknown }).size
   const next: Partial<PlayerBlockSpec> = {
-    ...updates,
+    ...restUpdates,
     ...(updates.position
       ? { position: { x: Math.round(updates.position.x), y: Math.round(updates.position.y) } }
       : {}),
-    ...(updates.size
-      ? { size: { width: Math.round(updates.size.width), height: Math.round(updates.size.height) } }
-      : {}),
-    ...(updates.hp === undefined ? {} : { hp: Math.round(updates.hp) }),
+    ...(nextSize ? { size: nextSize } : {}),
+    ...(updates.hp === undefined ? {} : { hp: Math.max(1, Math.min(8, Math.round(updates.hp))) }),
     ...(updates.rotation === undefined
       ? {}
       : { rotation: (Math.round((updates.rotation * 180) / Math.PI / 5) * 5 * Math.PI) / 180 }),
-    ...(updates.effects
-      ? {
-          effects: updates.effects.map((effect) => {
-            if (effect.kind === "armor") return { ...effect, amount: Math.round(effect.amount) }
-            if (effect.kind === "brittle") {
-              return {
-                ...effect,
-                ...(effect.radius === undefined ? {} : { radius: Math.round(effect.radius) }),
-                ...(effect.damage === undefined ? {} : { damage: Math.round(effect.damage) }),
-              }
-            }
-            if (effect.kind === "phase") {
-              return {
-                ...effect,
-                ...(effect.period === undefined
-                  ? {}
-                  : { period: Math.round(effect.period * 10) / 10 }),
-                ...(effect.activeFraction === undefined
-                  ? {}
-                  : { activeFraction: Math.round(effect.activeFraction * 100) / 100 }),
-                ...(effect.offset === undefined
-                  ? {}
-                  : { offset: Math.round(effect.offset * 10) / 10 }),
-              }
-            }
-            if (effect.kind === "magnet") {
-              return {
-                ...effect,
-                ...(effect.radius === undefined ? {} : { radius: Math.round(effect.radius) }),
-                ...(effect.force === undefined ? {} : { force: Math.round(effect.force) }),
-              }
-            }
-            if (effect.kind === "pulse") {
-              return {
-                ...effect,
-                amplitude: Math.round(effect.amplitude * 10) / 10,
-                frequency: Math.round(effect.frequency * 10) / 10,
-              }
-            }
-            if (effect.kind === "spring" || effect.kind === "cotton") {
-              return {
-                ...effect,
-                ...(effect.speedMultiplier === undefined
-                  ? {}
-                  : { speedMultiplier: Math.round(effect.speedMultiplier * 10) / 10 }),
-                ...(effect.duration === undefined
-                  ? {}
-                  : { duration: Math.round(effect.duration * 10) / 10 }),
-              }
-            }
-            return effect
-          }),
-        }
-      : {}),
+    ...(updates.effects ? { effects: sanitizeEffects(updates.effects) } : {}),
   }
   if (updates.shape === "circle" || (updates.shape === undefined && block.shape === "circle")) {
-    const size = updates.size ?? block.size
+    const size = next.size ?? block.size
     const side = Math.min(size.width, size.height)
     next.size = { width: side, height: side }
   }
