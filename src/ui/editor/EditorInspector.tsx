@@ -2,7 +2,7 @@ import { TIER } from "../../game/palette"
 import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapWinCondition } from "../../game/mapSpec"
 
 import { defaultEffect } from "./editorState"
-import { getBlocksBoundingBox } from "./EditorCanvas"
+import { getBlocksBoundingBox, getBlocksBoundingCenter } from "./EditorCanvas"
 import type { EditorAction, EditorInspectorProps, EditorState, PlayerBlockUpdates } from "./types"
 
 export function EditorInspector({ state, dispatch, author }: EditorInspectorProps) {
@@ -987,6 +987,27 @@ function GroupInspector({
           value={commonRot}
           onChange={(deg) => updateSelected({ rotation: (deg * Math.PI) / 180 })}
         />
+        <div className="grid grid-cols-5 gap-1 pt-1">
+          {[-90, -45, 45, 90, 180].map((deg) => (
+            <button
+              key={deg}
+              type="button"
+              className="rounded border border-amber-400/30 bg-abyss py-1 text-xs font-mono text-amber-300 transition-colors hover:border-amber-400 hover:bg-amber-400/10"
+              onClick={() => {
+                const center = getBlocksBoundingCenter(selectedBlocks)
+                dispatch({
+                  type: "ROTATE_GROUP",
+                  blockIds: state.selectedBlockIds,
+                  center,
+                  angle: (deg * Math.PI) / 180,
+                })
+              }}
+              title={`Повернуть группу на ${deg > 0 ? "+" + deg : deg}° вокруг центра`}
+            >
+              {deg > 0 ? `+${deg}°` : `${deg}°`}
+            </button>
+          ))}
+        </div>
       </div>
 
       <section className="space-y-3 border-t border-line pt-3">

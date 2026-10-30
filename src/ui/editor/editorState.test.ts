@@ -214,6 +214,64 @@ describe("editorReducer", () => {
     ])
   })
 
+  it("rotates selected blocks around a specified center point and supports undo/redo", () => {
+    const state = createEditorState(makeMap())
+    // Set initial positions well inside playing field
+    state.map.blocks[0]!.position = { x: 250, y: 300 }
+    state.map.blocks[1]!.position = { x: 350, y: 300 }
+    state.map.blocks[0]!.rotation = 0
+    state.map.blocks[1]!.rotation = 0
+
+    // Center is (300, 300), rotate +90 degrees (Math.PI / 2)
+    const center = { x: 300, y: 300 }
+    const rotated = editorReducer(state, {
+      type: "ROTATE_GROUP",
+      blockIds: ["a", "b"],
+      center,
+      angle: Math.PI / 2,
+    })
+
+    // After 90 deg clockwise rotation around (300, 300):
+    // a (250, 300): dx = -50, dy = 0 -> nx = 300, ny = 250
+    // b (350, 300): dx = 50, dy = 0  -> nx = 300, ny = 350
+    const blockA = rotated.map.blocks.find((b) => b.id === "a")!
+    const blockB = rotated.map.blocks.find((b) => b.id === "b")!
+
+    expect(blockA.position).toEqual({ x: 300, y: 250 })
+    expect(blockB.position).toEqual({ x: 300, y: 350 })
+    expect(blockA.rotation).toBeCloseTo(Math.PI / 2)
+    expect(blockB.rotation).toBeCloseTo(Math.PI / 2)
+
+    // Undo restores original positions and rotations
+    const undone = editorReducer(rotated, { type: "UNDO" })
+    expect(undone.map.blocks[0]!.position).toEqual({ x: 250, y: 300 })
+    expect(undone.map.blocks[1]!.position).toEqual({ x: 350, y: 300 })
+    expect(undone.map.blocks[0]!.rotation).toBe(0)
+    expect(undone.map.blocks[1]!.rotation).toBe(0)
+
+    // Redo re-applies rotation
+    const redone = editorReducer(undone, { type: "REDO" })
+    expect(redone.map.blocks[0]!.position).toEqual({ x: 300, y: 250 })
+    expect(redone.map.blocks[1]!.position).toEqual({ x: 300, y: 350 })
+
+    // No-op on near-zero angle or empty block list
+    const noop1 = editorReducer(state, {
+      type: "ROTATE_GROUP",
+      blockIds: ["a", "b"],
+      center,
+      angle: 0.0001,
+    })
+    expect(noop1).toBe(state)
+
+    const noop2 = editorReducer(state, {
+      type: "ROTATE_GROUP",
+      blockIds: [],
+      center,
+      angle: Math.PI / 2,
+    })
+    expect(noop2).toBe(state)
+  })
+
   it("copies and pastes selected blocks with unique ids and +32 offset", () => {
     let state = createEditorState(makeMap())
     state = editorReducer(state, { type: "SELECT_BLOCKS", blockIds: ["a", "b"] })

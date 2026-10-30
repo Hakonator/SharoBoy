@@ -4,6 +4,7 @@ import { TIER } from "../../game/palette"
 import { PADDLE_ZONE_TOP } from "../../game/mapValidator"
 import type { PlayerBlockEffect, PlayerBlockSpec } from "../../game/mapSpec"
 
+import { clampPosition } from "./editorState"
 import type { EditorCanvasProps, EditorState } from "./types"
 
 const WORLD_WIDTH = 1920
@@ -24,6 +25,8 @@ interface DragState {
   moved: boolean
   activeGap?: number
   lastStepSize?: number
+  center?: { x: number; y: number }
+  rotationAngle?: number
 }
 
 interface CanvasContextMenu {
@@ -155,7 +158,7 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       drawTransformHandles(context, previewBlock)
     } else if (selected.length > 1) {
       const previewBlocks = groupPreview
-        ? selected.map((b) => ({
+        ? groupPreview.blocks.map((b) => ({
             ...b,
             position: {
               x: b.position.x + groupPreview.delta.x,
@@ -168,6 +171,14 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     for (const block of clonePreview) drawBlock(context, block, false, 0.42)
     if (dragRef.current?.kind === "clone") {
       drawCloneDragHud(context, dragRef.current, lastPointerPos.current)
+    }
+    if (
+      dragRef.current?.kind === "rotate" &&
+      dragRef.current.originals.length > 1 &&
+      dragRef.current.center &&
+      dragRef.current.rotationAngle !== undefined
+    ) {
+      drawGroupRotateHud(context, dragRef.current.center, dragRef.current.rotationAngle)
     }
     if (marquee) drawMarquee(context, marquee.start, marquee.end)
     if (state.pastePhantom) {
@@ -376,6 +387,21 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     if (!point || !isInsideWorld(point)) return
     event.currentTarget.setPointerCapture(event.pointerId)
     const selected = state.map.blocks.filter((item) => state.selectedBlockIds.includes(item.id))
+    if (selected.length > 1 && isGroupRotateHandle(selected, point)) {
+      const center = getBlocksBoundingCenter(selected)
+      dragRef.current = {
+        kind: "rotate",
+        blockIds: selected.map((b) => b.id),
+        originals: selected,
+        startX: point.x,
+        startY: point.y,
+        center,
+        rotationAngle: 0,
+        moved: false,
+      }
+      return
+    }
+
     if (selected.length > 1 && isGroupCloneHandle(selected, point)) {
       const portalCounts = new Map<string, number>()
       for (const b of selected) {
@@ -502,12 +528,13 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     if (!drag) {
       const selected = state.map.blocks.filter((item) => state.selectedBlockIds.includes(item.id))
       const isGroupClone = selected.length > 1 && isGroupCloneHandle(selected, point)
+      const isGroupRotate = selected.length > 1 && isGroupRotateHandle(selected, point)
       const isSingleClone = selected.length === 1 && isCloneHandle(selected[0]!, point)
       const handle = selected.length === 1 ? hitTestTransformHandle(selected[0]!, point) : null
       event.currentTarget.style.cursor =
         isGroupClone || isSingleClone
           ? "copy"
-          : handle?.kind === "rotate"
+          : isGroupRotate || handle?.kind === "rotate"
             ? "grab"
             : handle
               ? "nwse-resize"
@@ -578,12 +605,45 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       if (block.shape === "circle") width = height = clampSize(Math.max(width, height))
       setDragPreview({ block: { ...block, size: { width, height } }, position: block.position })
     } else {
-      const from = Math.atan2(drag.startY - block.position.y, drag.startX - block.position.x)
-      const to = Math.atan2(point.y - block.position.y, point.x - block.position.x)
-      setDragPreview({
-        block: { ...block, rotation: (block.rotation ?? 0) + to - from },
-        position: block.position,
-      })
+      if (drag.originals.length > 1) {
+        const center = drag.center ?? getBlocksBoundingCenter(drag.originals)
+        const from = Math.atan2(drag.startY - center.y, drag.startX - center.x)
+        const to = Math.atan2(point.y - center.y, point.x - center.x)
+        let deltaAngle = to - from
+        if (state.snapToGrid) {
+          deltaAngle = (Math.round((deltaAngle * 180) / Math.PI / 5) * 5 * Math.PI) / 180
+        }
+        drag.rotationAngle = deltaAngle
+        const cos = Math.cos(deltaAngle)
+        const sin = Math.sin(deltaAngle)
+        const previewBlocks: PlayerBlockSpec[] = drag.originals.map((b) => {
+          const dx = b.position.x - center.x
+          const dy = b.position.y - center.y
+          const nx = center.x + dx * cos - dy * sin
+          const ny = center.y + dx * sin + dy * cos
+          const nRot = (b.rotation ?? 0) + deltaAngle
+          const clampedPos = clampPosition(
+            { x: Math.round(nx), y: Math.round(ny) },
+            b.size.width,
+            b.size.height
+          )
+          return {
+            ...b,
+            position: clampedPos,
+            rotation: nRot,
+          }
+        })
+        setGroupPreview({ blocks: previewBlocks, delta: { x: 0, y: 0 } })
+        event.currentTarget.style.cursor = "grabbing"
+      } else {
+        const from = Math.atan2(drag.startY - block.position.y, drag.startX - block.position.x)
+        const to = Math.atan2(point.y - block.position.y, point.x - block.position.x)
+        setDragPreview({
+          block: { ...block, rotation: (block.rotation ?? 0) + to - from },
+          position: block.position,
+        })
+        event.currentTarget.style.cursor = "grabbing"
+      }
     }
   }
 
@@ -662,6 +722,24 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
         let height = clampSize(block.size.height + (point.y - drag.startY) * sy * 2)
         if (block.shape === "circle") width = height = clampSize(Math.max(width, height))
         dispatch({ type: "UPDATE_BLOCK", blockId: block.id, updates: { size: { width, height } } })
+      } else if (drag.originals.length > 1) {
+        const center = drag.center ?? getBlocksBoundingCenter(drag.originals)
+        const from = Math.atan2(drag.startY - center.y, drag.startX - center.x)
+        const to = Math.atan2(point.y - center.y, point.x - center.x)
+        let deltaAngle = to - from
+        if (state.snapToGrid) {
+          deltaAngle = (Math.round((deltaAngle * 180) / Math.PI / 5) * 5 * Math.PI) / 180
+        }
+        if (Math.abs(deltaAngle) > 0.001) {
+          dispatch({
+            type: "ROTATE_GROUP",
+            blockIds: drag.blockIds,
+            center,
+            angle: deltaAngle,
+          })
+          const deg = Math.round((deltaAngle * 180) / Math.PI)
+          showNotice(`Группа повернута на ${deg > 0 ? "+" + deg : deg}°.`)
+        }
       } else {
         const from = Math.atan2(drag.startY - block.position.y, drag.startX - block.position.x)
         const to = Math.atan2(point.y - block.position.y, point.x - block.position.x)
@@ -1192,15 +1270,46 @@ function drawGroupSelectionFrame(context: CanvasRenderingContext2D, blocks: Play
   context.textBaseline = "middle"
   context.fillText("+", hx, hy)
 
-  // Floating label with count
+  // Rotation stem & handle at top-center
+  const rx = x + w / 2
+  const ry = y
+  context.beginPath()
+  context.moveTo(rx, ry)
+  context.lineTo(rx, ry - 28)
+  context.strokeStyle = "#52f5ff"
+  context.lineWidth = 1.5
+  context.stroke()
+
+  context.beginPath()
+  context.arc(rx, ry - 34, 10, 0, Math.PI * 2)
+  context.fillStyle = "#ffc94d"
+  context.shadowColor = "#ffc94d"
+  context.shadowBlur = 8
+  context.fill()
+  context.shadowBlur = 0
+  context.strokeStyle = "#05241c"
+  context.lineWidth = 2
+  context.stroke()
+
+  context.fillStyle = "#07131b"
+  context.font = "bold 16px sans-serif"
+  context.textAlign = "center"
+  context.textBaseline = "middle"
+  context.fillText("↻", rx, ry - 33)
+
+  // Floating label with count placed at top-left or bottom so it does not overlap rotation handle
   const label = `Группа: ${blocks.length} бл.`
   context.font = "bold 12px sans-serif"
   const textWidth = context.measureText(label).width
   const lw = textWidth + 14
   const lh = 20
-  const lx = x + (w - lw) / 2
-  const ly = y - lh - 4
-  if (ly >= HUD_BOTTOM) {
+  let lx = x
+  let ly = y - lh - 4
+  if (w < lw + 24) {
+    lx = x + (w - lw) / 2
+    ly = y + h + 16
+  }
+  if (ly >= HUD_BOTTOM - 20) {
     context.fillStyle = "rgba(7, 19, 27, 0.88)"
     context.beginPath()
     if (typeof context.roundRect === "function") {
@@ -1227,6 +1336,77 @@ function isGroupCloneHandle(blocks: PlayerBlockSpec[], point: { x: number; y: nu
   const hx = bbox.maxX + pad
   const hy = bbox.maxY + pad
   return Math.hypot(point.x - hx, point.y - hy) <= 16
+}
+
+function getGroupRotateHandlePoint(blocks: PlayerBlockSpec[]): { x: number; y: number } {
+  const bbox = getBlocksBoundingBox(blocks)
+  const pad = 8
+  const rx = bbox.minX - pad + (bbox.width + pad * 2) / 2
+  const ry = bbox.minY - pad - 34
+  return { x: rx, y: ry }
+}
+
+function isGroupRotateHandle(blocks: PlayerBlockSpec[], point: { x: number; y: number }) {
+  if (blocks.length <= 1) return false
+  const handle = getGroupRotateHandlePoint(blocks)
+  return Math.hypot(point.x - handle.x, point.y - handle.y) <= 16
+}
+
+function drawGroupRotateHud(
+  context: CanvasRenderingContext2D,
+  center: { x: number; y: number },
+  angle: number
+) {
+  const deg = Math.round((angle * 180) / Math.PI)
+  const degText = `${deg > 0 ? "+" + deg : deg}°`
+  const text = `Поворот группы: ${degText}`
+  const hint = "Привязка: 5°"
+
+  context.save()
+  context.font = "bold 13px sans-serif"
+  const tw = Math.max(context.measureText(text).width, context.measureText(hint).width)
+  const padX = 12
+  const padY = 8
+  const w = tw + padX * 2
+  const h = 42
+
+  const bx = center.x - w / 2
+  const by = center.y - h / 2
+
+  context.fillStyle = "rgba(7, 19, 27, 0.94)"
+  context.strokeStyle = "#ffc94d"
+  context.lineWidth = 1.5
+  context.shadowColor = "rgba(255, 201, 77, 0.35)"
+  context.shadowBlur = 10
+  context.beginPath()
+  if (typeof context.roundRect === "function") {
+    context.roundRect(bx, by, w, h, 6)
+  } else {
+    context.rect(bx, by, w, h)
+  }
+  context.fill()
+  context.shadowBlur = 0
+  context.stroke()
+
+  context.textAlign = "center"
+  context.textBaseline = "middle"
+  context.fillStyle = "#eaf7ff"
+  context.fillText(text, center.x, by + padY + 4)
+
+  context.font = "11px sans-serif"
+  context.fillStyle = "#ffc94d"
+  context.fillText(hint, center.x, by + padY + 22)
+
+  // Center pivot dot
+  context.beginPath()
+  context.arc(center.x, center.y, 4, 0, Math.PI * 2)
+  context.fillStyle = "#ffc94d"
+  context.fill()
+  context.strokeStyle = "#05241c"
+  context.lineWidth = 1.5
+  context.stroke()
+
+  context.restore()
 }
 
 function drawCloneDragHud(
@@ -1656,21 +1836,12 @@ function isInsideWorld(point: { x: number; y: number }) {
   return point.x >= 0 && point.x <= WORLD_WIDTH && point.y >= 0 && point.y <= WORLD_HEIGHT
 }
 
-function getBlocksBoundingCenter(blocks: PlayerBlockSpec[]): { x: number; y: number } {
+export function getBlocksBoundingCenter(blocks: PlayerBlockSpec[]): { x: number; y: number } {
   if (blocks.length === 0) return { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 }
-  let minX = Number.POSITIVE_INFINITY
-  let maxX = Number.NEGATIVE_INFINITY
-  let minY = Number.POSITIVE_INFINITY
-  let maxY = Number.NEGATIVE_INFINITY
-  for (const b of blocks) {
-    minX = Math.min(minX, b.position.x)
-    maxX = Math.max(maxX, b.position.x)
-    minY = Math.min(minY, b.position.y)
-    maxY = Math.max(maxY, b.position.y)
-  }
+  const bbox = getBlocksBoundingBox(blocks)
   return {
-    x: (minX + maxX) / 2,
-    y: (minY + maxY) / 2,
+    x: bbox.minX + bbox.width / 2,
+    y: bbox.minY + bbox.height / 2,
   }
 }
 

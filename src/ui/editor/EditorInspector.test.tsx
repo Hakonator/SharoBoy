@@ -82,6 +82,9 @@ describe("EditorInspector", () => {
     expect(html).toContain("Ширина")
     expect(html).toContain("Высота")
     expect(html).toContain("Поворот (°)")
+    expect(html).toContain("+90°")
+    expect(html).toContain("-90°")
+    expect(html).toContain("180°")
   })
 
   it("indicates effect coverage across selected blocks and displays mutual exclusions", () => {

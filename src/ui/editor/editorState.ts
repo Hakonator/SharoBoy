@@ -192,6 +192,36 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       )
       return updateMap(state, { ...state.map, blocks })
     }
+    case "ROTATE_GROUP": {
+      const selectedIds = new Set(action.blockIds)
+      if (selectedIds.size === 0 || Math.abs(action.angle) < 0.001) return state
+      const cos = Math.cos(action.angle)
+      const sin = Math.sin(action.angle)
+      const center = action.center
+
+      const blocks = state.map.blocks.map((block) => {
+        if (!selectedIds.has(block.id)) return block
+        const dx = block.position.x - center.x
+        const dy = block.position.y - center.y
+        const nx = center.x + dx * cos - dy * sin
+        const ny = center.y + dx * sin + dy * cos
+        const nRot = (block.rotation ?? 0) + action.angle
+        const normalizedRot = state.snapToGrid
+          ? (Math.round((nRot * 180) / Math.PI / 5) * 5 * Math.PI) / 180
+          : nRot
+        const clampedPos = clampPosition(
+          { x: Math.round(nx), y: Math.round(ny) },
+          block.size.width,
+          block.size.height
+        )
+        return {
+          ...block,
+          position: clampedPos,
+          rotation: normalizedRot,
+        }
+      })
+      return updateMap(state, { ...state.map, blocks }, state.selectedBlockIds)
+    }
     case "COPY_SELECTED": {
       const selected = new Set(state.selectedBlockIds)
       return {
@@ -543,7 +573,7 @@ function snapPosition(position: { x: number; y: number }, state: EditorState) {
   }
 }
 
-function clampPosition(position: { x: number; y: number }, width: number, height: number) {
+export function clampPosition(position: { x: number; y: number }, width: number, height: number) {
   return {
     x: Math.max(width / 2, Math.min(1920 - width / 2, position.x)),
     y: Math.max(HUD_ZONE_BOTTOM + height / 2, Math.min(PADDLE_ZONE_TOP - height / 2, position.y)),

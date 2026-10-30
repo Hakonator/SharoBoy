@@ -83,6 +83,12 @@ export type EditorAction =
       delta?: { x: number; y: number }
     }
   | { type: "MOVE_BLOCKS"; blockIds: string[]; delta: { x: number; y: number } }
+  | {
+      type: "ROTATE_GROUP"
+      blockIds: string[]
+      center: { x: number; y: number }
+      angle: number
+    }
   | { type: "COPY_SELECTED" }
   | { type: "PASTE_CLIPBOARD" }
   | { type: "START_PASTE" }
