@@ -26,6 +26,11 @@ export function EditorToolbar({
 }: PublishToolbarProps) {
   const canUndo = state.history.past.length > 0
   const canRedo = state.history.future.length > 0
+  const isGroup = state.selectedBlockIds.length > 1
+  const activeGap = isGroup ? (state.groupCloneGap ?? 0) : (state.singleCloneGap ?? 0)
+  const setGap = (gap: number) => {
+    dispatch(isGroup ? { type: "SET_GROUP_CLONE_GAP", gap } : { type: "SET_SINGLE_CLONE_GAP", gap })
+  }
 
   return (
     <header className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-deep/95 p-3 text-foam shadow-xl">
@@ -106,6 +111,46 @@ export function EditorToolbar({
           ))}
         </select>
       </label>
+
+      <div
+        className="flex items-center gap-1.5 rounded-lg border border-line bg-abyss/70 px-2.5 py-1.5 text-xs"
+        title="Зазор между копиями при протяжке мыши (можно регулировать колёсиком мыши во время протяжки)"
+      >
+        <span className="text-dim">Зазор</span>
+        <button
+          className="btn-ghost px-1.5 py-0.5 text-[11px]"
+          onClick={() => setGap(Math.max(-60, activeGap - 4))}
+          title="Уменьшить зазор на 4px"
+          type="button"
+        >
+          -
+        </button>
+        <select
+          aria-label="Зазор протяжки"
+          className="rounded border border-line bg-abyss px-1.5 py-1 text-xs font-mono text-cyan-neon outline-none focus:border-cyan-neon"
+          onChange={(event) => setGap(Number(event.target.value))}
+          value={activeGap}
+        >
+          {[0, 8, 16, 24, 32, 48, 64].map((gapVal) => (
+            <option key={gapVal} value={gapVal}>
+              {gapVal === 0 ? "0 (встык)" : `+${gapVal}px`}
+            </option>
+          ))}
+          {![0, 8, 16, 24, 32, 48, 64].includes(activeGap) && (
+            <option value={activeGap}>
+              {activeGap > 0 ? `+${activeGap}px` : `${activeGap}px`}
+            </option>
+          )}
+        </select>
+        <button
+          className="btn-ghost px-1.5 py-0.5 text-[11px]"
+          onClick={() => setGap(Math.min(300, activeGap + 4))}
+          title="Увеличить зазор на 4px"
+          type="button"
+        >
+          +
+        </button>
+      </div>
 
       <span className="mx-1 hidden h-8 border-l border-line sm:block" />
       <ToolbarButton

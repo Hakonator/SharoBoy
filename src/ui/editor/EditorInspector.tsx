@@ -2,6 +2,7 @@ import { TIER } from "../../game/palette"
 import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapWinCondition } from "../../game/mapSpec"
 
 import { defaultEffect } from "./editorState"
+import { getBlocksBoundingBox } from "./EditorCanvas"
 import type { EditorAction, EditorInspectorProps, EditorState, PlayerBlockUpdates } from "./types"
 
 export function EditorInspector({ state, dispatch, author }: EditorInspectorProps) {
@@ -201,6 +202,15 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
         step={5}
         value={Math.round(((block.rotation ?? 0) * 180) / Math.PI / 5) * 5}
         onChange={(degrees) => updateBlock({ rotation: (degrees * Math.PI) / 180 })}
+      />
+
+      <CloneSpacingControl
+        dimH={block.size.height}
+        dimW={block.size.width}
+        gap={state.singleCloneGap ?? 0}
+        label="Зазор протяжки блока"
+        onChange={(gap) => dispatch({ type: "SET_SINGLE_CLONE_GAP", gap })}
+        tip="Потяните изумрудный «+» в правом нижнем углу блока. Колёсико мыши меняет зазор."
       />
 
       <section className="space-y-3 border-t border-line pt-3">
@@ -518,6 +528,100 @@ function EffectToggle({
   )
 }
 
+function CloneSpacingControl({
+  label,
+  gap,
+  onChange,
+  dimW,
+  dimH,
+  tip,
+}: {
+  label: string
+  gap: number
+  onChange: (gap: number) => void
+  dimW: number
+  dimH: number
+  tip?: string
+}) {
+  const PRESETS = [
+    { label: "0 (встык)", value: 0 },
+    { label: "+8", value: 8 },
+    { label: "+16", value: 16 },
+    { label: "+32", value: 32 },
+    { label: "+64", value: 64 },
+  ]
+  const stepW = Math.max(8, Math.round(dimW + gap))
+  const stepH = Math.max(8, Math.round(dimH + gap))
+
+  return (
+    <div className="space-y-2 rounded-lg border border-line bg-abyss/40 p-3">
+      <div className="flex items-center justify-between">
+        <span className="hud-label">{label}</span>
+        <span className="font-mono text-xs font-bold text-cyan-neon">
+          {gap > 0 ? `+${gap} px` : `${gap} px`}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        {PRESETS.map((p) => (
+          <button
+            key={p.value}
+            className={`rounded px-2 py-1 text-xs transition-colors ${
+              gap === p.value
+                ? "bg-cyan-neon font-bold text-abyss shadow-sm"
+                : "border border-line bg-deep/70 text-foam hover:border-cyan-neon/50"
+            }`}
+            onClick={() => onChange(p.value)}
+            type="button"
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          className="btn-ghost px-2 py-1 text-xs"
+          onClick={() => onChange(Math.max(-60, gap - 4))}
+          title="Уменьшить зазор на 4px"
+          type="button"
+        >
+          -4
+        </button>
+        <input
+          aria-label={label}
+          className="w-full accent-cyan-neon"
+          max={200}
+          min={-60}
+          onChange={(e) => onChange(Number(e.target.value))}
+          step={4}
+          type="range"
+          value={gap}
+        />
+        <button
+          className="btn-ghost px-2 py-1 text-xs"
+          onClick={() => onChange(Math.min(300, gap + 4))}
+          title="Увеличить зазор на 4px"
+          type="button"
+        >
+          +4
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between border-t border-line/30 pt-1.5 font-mono text-[11px] text-dim">
+        <span>
+          Шаг гориз.: <strong className="text-foam">{stepW}px</strong>
+        </span>
+        <span>
+          Шаг верт.: <strong className="text-foam">{stepH}px</strong>
+        </span>
+      </div>
+
+      {tip && <p className="text-[10px] text-emerald-300/80">💡 {tip}</p>}
+    </div>
+  )
+}
+
 function MagnetFields({
   effect,
   onChange,
@@ -624,6 +728,7 @@ function GroupInspector({
 }) {
   const selectedBlocks = state.map.blocks.filter((item) => state.selectedBlockIds.includes(item.id))
   const count = selectedBlocks.length
+  const bbox = getBlocksBoundingBox(selectedBlocks)
   const totalHp = selectedBlocks.reduce((sum, item) => sum + item.hp, 0)
   const avgHp = Math.round(totalHp / (count || 1))
 
@@ -738,13 +843,22 @@ function GroupInspector({
         </button>
       </div>
 
-      <div className="rounded-lg bg-abyss/40 border border-emerald-400/25 px-3 py-2 text-[11px] text-emerald-300 flex items-start gap-2">
+      <div className="flex items-start gap-2 rounded-lg border border-emerald-400/25 bg-abyss/40 px-3 py-2 text-[11px] text-emerald-300">
         <span className="text-base leading-none">✨</span>
         <span>
           <strong>Копирование протяжкой:</strong> потяните мышью за маркер <strong>«+»</strong> в
           правом нижнем углу рамки на поле.
         </span>
       </div>
+
+      <CloneSpacingControl
+        dimH={bbox.height}
+        dimW={bbox.width}
+        gap={state.groupCloneGap ?? 0}
+        label="Зазор протяжки группы"
+        onChange={(gap) => dispatch({ type: "SET_GROUP_CLONE_GAP", gap })}
+        tip="Колёсико мыши регулирует зазор между группами при протяжке."
+      />
 
       <section className="space-y-3 border-t border-line pt-3">
         <div className="flex items-center justify-between">

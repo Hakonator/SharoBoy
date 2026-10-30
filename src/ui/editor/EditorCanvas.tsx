@@ -22,6 +22,8 @@ interface DragState {
   source?: PlayerBlockSpec
   limitReached?: boolean
   moved: boolean
+  activeGap?: number
+  lastStepSize?: number
 }
 
 interface CanvasContextMenu {
@@ -164,6 +166,9 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       drawGroupSelectionFrame(context, previewBlocks)
     }
     for (const block of clonePreview) drawBlock(context, block, false, 0.42)
+    if (dragRef.current?.kind === "clone") {
+      drawCloneDragHud(context, dragRef.current, lastPointerPos.current)
+    }
     if (marquee) drawMarquee(context, marquee.start, marquee.end)
     if (state.pastePhantom) {
       const targetPos = phantomPos ?? lastPointerPos.current
@@ -225,6 +230,97 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       window.removeEventListener("keydown", onKeyDown)
     }
   }, [contextMenu])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const adjustGap = (delta: number) => {
+      const drag = dragRef.current
+      if (!drag || drag.kind !== "clone") return
+      const isGroup = drag.originals.length > 1
+      const currentGap =
+        drag.activeGap !== undefined
+          ? drag.activeGap
+          : isGroup
+            ? (state.groupCloneGap ?? 0)
+            : (state.singleCloneGap ?? 0)
+      const nextGap = Math.max(-60, Math.min(300, currentGap + delta))
+      drag.activeGap = nextGap
+      if (isGroup) {
+        dispatch({ type: "SET_GROUP_CLONE_GAP", gap: nextGap })
+      } else {
+        dispatch({ type: "SET_SINGLE_CLONE_GAP", gap: nextGap })
+      }
+      const point = lastPointerPos.current
+      if (isGroup) {
+        const sequence = createGroupCloneSequence(
+          drag.originals,
+          point,
+          state,
+          drag.startX,
+          drag.startY,
+          nextGap
+        )
+        drag.groupDeltas = sequence.deltas
+        drag.limitReached = sequence.limitReached
+        drag.lastStepSize = sequence.stepSize
+        setClonePreview(sequence.previewBlocks)
+      } else if (drag.source) {
+        const sequence = createCloneSequence(
+          drag.source,
+          point,
+          state,
+          drag.startX,
+          drag.startY,
+          nextGap
+        )
+        drag.clonePositions = sequence.positions
+        drag.limitReached = sequence.limitReached
+        drag.lastStepSize = sequence.stepSize
+        setClonePreview(
+          sequence.positions.map((position, index) => ({
+            ...drag.source!,
+            id: `preview-${index}`,
+            position,
+          }))
+        )
+      }
+    }
+
+    const onWheel = (event: WheelEvent) => {
+      const drag = dragRef.current
+      if (!drag || drag.kind !== "clone") return
+      event.preventDefault()
+      const step = event.shiftKey ? 16 : 4
+      const delta = event.deltaY < 0 ? step : -step
+      adjustGap(delta)
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const drag = dragRef.current
+      if (!drag || drag.kind !== "clone") return
+      const step = event.shiftKey ? 16 : 4
+      if (event.key === "ArrowUp" || event.key === "+" || event.key === "=") {
+        event.preventDefault()
+        adjustGap(step)
+      } else if (event.key === "ArrowDown" || event.key === "-" || event.key === "_") {
+        event.preventDefault()
+        adjustGap(-step)
+      } else if (event.key === "0") {
+        event.preventDefault()
+        const currentGap = drag.activeGap ?? 0
+        adjustGap(-currentGap)
+      }
+    }
+
+    canvas.addEventListener("wheel", onWheel, { passive: false })
+    window.addEventListener("keydown", onKeyDown)
+    return () => {
+      canvas.removeEventListener("wheel", onWheel)
+      window.removeEventListener("keydown", onKeyDown)
+    }
+  }, [dispatch, state])
 
   const toWorldPoint = useCallback(
     (event: { clientX: number; clientY: number; currentTarget: HTMLCanvasElement }) => {
@@ -309,6 +405,7 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
         originals: selected,
         startX: point.x,
         startY: point.y,
+        activeGap: state.groupCloneGap ?? 0,
         moved: false,
       }
       return
@@ -327,6 +424,7 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
           source: selected[0]!,
           startX: point.x,
           startY: point.y,
+          activeGap: state.singleCloneGap ?? 0,
           moved: false,
         }
         return
@@ -428,18 +526,28 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
           point,
           state,
           drag.startX,
-          drag.startY
+          drag.startY,
+          drag.activeGap
         )
         drag.groupDeltas = sequence.deltas
         drag.limitReached = sequence.limitReached
+        drag.lastStepSize = sequence.stepSize
         setClonePreview(sequence.previewBlocks)
         return
       }
       const source = drag.source
       if (!source) return
-      const sequence = createCloneSequence(source, point, state, drag.startX, drag.startY)
+      const sequence = createCloneSequence(
+        source,
+        point,
+        state,
+        drag.startX,
+        drag.startY,
+        drag.activeGap
+      )
       drag.clonePositions = sequence.positions
       drag.limitReached = sequence.limitReached
+      drag.lastStepSize = sequence.stepSize
       setClonePreview(
         sequence.positions.map((position, index) => ({
           ...source,
@@ -516,7 +624,7 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
             deltas: drag.groupDeltas,
           })
           showNotice(
-            `Скопировано повторений группы: ${drag.groupDeltas.length} (+${drag.groupDeltas.length * drag.originals.length} блоков).`
+            `Скопировано повторений группы: ${drag.groupDeltas.length} (+${drag.groupDeltas.length * drag.originals.length} блоков). Шаг: ${drag.lastStepSize ?? 0}px (зазор: ${drag.activeGap ?? 0}px).`
           )
         }
         if (drag.limitReached) showNotice("Достигнут лимит карты: не более 200 блоков.")
@@ -527,6 +635,9 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
             blockId: drag.blockIds[0]!,
             positions: drag.clonePositions,
           })
+          showNotice(
+            `Создано копий блока: ${drag.clonePositions.length}. Шаг: ${drag.lastStepSize ?? 0}px (зазор: ${drag.activeGap ?? 0}px).`
+          )
         }
         if (drag.limitReached) showNotice("Достигнут лимит карты: не более 200 блоков.")
       }
@@ -963,20 +1074,35 @@ function createCloneSequence(
   point: { x: number; y: number },
   state: EditorState,
   startX: number,
-  startY: number
-) {
+  startY: number,
+  overrideGap?: number
+): {
+  positions: { x: number; y: number }[]
+  limitReached: boolean
+  stepSize: number
+  gap: number
+} {
   const dx = point.x - startX
   const dy = point.y - startY
   const horizontal = Math.abs(dx) >= Math.abs(dy)
   const rawDistance = horizontal ? dx : dy
-  const stepSize = Math.max(state.gridSize, horizontal ? source.size.width : source.size.height)
+
+  const corners = blockCorners(source)
+  const bWidth = Math.max(...corners.map((c) => c.x)) - Math.min(...corners.map((c) => c.x))
+  const bHeight = Math.max(...corners.map((c) => c.y)) - Math.min(...corners.map((c) => c.y))
+  const dim = horizontal ? bWidth : bHeight
+
+  const gap = overrideGap !== undefined ? overrideGap : (state.singleCloneGap ?? 0)
+  const stepSize = Math.max(8, Math.round(dim + gap))
+
   const steps = Math.floor(Math.abs(rawDistance) / stepSize)
   const freeSlots = Math.max(0, MAX_BLOCKS - state.map.blocks.length)
   const positions: { x: number; y: number }[] = []
+  const direction = Math.sign(rawDistance)
   for (let step = 1; step <= Math.min(steps, freeSlots); step += 1) {
     const position = {
-      x: source.position.x + (horizontal ? Math.sign(rawDistance) * step * stepSize : 0),
-      y: source.position.y + (!horizontal ? Math.sign(rawDistance) * step * stepSize : 0),
+      x: source.position.x + (horizontal ? direction * step * stepSize : 0),
+      y: source.position.y + (!horizontal ? direction * step * stepSize : 0),
     }
     const halfW = source.size.width / 2
     const halfH = source.size.height / 2
@@ -984,10 +1110,10 @@ function createCloneSequence(
     if (position.y - halfH < HUD_BOTTOM || position.y + halfH > PADDLE_ZONE_TOP) continue
     positions.push(position)
   }
-  return { positions, limitReached: steps > freeSlots }
+  return { positions, limitReached: steps > freeSlots, stepSize, gap }
 }
 
-function getBlocksBoundingBox(blocks: PlayerBlockSpec[]) {
+export function getBlocksBoundingBox(blocks: PlayerBlockSpec[]) {
   if (blocks.length === 0) {
     return { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0 }
   }
@@ -1103,13 +1229,73 @@ function isGroupCloneHandle(blocks: PlayerBlockSpec[], point: { x: number; y: nu
   return Math.hypot(point.x - hx, point.y - hy) <= 16
 }
 
+function drawCloneDragHud(
+  context: CanvasRenderingContext2D,
+  drag: DragState,
+  pointer: { x: number; y: number }
+) {
+  const isGroup = drag.originals.length > 1
+  const gap = drag.activeGap ?? 0
+  const step = drag.lastStepSize ?? 0
+  const count = isGroup ? (drag.groupDeltas?.length ?? 0) : (drag.clonePositions?.length ?? 0)
+  const countText = count > 0 ? ` (+${count} ${isGroup ? "групп" : "копий"})` : ""
+  const gapText = gap > 0 ? `+${gap}px` : gap === 0 ? "0px (встык)" : `${gap}px`
+  const text = `Шаг: ${step}px • Зазор: ${gapText}${countText}`
+  const hint = "Колёсико мыши: ± зазор • 0: встык"
+
+  context.save()
+  context.font = "bold 13px sans-serif"
+  const tw = Math.max(context.measureText(text).width, context.measureText(hint).width)
+  const padX = 12
+  const padY = 8
+  const w = tw + padX * 2
+  const h = 44
+
+  let bx = pointer.x + 20
+  let by = pointer.y - h - 10
+  if (bx + w > WORLD_WIDTH - 20) bx = pointer.x - w - 20
+  if (by < HUD_BOTTOM + 10) by = pointer.y + 25
+
+  context.fillStyle = "rgba(7, 19, 27, 0.94)"
+  context.strokeStyle = "#42ffb0"
+  context.lineWidth = 1.5
+  context.shadowColor = "rgba(66, 255, 176, 0.35)"
+  context.shadowBlur = 10
+  context.beginPath()
+  if (typeof context.roundRect === "function") {
+    context.roundRect(bx, by, w, h, 6)
+  } else {
+    context.rect(bx, by, w, h)
+  }
+  context.fill()
+  context.shadowBlur = 0
+  context.stroke()
+
+  context.textAlign = "left"
+  context.textBaseline = "top"
+  context.fillStyle = "#eaf7ff"
+  context.fillText(text, bx + padX, by + padY)
+
+  context.font = "11px sans-serif"
+  context.fillStyle = "#42ffb0"
+  context.fillText(hint, bx + padX, by + padY + 19)
+  context.restore()
+}
+
 function createGroupCloneSequence(
   originals: PlayerBlockSpec[],
   point: { x: number; y: number },
   state: EditorState,
   startX: number,
-  startY: number
-): { deltas: { x: number; y: number }[]; limitReached: boolean; previewBlocks: PlayerBlockSpec[] } {
+  startY: number,
+  overrideGap?: number
+): {
+  deltas: { x: number; y: number }[]
+  limitReached: boolean
+  previewBlocks: PlayerBlockSpec[]
+  stepSize: number
+  gap: number
+} {
   const dx = point.x - startX
   const dy = point.y - startY
   const horizontal = Math.abs(dx) >= Math.abs(dy)
@@ -1117,9 +1303,8 @@ function createGroupCloneSequence(
   const bbox = getBlocksBoundingBox(originals)
 
   const minDim = horizontal ? bbox.width : bbox.height
-  const stepSize = state.snapToGrid
-    ? Math.max(state.gridSize, Math.ceil(minDim / state.gridSize) * state.gridSize)
-    : Math.max(20, Math.round(minDim))
+  const gap = overrideGap !== undefined ? overrideGap : (state.groupCloneGap ?? 0)
+  const stepSize = Math.max(8, Math.round(minDim + gap))
 
   const maxSteps = Math.floor(Math.abs(rawDistance) / stepSize)
   const blocksPerStep = originals.length
@@ -1164,7 +1349,7 @@ function createGroupCloneSequence(
     }
   }
 
-  return { deltas, limitReached, previewBlocks }
+  return { deltas, limitReached, previewBlocks, stepSize, gap }
 }
 
 function drawBlock(

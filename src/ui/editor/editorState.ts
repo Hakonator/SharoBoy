@@ -19,6 +19,8 @@ export function createEditorState(map: PlayerMapSpec): EditorState {
     addPreset: { shape: "ellipse", size: { width: 64, height: 40 }, hp: 1 },
     gridSize: 32,
     snapToGrid: true,
+    singleCloneGap: 0,
+    groupCloneGap: 0,
     history: { past: [], future: [] },
     isDirty: false,
   }
@@ -55,6 +57,14 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         : state
     case "SET_SNAP_TO_GRID":
       return { ...state, snapToGrid: action.enabled }
+    case "SET_SINGLE_CLONE_GAP":
+      return Number.isFinite(action.gap)
+        ? { ...state, singleCloneGap: Math.max(-60, Math.min(300, Math.round(action.gap))) }
+        : state
+    case "SET_GROUP_CLONE_GAP":
+      return Number.isFinite(action.gap)
+        ? { ...state, groupCloneGap: Math.max(-60, Math.min(300, Math.round(action.gap))) }
+        : state
     case "ADD_BLOCK": {
       const preset = { ...state.addPreset, ...action.block }
       const presetSize = preset.size ? { ...preset.size } : { width: 64, height: 40 }
@@ -351,7 +361,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           }
           const newId = createBlockId(mapWithCopies)
           const newPosition = clampPosition(
-            snapPosition({ x: source.position.x + delta.x, y: source.position.y + delta.y }, state),
+            { x: source.position.x + delta.x, y: source.position.y + delta.y },
             source.size.width,
             source.size.height
           )

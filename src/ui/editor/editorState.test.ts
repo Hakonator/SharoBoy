@@ -528,6 +528,25 @@ describe("editorReducer", () => {
     const undone = editorReducer(state, { type: "UNDO" })
     expect(undone.map.blocks).toHaveLength(2)
   })
+
+  it("updates and clamps single and group clone gap settings", () => {
+    let state = createEditorState(makeMap())
+    expect(state.singleCloneGap).toBe(0)
+    expect(state.groupCloneGap).toBe(0)
+
+    state = editorReducer(state, { type: "SET_SINGLE_CLONE_GAP", gap: 16 })
+    expect(state.singleCloneGap).toBe(16)
+
+    state = editorReducer(state, { type: "SET_GROUP_CLONE_GAP", gap: 32 })
+    expect(state.groupCloneGap).toBe(32)
+
+    // Clamps to [-60, 300]
+    state = editorReducer(state, { type: "SET_SINGLE_CLONE_GAP", gap: -100 })
+    expect(state.singleCloneGap).toBe(-60)
+
+    state = editorReducer(state, { type: "SET_GROUP_CLONE_GAP", gap: 500 })
+    expect(state.groupCloneGap).toBe(300)
+  })
 })
 
 describe("editor draft storage", () => {

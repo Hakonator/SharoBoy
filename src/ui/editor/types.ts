@@ -17,6 +17,8 @@ export interface EditorState {
   addPreset: Partial<PlayerBlockSpec>
   gridSize: number
   snapToGrid: boolean
+  singleCloneGap: number
+  groupCloneGap: number
   history: EditorHistory
   isDirty: boolean
 }
@@ -58,6 +60,8 @@ export type EditorAction =
   | { type: "SET_ADD_PRESET"; preset: Partial<PlayerBlockSpec> }
   | { type: "SET_GRID_SIZE"; gridSize: number }
   | { type: "SET_SNAP_TO_GRID"; enabled: boolean }
+  | { type: "SET_SINGLE_CLONE_GAP"; gap: number }
+  | { type: "SET_GROUP_CLONE_GAP"; gap: number }
   | { type: "ADD_BLOCK"; block?: Partial<PlayerBlockSpec>; position: { x: number; y: number } }
   | { type: "UPDATE_BLOCK"; blockId: string; updates: PlayerBlockUpdates }
   | { type: "UPDATE_BLOCKS"; blockIds: string[]; updates: PlayerBlockUpdates }
