@@ -36,6 +36,7 @@ export interface EditorToolbarProps {
   onTestRun: () => void
   onClose: () => void
   onOpenMaps?: () => void
+  onOpenPrefabs?: () => void
   musicMuted: boolean
   onToggleMusic: () => void
   onNextMusicTrack: () => void
@@ -89,6 +90,56 @@ export type EditorAction =
       center: { x: number; y: number }
       angle: number
     }
+  | {
+      type: "FLIP_BLOCKS"
+      blockIds: string[]
+      axis: "horizontal" | "vertical"
+      origin?: "selection" | "center"
+    }
+  | {
+      type: "SYMMETRIC_DUPLICATE"
+      blockIds: string[]
+      axis: "horizontal" | "vertical"
+      mirrorLine?: number
+    }
+  | {
+      type: "ALIGN_BLOCKS"
+      blockIds: string[]
+      alignment: "left" | "right" | "top" | "bottom" | "center_x" | "center_y"
+    }
+  | { type: "DISTRIBUTE_BLOCKS"; blockIds: string[]; axis: "horizontal" | "vertical" }
+  | { type: "SNAP_BLOCKS_TO_GRID"; blockIds: string[] }
+  | {
+      type: "APPLY_HP_GRADIENT"
+      blockIds: string[]
+      direction: "horizontal" | "vertical"
+      fromHp: number
+      toHp: number
+    }
+  | {
+      type: "RANDOMIZE_BLOCKS"
+      blockIds: string[]
+      options: {
+        hpMin?: number
+        hpMax?: number
+        addEffects?: boolean
+        jitterDeg?: number
+      }
+    }
+  | {
+      type: "APPLY_ZEBRA_PATTERN"
+      blockIds: string[]
+      kind: "hp" | "shape"
+      optionA: number | PlayerBlockSpec["shape"]
+      optionB: number | PlayerBlockSpec["shape"]
+    }
+  | {
+      type: "SELECT_SIMILAR"
+      criterion: "hp" | "shape" | "effect"
+      referenceBlockId: string
+    }
+  | { type: "SELECT_CONNECTED"; referenceBlockId: string }
+  | { type: "INVERT_SELECTION" }
   | { type: "COPY_SELECTED" }
   | { type: "PASTE_CLIPBOARD" }
   | { type: "START_PASTE" }

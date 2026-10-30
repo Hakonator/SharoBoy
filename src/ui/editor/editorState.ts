@@ -1,6 +1,7 @@
 import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapSpec } from "../../game/mapSpec"
 import { PADDLE_ZONE_TOP } from "../../game/mapValidator"
 
+import { areBlocksTouching, getBlocksBoundingBox, WORLD_WIDTH } from "./geometry"
 import type { EditorAction, EditorState, PlayerBlockUpdates } from "./types"
 
 export const EDITOR_DRAFT_STORAGE_KEY = "sharoboy_custom_map_draft"
@@ -221,6 +222,365 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         }
       })
       return updateMap(state, { ...state.map, blocks }, state.selectedBlockIds)
+    }
+    case "FLIP_BLOCKS": {
+      const selectedIds = new Set(action.blockIds)
+      if (selectedIds.size === 0) return state
+      const targetBlocks = state.map.blocks.filter((b) => selectedIds.has(b.id))
+      const bbox = getBlocksBoundingBox(targetBlocks)
+      const mirrorLine =
+        action.origin === "center"
+          ? action.axis === "horizontal"
+            ? WORLD_WIDTH / 2
+            : HUD_ZONE_BOTTOM + (PADDLE_ZONE_TOP - HUD_ZONE_BOTTOM) / 2
+          : action.axis === "horizontal"
+            ? bbox.minX + bbox.width / 2
+            : bbox.minY + bbox.height / 2
+
+      const blocks = state.map.blocks.map((block) => {
+        if (!selectedIds.has(block.id)) return block
+        let nx = block.position.x
+        let ny = block.position.y
+        let nRot = block.rotation ?? 0
+        if (action.axis === "horizontal") {
+          nx = 2 * mirrorLine - block.position.x
+          nRot = -nRot
+        } else {
+          ny = 2 * mirrorLine - block.position.y
+          nRot = -nRot
+        }
+        if (state.snapToGrid) {
+          nRot = (Math.round((nRot * 180) / Math.PI / 5) * 5 * Math.PI) / 180
+        }
+        const clampedPos = clampPosition(
+          { x: Math.round(nx), y: Math.round(ny) },
+          block.size.width,
+          block.size.height
+        )
+        return {
+          ...block,
+          position: clampedPos,
+          rotation: nRot,
+        }
+      })
+      return updateMap(state, { ...state.map, blocks }, state.selectedBlockIds)
+    }
+    case "SYMMETRIC_DUPLICATE": {
+      const selectedIds = new Set(action.blockIds)
+      if (selectedIds.size === 0) return state
+      const targetBlocks = state.map.blocks.filter((b) => selectedIds.has(b.id))
+      if (state.map.blocks.length + targetBlocks.length > MAX_BLOCKS) return state
+      const mirrorLine =
+        action.mirrorLine ??
+        (action.axis === "horizontal"
+          ? WORLD_WIDTH / 2
+          : HUD_ZONE_BOTTOM + (PADDLE_ZONE_TOP - HUD_ZONE_BOTTOM) / 2)
+
+      const portalPairMap = new Map<string, string>()
+      const cloned = cloneBlocks(targetBlocks)
+      const idMap = new Map<string, string>()
+
+      const tempMap = { ...state.map, blocks: [...state.map.blocks] }
+      for (const block of cloned) {
+        const newId = createBlockId(tempMap)
+        idMap.set(block.id, newId)
+        block.id = newId
+        tempMap.blocks.push(block)
+      }
+
+      for (const block of cloned) {
+        if (block.effects) {
+          block.effects = block.effects.map((e) => {
+            if (e.kind === "portal") {
+              const oldPairId = e.pairId
+              let newPairId = portalPairMap.get(oldPairId)
+              if (!newPairId) {
+                newPairId = `portal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+                portalPairMap.set(oldPairId, newPairId)
+              }
+              return { ...e, pairId: newPairId }
+            }
+            return e
+          })
+        }
+        if (block.links) {
+          block.links = block.links
+            .map((l) => {
+              if (l.kind === "portal-pair") {
+                const newTarget = idMap.get(l.targetBlockId)
+                return newTarget ? { ...l, targetBlockId: newTarget } : null
+              }
+              return l
+            })
+            .filter((l): l is NonNullable<typeof l> => l !== null)
+        }
+
+        let nx = block.position.x
+        let ny = block.position.y
+        let nRot = block.rotation ?? 0
+        if (action.axis === "horizontal") {
+          nx = 2 * mirrorLine - block.position.x
+          nRot = -nRot
+        } else {
+          ny = 2 * mirrorLine - block.position.y
+          nRot = -nRot
+        }
+        if (state.snapToGrid) {
+          nRot = (Math.round((nRot * 180) / Math.PI / 5) * 5 * Math.PI) / 180
+        }
+        block.position = clampPosition(
+          { x: Math.round(nx), y: Math.round(ny) },
+          block.size.width,
+          block.size.height
+        )
+        block.rotation = nRot
+      }
+
+      const newBlocks = [...state.map.blocks, ...cloned]
+      const newSelectedIds = cloned.map((b) => b.id)
+      return updateMap(state, { ...state.map, blocks: newBlocks }, newSelectedIds)
+    }
+    case "ALIGN_BLOCKS": {
+      const selectedIds = new Set(action.blockIds)
+      if (selectedIds.size <= 1) return state
+      const targetBlocks = state.map.blocks.filter((b) => selectedIds.has(b.id))
+      const bbox = getBlocksBoundingBox(targetBlocks)
+
+      const blocks = state.map.blocks.map((block) => {
+        if (!selectedIds.has(block.id)) return block
+        let nx = block.position.x
+        let ny = block.position.y
+        switch (action.alignment) {
+          case "left":
+            nx = bbox.minX + block.size.width / 2
+            break
+          case "right":
+            nx = bbox.maxX - block.size.width / 2
+            break
+          case "center_x":
+            nx = bbox.minX + bbox.width / 2
+            break
+          case "top":
+            ny = bbox.minY + block.size.height / 2
+            break
+          case "bottom":
+            ny = bbox.maxY - block.size.height / 2
+            break
+          case "center_y":
+            ny = bbox.minY + bbox.height / 2
+            break
+        }
+        return {
+          ...block,
+          position: clampPosition(
+            { x: Math.round(nx), y: Math.round(ny) },
+            block.size.width,
+            block.size.height
+          ),
+        }
+      })
+      return updateMap(state, { ...state.map, blocks }, state.selectedBlockIds)
+    }
+    case "DISTRIBUTE_BLOCKS": {
+      const selectedIds = new Set(action.blockIds)
+      if (selectedIds.size < 3) return state
+      const targetBlocks = state.map.blocks.filter((b) => selectedIds.has(b.id))
+      const sorted = [...targetBlocks].sort((a, b) =>
+        action.axis === "horizontal" ? a.position.x - b.position.x : a.position.y - b.position.y
+      )
+      const first = sorted[0]!
+      const last = sorted[sorted.length - 1]!
+      const count = sorted.length
+      const posMap = new Map<string, { x: number; y: number }>()
+
+      if (action.axis === "horizontal") {
+        const span = last.position.x - first.position.x
+        const step = span / (count - 1)
+        sorted.forEach((block, idx) => {
+          posMap.set(block.id, {
+            x: Math.round(first.position.x + idx * step),
+            y: block.position.y,
+          })
+        })
+      } else {
+        const span = last.position.y - first.position.y
+        const step = span / (count - 1)
+        sorted.forEach((block, idx) => {
+          posMap.set(block.id, {
+            x: block.position.x,
+            y: Math.round(first.position.y + idx * step),
+          })
+        })
+      }
+
+      const blocks = state.map.blocks.map((block) => {
+        const newPos = posMap.get(block.id)
+        if (!newPos) return block
+        return {
+          ...block,
+          position: clampPosition(newPos, block.size.width, block.size.height),
+        }
+      })
+      return updateMap(state, { ...state.map, blocks }, state.selectedBlockIds)
+    }
+    case "SNAP_BLOCKS_TO_GRID": {
+      const selectedIds = new Set(action.blockIds)
+      if (selectedIds.size === 0) return state
+      const blocks = state.map.blocks.map((block) => {
+        if (!selectedIds.has(block.id)) return block
+        const snapped = {
+          x: Math.round(block.position.x / state.gridSize) * state.gridSize,
+          y: Math.round(block.position.y / state.gridSize) * state.gridSize,
+        }
+        return {
+          ...block,
+          position: clampPosition(snapped, block.size.width, block.size.height),
+        }
+      })
+      return updateMap(state, { ...state.map, blocks }, state.selectedBlockIds)
+    }
+    case "APPLY_HP_GRADIENT": {
+      const selectedIds = new Set(action.blockIds)
+      if (selectedIds.size === 0) return state
+      const targetBlocks = state.map.blocks.filter((b) => selectedIds.has(b.id))
+      const sorted = [...targetBlocks].sort((a, b) =>
+        action.direction === "horizontal"
+          ? a.position.x - b.position.x
+          : a.position.y - b.position.y
+      )
+      const count = sorted.length
+      const hpMap = new Map<string, number>()
+      sorted.forEach((block, idx) => {
+        const t = count > 1 ? idx / (count - 1) : 0
+        const hp = Math.min(
+          8,
+          Math.max(1, Math.round(action.fromHp + (action.toHp - action.fromHp) * t))
+        )
+        hpMap.set(block.id, hp)
+      })
+      const blocks = state.map.blocks.map((block) => {
+        const hp = hpMap.get(block.id)
+        if (hp === undefined) return block
+        return { ...block, hp }
+      })
+      return updateMap(state, { ...state.map, blocks }, state.selectedBlockIds)
+    }
+    case "RANDOMIZE_BLOCKS": {
+      const selectedIds = new Set(action.blockIds)
+      if (selectedIds.size === 0) return state
+      const pool: PlayerBlockEffect["kind"][] = ["armor", "brittle", "pulse", "spring", "magnet"]
+      const blocks = state.map.blocks.map((block) => {
+        if (!selectedIds.has(block.id)) return block
+        let hp = block.hp
+        if (action.options.hpMin !== undefined && action.options.hpMax !== undefined) {
+          const min = Math.min(action.options.hpMin, action.options.hpMax)
+          const max = Math.max(action.options.hpMin, action.options.hpMax)
+          hp = Math.floor(Math.random() * (max - min + 1)) + min
+        }
+        let rotation = block.rotation ?? 0
+        if (action.options.jitterDeg) {
+          const jitter = ((Math.random() * 2 - 1) * action.options.jitterDeg * Math.PI) / 180
+          rotation += jitter
+          if (state.snapToGrid) {
+            rotation = (Math.round((rotation * 180) / Math.PI / 5) * 5 * Math.PI) / 180
+          }
+        }
+        let effects = block.effects ? [...block.effects] : []
+        if (action.options.addEffects) {
+          if (Math.random() < 0.28 && !effects.some((e) => e.kind === "portal")) {
+            const pick = pool[Math.floor(Math.random() * pool.length)]!
+            const eff = defaultEffect(pick, block)
+            if (eff) effects = [eff]
+          }
+        }
+        return {
+          ...block,
+          hp,
+          rotation,
+          effects,
+        }
+      })
+      return updateMap(state, { ...state.map, blocks }, state.selectedBlockIds)
+    }
+    case "APPLY_ZEBRA_PATTERN": {
+      const selectedIds = new Set(action.blockIds)
+      if (selectedIds.size < 2) return state
+      const targetBlocks = state.map.blocks.filter((b) => selectedIds.has(b.id))
+      const sorted = [...targetBlocks].sort((a, b) => {
+        const rowDiff = Math.round(a.position.y / 20) - Math.round(b.position.y / 20)
+        return rowDiff !== 0 ? rowDiff : a.position.x - b.position.x
+      })
+      const valMap = new Map<string, number | PlayerBlockSpec["shape"]>()
+      sorted.forEach((block, idx) => {
+        valMap.set(block.id, idx % 2 === 0 ? action.optionA : action.optionB)
+      })
+      const blocks = state.map.blocks.map((block) => {
+        const val = valMap.get(block.id)
+        if (val === undefined) return block
+        if (action.kind === "hp") {
+          return { ...block, hp: Number(val) }
+        } else {
+          const shape = val as PlayerBlockSpec["shape"]
+          let size = { ...block.size }
+          if (shape === "circle") {
+            const s = Math.max(size.width, size.height)
+            size = { width: s, height: s }
+          }
+          return { ...block, shape, size }
+        }
+      })
+      return updateMap(state, { ...state.map, blocks }, state.selectedBlockIds)
+    }
+    case "SELECT_SIMILAR": {
+      const ref = state.map.blocks.find((b) => b.id === action.referenceBlockId)
+      if (!ref) return state
+      let matchingIds: string[] = []
+      if (action.criterion === "hp") {
+        matchingIds = state.map.blocks.filter((b) => b.hp === ref.hp).map((b) => b.id)
+      } else if (action.criterion === "shape") {
+        matchingIds = state.map.blocks.filter((b) => b.shape === ref.shape).map((b) => b.id)
+      } else if (action.criterion === "effect") {
+        const refEffects = new Set(ref.effects?.map((e) => e.kind) ?? [])
+        matchingIds = state.map.blocks
+          .filter((b) => b.effects?.some((e) => refEffects.has(e.kind)))
+          .map((b) => b.id)
+        if (matchingIds.length === 0) matchingIds = [ref.id]
+      }
+      return {
+        ...state,
+        selectedBlockIds: matchingIds,
+        selectedBlockId: matchingIds[0] ?? null,
+      }
+    }
+    case "SELECT_CONNECTED": {
+      const ref = state.map.blocks.find((b) => b.id === action.referenceBlockId)
+      if (!ref) return state
+      const visited = new Set<string>([ref.id])
+      const queue = [ref]
+      while (queue.length > 0) {
+        const curr = queue.shift()!
+        for (const other of state.map.blocks) {
+          if (!visited.has(other.id) && areBlocksTouching(curr, other, 10)) {
+            visited.add(other.id)
+            queue.push(other)
+          }
+        }
+      }
+      const ids = Array.from(visited)
+      return {
+        ...state,
+        selectedBlockIds: ids,
+        selectedBlockId: ids[0] ?? null,
+      }
+    }
+    case "INVERT_SELECTION": {
+      const currentlySelected = new Set(state.selectedBlockIds)
+      const newIds = state.map.blocks.filter((b) => !currentlySelected.has(b.id)).map((b) => b.id)
+      return {
+        ...state,
+        selectedBlockIds: newIds,
+        selectedBlockId: newIds[0] ?? null,
+      }
     }
     case "COPY_SELECTED": {
       const selected = new Set(state.selectedBlockIds)

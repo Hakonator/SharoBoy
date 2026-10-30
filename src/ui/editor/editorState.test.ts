@@ -605,6 +605,158 @@ describe("editorReducer", () => {
     state = editorReducer(state, { type: "SET_GROUP_CLONE_GAP", gap: 500 })
     expect(state.groupCloneGap).toBe(300)
   })
+
+  it("flips blocks horizontally and vertically and supports undo/redo", () => {
+    let state = createEditorState(makeMap())
+    state.map.blocks[0]!.size = { width: 40, height: 30 }
+    state.map.blocks[1]!.size = { width: 40, height: 30 }
+    state.map.blocks[0]!.position = { x: 200, y: 300 }
+    state.map.blocks[1]!.position = { x: 400, y: 300 }
+    state.map.blocks[0]!.rotation = 0
+    state.map.blocks[1]!.rotation = 0
+
+    // Flip horizontally around selection center (center X = 300)
+    // a (200) -> 2*300 - 200 = 400
+    // b (400) -> 2*300 - 400 = 200
+    state = editorReducer(state, {
+      type: "FLIP_BLOCKS",
+      blockIds: ["a", "b"],
+      axis: "horizontal",
+      origin: "selection",
+    })
+    expect(state.map.blocks[0]!.position.x).toBe(400)
+    expect(state.map.blocks[1]!.position.x).toBe(200)
+
+    // Undo restores original
+    const undone = editorReducer(state, { type: "UNDO" })
+    expect(undone.map.blocks[0]!.position.x).toBe(200)
+    expect(undone.map.blocks[1]!.position.x).toBe(400)
+  })
+
+  it("creates a symmetric duplicate across arena center and selects copies", () => {
+    const state = createEditorState(makeMap())
+    state.map.blocks[0]!.position = { x: 200, y: 300 }
+    state.map.blocks[1]!.position = { x: 300, y: 300 }
+
+    // Arena center is 960. 2*960 - 200 = 1720, 2*960 - 300 = 1620
+    const duplicated = editorReducer(state, {
+      type: "SYMMETRIC_DUPLICATE",
+      blockIds: ["a", "b"],
+      axis: "horizontal",
+    })
+
+    expect(duplicated.map.blocks).toHaveLength(4)
+    expect(duplicated.selectedBlockIds).toHaveLength(2)
+    const cloneA = duplicated.map.blocks[2]!
+    const cloneB = duplicated.map.blocks[3]!
+    expect(cloneA.position.x).toBe(1720)
+    expect(cloneB.position.x).toBe(1620)
+
+    // Undo removes copies
+    const undone = editorReducer(duplicated, { type: "UNDO" })
+    expect(undone.map.blocks).toHaveLength(2)
+  })
+
+  it("aligns blocks to left, center and right edges", () => {
+    const state = createEditorState(makeMap())
+    state.map.blocks[0]!.position = { x: 200, y: 300 } // width 40 -> left = 180
+    state.map.blocks[1]!.position = { x: 400, y: 300 } // width 30 -> right = 415
+
+    // Align left: both start at left edge (minX = 180)
+    const alignedLeft = editorReducer(state, {
+      type: "ALIGN_BLOCKS",
+      blockIds: ["a", "b"],
+      alignment: "left",
+    })
+    expect(alignedLeft.map.blocks[0]!.position.x).toBe(180 + 20)
+    expect(alignedLeft.map.blocks[1]!.position.x).toBe(180 + 15)
+  })
+
+  it("distributes blocks evenly along axis", () => {
+    const state = createEditorState(makeMap())
+    // Add third block
+    state.map.blocks.push({
+      id: "c",
+      position: { x: 390, y: 100 },
+      shape: "rect",
+      size: { width: 30, height: 30 },
+      hp: 1,
+    })
+    state.map.blocks[0]!.position = { x: 100, y: 300 }
+    state.map.blocks[1]!.position = { x: 150, y: 300 }
+    state.map.blocks[2]!.position = { x: 500, y: 300 }
+
+    const distributed = editorReducer(state, {
+      type: "DISTRIBUTE_BLOCKS",
+      blockIds: ["a", "b", "c"],
+      axis: "horizontal",
+    })
+    expect(distributed.map.blocks[0]!.position.x).toBe(100)
+    expect(distributed.map.blocks[1]!.position.x).toBe(300)
+    expect(distributed.map.blocks[2]!.position.x).toBe(500)
+  })
+
+  it("applies HP gradient and zebra pattern across blocks", () => {
+    const state = createEditorState(makeMap())
+    state.map.blocks[0]!.position = { x: 100, y: 200 }
+    state.map.blocks[1]!.position = { x: 100, y: 400 }
+
+    const gradient = editorReducer(state, {
+      type: "APPLY_HP_GRADIENT",
+      blockIds: ["a", "b"],
+      direction: "vertical",
+      fromHp: 1,
+      toHp: 4,
+    })
+    expect(gradient.map.blocks[0]!.hp).toBe(1)
+    expect(gradient.map.blocks[1]!.hp).toBe(4)
+
+    const zebra = editorReducer(state, {
+      type: "APPLY_ZEBRA_PATTERN",
+      blockIds: ["a", "b"],
+      kind: "shape",
+      optionA: "circle",
+      optionB: "rect",
+    })
+    expect(zebra.map.blocks[0]!.shape).toBe("circle")
+    expect(zebra.map.blocks[1]!.shape).toBe("rect")
+  })
+
+  it("supports smart selection: similar, connected, and invert", () => {
+    const state = createEditorState(makeMap())
+    // Block a: hp 1, shape ellipse, (100, 100)
+    // Block b: hp 2, shape circle, (200, 100)
+    // Add Block c: hp 1, shape rect, (110, 100) -> touches a
+    state.map.blocks.push({
+      id: "c",
+      position: { x: 110, y: 100 },
+      shape: "rect",
+      size: { width: 30, height: 30 },
+      hp: 1,
+    })
+
+    // Select similar by HP: a and c have hp 1
+    const similarHp = editorReducer(state, {
+      type: "SELECT_SIMILAR",
+      criterion: "hp",
+      referenceBlockId: "a",
+    })
+    expect(similarHp.selectedBlockIds.sort()).toEqual(["a", "c"])
+
+    // Select connected: c touches a, but b is at 200 (far away)
+    const connected = editorReducer(state, {
+      type: "SELECT_CONNECTED",
+      referenceBlockId: "a",
+    })
+    expect(connected.selectedBlockIds.sort()).toEqual(["a", "c"])
+
+    // Invert selection
+    const inverted = editorReducer(
+      { ...state, selectedBlockIds: ["a"] },
+      { type: "INVERT_SELECTION" }
+    )
+    expect(inverted.selectedBlockIds.sort()).toEqual(["b", "c"])
+  })
 })
 
 describe("editor draft storage", () => {

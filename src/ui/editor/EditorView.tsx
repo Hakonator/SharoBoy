@@ -8,6 +8,7 @@ import { EditorCanvas } from "./EditorCanvas"
 import { EditorInspector } from "./EditorInspector"
 import { EditorJsonModal } from "./EditorJsonModal"
 import { EditorMapsModal } from "./EditorMapsModal"
+import { EditorPrefabsModal } from "./EditorPrefabsModal"
 import { EditorPublishModal } from "./EditorPublishModal"
 import { createEditorState, editorReducer, saveEditorDraft } from "./editorState"
 import { EditorToolbar } from "./EditorToolbar"
@@ -48,6 +49,7 @@ export function EditorView({
   const [showJson, setShowJson] = useState(false)
   const [showPublish, setShowPublish] = useState(false)
   const [showMapsModal, setShowMapsModal] = useState(false)
+  const [showPrefabsModal, setShowPrefabsModal] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
   const author = playerNick.trim() || "не указано"
 
@@ -82,8 +84,18 @@ export function EditorView({
         event.code === "KeyC" || event.key.toLowerCase() === "c" || event.key.toLowerCase() === "с"
       const isKeyV =
         event.code === "KeyV" || event.key.toLowerCase() === "v" || event.key.toLowerCase() === "м"
+      const isKeyA =
+        event.code === "KeyA" || event.key.toLowerCase() === "a" || event.key.toLowerCase() === "ф"
+      const isKeyI =
+        event.code === "KeyI" || event.key.toLowerCase() === "i" || event.key.toLowerCase() === "ш"
 
-      if (isCtrlOrMeta && isKeyZ) {
+      if (isCtrlOrMeta && isKeyA) {
+        event.preventDefault()
+        dispatch({ type: "SELECT_BLOCKS", blockIds: state.map.blocks.map((b) => b.id) })
+      } else if (isCtrlOrMeta && isKeyI) {
+        event.preventDefault()
+        dispatch({ type: "INVERT_SELECTION" })
+      } else if (isCtrlOrMeta && isKeyZ) {
         event.preventDefault()
         dispatch({ type: event.shiftKey ? "REDO" : "UNDO" })
       } else if (isCtrlOrMeta && isKeyY) {
@@ -106,7 +118,8 @@ export function EditorView({
         if (state.pastePhantom) {
           event.preventDefault()
           dispatch({ type: "CANCEL_PASTE" })
-        } else if (showMapsModal) setShowMapsModal(false)
+        } else if (showPrefabsModal) setShowPrefabsModal(false)
+        else if (showMapsModal) setShowMapsModal(false)
         else if (showPublish) setShowPublish(false)
         else if (showJson) setShowJson(false)
         else if (state.selectedBlockIds.length > 0)
@@ -116,7 +129,16 @@ export function EditorView({
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [onClose, showJson, showMapsModal, showPublish, state.selectedBlockIds, state.pastePhantom])
+  }, [
+    onClose,
+    showJson,
+    showMapsModal,
+    showPrefabsModal,
+    showPublish,
+    state.map.blocks,
+    state.selectedBlockIds,
+    state.pastePhantom,
+  ])
 
   const testRun = () => {
     const errors = validatePlayerMapSpec(state.map)
@@ -166,6 +188,7 @@ export function EditorView({
         onImportExport={() => setShowJson(true)}
         onNextMusicTrack={onNextMusicTrack}
         onOpenMaps={() => setShowMapsModal(true)}
+        onOpenPrefabs={() => setShowPrefabsModal(true)}
         onPublish={() => setShowPublish(true)}
         onTestRun={testRun}
         onToggleMusic={onToggleMusic}
@@ -211,6 +234,13 @@ export function EditorView({
           onCreateMap={handleCreateMap}
           onDeleteMap={handleDeleteMap}
           onSelectMap={handleSelectMap}
+        />
+      )}
+      {showPrefabsModal && (
+        <EditorPrefabsModal
+          dispatch={dispatch}
+          onClose={() => setShowPrefabsModal(false)}
+          state={state}
         />
       )}
     </section>

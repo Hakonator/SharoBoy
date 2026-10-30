@@ -213,6 +213,87 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
         tip="Потяните изумрудный «+» в правом нижнем углу блока. Колёсико мыши меняет зазор."
       />
 
+      <section className="space-y-2 border-t border-line/40 pt-3">
+        <div className="flex items-center justify-between">
+          <h3 className="hud-label">Симметрия и поиск</h3>
+          <span className="text-[11px] text-cyan-neon">Действия</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1.5 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "FLIP_BLOCKS",
+                blockIds: [block.id],
+                axis: "horizontal",
+                origin: "center",
+              })
+            }
+            title="Перенести блок на зеркальную сторону арены (относительно X = 960)"
+          >
+            ↔ На другую сторону
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1.5 text-xs text-emerald-300 border-emerald-400/40 hover:border-emerald-400 hover:bg-emerald-400/10"
+            onClick={() =>
+              dispatch({
+                type: "SYMMETRIC_DUPLICATE",
+                blockIds: [block.id],
+                axis: "horizontal",
+              })
+            }
+            title="Создать зеркальную копию блока на противоположной стороне арены"
+          >
+            ✨ Зеркальный клон
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-1 pt-1">
+          <button
+            type="button"
+            className="btn-ghost px-1.5 py-1 text-[11px] text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "SELECT_SIMILAR",
+                criterion: "hp",
+                referenceBlockId: block.id,
+              })
+            }
+            title="Выбрать все блоки карты с таким же HP"
+          >
+            🔍 С таким же HP
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-1.5 py-1 text-[11px] text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "SELECT_SIMILAR",
+                criterion: "shape",
+                referenceBlockId: block.id,
+              })
+            }
+            title="Выбрать все блоки карты с такой же формой"
+          >
+            🔍 С той же формой
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-1.5 py-1 text-[11px] text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "SELECT_CONNECTED",
+                referenceBlockId: block.id,
+              })
+            }
+            title="Выбрать все соприкасающиеся блоки (связный кластер)"
+          >
+            🔗 Связный кластер
+          </button>
+        </div>
+      </section>
+
       <section className="space-y-3 border-t border-line pt-3">
         <h3 className="hud-label">Эффекты</h3>
         <EffectToggle
@@ -1009,6 +1090,418 @@ function GroupInspector({
           ))}
         </div>
       </div>
+
+      {/* Секция: Симметрия и Отражение */}
+      <section className="space-y-2.5 border-t border-line/40 pt-3">
+        <div className="flex items-center justify-between">
+          <h3 className="hud-label">Симметрия и отражение</h3>
+          <span className="text-[11px] text-cyan-neon">Отражение</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            className="btn-ghost flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "FLIP_BLOCKS",
+                blockIds: state.selectedBlockIds,
+                axis: "horizontal",
+                origin: "selection",
+              })
+            }
+            title="Отразить группу по горизонтали относительно собственного центра"
+          >
+            <span>↔ Отразить X</span>
+          </button>
+          <button
+            type="button"
+            className="btn-ghost flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "FLIP_BLOCKS",
+                blockIds: state.selectedBlockIds,
+                axis: "vertical",
+                origin: "selection",
+              })
+            }
+            title="Отразить группу по вертикали относительно собственного центра"
+          >
+            <span>↕ Отразить Y</span>
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            className="btn-ghost flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-dim hover:text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "FLIP_BLOCKS",
+                blockIds: state.selectedBlockIds,
+                axis: "horizontal",
+                origin: "center",
+              })
+            }
+            title="Отразить группу на противоположную сторону арены (относительно X = 960)"
+          >
+            <span>🌐 По центру арены</span>
+          </button>
+          <button
+            type="button"
+            className="btn-ghost flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-emerald-300 border-emerald-400/40 hover:border-emerald-400 hover:bg-emerald-400/10"
+            onClick={() =>
+              dispatch({
+                type: "SYMMETRIC_DUPLICATE",
+                blockIds: state.selectedBlockIds,
+                axis: "horizontal",
+              })
+            }
+            title="Создать зеркальную копию группы на противоположной стороне арены (X = 960) и выделить её"
+          >
+            <span>✨ Зеркальный клон</span>
+          </button>
+        </div>
+      </section>
+
+      {/* Секция: Выравнивание и Распределение */}
+      <section className="space-y-2.5 border-t border-line/40 pt-3">
+        <div className="flex items-center justify-between">
+          <h3 className="hud-label">Выравнивание и шаг</h3>
+          <span className="text-[11px] text-cyan-neon">Выравнивание</span>
+        </div>
+        <div className="grid grid-cols-3 gap-1">
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "ALIGN_BLOCKS",
+                blockIds: state.selectedBlockIds,
+                alignment: "left",
+              })
+            }
+            title="Выровнять блоки по левому краю"
+          >
+            |← Влево
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "ALIGN_BLOCKS",
+                blockIds: state.selectedBlockIds,
+                alignment: "center_x",
+              })
+            }
+            title="Выровнять блоки по горизонтальному центру"
+          >
+            →|← Центр X
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "ALIGN_BLOCKS",
+                blockIds: state.selectedBlockIds,
+                alignment: "right",
+              })
+            }
+            title="Выровнять блоки по правому краю"
+          >
+            →| Вправо
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "ALIGN_BLOCKS",
+                blockIds: state.selectedBlockIds,
+                alignment: "top",
+              })
+            }
+            title="Выровнять блоки по верхнему краю"
+          >
+            ↑ Вверх
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "ALIGN_BLOCKS",
+                blockIds: state.selectedBlockIds,
+                alignment: "center_y",
+              })
+            }
+            title="Выровнять блоки по вертикальному центру"
+          >
+            ↕ Центр Y
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "ALIGN_BLOCKS",
+                blockIds: state.selectedBlockIds,
+                alignment: "bottom",
+              })
+            }
+            title="Выровнять блоки по нижнему краю"
+          >
+            ↓ Вниз
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-1 pt-1">
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "DISTRIBUTE_BLOCKS",
+                blockIds: state.selectedBlockIds,
+                axis: "horizontal",
+              })
+            }
+            title="Равномерно распределить расстояние между блоками по горизонтали"
+          >
+            ⇥ Шаг по X
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "DISTRIBUTE_BLOCKS",
+                blockIds: state.selectedBlockIds,
+                axis: "vertical",
+              })
+            }
+            title="Равномерно распределить расстояние между блоками по вертикали"
+          >
+            ⤓ Шаг по Y
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1 text-xs text-amber-300 hover:border-amber-400"
+            onClick={() =>
+              dispatch({
+                type: "SNAP_BLOCKS_TO_GRID",
+                blockIds: state.selectedBlockIds,
+              })
+            }
+            title="Привязать позиции всех блоков группы к текущей сетке"
+          >
+            # В сетку
+          </button>
+        </div>
+      </section>
+
+      {/* Секция: Генератор и Градиенты */}
+      <section className="space-y-2.5 border-t border-line/40 pt-3">
+        <div className="flex items-center justify-between">
+          <h3 className="hud-label">Генератор и градиенты</h3>
+          <span className="text-[11px] text-amber-300">Генератор</span>
+        </div>
+
+        <div>
+          <span className="text-[11px] text-dim font-medium">Градиент HP (1 ➔ 4):</span>
+          <div className="grid grid-cols-3 gap-1 pt-1">
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+              onClick={() =>
+                dispatch({
+                  type: "APPLY_HP_GRADIENT",
+                  blockIds: state.selectedBlockIds,
+                  direction: "vertical",
+                  fromHp: 1,
+                  toHp: 4,
+                })
+              }
+              title="Градиент HP сверху вниз (1 -> 4)"
+            >
+              ↓ Сверху вниз
+            </button>
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+              onClick={() =>
+                dispatch({
+                  type: "APPLY_HP_GRADIENT",
+                  blockIds: state.selectedBlockIds,
+                  direction: "vertical",
+                  fromHp: 4,
+                  toHp: 1,
+                })
+              }
+              title="Градиент HP снизу вверх (4 -> 1)"
+            >
+              ↑ Снизу вверх
+            </button>
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+              onClick={() =>
+                dispatch({
+                  type: "APPLY_HP_GRADIENT",
+                  blockIds: state.selectedBlockIds,
+                  direction: "horizontal",
+                  fromHp: 1,
+                  toHp: 4,
+                })
+              }
+              title="Градиент HP слева направо (1 -> 4)"
+            >
+              → Слева направо
+            </button>
+          </div>
+        </div>
+
+        <div className="pt-1">
+          <span className="text-[11px] text-dim font-medium">Случайный разброс и шахматка:</span>
+          <div className="grid grid-cols-3 gap-1 pt-1">
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+              onClick={() =>
+                dispatch({
+                  type: "RANDOMIZE_BLOCKS",
+                  blockIds: state.selectedBlockIds,
+                  options: { hpMin: 1, hpMax: 4 },
+                })
+              }
+              title="Случайный разброс HP от 1 до 4 среди выбранных блоков"
+            >
+              🎲 Случайный HP
+            </button>
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+              onClick={() =>
+                dispatch({
+                  type: "RANDOMIZE_BLOCKS",
+                  blockIds: state.selectedBlockIds,
+                  options: { addEffects: true },
+                })
+              }
+              title="Разбросать случайные спецэффекты (броня, пружины, импульс, хрупкость)"
+            >
+              ✨ Спецэффекты
+            </button>
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+              onClick={() =>
+                dispatch({
+                  type: "RANDOMIZE_BLOCKS",
+                  blockIds: state.selectedBlockIds,
+                  options: { jitterDeg: 3 },
+                })
+              }
+              title="Лёгкий органический наклон блоков (±3°)"
+            >
+              〰 Наклон ±3°
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-1 pt-1.5">
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+              onClick={() =>
+                dispatch({
+                  type: "APPLY_ZEBRA_PATTERN",
+                  blockIds: state.selectedBlockIds,
+                  kind: "shape",
+                  optionA: "circle",
+                  optionB: "rect",
+                })
+              }
+              title="Шахматное чередование форм: Круг / Прямоугольник"
+            >
+              🏁 Шахматка: Круг / Прям.
+            </button>
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1 text-xs text-foam hover:border-cyan-neon"
+              onClick={() =>
+                dispatch({
+                  type: "APPLY_ZEBRA_PATTERN",
+                  blockIds: state.selectedBlockIds,
+                  kind: "hp",
+                  optionA: 1,
+                  optionB: 3,
+                })
+              }
+              title="Шахматное чередование HP: 1 HP / 3 HP"
+            >
+              🏁 Шахматка: 1 / 3 HP
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Секция: Умное выделение */}
+      <section className="space-y-2 border-t border-line/40 pt-3">
+        <div className="flex items-center justify-between">
+          <h3 className="hud-label">Умное выделение</h3>
+          <span className="text-[11px] text-cyan-neon">Выбор</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1.5 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "SELECT_SIMILAR",
+                criterion: "hp",
+                referenceBlockId: state.selectedBlockIds[0]!,
+              })
+            }
+            title="Выбрать все блоки на карте с таким же HP"
+          >
+            🔍 Похожие по HP
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1.5 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "SELECT_SIMILAR",
+                criterion: "shape",
+                referenceBlockId: state.selectedBlockIds[0]!,
+              })
+            }
+            title="Выбрать все блоки на карте с такой же формой"
+          >
+            🔍 Похожие по форме
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1.5 text-xs text-foam hover:border-cyan-neon"
+            onClick={() =>
+              dispatch({
+                type: "SELECT_CONNECTED",
+                referenceBlockId: state.selectedBlockIds[0]!,
+              })
+            }
+            title="Выбрать все соприкасающиеся блоки (связный кластер)"
+          >
+            🔗 Связный кластер
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1.5 text-xs text-cyan-neon hover:border-cyan-neon"
+            onClick={() => dispatch({ type: "INVERT_SELECTION" })}
+            title="Инвертировать выделение (Ctrl+I)"
+          >
+            🔄 Инвертировать
+          </button>
+        </div>
+      </section>
 
       <section className="space-y-3 border-t border-line pt-3">
         <div>

@@ -5,11 +5,20 @@ import { PADDLE_ZONE_TOP } from "../../game/mapValidator"
 import type { PlayerBlockEffect, PlayerBlockSpec } from "../../game/mapSpec"
 
 import { clampPosition } from "./editorState"
+import {
+  areBlocksTouching,
+  blockCorners,
+  getBlocksBoundingBox,
+  getBlocksBoundingCenter,
+  intersectsBlock,
+  normalizeRect,
+  WORLD_HEIGHT,
+  WORLD_WIDTH,
+  HUD_ZONE_BOTTOM as HUD_BOTTOM,
+} from "./geometry"
 import type { EditorCanvasProps, EditorState } from "./types"
 
-const WORLD_WIDTH = 1920
-const WORLD_HEIGHT = 1080
-const HUD_BOTTOM = 140
+export { getBlocksBoundingBox, getBlocksBoundingCenter } from "./geometry"
 
 interface DragState {
   kind: "move" | "marquee" | "resize" | "rotate" | "clone"
@@ -80,6 +89,20 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [phantomPos, setPhantomPos] = useState<{ x: number; y: number } | null>(null)
   const lastPointerPos = useRef<{ x: number; y: number }>({ x: 960, y: 500 })
+  const [isCtrlDown, setIsCtrlDown] = useState(false)
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      const isCtrl = e.ctrlKey || e.metaKey || e.key === "Control" || e.key === "Meta"
+      setIsCtrlDown(isCtrl)
+    }
+    window.addEventListener("keydown", handleKey)
+    window.addEventListener("keyup", handleKey)
+    return () => {
+      window.removeEventListener("keydown", handleKey)
+      window.removeEventListener("keyup", handleKey)
+    }
+  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -205,8 +228,64 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
         drawBlock(context, block, true, 0.64)
       }
     }
+
+    // Ctrl-hover illumination when there are already selected blocks
+    if (
+      isCtrlDown &&
+      state.selectedBlockIds.length > 0 &&
+      !dragRef.current &&
+      !state.pastePhantom &&
+      lastPointerPos.current
+    ) {
+      const point = lastPointerPos.current
+      if (isInsideWorld(point)) {
+        const hovered = hitTest(state.map.blocks, point)
+        if (hovered) {
+          const isSelected = state.selectedBlockIds.includes(hovered.id)
+          if (isSelected) {
+            drawBlockHighlight(context, hovered, "#ff6b6b", 16)
+            drawCtrlTooltip(context, point, "[-] Исключить из группы (Ctrl+клик)", "#ff6b6b")
+          } else {
+            const logicalGroup = state.map.groups?.find((g) => g.blockIds.includes(hovered.id))
+            let targetGroup: PlayerBlockSpec[] = []
+            if (logicalGroup) {
+              targetGroup = state.map.blocks.filter((b) => logicalGroup.blockIds.includes(b.id))
+            } else {
+              targetGroup = findConnectedCluster(state.map.blocks, hovered)
+            }
+            if (targetGroup.length === 0) targetGroup = [hovered]
+
+            for (const b of targetGroup) {
+              drawBlockHighlight(context, b, "#42ffb0", 16)
+            }
+
+            const unionBlocks = [...selected, ...targetGroup]
+            const unionBbox = getBlocksBoundingBox(unionBlocks)
+            context.save()
+            context.strokeStyle = "rgba(66, 255, 176, 0.85)"
+            context.lineWidth = 1.5
+            context.setLineDash([5, 5])
+            context.shadowColor = "rgba(66, 255, 176, 0.4)"
+            context.shadowBlur = 10
+            context.strokeRect(
+              unionBbox.minX - 10,
+              unionBbox.minY - 10,
+              unionBbox.width + 20,
+              unionBbox.height + 20
+            )
+            context.restore()
+
+            const label =
+              targetGroup.length > 1
+                ? `[+] Добавить группу (${targetGroup.length} бл.) · Ctrl+клик`
+                : `[+] Добавить в группу · Ctrl+клик`
+            drawCtrlTooltip(context, point, label, "#42ffb0")
+          }
+        }
+      }
+    }
     context.restore()
-  }, [clonePreview, dragPreview, groupPreview, marquee, phantomPos, size, state])
+  }, [clonePreview, dragPreview, groupPreview, isCtrlDown, marquee, phantomPos, size, state])
 
   useEffect(
     () => () => {
@@ -493,7 +572,18 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       return
     }
     if (event.shiftKey || event.ctrlKey || event.metaKey) {
-      dispatch({ type: "TOGGLE_BLOCK_SELECTION", blockId: block.id })
+      if (state.selectedBlockIds.includes(block.id)) {
+        dispatch({ type: "TOGGLE_BLOCK_SELECTION", blockId: block.id })
+      } else {
+        const logicalGroup = state.map.groups?.find((g) => g.blockIds.includes(block.id))
+        const targetGroup = logicalGroup
+          ? state.map.blocks.filter((b) => logicalGroup.blockIds.includes(b.id))
+          : findConnectedCluster(state.map.blocks, block)
+        const newIds = Array.from(
+          new Set([...state.selectedBlockIds, ...targetGroup.map((b) => b.id)])
+        )
+        dispatch({ type: "SELECT_BLOCKS", blockIds: newIds })
+      }
       return
     }
     const isAlreadySelected = state.selectedBlockIds.includes(block.id)
@@ -517,6 +607,9 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     const point = toWorldPoint(event)
     if (!point) return
     lastPointerPos.current = point
+    if ((event.ctrlKey || event.metaKey) !== isCtrlDown) {
+      setIsCtrlDown(event.ctrlKey || event.metaKey)
+    }
 
     if (state.pastePhantom) {
       setPhantomPos(point)
@@ -1089,42 +1182,98 @@ function isCloneHandle(block: PlayerBlockSpec, point: { x: number; y: number }) 
   )
 }
 
-function blockCorners(block: PlayerBlockSpec) {
-  const halfW = block.size.width / 2
-  const halfH = block.size.height / 2
-  const angle = block.rotation ?? 0
-  return [
-    [-halfW, -halfH],
-    [halfW, -halfH],
-    [halfW, halfH],
-    [-halfW, halfH],
-  ].map(([x, y]) => ({
-    x: block.position.x + x! * Math.cos(angle) - y! * Math.sin(angle),
-    y: block.position.y + x! * Math.sin(angle) + y! * Math.cos(angle),
-  }))
-}
-
-function normalizeRect(a: { x: number; y: number }, b: { x: number; y: number }) {
-  return {
-    x: Math.min(a.x, b.x),
-    y: Math.min(a.y, b.y),
-    width: Math.abs(a.x - b.x),
-    height: Math.abs(a.y - b.y),
+function findConnectedCluster(
+  blocks: PlayerBlockSpec[],
+  start: PlayerBlockSpec
+): PlayerBlockSpec[] {
+  const visited = new Set<string>([start.id])
+  const queue = [start]
+  while (queue.length > 0) {
+    const curr = queue.shift()!
+    for (const b of blocks) {
+      if (!visited.has(b.id) && areBlocksTouching(curr, b, 8)) {
+        visited.add(b.id)
+        queue.push(b)
+      }
+    }
   }
+  return blocks.filter((b) => visited.has(b.id))
 }
 
-function intersectsBlock(rect: ReturnType<typeof normalizeRect>, block: PlayerBlockSpec) {
-  const corners = blockCorners(block)
-  const left = Math.min(...corners.map((corner) => corner.x))
-  const right = Math.max(...corners.map((corner) => corner.x))
-  const top = Math.min(...corners.map((corner) => corner.y))
-  const bottom = Math.max(...corners.map((corner) => corner.y))
-  return (
-    left <= rect.x + rect.width &&
-    right >= rect.x &&
-    top <= rect.y + rect.height &&
-    bottom >= rect.y
-  )
+function drawBlockHighlight(
+  context: CanvasRenderingContext2D,
+  block: PlayerBlockSpec,
+  color: string,
+  glowBlur = 12
+) {
+  context.save()
+  context.translate(block.position.x, block.position.y)
+  context.rotate(block.rotation ?? 0)
+  const rx = block.size.width / 2
+  const ry = block.size.height / 2
+  context.beginPath()
+  if (block.shape === "circle") {
+    context.arc(0, 0, Math.min(rx, ry), 0, Math.PI * 2)
+  } else if (block.shape === "rect") {
+    context.rect(-rx, -ry, rx * 2, ry * 2)
+  } else if (block.shape === "round_rect") {
+    const cr = Math.min(12, rx * 0.5, ry * 0.5)
+    if (typeof context.roundRect === "function") {
+      context.roundRect(-rx, -ry, rx * 2, ry * 2, cr)
+    } else {
+      context.rect(-rx, -ry, rx * 2, ry * 2)
+    }
+  } else {
+    context.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2)
+  }
+  context.shadowColor = color
+  context.shadowBlur = glowBlur
+  context.strokeStyle = color
+  context.lineWidth = 3
+  context.stroke()
+  context.fillStyle = color
+  context.globalAlpha = 0.22
+  context.fill()
+  context.restore()
+}
+
+function drawCtrlTooltip(
+  context: CanvasRenderingContext2D,
+  point: { x: number; y: number },
+  text: string,
+  accentColor: string
+) {
+  context.save()
+  context.font = "bold 12px sans-serif"
+  const tw = context.measureText(text).width
+  const padX = 10
+  const w = tw + padX * 2
+  const h = 24
+  let x = point.x + 16
+  let y = point.y - 28
+  if (x + w > WORLD_WIDTH - 20) x = point.x - w - 16
+  if (y < HUD_BOTTOM) y = point.y + 20
+
+  context.fillStyle = "rgba(4, 18, 28, 0.92)"
+  context.strokeStyle = accentColor
+  context.lineWidth = 1.5
+  context.shadowColor = accentColor
+  context.shadowBlur = 8
+  context.beginPath()
+  if (typeof context.roundRect === "function") {
+    context.roundRect(x, y, w, h, 6)
+  } else {
+    context.rect(x, y, w, h)
+  }
+  context.fill()
+  context.shadowBlur = 0
+  context.stroke()
+
+  context.fillStyle = "#ffffff"
+  context.textAlign = "left"
+  context.textBaseline = "middle"
+  context.fillText(text, x + padX, y + h / 2)
+  context.restore()
 }
 
 function clampGroupPreview(blocks: PlayerBlockSpec[], delta: { x: number; y: number }) {
@@ -1189,33 +1338,6 @@ function createCloneSequence(
     positions.push(position)
   }
   return { positions, limitReached: steps > freeSlots, stepSize, gap }
-}
-
-export function getBlocksBoundingBox(blocks: PlayerBlockSpec[]) {
-  if (blocks.length === 0) {
-    return { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0 }
-  }
-  let minX = Number.POSITIVE_INFINITY
-  let maxX = Number.NEGATIVE_INFINITY
-  let minY = Number.POSITIVE_INFINITY
-  let maxY = Number.NEGATIVE_INFINITY
-  for (const b of blocks) {
-    const corners = blockCorners(b)
-    for (const c of corners) {
-      minX = Math.min(minX, c.x)
-      maxX = Math.max(maxX, c.x)
-      minY = Math.min(minY, c.y)
-      maxY = Math.max(maxY, c.y)
-    }
-  }
-  return {
-    minX,
-    maxX,
-    minY,
-    maxY,
-    width: Math.max(20, maxX - minX),
-    height: Math.max(20, maxY - minY),
-  }
 }
 
 function drawGroupSelectionFrame(context: CanvasRenderingContext2D, blocks: PlayerBlockSpec[]) {
@@ -1834,15 +1956,6 @@ function hitTest(
 
 function isInsideWorld(point: { x: number; y: number }) {
   return point.x >= 0 && point.x <= WORLD_WIDTH && point.y >= 0 && point.y <= WORLD_HEIGHT
-}
-
-export function getBlocksBoundingCenter(blocks: PlayerBlockSpec[]): { x: number; y: number } {
-  if (blocks.length === 0) return { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 }
-  const bbox = getBlocksBoundingBox(blocks)
-  return {
-    x: bbox.minX + bbox.width / 2,
-    y: bbox.minY + bbox.height / 2,
-  }
 }
 
 function drawPhantomGroup(context: CanvasRenderingContext2D, blocks: PlayerBlockSpec[]) {

@@ -85,6 +85,11 @@ describe("EditorInspector", () => {
     expect(html).toContain("+90°")
     expect(html).toContain("-90°")
     expect(html).toContain("180°")
+    expect(html).toContain("Симметрия и отражение")
+    expect(html).toContain("Выравнивание и шаг")
+    expect(html).toContain("Генератор и градиенты")
+    expect(html).toContain("Умное выделение")
+    expect(html).toContain("Зеркальный клон")
   })
 
   it("indicates effect coverage across selected blocks and displays mutual exclusions", () => {

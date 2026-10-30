@@ -18,6 +18,7 @@ export function EditorToolbar({
   onTestRun,
   onClose,
   onOpenMaps,
+  onOpenPrefabs,
   musicMuted,
   onToggleMusic,
   onNextMusicTrack,
@@ -150,6 +151,39 @@ export function EditorToolbar({
         >
           +
         </button>
+      </div>
+
+      {onOpenPrefabs && (
+        <button
+          type="button"
+          className="btn-ghost flex items-center gap-1.5 px-3 py-2 text-xs text-cyan-neon border-cyan-neon/30 hover:border-cyan-neon hover:bg-cyan-neon/10"
+          onClick={onOpenPrefabs}
+          title="Библиотека шаблонов фигур (Префабы): щиты, арки, шестерёнки, соты"
+        >
+          <span>🧩 Шаблоны</span>
+        </button>
+      )}
+
+      <div className="flex items-center gap-1">
+        <ToolbarButton
+          label="Все"
+          onClick={() =>
+            dispatch({
+              type: "SELECT_BLOCKS",
+              blockIds: state.map.blocks.map((b) => b.id),
+            })
+          }
+          title="Выделить все блоки карты (Ctrl+A)"
+        >
+          Все
+        </ToolbarButton>
+        <ToolbarButton
+          label="Инверт"
+          onClick={() => dispatch({ type: "INVERT_SELECTION" })}
+          title="Инвертировать выделение (Ctrl+I)"
+        >
+          Инверт
+        </ToolbarButton>
       </div>
 
       <span className="mx-1 hidden h-8 border-l border-line sm:block" />
