@@ -12,6 +12,7 @@ export interface EditorState {
   selectedBlockId: string | null
   selectedBlockIds: string[]
   clipboard: PlayerBlockSpec[]
+  pastePhantom: PlayerBlockSpec[] | null
   activeTool: EditorTool
   addPreset: Partial<PlayerBlockSpec>
   gridSize: number
@@ -66,6 +67,9 @@ export type EditorAction =
   | { type: "MOVE_BLOCKS"; blockIds: string[]; delta: { x: number; y: number } }
   | { type: "COPY_SELECTED" }
   | { type: "PASTE_CLIPBOARD" }
+  | { type: "START_PASTE" }
+  | { type: "CANCEL_PASTE" }
+  | { type: "COMMIT_PASTE"; blocks: PlayerBlockSpec[] }
   | { type: "CLONE_SEQUENCE"; blockId: string; positions: { x: number; y: number }[] }
   | {
       type: "UPDATE_METADATA"

@@ -64,7 +64,7 @@ export function EditorToolbar({
           disabled={!canUndo}
           label="Отменить"
           onClick={() => dispatch({ type: "UNDO" })}
-          title="Отменить последнее изменение"
+          title="Отменить последнее изменение (Ctrl+Z)"
         >
           ↶
         </ToolbarButton>
@@ -72,7 +72,7 @@ export function EditorToolbar({
           disabled={!canRedo}
           label="Повторить"
           onClick={() => dispatch({ type: "REDO" })}
-          title="Повторить изменение"
+          title="Повторить изменение (Ctrl+Y / Ctrl+Shift+Z)"
         >
           ↷
         </ToolbarButton>

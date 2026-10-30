@@ -73,27 +73,40 @@ export function EditorView({
         (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
       if (isEditingText) return
 
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+      const isCtrlOrMeta = event.ctrlKey || event.metaKey
+      const isKeyZ =
+        event.code === "KeyZ" || event.key.toLowerCase() === "z" || event.key.toLowerCase() === "я"
+      const isKeyY =
+        event.code === "KeyY" || event.key.toLowerCase() === "y" || event.key.toLowerCase() === "н"
+      const isKeyC =
+        event.code === "KeyC" || event.key.toLowerCase() === "c" || event.key.toLowerCase() === "с"
+      const isKeyV =
+        event.code === "KeyV" || event.key.toLowerCase() === "v" || event.key.toLowerCase() === "м"
+
+      if (isCtrlOrMeta && isKeyZ) {
         event.preventDefault()
         dispatch({ type: event.shiftKey ? "REDO" : "UNDO" })
-      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+      } else if (isCtrlOrMeta && isKeyY) {
         event.preventDefault()
         dispatch({ type: "REDO" })
-      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") {
+      } else if (isCtrlOrMeta && isKeyC) {
         if (state.selectedBlockIds.length > 0) {
           event.preventDefault()
           dispatch({ type: "COPY_SELECTED" })
         }
-      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v") {
+      } else if (isCtrlOrMeta && isKeyV) {
         event.preventDefault()
-        dispatch({ type: "PASTE_CLIPBOARD" })
+        dispatch({ type: "START_PASTE" })
       } else if (event.key === "Delete" || event.key === "Backspace") {
         if (state.selectedBlockIds.length > 0) {
           event.preventDefault()
           dispatch({ type: "DELETE_SELECTED_BLOCKS" })
         }
       } else if (event.key === "Escape") {
-        if (showMapsModal) setShowMapsModal(false)
+        if (state.pastePhantom) {
+          event.preventDefault()
+          dispatch({ type: "CANCEL_PASTE" })
+        } else if (showMapsModal) setShowMapsModal(false)
         else if (showPublish) setShowPublish(false)
         else if (showJson) setShowJson(false)
         else if (state.selectedBlockIds.length > 0)
@@ -103,7 +116,7 @@ export function EditorView({
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [onClose, showJson, showMapsModal, showPublish, state.selectedBlockIds])
+  }, [onClose, showJson, showMapsModal, showPublish, state.selectedBlockIds, state.pastePhantom])
 
   const testRun = () => {
     const errors = validatePlayerMapSpec(state.map)

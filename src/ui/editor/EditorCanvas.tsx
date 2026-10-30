@@ -72,6 +72,8 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
   const contextMenuRef = useRef<HTMLDivElement>(null)
   const [contextMenu, setContextMenu] = useState<CanvasContextMenu | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
+  const [phantomPos, setPhantomPos] = useState<{ x: number; y: number } | null>(null)
+  const lastPointerPos = useRef<{ x: number; y: number }>({ x: 960, y: 500 })
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -151,8 +153,32 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     }
     for (const block of clonePreview) drawBlock(context, block, false, 0.42)
     if (marquee) drawMarquee(context, marquee.start, marquee.end)
+    if (state.pastePhantom) {
+      const targetPos = phantomPos ?? lastPointerPos.current
+      const center = getBlocksBoundingCenter(state.pastePhantom)
+      const rawDelta = { x: targetPos.x - center.x, y: targetPos.y - center.y }
+      const delta = state.snapToGrid
+        ? {
+            x: Math.round(rawDelta.x / state.gridSize) * state.gridSize,
+            y: Math.round(rawDelta.y / state.gridSize) * state.gridSize,
+          }
+        : rawDelta
+      const clampedDelta = clampGroupPreview(state.pastePhantom, delta)
+      const phantoms = state.pastePhantom.map((b) => ({
+        ...b,
+        position: {
+          x: b.position.x + clampedDelta.x,
+          y: b.position.y + clampedDelta.y,
+        },
+      }))
+
+      drawPhantomGroup(context, phantoms)
+      for (const block of phantoms) {
+        drawBlock(context, block, true, 0.64)
+      }
+    }
     context.restore()
-  }, [clonePreview, dragPreview, groupPreview, marquee, size, state])
+  }, [clonePreview, dragPreview, groupPreview, marquee, phantomPos, size, state])
 
   useEffect(
     () => () => {
@@ -205,6 +231,38 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
   )
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (state.pastePhantom) {
+      if (event.button === 0) {
+        const point = toWorldPoint(event)
+        const targetPos =
+          point && isInsideWorld(point) ? point : (phantomPos ?? lastPointerPos.current)
+        const center = getBlocksBoundingCenter(state.pastePhantom)
+        const rawDelta = { x: targetPos.x - center.x, y: targetPos.y - center.y }
+        const delta = state.snapToGrid
+          ? {
+              x: Math.round(rawDelta.x / state.gridSize) * state.gridSize,
+              y: Math.round(rawDelta.y / state.gridSize) * state.gridSize,
+            }
+          : rawDelta
+        const clampedDelta = clampGroupPreview(state.pastePhantom, delta)
+        const committedBlocks = state.pastePhantom.map((b) => ({
+          ...b,
+          position: {
+            x: b.position.x + clampedDelta.x,
+            y: b.position.y + clampedDelta.y,
+          },
+        }))
+        dispatch({ type: "COMMIT_PASTE", blocks: committedBlocks })
+        setPhantomPos(null)
+        showNotice(`Закреплено блоков: ${committedBlocks.length}. Нажмите Ctrl+Z для отмены.`)
+      } else if (event.button === 2) {
+        dispatch({ type: "CANCEL_PASTE" })
+        setPhantomPos(null)
+        showNotice("Вставка отменена.")
+      }
+      return
+    }
+
     if (event.button !== 0) return
     const point = toWorldPoint(event)
     if (!point || !isInsideWorld(point)) return
@@ -268,9 +326,11 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       dispatch({ type: "TOGGLE_BLOCK_SELECTION", blockId: block.id })
       return
     }
-    const blockIds = state.selectedBlockIds.includes(block.id) ? state.selectedBlockIds : [block.id]
-    if (state.selectedBlockIds.length !== 1 || state.selectedBlockIds[0] !== block.id)
+    const isAlreadySelected = state.selectedBlockIds.includes(block.id)
+    const blockIds = isAlreadySelected ? state.selectedBlockIds : [block.id]
+    if (!isAlreadySelected) {
       dispatch({ type: "SELECT_BLOCK", blockId: block.id })
+    }
     const originals = state.map.blocks.filter((item) => blockIds.includes(item.id))
     dragRef.current = {
       kind: "move",
@@ -284,9 +344,17 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
   }
 
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const drag = dragRef.current
     const point = toWorldPoint(event)
     if (!point) return
+    lastPointerPos.current = point
+
+    if (state.pastePhantom) {
+      setPhantomPos(point)
+      event.currentTarget.style.cursor = "copy"
+      return
+    }
+
+    const drag = dragRef.current
     if (!drag) {
       const selected = state.map.blocks.filter((item) => state.selectedBlockIds.includes(item.id))
       const handle = selected.length === 1 ? hitTestTransformHandle(selected[0]!, point) : null
@@ -357,9 +425,18 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     setGroupPreview(null)
     setMarquee(null)
     setClonePreview([])
-    if (!drag || !drag.moved) return
+    if (!drag) return
     const point = toWorldPoint(event)
     if (!point) return
+    if (!drag.moved) {
+      if (drag.kind === "move" && drag.blockIds.length > 1) {
+        const clicked = hitTest(state.map.blocks, point)
+        if (clicked && drag.blockIds.includes(clicked.id)) {
+          dispatch({ type: "SELECT_BLOCK", blockId: clicked.id })
+        }
+      }
+      return
+    }
     if (drag.kind === "marquee") {
       dispatch({
         type: "SELECT_BLOCKS",
@@ -386,7 +463,8 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
             y: Math.round(rawDelta.y / state.gridSize) * state.gridSize,
           }
         : rawDelta
-      dispatch({ type: "MOVE_BLOCKS", blockIds: drag.blockIds, delta })
+      const clampedDelta = clampGroupPreview(drag.originals, delta)
+      dispatch({ type: "MOVE_BLOCKS", blockIds: drag.blockIds, delta: clampedDelta })
     } else {
       const block = drag.originals[0]
       if (!block) return
@@ -412,6 +490,12 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
 
   const onContextMenu = (event: React.MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault()
+    if (state.pastePhantom) {
+      dispatch({ type: "CANCEL_PASTE" })
+      setPhantomPos(null)
+      showNotice("Вставка отменена.")
+      return
+    }
     const point = toWorldPoint(event)
     const block = point && isInsideWorld(point) ? hitTest(state.map.blocks, point) : undefined
     const bounds = event.currentTarget.parentElement?.getBoundingClientRect()
@@ -451,7 +535,8 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
                 onClick={() => {
                   dispatch({ type: "SELECT_BLOCK", blockId: contextMenu.blockId })
                   dispatch({ type: "COPY_SELECTED" })
-                  dispatch({ type: "PASTE_CLIPBOARD" })
+                  dispatch({ type: "START_PASTE" })
+                  showNotice("Фантом следует за курсором. Кликните для размещения.")
                   setContextMenu(null)
                 }}
               >
@@ -529,7 +614,8 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
               {state.clipboard.length > 0 && (
                 <ContextMenuButton
                   onClick={() => {
-                    dispatch({ type: "PASTE_CLIPBOARD" })
+                    dispatch({ type: "START_PASTE" })
+                    showNotice("Фантом следует за курсором. Кликните для размещения.")
                     setContextMenu(null)
                   }}
                 >
@@ -1128,4 +1214,86 @@ function hitTest(
 
 function isInsideWorld(point: { x: number; y: number }) {
   return point.x >= 0 && point.x <= WORLD_WIDTH && point.y >= 0 && point.y <= WORLD_HEIGHT
+}
+
+function getBlocksBoundingCenter(blocks: PlayerBlockSpec[]): { x: number; y: number } {
+  if (blocks.length === 0) return { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 }
+  let minX = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  for (const b of blocks) {
+    minX = Math.min(minX, b.position.x)
+    maxX = Math.max(maxX, b.position.x)
+    minY = Math.min(minY, b.position.y)
+    maxY = Math.max(maxY, b.position.y)
+  }
+  return {
+    x: (minX + maxX) / 2,
+    y: (minY + maxY) / 2,
+  }
+}
+
+function drawPhantomGroup(context: CanvasRenderingContext2D, blocks: PlayerBlockSpec[]) {
+  if (blocks.length === 0) return
+  let minX = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  for (const b of blocks) {
+    const hw = b.size.width / 2
+    const hh = b.size.height / 2
+    minX = Math.min(minX, b.position.x - hw)
+    maxX = Math.max(maxX, b.position.x + hw)
+    minY = Math.min(minY, b.position.y - hh)
+    maxY = Math.max(maxY, b.position.y + hh)
+  }
+  const padding = 12
+  const rect = {
+    x: minX - padding,
+    y: minY - padding,
+    w: maxX - minX + padding * 2,
+    h: maxY - minY + padding * 2,
+  }
+
+  context.save()
+  context.strokeStyle = "#35e0ff"
+  context.lineWidth = 2
+  context.setLineDash([8, 6])
+  context.strokeRect(rect.x, rect.y, rect.w, rect.h)
+
+  // Soft cyan glow
+  context.shadowColor = "#35e0ff"
+  context.shadowBlur = 14
+  context.strokeStyle = "rgba(53, 224, 255, 0.45)"
+  context.strokeRect(rect.x, rect.y, rect.w, rect.h)
+
+  // Floating guide badge
+  context.shadowBlur = 0
+  context.setLineDash([])
+  const pillText = `ФАНТОМ (${blocks.length}): клик — закрепить • Esc — отмена`
+  context.font = "bold 14px sans-serif"
+  const textWidth = context.measureText(pillText).width
+  const pillW = textWidth + 24
+  const pillH = 28
+  const pillX = rect.x + (rect.w - pillW) / 2
+  const pillY = Math.max(HUD_BOTTOM + 8, rect.y - pillH - 8)
+
+  context.fillStyle = "rgba(7, 19, 27, 0.94)"
+  context.beginPath()
+  if (typeof context.roundRect === "function") {
+    context.roundRect(pillX, pillY, pillW, pillH, 6)
+  } else {
+    context.rect(pillX, pillY, pillW, pillH)
+  }
+  context.fill()
+  context.strokeStyle = "#35e0ff"
+  context.lineWidth = 1.5
+  context.stroke()
+
+  context.fillStyle = "#35e0ff"
+  context.textAlign = "center"
+  context.textBaseline = "middle"
+  context.fillText(pillText, pillX + pillW / 2, pillY + pillH / 2)
+  context.restore()
 }

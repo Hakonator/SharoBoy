@@ -14,6 +14,7 @@ export function createEditorState(map: PlayerMapSpec): EditorState {
     selectedBlockId: null,
     selectedBlockIds: [],
     clipboard: [],
+    pastePhantom: null,
     activeTool: "select",
     addPreset: { shape: "ellipse", size: { width: 64, height: 40 }, hp: 1 },
     gridSize: 32,
@@ -142,6 +143,93 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       const ids = copied.map((block) => block.id)
       return updateMap(state, { ...state.map, blocks: [...state.map.blocks, ...copied] }, ids)
     }
+    case "START_PASTE": {
+      const source =
+        state.clipboard.length > 0
+          ? state.clipboard
+          : state.map.blocks.filter((block) => state.selectedBlockIds.includes(block.id))
+      if (source.length === 0) return state
+      return {
+        ...state,
+        clipboard: cloneBlocks(source),
+        pastePhantom: cloneBlocks(source),
+      }
+    }
+    case "CANCEL_PASTE":
+      return state.pastePhantom ? { ...state, pastePhantom: null } : state
+    case "COMMIT_PASTE": {
+      const incoming = action.blocks
+      if (!incoming || incoming.length === 0) {
+        return { ...state, pastePhantom: null }
+      }
+      const available = Math.max(0, MAX_BLOCKS - state.map.blocks.length)
+      if (available <= 0) {
+        return { ...state, pastePhantom: null }
+      }
+      const toAdd = incoming.slice(0, available)
+      const idMap = new Map<string, string>()
+      const portalMap = new Map<string, string>()
+      const currentIds = new Set(state.map.blocks.map((b) => b.id))
+
+      for (const block of toAdd) {
+        let newId: string
+        do {
+          newId = `b-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        } while (currentIds.has(newId) || Array.from(idMap.values()).includes(newId))
+        idMap.set(block.id, newId)
+
+        if (block.effects) {
+          for (const effect of block.effects) {
+            if (effect.kind === "portal" && effect.pairId && !portalMap.has(effect.pairId)) {
+              portalMap.set(
+                effect.pairId,
+                `portal-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+              )
+            }
+          }
+        }
+      }
+
+      const finalBlocks: PlayerBlockSpec[] = toAdd.map((block) => {
+        const newId = idMap.get(block.id) ?? createBlockId(state.map)
+        const newEffects = block.effects?.map((effect) => {
+          if (effect.kind === "portal" && effect.pairId) {
+            return {
+              ...effect,
+              pairId: portalMap.get(effect.pairId) ?? effect.pairId,
+            }
+          }
+          return { ...effect }
+        })
+        const newLinks = block.links?.map((link) => {
+          if (link.targetBlockId && idMap.has(link.targetBlockId)) {
+            return {
+              ...link,
+              targetBlockId: idMap.get(link.targetBlockId)!,
+            }
+          }
+          return { ...link }
+        })
+        return {
+          ...block,
+          id: newId,
+          position: clampPosition(
+            snapPosition(block.position, state),
+            block.size.width,
+            block.size.height
+          ),
+          ...(newEffects ? { effects: newEffects } : {}),
+          ...(newLinks ? { links: newLinks } : {}),
+        }
+      })
+
+      const newIds = finalBlocks.map((b) => b.id)
+      const nextMap = { ...state.map, blocks: [...state.map.blocks, ...finalBlocks] }
+      return {
+        ...updateMap(state, nextMap, newIds),
+        pastePhantom: null,
+      }
+    }
     case "CLONE_SEQUENCE": {
       const source = state.map.blocks.find((block) => block.id === action.blockId)
       if (!source || source.effects?.some((effect) => effect.kind === "portal")) return state
@@ -200,6 +288,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         map: cloneMap(previous),
         selectedBlockId: null,
         selectedBlockIds: [],
+        pastePhantom: null,
         history: {
           past: state.history.past.slice(0, -1),
           future: [cloneMap(state.map), ...state.history.future],
@@ -215,6 +304,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         map: cloneMap(next),
         selectedBlockId: null,
         selectedBlockIds: [],
+        pastePhantom: null,
         history: {
           past: [...state.history.past, cloneMap(state.map)].slice(-HISTORY_LIMIT),
           future: state.history.future.slice(1),

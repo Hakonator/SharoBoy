@@ -226,6 +226,84 @@ describe("editorReducer", () => {
     expect(state.selectedBlockIds).toEqual(state.map.blocks.slice(2).map((block) => block.id))
   })
 
+  it("supports interactive paste phantom (START_PASTE, CANCEL_PASTE, COMMIT_PASTE) with portal remapping and undo/redo", () => {
+    let state = createEditorState(makeMap())
+    // Добавим портал для проверки ремаппинга связей при вставке
+    state.map.blocks[0]!.effects = [{ kind: "portal", pairId: "portal-original" }]
+    state.map.blocks[1]!.effects = [{ kind: "portal", pairId: "portal-original" }]
+    state.map.blocks[0]!.links = [{ kind: "portal-pair", targetBlockId: "b" }]
+    state.map.blocks[1]!.links = [{ kind: "portal-pair", targetBlockId: "a" }]
+
+    state = editorReducer(state, { type: "SELECT_BLOCKS", blockIds: ["a", "b"] })
+    state = editorReducer(state, { type: "COPY_SELECTED" })
+    expect(state.clipboard).toHaveLength(2)
+
+    // Запуск фантома вставки
+    state = editorReducer(state, { type: "START_PASTE" })
+    expect(state.pastePhantom).toHaveLength(2)
+
+    // Отмена фантома
+    state = editorReducer(state, { type: "CANCEL_PASTE" })
+    expect(state.pastePhantom).toBeNull()
+
+    // Повторный запуск и закрепление в позиции (COMMIT_PASTE)
+    state = editorReducer(state, { type: "START_PASTE" })
+    const targetBlocks = state.pastePhantom!.map((block) => ({
+      ...block,
+      position: { x: block.position.x + 300, y: block.position.y + 200 },
+    }))
+
+    state = editorReducer(state, { type: "COMMIT_PASTE", blocks: targetBlocks })
+    expect(state.pastePhantom).toBeNull()
+    expect(state.map.blocks).toHaveLength(4)
+
+    const pastedA = state.map.blocks[2]!
+    const pastedB = state.map.blocks[3]!
+    expect(pastedA.id).not.toBe("a")
+    expect(pastedB.id).not.toBe("b")
+    expect(state.selectedBlockIds).toEqual([pastedA.id, pastedB.id])
+
+    // Порталы в скопированной группе получили новый уникальный pairId и ссылаются друг на друга
+    const portalA = pastedA.effects?.find((e) => e.kind === "portal")
+    const portalB = pastedB.effects?.find((e) => e.kind === "portal")
+    expect(portalA?.pairId).toBeDefined()
+    expect(portalA?.pairId).not.toBe("portal-original")
+    expect(portalA?.pairId).toBe(portalB?.pairId)
+    expect(pastedA.links?.[0]?.targetBlockId).toBe(pastedB.id)
+    expect(pastedB.links?.[0]?.targetBlockId).toBe(pastedA.id)
+
+    // Отмена (UNDO) полностью удаляет вставленные блоки
+    const undone = editorReducer(state, { type: "UNDO" })
+    expect(undone.map.blocks).toHaveLength(2)
+    expect(undone.map.blocks.map((b) => b.id)).toEqual(["a", "b"])
+
+    // Повтор (REDO) восстанавливает вставку
+    const redone = editorReducer(undone, { type: "REDO" })
+    expect(redone.map.blocks).toHaveLength(4)
+  })
+
+  it("supports moving a group of blocks with undo and redo", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, { type: "SELECT_BLOCKS", blockIds: ["a", "b"] })
+    state = editorReducer(state, {
+      type: "MOVE_BLOCKS",
+      blockIds: ["a", "b"],
+      delta: { x: 50, y: 50 },
+    })
+    expect(state.map.blocks[0]!.position).toEqual({ x: 150, y: 155 })
+    expect(state.map.blocks[1]!.position).toEqual({ x: 250, y: 155 })
+
+    // Отмена возвращает всю группу обратно
+    const undone = editorReducer(state, { type: "UNDO" })
+    expect(undone.map.blocks[0]!.position).toEqual({ x: 100, y: 100 })
+    expect(undone.map.blocks[1]!.position).toEqual({ x: 200, y: 100 })
+
+    // Повтор возвращает смещение
+    const redone = editorReducer(undone, { type: "REDO" })
+    expect(redone.map.blocks[0]!.position).toEqual({ x: 150, y: 155 })
+    expect(redone.map.blocks[1]!.position).toEqual({ x: 250, y: 155 })
+  })
+
   it("deletes all selected blocks and cleans group and win-condition references", () => {
     let state = createEditorState(makeMap())
     state = editorReducer(state, { type: "SELECT_BLOCKS", blockIds: ["a", "b"] })

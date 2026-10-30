@@ -14,12 +14,62 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
 
   if (state.selectedBlockIds.length > 1) {
     return (
-      <aside className="rounded-xl border border-line bg-deep/95 p-4 text-foam">
-        <h2 className="font-display text-lg text-cyan-neon">Множественный выбор</h2>
-        <p className="mt-2 text-sm text-dim">Выбрано блоков: {state.selectedBlockIds.length}</p>
-        <p className="mt-1 text-xs text-dim">
-          Перетаскивайте любой блок, чтобы переместить группу.
-        </p>
+      <aside className="rounded-xl border border-line bg-deep/95 p-4 text-foam flex flex-col gap-3">
+        <div>
+          <h2 className="font-display text-lg text-cyan-neon">Множественный выбор</h2>
+          <p className="mt-1 text-sm text-dim">Выбрано блоков: {state.selectedBlockIds.length}</p>
+          <p className="mt-1 text-xs text-dim">
+            Перетаскивайте мышью любой блок, чтобы переместить всю группу.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2 pt-2 border-t border-line/50">
+          <button
+            type="button"
+            className="btn-ghost flex items-center justify-between px-3 py-2 text-xs text-foam hover:border-cyan-neon"
+            onClick={() => dispatch({ type: "COPY_SELECTED" })}
+            title="Скопировать выделенную группу (Ctrl+C)"
+          >
+            <span>📋 Копировать группу</span>
+            <kbd className="rounded bg-abyss px-1.5 py-0.5 text-[10px] text-dim">Ctrl+C</kbd>
+          </button>
+          <button
+            type="button"
+            className="btn-ghost flex items-center justify-between px-3 py-2 text-xs text-cyan-neon hover:border-cyan-neon"
+            onClick={() => dispatch({ type: "START_PASTE" })}
+            title="Вставить с фантомом под курсором (Ctrl+V)"
+          >
+            <span>✨ Вставить (фантом)</span>
+            <kbd className="rounded bg-abyss px-1.5 py-0.5 text-[10px] text-dim">Ctrl+V</kbd>
+          </button>
+          <button
+            type="button"
+            className="btn-ghost flex items-center justify-between px-3 py-2 text-xs text-punch hover:border-punch/60"
+            onClick={() => dispatch({ type: "DELETE_SELECTED_BLOCKS" })}
+            title="Удалить выделенные блоки (Delete / Backspace)"
+          >
+            <span>🗑 Удалить группу</span>
+            <kbd className="rounded bg-abyss px-1.5 py-0.5 text-[10px] text-dim">Del</kbd>
+          </button>
+          <button
+            type="button"
+            className="btn-ghost flex items-center justify-between px-3 py-2 text-xs text-dim hover:text-foam"
+            onClick={() => dispatch({ type: "SELECT_BLOCKS", blockIds: [] })}
+            title="Снять выделение со всех блоков (Escape)"
+          >
+            <span>✖ Снять выделение</span>
+            <kbd className="rounded bg-abyss px-1.5 py-0.5 text-[10px] text-dim">Esc</kbd>
+          </button>
+        </div>
+
+        <div className="pt-2 border-t border-line/40 text-[11px] text-dim space-y-1">
+          <p>
+            • <span className="text-foam">Ctrl+Z</span> — отмена перемещения / вставки
+          </p>
+          <p>
+            • <span className="text-foam">Ctrl+Y</span> — повтор операции
+          </p>
+        </div>
       </aside>
     )
   }
