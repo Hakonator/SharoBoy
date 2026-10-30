@@ -683,7 +683,7 @@ function normalizeBlockUpdates(
   const restUpdates = { ...updates }
   delete (restUpdates as { size?: unknown }).size
   const next: Partial<PlayerBlockSpec> = {
-    ...restUpdates,
+    ...(restUpdates as Partial<Omit<PlayerBlockSpec, "size">>),
     ...(updates.position
       ? { position: { x: Math.round(updates.position.x), y: Math.round(updates.position.y) } }
       : {}),
