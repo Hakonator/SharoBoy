@@ -1,10 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 
+import type { PlayerMapSpec } from "../../game/mapSpec"
+
 import { EditorPrefabsModal } from "./EditorPrefabsModal"
 import { createEditorState } from "./editorState"
 
-function makeTestMap() {
+function makeTestMap(): PlayerMapSpec {
   return {
     version: 1,
     id: "test",
@@ -13,12 +15,12 @@ function makeTestMap() {
       {
         id: "b1",
         position: { x: 200, y: 200 },
-        shape: "circle" as const,
+        shape: "circle",
         size: { width: 40, height: 40 },
         hp: 1,
       },
     ],
-    winCondition: { kind: "all-destructible" as const },
+    winCondition: { kind: "all-destructible" },
   }
 }
 
