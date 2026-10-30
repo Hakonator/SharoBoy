@@ -114,7 +114,12 @@ export function pushHud(g: Game) {
     best: g.best,
     lives: g.lives,
     level: g.mode === "endless" ? g.wave : g.level,
-    levelCount: g.mode === "endless" ? -1 : (g.campaign?.tiers ?? LEVELS.length),
+    levelCount:
+      g.mode === "custom" && g.customPlaylist
+        ? g.customPlaylist.maps.length
+        : g.mode === "endless"
+          ? -1
+          : (g.campaign?.tiers ?? LEVELS.length),
     levelName: levelDisplayName(g),
     mode: g.mode,
     wave: g.wave,

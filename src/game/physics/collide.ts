@@ -297,29 +297,89 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
     // Порталы на кулдауне после телепорта полностью прозрачны для шара:
     // не отражают его и не получают урон обычным/огненным попаданием.
     if (b.sp?.portalId !== undefined && (b.sp.portalCd ?? 0) > 0) continue
-    const ex = b.rx + ball.r
-    const ey = b.ry + ball.r
     const dx = ball.x - b.x
     const dy = ball.y - b.y
     const cs = Math.cos(b.rot)
     const sn = Math.sin(b.rot)
     const lx = dx * cs + dy * sn
     const ly = -dx * sn + dy * cs
-    const q = (lx * lx) / (ex * ex) + (ly * ly) / (ey * ey)
-    if (q > 1) continue
+    const isBox = b.shape === "rect" || b.shape === "round_rect"
+    let wnx = 0
+    let wny = 0
+    const ex = b.rx + ball.r
 
-    let nx = lx / (ex * ex)
-    let ny = ly / (ey * ey)
-    const nl = Math.hypot(nx, ny) || 1
-    nx /= nl
-    ny /= nl
-    const wnx = nx * cs - ny * sn
-    const wny = nx * sn + ny * cs
-    const sc = 1 / Math.sqrt(Math.max(q, 1e-6))
-    const plx = lx * sc
-    const ply = ly * sc
-    ball.x = b.x + plx * cs - ply * sn + wnx * 0.8
-    ball.y = b.y + plx * sn + ply * cs + wny * 0.8
+    if (isBox) {
+      const cr = b.shape === "round_rect" ? Math.min(12, b.rx * 0.5, b.ry * 0.5) : 0
+      const hx = Math.max(0, b.rx - cr)
+      const hy = Math.max(0, b.ry - cr)
+      const cx = Math.max(-hx, Math.min(hx, lx))
+      const cy = Math.max(-hy, Math.min(hy, ly))
+      const cdx = lx - cx
+      const cdy = ly - cy
+      const distSq = cdx * cdx + cdy * cdy
+      const effR = cr + ball.r
+      if (distSq > effR * effR) continue
+
+      let nx = 0
+      let ny = 0
+      let plx = 0
+      let ply = 0
+      if (distSq > 1e-6) {
+        const dist = Math.sqrt(distSq)
+        nx = cdx / dist
+        ny = cdy / dist
+        plx = cx + nx * effR
+        ply = cy + ny * effR
+      } else {
+        const dRight = hx - lx
+        const dLeft = lx + hx
+        const dTop = hy - ly
+        const dBottom = ly + hy
+        const minDist = Math.min(dRight, dLeft, dTop, dBottom)
+        if (minDist === dRight) {
+          nx = 1
+          ny = 0
+          plx = hx + effR
+          ply = ly
+        } else if (minDist === dLeft) {
+          nx = -1
+          ny = 0
+          plx = -hx - effR
+          ply = ly
+        } else if (minDist === dTop) {
+          nx = 0
+          ny = 1
+          plx = lx
+          ply = hy + effR
+        } else {
+          nx = 0
+          ny = -1
+          plx = lx
+          ply = -hy - effR
+        }
+      }
+      wnx = nx * cs - ny * sn
+      wny = nx * sn + ny * cs
+      ball.x = b.x + plx * cs - ply * sn + wnx * 0.8
+      ball.y = b.y + plx * sn + ply * cs + wny * 0.8
+    } else {
+      const ey = b.ry + ball.r
+      const q = (lx * lx) / (ex * ex) + (ly * ly) / (ey * ey)
+      if (q > 1) continue
+
+      let nx = lx / (ex * ex)
+      let ny = ly / (ey * ey)
+      const nl = Math.hypot(nx, ny) || 1
+      nx /= nl
+      ny /= nl
+      wnx = nx * cs - ny * sn
+      wny = nx * sn + ny * cs
+      const sc = 1 / Math.sqrt(Math.max(q, 1e-6))
+      const plx = lx * sc
+      const ply = ly * sc
+      ball.x = b.x + plx * cs - ply * sn + wnx * 0.8
+      ball.y = b.y + plx * sn + ply * cs + wny * 0.8
+    }
     ball.sinceHit = 0
     // специальный блок (§6): пружина/вата/вращение/телепорт. Телепорт
     // поглощает контакт целиком (без отражения и урона от шара).

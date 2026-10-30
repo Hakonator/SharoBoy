@@ -25,7 +25,7 @@ import { usePlayerStats } from "./ui/usePlayerStats"
 import { usePortrait } from "./ui/usePortrait"
 import { useTouchDevice } from "./ui/useTouchDevice"
 import { MapTesterView } from "./ui/MapTesterView"
-import type { PlayerMapSpec } from "./game/mapSpec"
+import type { MapPlaylistSpec, PlayerMapSpec } from "./game/mapSpec"
 import { clearAccountStorage } from "./game/account"
 import { DEFAULT_TACTICAL_MODULES } from "./game/tacticalModules"
 import { EditorView } from "./ui/editor"
@@ -168,6 +168,11 @@ export default function App() {
   const startCommunityMap = (spec: PlayerMapSpec) => {
     setShowCommunityMaps(false)
     g()?.startCustomMap(spec, () => setShowCommunityMaps(true))
+  }
+
+  const startCommunityPlaylist = (playlist: MapPlaylistSpec) => {
+    setShowCommunityMaps(false)
+    g()?.startCustomPlaylist(playlist, () => setShowCommunityMaps(true))
   }
 
   const startAdminMap = (spec: PlayerMapSpec) => {
@@ -322,6 +327,7 @@ export default function App() {
             }
           }}
           onPlay={startCommunityMap}
+          onPlayPlaylist={startCommunityPlaylist}
         />
       )}
 

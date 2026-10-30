@@ -8,8 +8,17 @@ import {
   voteMap,
   type CustomMapRecord,
 } from "../../game/customMapsApi"
-import type { PlayerMapSpec } from "../../game/mapSpec"
-import { saveLocalMap, setCurrentLocalMapId } from "../editor/localMapsStorage"
+import type { MapPlaylistSpec, PlayerMapSpec } from "../../game/mapSpec"
+import {
+  createDefaultPlaylist,
+  deleteLocalPlaylist,
+  loadLocalMaps,
+  loadLocalPlaylists,
+  saveLocalMap,
+  saveLocalPlaylist,
+  setCurrentLocalMapId,
+  type LocalPlaylistEntry,
+} from "../editor/localMapsStorage"
 import { MapThumbnail } from "../editor/MapThumbnail"
 
 type CommunityMapsSort = "popular" | "newest"
@@ -19,6 +28,7 @@ const LIKED_MAPS_KEY = "sharoboy-liked-community-maps"
 export interface CommunityMapsProps {
   onBack: () => void
   onPlay: (spec: PlayerMapSpec) => void
+  onPlayPlaylist?: (playlist: MapPlaylistSpec) => void
   onEditCopy?: (spec: PlayerMapSpec) => void
 }
 
@@ -53,15 +63,42 @@ function saveLikedMaps(ids: Set<string>): void {
   }
 }
 
-export function CommunityMaps({ onBack, onPlay, onEditCopy }: CommunityMapsProps) {
+export function CommunityMaps({ onBack, onPlay, onPlayPlaylist, onEditCopy }: CommunityMapsProps) {
+  const [viewTab, setViewTab] = useState<"maps" | "playlists">("maps")
   const [sort, setSort] = useState<CommunityMapsSort>("popular")
   const [search, setSearch] = useState("")
   const [maps, setMaps] = useState<CustomMapRecord[]>([])
+  const [playlists, setPlaylists] = useState<LocalPlaylistEntry[]>(() => loadLocalPlaylists())
   const [likedMaps, setLikedMaps] = useState<Set<string>>(loadLikedMaps)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [likingId, setLikingId] = useState<string | null>(null)
   const [copiedNotice, setCopiedNotice] = useState<string | null>(null)
+
+  const [showCreatePlaylist, setShowCreatePlaylist] = useState(false)
+  const [playlistTitle, setPlaylistTitle] = useState("")
+  const [playlistDesc, setPlaylistDesc] = useState("")
+  const [selectedMapIds, setSelectedMapIds] = useState<string[]>([])
+
+  const getAllAvailableMaps = useCallback((): PlayerMapSpec[] => {
+    const local = loadLocalMaps().map((entry) => entry.spec)
+    const community = maps.map((entry) => entry.spec_json)
+    const combined = [...local, ...community]
+    const mapById = new Map<string, PlayerMapSpec>()
+    for (const m of combined) {
+      if (!mapById.has(m.id)) {
+        mapById.set(m.id, m)
+      }
+    }
+    if (mapById.size < 2) {
+      for (const m of createDefaultPlaylist().maps) {
+        if (!mapById.has(m.id)) {
+          mapById.set(m.id, m)
+        }
+      }
+    }
+    return Array.from(mapById.values())
+  }, [maps])
 
   const loadMaps = useCallback(async () => {
     if (!LEADERBOARD_ENABLED) return
@@ -143,9 +180,253 @@ export function CommunityMaps({ onBack, onPlay, onEditCopy }: CommunityMapsProps
           </button>
         </header>
 
-        {!LEADERBOARD_ENABLED ? (
-          <div className="hud-chip p-6 text-center text-dim">
-            Каталог карт недоступен: подключение Supabase не настроено.
+        <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-line/60 pb-3">
+          <button
+            type="button"
+            onClick={() => setViewTab("maps")}
+            className={`rounded-lg px-4 py-2 font-display text-sm transition ${
+              viewTab === "maps"
+                ? "border border-cyan-neon bg-cyan-neon/20 text-cyan-neon shadow-[0_0_12px_rgba(53,224,255,0.3)] font-bold"
+                : "border border-line/60 bg-deep/50 text-dim hover:text-foam"
+            }`}
+          >
+            🗺 Одиночные карты
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setViewTab("playlists")
+              setPlaylists(loadLocalPlaylists())
+            }}
+            className={`rounded-lg px-4 py-2 font-display text-sm transition ${
+              viewTab === "playlists"
+                ? "border border-gold bg-gold/20 text-gold shadow-[0_0_12px_rgba(255,201,77,0.3)] font-bold"
+                : "border border-line/60 bg-deep/50 text-dim hover:text-foam"
+            }`}
+          >
+            📚 Плейлисты (Мини-кампании)
+          </button>
+        </div>
+
+        {viewTab === "playlists" ? (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/40 bg-deep/80 p-4">
+              <div>
+                <h2 className="font-display text-xl text-gold font-bold">
+                  Мини-кампании и плейлисты
+                </h2>
+                <p className="text-xs text-dim mt-0.5">
+                  Последовательное прохождение карт с переносом счёта, жизней и наград
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-arcade px-4 py-2 text-sm shadow-[0_0_12px_rgba(255,201,77,0.3)]"
+                onClick={() => {
+                  setPlaylistTitle("")
+                  setPlaylistDesc("")
+                  setSelectedMapIds([])
+                  setShowCreatePlaylist(true)
+                }}
+              >
+                + Создать плейлист
+              </button>
+            </div>
+
+            {playlists.length === 0 ? (
+              <div className="hud-chip p-8 text-center text-dim">
+                Плейлистов пока нет. Нажмите «+ Создать плейлист», чтобы собрать свою мини-кампанию!
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {playlists.map((entry) => (
+                  <article
+                    key={entry.id}
+                    className="flex flex-col rounded-xl border border-gold/40 bg-deep/90 p-5 shadow-xl transition-all hover:border-gold/80"
+                  >
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <h3
+                        className="font-display text-lg text-gold font-bold truncate"
+                        title={entry.title}
+                      >
+                        {entry.title}
+                      </h3>
+                      <span className="rounded border border-gold/40 bg-gold/15 px-2 py-0.5 text-xs font-mono text-gold shrink-0">
+                        {entry.spec.maps.length} секторов
+                      </span>
+                    </div>
+                    {entry.author && <p className="mb-2 text-xs text-dim">Автор: {entry.author}</p>}
+                    <p className="mb-3 text-xs text-foam/80 min-h-8">
+                      {entry.description || "Серия секторов для проверки мастерства"}
+                    </p>
+
+                    <div className="mb-4 rounded-lg border border-line/50 bg-abyss/80 p-3">
+                      <div className="hud-label text-[10px] mb-1.5 text-cyan-neon">
+                        Маршрут мини-кампании:
+                      </div>
+                      <ol className="space-y-1 text-xs">
+                        {entry.spec.maps.map((m, idx) => (
+                          <li
+                            key={m.id || idx}
+                            className="flex items-center justify-between gap-2 text-foam/90"
+                          >
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="font-mono text-gold font-bold">{idx + 1}.</span>
+                              <span className="truncate">{m.metadata.title}</span>
+                            </div>
+                            <span className="text-[10px] text-dim shrink-0">
+                              🧱 {m.blocks.length}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+
+                    <div className="mt-auto flex items-center gap-2 pt-2 border-t border-line/40">
+                      {playlists.length > 1 && (
+                        <button
+                          type="button"
+                          className="btn-ghost px-2.5 py-2 text-xs text-coral hover:bg-coral/10"
+                          onClick={() => {
+                            const next = deleteLocalPlaylist(entry.id)
+                            setPlaylists(next)
+                          }}
+                          title="Удалить плейлист"
+                        >
+                          🗑
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn-arcade flex-1 py-2.5 text-sm font-bold shadow-[0_0_15px_rgba(255,201,77,0.3)]"
+                        onClick={() => onPlayPlaylist?.(entry.spec)}
+                      >
+                        ▶ Начать кампанию ({entry.spec.maps.length} карт)
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+
+            {showCreatePlaylist && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-abyss/80 backdrop-blur-md anim-fade-in">
+                <div className="relative w-full max-w-lg rounded-2xl border border-gold/50 bg-deep/95 p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto arcade-scrollbar text-foam">
+                  <div className="flex items-center justify-between border-b border-line/60 pb-3 mb-4">
+                    <h3 className="font-display text-lg text-gold font-bold">
+                      Новый плейлист карт
+                    </h3>
+                    <button
+                      type="button"
+                      className="text-dim hover:text-foam text-lg"
+                      onClick={() => setShowCreatePlaylist(false)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="space-y-4 text-sm">
+                    <div>
+                      <label className="hud-label block mb-1">Название плейлиста</label>
+                      <input
+                        className="w-full rounded border border-line bg-abyss px-3 py-2 text-sm text-foam outline-none focus:border-gold"
+                        value={playlistTitle}
+                        onChange={(e) => setPlaylistTitle(e.target.value)}
+                        placeholder="Например: Испытание геометрии"
+                        maxLength={60}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="hud-label block mb-1">Описание (опционально)</label>
+                      <textarea
+                        className="w-full rounded border border-line bg-abyss px-3 py-2 text-sm text-foam outline-none focus:border-gold resize-none h-16"
+                        value={playlistDesc}
+                        onChange={(e) => setPlaylistDesc(e.target.value)}
+                        placeholder="Краткое описание мини-кампании"
+                        maxLength={200}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="hud-label block mb-1.5">
+                        Выберите карты ({selectedMapIds.length} выбрано, минимум 2):
+                      </label>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto arcade-scrollbar rounded border border-line/60 bg-abyss/60 p-2">
+                        {getAllAvailableMaps().map((map) => {
+                          const isChecked = selectedMapIds.includes(map.id)
+                          return (
+                            <label
+                              key={map.id}
+                              className="flex items-center justify-between gap-2 p-1.5 rounded hover:bg-foam/5 cursor-pointer text-xs"
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedMapIds([...selectedMapIds, map.id])
+                                    } else {
+                                      setSelectedMapIds(
+                                        selectedMapIds.filter((id) => id !== map.id)
+                                      )
+                                    }
+                                  }}
+                                />
+                                <span className="truncate">{map.metadata.title}</span>
+                              </div>
+                              <span className="text-[10px] text-dim shrink-0">
+                                🧱 {map.blocks.length}
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-3 border-t border-line/50">
+                      <button
+                        type="button"
+                        className="btn-ghost px-4 py-2"
+                        onClick={() => setShowCreatePlaylist(false)}
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-arcade px-6 py-2"
+                        disabled={!playlistTitle.trim() || selectedMapIds.length < 2}
+                        onClick={() => {
+                          const available = getAllAvailableMaps()
+                          const chosen = selectedMapIds
+                            .map((id) => available.find((m) => m.id === id))
+                            .filter((m): m is PlayerMapSpec => Boolean(m))
+                          if (chosen.length < 2) return
+                          const spec: MapPlaylistSpec = {
+                            version: 1,
+                            id: `playlist-${Date.now()}`,
+                            metadata: {
+                              title: playlistTitle.trim(),
+                              description: playlistDesc.trim() || undefined,
+                              author: "Игрок",
+                              createdAt: new Date().toISOString(),
+                              updatedAt: new Date().toISOString(),
+                            },
+                            maps: chosen,
+                          }
+                          const updated = saveLocalPlaylist(spec)
+                          setPlaylists(updated)
+                          setShowCreatePlaylist(false)
+                        }}
+                      >
+                        Создать
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <>

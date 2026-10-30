@@ -474,20 +474,36 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
               <ContextMenuButton
                 onClick={() => {
                   const block = state.map.blocks.find((item) => item.id === contextMenu.blockId)
-                  if (block)
+                  if (block) {
+                    const nextShape: Record<PlayerBlockSpec["shape"], PlayerBlockSpec["shape"]> = {
+                      circle: "ellipse",
+                      ellipse: "rect",
+                      rect: "round_rect",
+                      round_rect: "circle",
+                    }
+                    const targetShape = nextShape[block.shape] ?? "ellipse"
                     dispatch({
                       type: "UPDATE_BLOCK",
                       blockId: block.id,
-                      updates: { shape: block.shape === "circle" ? "ellipse" : "circle" },
+                      updates: { shape: targetShape },
                     })
+                  }
                   setContextMenu(null)
                 }}
               >
                 🔘 Сменить форму (
-                {state.map.blocks.find((item) => item.id === contextMenu.blockId)?.shape ===
-                "circle"
-                  ? "Эллипс"
-                  : "Круг"}
+                {(() => {
+                  const current =
+                    state.map.blocks.find((item) => item.id === contextMenu.blockId)?.shape ??
+                    "circle"
+                  const nextShape: Record<PlayerBlockSpec["shape"], string> = {
+                    circle: "Эллипс",
+                    ellipse: "Прямоугольник",
+                    rect: "Скруглённый",
+                    round_rect: "Круг",
+                  }
+                  return `→ ${nextShape[current] ?? "Эллипс"}`
+                })()}
                 )
               </ContextMenuButton>
               <ContextMenuButton
@@ -826,6 +842,15 @@ function drawBlock(
   context.beginPath()
   if (block.shape === "circle") {
     context.arc(0, 0, Math.min(rx, ry), 0, Math.PI * 2)
+  } else if (block.shape === "rect") {
+    context.rect(-rx, -ry, rx * 2, ry * 2)
+  } else if (block.shape === "round_rect") {
+    const cr = Math.min(12, rx * 0.5, ry * 0.5)
+    if (typeof context.roundRect === "function") {
+      context.roundRect(-rx, -ry, rx * 2, ry * 2, cr)
+    } else {
+      context.rect(-rx, -ry, rx * 2, ry * 2)
+    }
   } else {
     context.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2)
   }
@@ -1081,8 +1106,21 @@ function hitTest(
     const localY = dx * Math.sin(rotation) + dy * Math.cos(rotation)
     const rx = block.size.width / 2
     const ry = block.size.height / 2
-    if (rx > 0 && ry > 0 && (localX * localX) / (rx * rx) + (localY * localY) / (ry * ry) <= 1) {
-      return block
+    if (rx > 0 && ry > 0) {
+      if (block.shape === "rect") {
+        if (Math.abs(localX) <= rx && Math.abs(localY) <= ry) return block
+      } else if (block.shape === "round_rect") {
+        const cr = Math.min(12, rx * 0.5, ry * 0.5)
+        const hx = Math.max(0, rx - cr)
+        const hy = Math.max(0, ry - cr)
+        const cx = Math.max(-hx, Math.min(hx, localX))
+        const cy = Math.max(-hy, Math.min(hy, localY))
+        const cdx = localX - cx
+        const cdy = localY - cy
+        if (cdx * cdx + cdy * cdy <= cr * cr) return block
+      } else if ((localX * localX) / (rx * rx) + (localY * localY) / (ry * ry) <= 1) {
+        return block
+      }
     }
   }
   return undefined

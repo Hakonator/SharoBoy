@@ -31,7 +31,7 @@ export interface PlayerMapSpec {
   winCondition: PlayerMapWinCondition
 }
 
-export type PlayerBlockShape = "circle" | "ellipse"
+export type PlayerBlockShape = "circle" | "ellipse" | "rect" | "round_rect"
 
 export interface PlayerBlockSpec {
   id: PlayerBlockId
@@ -79,4 +79,21 @@ export type MotionSpec =
 export interface BlockGroupSpec {
   id: BlockGroupId
   blockIds: PlayerBlockId[]
+}
+
+export interface MapPlaylistMetadata {
+  title: string
+  description?: string
+  author?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+/** Декларативная спецификация плейлиста / мини-кампании пользовательских карт. */
+export interface MapPlaylistSpec {
+  version: 1
+  id: string
+  metadata: MapPlaylistMetadata
+  /** Упорядоченный список карт мини-кампании. */
+  maps: PlayerMapSpec[]
 }

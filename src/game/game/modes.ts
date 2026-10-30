@@ -1,5 +1,5 @@
 import type { Game } from "../game"
-import type { PlayerMapSpec } from "../mapSpec"
+import type { MapPlaylistSpec, PlayerMapSpec } from "../mapSpec"
 import { mapSpecToBlocks } from "../mapAdapter"
 import type { CampaignModifierId } from "../campaignModifiers"
 import { getDailyRunInfo, markTodayDailyPlayed } from "../daily"
@@ -79,6 +79,8 @@ export function startCustomMap(
   g.sfx.ensure()
   g.sfx.ui()
   g.mode = "custom"
+  g.customPlaylist = null
+  g.customPlaylistIndex = 0
   g.wave = 0
   g.waveSpec = null
   resetRun(g)
@@ -95,6 +97,7 @@ export function startCustomMap(
   g.blocksInitial = Math.max(1, g.blocks.length)
   applyUpgrades(g)
   g.level = 1
+  g.customLevelName = spec.metadata.title
   g.levelLostBall = false
   g.runSectorStartTime = g.time
   serveBall(g)
@@ -102,6 +105,56 @@ export function startCustomMap(
   applyTrack(g)
   setBanner(g, spec.metadata.title)
   pushHud(g)
+}
+
+function loadPlaylistMap(g: Game, spec: PlayerMapSpec, level: number, _levelCount?: number) {
+  g.customWinCondition = spec.winCondition
+  g.blocks = mapSpecToBlocks(spec)
+  g.customTargetBlocks =
+    spec.winCondition.kind === "targets"
+      ? spec.winCondition.targetIds.map(
+          (id) => g.blocks[spec.blocks.findIndex((block) => block.id === id)]
+        )
+      : []
+  g.blocksInitial = Math.max(1, g.blocks.length)
+  g.level = level
+  g.customLevelName = spec.metadata.title
+  g.levelLostBall = false
+  g.runSectorStartTime = g.time
+  serveBall(g)
+  g.phase = "playing"
+  applyTrack(g)
+  setBanner(g, spec.metadata.title)
+  pushHud(g)
+}
+
+export function startCustomPlaylist(
+  g: Game,
+  playlist: MapPlaylistSpec,
+  onComplete?: (result: "won" | "over") => void
+) {
+  if (playlist.maps.length === 0) return
+  g.sfx.ensure()
+  g.sfx.ui()
+  g.mode = "custom"
+  g.customPlaylist = playlist
+  g.customPlaylistIndex = 0
+  g.onCustomComplete = onComplete ?? null
+  resetRun(g)
+  g.mode = "custom"
+  applyUpgrades(g)
+  loadPlaylistMap(g, playlist.maps[0]!, 1, playlist.maps.length)
+}
+
+export function advanceCustomPlaylist(g: Game): boolean {
+  if (!g.customPlaylist) return false
+  g.customPlaylistIndex += 1
+  if (g.customPlaylistIndex >= g.customPlaylist.maps.length) {
+    return false
+  }
+  const nextMap = g.customPlaylist.maps[g.customPlaylistIndex]!
+  loadPlaylistMap(g, nextMap, g.customPlaylistIndex + 1, g.customPlaylist.maps.length)
+  return true
 }
 
 export function toMenu(g: Game) {
@@ -123,6 +176,8 @@ export function toMenu(g: Game) {
   g.mode = "campaign"
   g.customWinCondition = null
   g.customTargetBlocks = []
+  g.customPlaylist = null
+  g.customPlaylistIndex = 0
   g.onCustomComplete = null
   g.campaign = null
   g.campaignMbSeen = {}

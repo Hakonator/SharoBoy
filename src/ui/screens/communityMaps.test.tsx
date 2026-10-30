@@ -2,7 +2,14 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { CustomMapRecord } from "../../game/customMapsApi"
-import { loadLocalMaps, saveLocalMap, setCurrentLocalMapId } from "../editor/localMapsStorage"
+import {
+  deleteLocalPlaylist,
+  loadLocalMaps,
+  loadLocalPlaylists,
+  saveLocalMap,
+  saveLocalPlaylist,
+  setCurrentLocalMapId,
+} from "../editor/localMapsStorage"
 
 import { CommunityMaps, formatMapDate, mapWinConditionLabel } from "./communityMaps"
 
@@ -71,5 +78,37 @@ describe("community map cards", () => {
     expect(stored.length).toBe(1)
     expect(stored[0].title).toBe("Test Map (копия)")
     expect(stored[0].id).toBe(newId)
+  })
+
+  it("loads default starter playlist and allows saving and deleting playlists", () => {
+    const initial = loadLocalPlaylists()
+    expect(initial.length).toBe(1)
+    expect(initial[0].title).toBe("Трилогия Бездны")
+    expect(initial[0].spec.maps.length).toBe(3)
+
+    const customEntry = saveLocalPlaylist({
+      version: 1,
+      id: "custom-test-playlist",
+      metadata: {
+        title: "Пользовательский тест",
+        author: "Тестер",
+        createdAt: "2026-10-30T00:00:00.000Z",
+        updatedAt: "2026-10-30T00:00:00.000Z",
+      },
+      maps: initial[0].spec.maps.slice(0, 2),
+    })
+
+    expect(customEntry.length).toBe(2)
+    const afterDelete = deleteLocalPlaylist("custom-test-playlist")
+    expect(afterDelete.length).toBe(1)
+    expect(afterDelete[0].id).toBe("playlist-starter-trilogy")
+  })
+
+  it("renders playlists toggle tab in community maps hub", () => {
+    const html = renderToStaticMarkup(
+      <CommunityMaps onBack={() => {}} onPlay={() => {}} onPlayPlaylist={() => {}} />
+    )
+    expect(html).toContain("Одиночные карты")
+    expect(html).toContain("Плейлисты (Мини-кампании)")
   })
 })

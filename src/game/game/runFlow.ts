@@ -17,6 +17,7 @@ import { applyTrack } from "./audioControls"
 import { enterMapView } from "./campaignFlow"
 import { pushHud, saveTop, setBanner } from "./hudSync"
 import { buildLevel, buildWave, serveBall } from "./levelBuild"
+import { advanceCustomPlaylist } from "./modes"
 import { blockTop } from "./paddleControl"
 import { addCoins, addMetaCrystals } from "./progress"
 
@@ -177,6 +178,16 @@ export function onLevelCleared(g: Game) {
   g.flash = 1
   g.hitStop = Math.max(g.hitStop, 0.35)
   if (g.mode === "custom") {
+    if (g.customPlaylist && g.customPlaylistIndex + 1 < g.customPlaylist.maps.length) {
+      g.score += 500
+      g.lives = Math.min(g.lives + 1, 5)
+      g.sfx.levelClear()
+      showIntermediateScore(g, () => advanceCustomPlaylist(g), {
+        title: `УРОВЕНЬ ${g.level} ПРОЙДЕН`,
+        subtitle: `Мини-кампания: ${g.customPlaylist.metadata.title}`,
+      })
+      return
+    }
     applyFinalScoreBreakdown(g)
     finishCustomRun(g, "won")
     return
@@ -574,6 +585,8 @@ export function loseLife(g: Game) {
 function finishCustomRun(g: Game, result: "won" | "over") {
   const onComplete = g.onCustomComplete
   g.onCustomComplete = null
+  g.customPlaylist = null
+  g.customPlaylistIndex = 0
   g.toMenu()
   onComplete?.(result)
 }

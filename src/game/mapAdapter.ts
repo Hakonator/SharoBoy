@@ -25,6 +25,7 @@ function adaptBlock(block: PlayerBlockSpec, portalIds: ReadonlyMap<string, numbe
     ry,
     rot: block.rotation ?? 0,
     circle: block.shape === "circle",
+    shape: block.shape,
     hp: block.hp,
     maxHp: block.hp,
     tier: hpTier,

@@ -282,4 +282,41 @@ describe("validatePlayerMapSpec", () => {
       expect.objectContaining({ path: "blocks[0].position.x", code: "INVALID_NUMBER" })
     )
   })
+
+  it("валидирует формы rect и round_rect и отклоняет неизвестные", () => {
+    const validRectMap = makeMap({
+      blocks: [
+        {
+          id: "rect-1",
+          position: { x: 100, y: 100 },
+          shape: "rect",
+          size: { width: 50, height: 30 },
+          hp: 2,
+        },
+        {
+          id: "round-1",
+          position: { x: 200, y: 100 },
+          shape: "round_rect",
+          size: { width: 50, height: 30 },
+          hp: 3,
+        },
+      ],
+    })
+    expect(validatePlayerMapSpec(validRectMap)).toEqual([])
+
+    const invalidShapeMap = makeMap({
+      blocks: [
+        {
+          id: "bad-1",
+          position: { x: 100, y: 100 },
+          shape: "triangle" as unknown as "rect",
+          size: { width: 50, height: 30 },
+          hp: 1,
+        },
+      ],
+    })
+    expect(validatePlayerMapSpec(invalidShapeMap)).toContainEqual(
+      expect.objectContaining({ path: "blocks[0].shape", code: "OUT_OF_RANGE" })
+    )
+  })
 })

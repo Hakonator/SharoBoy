@@ -20,7 +20,14 @@ export function MapThumbnail({ spec, className = "", alt = "Миниатюра �
         const height = Math.max(1.5, (block.size.height / 1080) * 100)
         const left = (block.position.x / 1920) * 100
         const top = (block.position.y / 1080) * 100
-        const isCircle = block.shape === "circle"
+        const roundedClass =
+          block.shape === "circle"
+            ? "rounded-full"
+            : block.shape === "rect"
+              ? "rounded-none"
+              : block.shape === "round_rect"
+                ? "rounded-[3px]"
+                : "rounded-[35%]"
         const colorClass =
           block.hp >= 3
             ? "border-gold/80 bg-gold/35"
@@ -30,9 +37,7 @@ export function MapThumbnail({ spec, className = "", alt = "Миниатюра �
 
         return (
           <span
-            className={`pointer-events-none absolute border ${colorClass} ${
-              isCircle ? "rounded-full" : "rounded-[35%]"
-            }`}
+            className={`pointer-events-none absolute border ${colorClass} ${roundedClass}`}
             key={block.id}
             style={{
               height: `${height}%`,

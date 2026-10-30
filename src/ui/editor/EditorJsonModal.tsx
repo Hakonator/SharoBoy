@@ -162,7 +162,10 @@ function isBlockShape(value: unknown): boolean {
     typeof value.position.y === "number" &&
     typeof value.size.width === "number" &&
     typeof value.size.height === "number" &&
-    (value.shape === "circle" || value.shape === "ellipse") &&
+    (value.shape === "circle" ||
+      value.shape === "ellipse" ||
+      value.shape === "rect" ||
+      value.shape === "round_rect") &&
     typeof value.hp === "number"
   )
 }

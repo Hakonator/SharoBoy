@@ -168,6 +168,8 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
         >
           <option value="circle">Круг</option>
           <option value="ellipse">Эллипс</option>
+          <option value="rect">Прямоугольник</option>
+          <option value="round_rect">Скруглённый прямоугольник</option>
         </select>
       </Field>
       <div className="grid grid-cols-2 gap-3">

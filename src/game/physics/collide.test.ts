@@ -532,3 +532,59 @@ describe("Синергии боевых механик (T-040, §3.1 Roadmap)", 
     })
   })
 })
+
+describe("Геометрические формы блоков: rect и round_rect (T-042, §3.4 Roadmap)", () => {
+  it("шар отскакивает от верхней плоской грани прямоугольного блока (rect)", () => {
+    const block = makeBlock(300, 300)
+    block.shape = "rect"
+    block.rx = 40
+    block.ry = 20
+    const world = makeWorld([block], false)
+    const ball = makeBall(300, 275)
+    ball.r = 8
+    ball.vy = 300
+    ball.vx = 0
+
+    collideBlocks(world, ball)
+
+    // При ударе в верхнюю грань вертикальная скорость инвертируется вверх
+    expect(ball.vy).toBeLessThan(0)
+    expect(block.hp).toBe(4) // получил урон
+    expect(ball.y).toBeLessThanOrEqual(300 - 20) // вытолкнут выше блока
+  })
+
+  it("шар не сталкивается с rect, если пролетает в стороне", () => {
+    const block = makeBlock(300, 300)
+    block.shape = "rect"
+    block.rx = 40
+    block.ry = 20
+    const world = makeWorld([block], false)
+    const ball = makeBall(360, 275)
+    ball.r = 8
+    ball.vy = 300
+
+    collideBlocks(world, ball)
+
+    // Нет коллизии — скорость сохраняется, блок целый
+    expect(ball.vy).toBe(300)
+    expect(block.hp).toBe(5)
+  })
+
+  it("шар корректно отскакивает от угла скруглённого прямоугольника (round_rect)", () => {
+    const block = makeBlock(300, 300)
+    block.shape = "round_rect"
+    block.rx = 40
+    block.ry = 20
+    const world = makeWorld([block], false)
+    // Шар летит по диагонали в правый верхний скруглённый угол
+    const ball = makeBall(338, 282)
+    ball.r = 8
+    ball.vx = -100
+    ball.vy = 200
+
+    collideBlocks(world, ball)
+
+    expect(ball.vy).toBeLessThan(0)
+    expect(block.hp).toBe(4)
+  })
+})

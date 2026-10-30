@@ -206,14 +206,18 @@ export interface ScoreEntry {
   nick: string
 }
 
+export type BlockShape = "circle" | "ellipse" | "rect" | "round_rect"
+
 export interface Block {
   x: number
   y: number
   rx: number
   ry: number
-  /** поворот эллипса (радианы); 0 — оси выровнены с экраном */
+  /** поворот эллипса/прямоугольника (радианы); 0 — оси выровнены с экраном */
   rot: number
   circle: boolean
+  /** Геометрическая форма блока: круг, эллипс, прямоугольник или скруглённый прямоугольник. */
+  shape?: BlockShape
   hp: number
   maxHp: number
   tier: 1 | 2 | 3

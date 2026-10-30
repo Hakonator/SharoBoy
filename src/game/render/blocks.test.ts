@@ -49,6 +49,10 @@ function recordBlock(hp: number) {
     arc: (x: number, y: number, r: number) => {
       currentPathArcs.push({ x, y, r })
     },
+    rect: () => {},
+    moveTo: () => {},
+    arcTo: () => {},
+    closePath: () => {},
     fill: () => fills.push({ style: ctx.fillStyle, arcs: [...currentPathArcs] }),
     stroke: () => strokes.push({ style: ctx.strokeStyle, arcs: [...currentPathArcs] }),
     createRadialGradient: () => ({
@@ -293,5 +297,43 @@ describe("drawBlocks", () => {
     // Единственная заливка — тело блока; дополнительной заливки индикаторов нет.
     expect(fills).toHaveLength(1)
     expect(strokes).toHaveLength(1)
+  })
+
+  it("рендерит блоки с формой rect и round_rect без ошибок", () => {
+    const rectBlock = { ...block(2), shape: "rect" as const }
+    const roundRectBlock = { ...block(3), shape: "round_rect" as const }
+
+    let rectCalls = 0
+    let roundCalls = 0
+    const ctx = {
+      globalAlpha: 1,
+      fillStyle: "",
+      strokeStyle: "",
+      lineWidth: 1,
+      save: () => {},
+      restore: () => {},
+      translate: () => {},
+      rotate: () => {},
+      scale: () => {},
+      beginPath: () => {},
+      arc: () => {},
+      rect: () => {
+        rectCalls++
+      },
+      moveTo: () => {
+        roundCalls++
+      },
+      arcTo: () => {},
+      closePath: () => {},
+      fill: () => {},
+      stroke: () => {},
+      createRadialGradient: () => ({
+        addColorStop: () => {},
+      }),
+    } as unknown as CanvasRenderingContext2D
+
+    drawBlocks(ctx, [rectBlock, roundRectBlock], 0)
+    expect(rectCalls).toBeGreaterThan(0)
+    expect(roundCalls).toBeGreaterThan(0)
   })
 })

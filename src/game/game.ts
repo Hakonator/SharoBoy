@@ -37,7 +37,7 @@ import type {
 import type { Ball, Block, Bubble, HudData, MouthBubble, PaddleShapeKind } from "./types"
 import type { PaddleState, Phase, PowerUp, Projectile, ScoreEntry, SparkHit } from "./types"
 import type { CampaignMap } from "./campaignMap"
-import type { PlayerMapSpec } from "./mapSpec"
+import type { MapPlaylistSpec, PlayerMapSpec } from "./mapSpec"
 import type { LevelSpec } from "./levels"
 import type { MinibossKind } from "./minibosses"
 import type { BossVariantKind } from "./bossVariants"
@@ -76,6 +76,7 @@ import {
   startDaily,
   startEndless,
   startCustomMap,
+  startCustomPlaylist,
   stopCustomMap,
   toMenu,
   togglePause,
@@ -160,6 +161,9 @@ export class Game {
   mode: "campaign" | "endless" | "custom" | "daily" = "campaign"
   customWinCondition: PlayerMapSpec["winCondition"] | null = null
   customTargetBlocks: Block[] = []
+  customLevelName: string | null = null
+  customPlaylist: MapPlaylistSpec | null = null
+  customPlaylistIndex = 0
   onCustomComplete: ((result: "won" | "over") => void) | null = null
   wave = 0
   waveSpec: { name: string; speed: number } | null = null
@@ -419,6 +423,9 @@ export class Game {
   }
   startCustomMap(spec: PlayerMapSpec, onComplete?: (result: "won" | "over") => void) {
     startCustomMap(this, spec, onComplete)
+  }
+  startCustomPlaylist(playlist: MapPlaylistSpec, onComplete?: (result: "won" | "over") => void) {
+    startCustomPlaylist(this, playlist, onComplete)
   }
   stopCustomMap() {
     stopCustomMap(this)

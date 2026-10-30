@@ -4,7 +4,7 @@ import { mulberry32 } from "../utils"
 
 import { drawBrittleBlock, drawPriorityMarks, drawSpecialBody, drawSpinMarks } from "./blockKinds"
 import { gradient } from "./gradCache"
-import { type Ctx } from "./shapes"
+import { roundRect, type Ctx } from "./shapes"
 
 function drawBomb(ctx: Ctx, b: Block, x: number, y: number, time: number) {
   const pulse = 0.6 + Math.sin(time * 9 + b.seed) * 0.4
@@ -68,8 +68,21 @@ function drawFrozenBlock(ctx: Ctx, b: Block, x: number, y: number, time: number)
     return rg
   })
   ctx.fillStyle = g
-  ctx.beginPath()
-  ctx.arc(0, 0, 1, 0, Math.PI * 2)
+  const isRectFrozen = b.shape === "rect"
+  const isRoundRectFrozen = b.shape === "round_rect"
+  const rrFrozen = isRoundRectFrozen
+    ? Math.min(12, b.rx * 0.5, b.ry * 0.5) / Math.max(1, Math.min(b.rx, b.ry))
+    : 0
+
+  if (isRectFrozen) {
+    ctx.beginPath()
+    ctx.rect(-1, -1, 2, 2)
+  } else if (isRoundRectFrozen) {
+    roundRect(ctx, -1, -1, 2, 2, rrFrozen)
+  } else {
+    ctx.beginPath()
+    ctx.arc(0, 0, 1, 0, Math.PI * 2)
+  }
   ctx.fill()
   ctx.lineWidth = 2.5 / Math.max(b.rx, b.ry)
   ctx.strokeStyle = "rgba(9,42,64,0.55)"
@@ -175,16 +188,36 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
       return rg
     })
     ctx.fillStyle = g
-    ctx.beginPath()
-    ctx.arc(0, 0, 1, 0, Math.PI * 2)
+    const isRect = b.shape === "rect"
+    const isRoundRect = b.shape === "round_rect"
+    const rr = isRoundRect
+      ? Math.min(12, b.rx * 0.5, b.ry * 0.5) / Math.max(1, Math.min(b.rx, b.ry))
+      : 0
+
+    if (isRect) {
+      ctx.beginPath()
+      ctx.rect(-1, -1, 2, 2)
+    } else if (isRoundRect) {
+      roundRect(ctx, -1, -1, 2, 2, rr)
+    } else {
+      ctx.beginPath()
+      ctx.arc(0, 0, 1, 0, Math.PI * 2)
+    }
     ctx.fill()
     ctx.lineWidth = 2.5 / Math.max(b.rx, b.ry)
     ctx.strokeStyle = "rgba(4,18,26,0.55)"
     ctx.stroke()
     if (b.flash > 0) {
       ctx.fillStyle = `rgba(255,255,255,${b.flash * 0.8})`
-      ctx.beginPath()
-      ctx.arc(0, 0, 1, 0, Math.PI * 2)
+      if (isRect) {
+        ctx.beginPath()
+        ctx.rect(-1, -1, 2, 2)
+      } else if (isRoundRect) {
+        roundRect(ctx, -1, -1, 2, 2, rr)
+      } else {
+        ctx.beginPath()
+        ctx.arc(0, 0, 1, 0, Math.PI * 2)
+      }
       ctx.fill()
     }
     ctx.restore()

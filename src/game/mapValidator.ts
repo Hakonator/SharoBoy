@@ -69,6 +69,10 @@ export function validatePlayerMapSpec(spec: PlayerMapSpec): MapValidationError[]
     if (Number.isFinite(block.hp) && !Number.isInteger(block.hp)) {
       addError(`${path}.hp`, "OUT_OF_RANGE", "HP должно быть целым числом.")
     }
+    const ALLOWED_SHAPES = new Set(["circle", "ellipse", "rect", "round_rect"])
+    if (!ALLOWED_SHAPES.has(block.shape)) {
+      addError(`${path}.shape`, "OUT_OF_RANGE", `Недопустимая форма блока: "${block.shape}".`)
+    }
     checkNumber(block.size.width, `${path}.size.width`, { min: 20, max: 100 })
     checkNumber(block.size.height, `${path}.size.height`, { min: 20, max: 100 })
     checkNumber(block.position.x, `${path}.position.x`)

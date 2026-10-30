@@ -198,4 +198,18 @@ describe("mapSpecToBlocks", () => {
     expect(second).not.toBe(first)
     expect(second[0]).not.toBe(first[0])
   })
+
+  it("корректно переносит формы rect и round_rect в рантайм-блоки", () => {
+    const blocks = mapSpecToBlocks(
+      makeMap([
+        makeBlock({ id: "rect-block", shape: "rect" }),
+        makeBlock({ id: "round-block", shape: "round_rect" }),
+      ])
+    )
+
+    expect(blocks[0].shape).toBe("rect")
+    expect(blocks[0].circle).toBe(false)
+    expect(blocks[1].shape).toBe("round_rect")
+    expect(blocks[1].circle).toBe(false)
+  })
 })
