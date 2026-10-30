@@ -8,7 +8,7 @@ export interface EditorHistory {
 }
 
 export interface HistorySession {
-  kind: "resize"
+  kind: "size" | "rotation" | "hp"
   blockIds: string[]
 }
 

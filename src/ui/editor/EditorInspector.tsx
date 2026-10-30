@@ -1,3 +1,5 @@
+import { useCallback, useEffect, useRef, useState } from "react"
+
 import { TIER } from "../../game/palette"
 import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapWinCondition } from "../../game/mapSpec"
 
@@ -132,21 +134,13 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
           HP {block.hp}
         </span>
       </div>
-      <Field label="HP">
-        <input
-          className="w-full accent-cyan-neon"
-          max="8"
-          min="1"
-          onChange={(event) => updateBlock({ hp: Number(event.target.value) })}
-          style={{ accentColor: hpTier.base }}
-          type="range"
-          value={block.hp}
-        />
-        <div className="flex justify-between font-mono text-xs text-dim">
-          <span>1</span>
-          <span>8</span>
-        </div>
-      </Field>
+      <NumberField
+        label=""
+        min={1}
+        max={8}
+        value={block.hp}
+        onChange={(hp) => updateBlock({ hp })}
+      />
       <Field label="Форма">
         <select
           className={INPUT_CLASS}
@@ -534,7 +528,7 @@ const INPUT_CLASS =
 function Field({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <label className="block space-y-1.5">
-      <span className="hud-label">{label}</span>
+      {label ? <span className="hud-label">{label}</span> : null}
       {children}
     </label>
   )
@@ -555,29 +549,104 @@ function NumberField({
   value: number
   onChange: (value: number) => void
 }) {
-  const normalize = (raw: number) => {
-    const precision = step < 1 ? 1 : 0
-    const factor = 10 ** precision
-    return Math.max(min, Math.min(max, (Math.round(raw / step) * step * factor) / factor))
+  const [draft, setDraft] = useState<string>(() => String(value))
+  const isFocusedRef = useRef(false)
+
+  const normalize = useCallback(
+    (raw: number) => {
+      const precision = step < 1 ? 1 : 0
+      const factor = 10 ** precision
+      return Math.max(min, Math.min(max, (Math.round(raw / step) * step * factor) / factor))
+    },
+    [min, max, step]
+  )
+
+  useEffect(() => {
+    if (!isFocusedRef.current) {
+      setDraft(String(value))
+    }
+  }, [value])
+
+  const commit = useCallback(() => {
+    const trimmed = draft.trim()
+    if (trimmed === "" || trimmed === "-" || trimmed === "+") {
+      setDraft(String(value))
+      return
+    }
+    const parsed = Number(trimmed)
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(value))
+      return
+    }
+    const normalized = normalize(parsed)
+    setDraft(String(normalized))
+    if (normalized !== value) {
+      onChange(normalized)
+    }
+  }, [draft, value, normalize, onChange])
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const rawText = event.target.value
+    setDraft(rawText)
+
+    if (rawText !== "" && rawText !== "-" && rawText !== "+") {
+      const parsed = Number(rawText)
+      if (Number.isFinite(parsed) && parsed >= min && parsed <= max) {
+        onChange(parsed)
+      }
+    }
   }
+
+  const handleSliderChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const next = normalize(Number(event.target.value))
+    setDraft(String(next))
+    onChange(next)
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      commit()
+      event.currentTarget.blur()
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault()
+      const current = Number(draft) || value
+      const next = normalize(current + step)
+      setDraft(String(next))
+      onChange(next)
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault()
+      const current = Number(draft) || value
+      const next = normalize(current - step)
+      setDraft(String(next))
+      onChange(next)
+    }
+  }
+
   return (
     <Field label={label}>
       <div className="space-y-1.5">
         <input
+          aria-label={label || "Числовое значение"}
           className={INPUT_CLASS}
-          max={max}
-          min={min}
-          onChange={(event) => onChange(normalize(Number(event.target.value)))}
-          step={step}
-          type="number"
-          value={normalize(value)}
+          inputMode="numeric"
+          onBlur={() => {
+            isFocusedRef.current = false
+            commit()
+          }}
+          onChange={handleInputChange}
+          onFocus={() => {
+            isFocusedRef.current = true
+          }}
+          onKeyDown={handleKeyDown}
+          type="text"
+          value={draft}
         />
         <input
-          aria-label={`${label} слайдер`}
+          aria-label={label ? `${label} слайдер` : "Слайдер"}
           className="w-full accent-cyan-neon"
           max={max}
           min={min}
-          onChange={(event) => onChange(normalize(Number(event.target.value)))}
+          onChange={handleSliderChange}
           step={step}
           type="range"
           value={Math.max(min, Math.min(max, value))}
@@ -951,20 +1020,13 @@ function GroupInspector({
             {allSameHp ? `HP ${commonHp}` : `~ HP ${commonHp}`}
           </span>
         </div>
-        <input
-          className="w-full accent-cyan-neon"
-          max="8"
-          min="1"
-          onChange={(event) => updateSelected({ hp: Number(event.target.value) })}
-          style={{ accentColor: hpTier.base }}
-          type="range"
+        <NumberField
+          label=""
+          min={1}
+          max={8}
           value={commonHp}
+          onChange={(hp) => updateSelected({ hp })}
         />
-        <div className="flex justify-between font-mono text-[11px] text-dim">
-          <span>1</span>
-          <span>4</span>
-          <span>8</span>
-        </div>
         <div className="flex gap-1.5 pt-0.5">
           {[1, 2, 3, 5, 8].map((h) => (
             <button

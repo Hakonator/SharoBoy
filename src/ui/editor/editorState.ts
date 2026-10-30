@@ -2,12 +2,33 @@ import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapSpec } from "../../ga
 import { PADDLE_ZONE_TOP } from "../../game/mapValidator"
 
 import { areBlocksTouching, getBlocksBoundingBox, WORLD_WIDTH } from "./geometry"
-import type { EditorAction, EditorState, PlayerBlockUpdates } from "./types"
+import type { EditorAction, EditorState, HistorySession, PlayerBlockUpdates } from "./types"
 
 export const EDITOR_DRAFT_STORAGE_KEY = "sharoboy_custom_map_draft"
 const HISTORY_LIMIT = 30
 const HUD_ZONE_BOTTOM = 140
 const MAX_BLOCKS = 200
+
+function getIncrementalUpdateKind(updates: PlayerBlockUpdates): "size" | "rotation" | "hp" | null {
+  const keys = Object.keys(updates)
+  if (keys.length === 1) {
+    if (keys[0] === "size" && updates.size !== undefined) return "size"
+    if (keys[0] === "rotation" && updates.rotation !== undefined) return "rotation"
+    if (keys[0] === "hp" && updates.hp !== undefined) return "hp"
+  }
+  return null
+}
+
+function isSameHistorySession(
+  session: HistorySession | null | undefined,
+  kind: "size" | "rotation" | "hp",
+  blockIds: string[]
+): boolean {
+  if (!session || session.kind !== kind) return false
+  if (session.blockIds.length !== blockIds.length) return false
+  const set = new Set(session.blockIds)
+  return blockIds.every((id) => set.has(id))
+}
 
 export function createEditorState(map: PlayerMapSpec): EditorState {
   return {
@@ -106,16 +127,10 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           ? mergeBlock(block, normalizeBlockUpdates(block, action.updates))
           : block
       )
-      const isPureSizeUpdate =
-        action.updates.size !== undefined && Object.keys(action.updates).every((k) => k === "size")
+      const incKind = getIncrementalUpdateKind(action.updates)
 
-      if (isPureSizeUpdate) {
-        const isSameSession =
-          state.historySession?.kind === "resize" &&
-          state.historySession.blockIds.length === 1 &&
-          state.historySession.blockIds[0] === action.blockId
-
-        if (isSameSession) {
+      if (incKind) {
+        if (isSameHistorySession(state.historySession, incKind, [action.blockId])) {
           return {
             ...state,
             map: { ...state.map, blocks },
@@ -125,7 +140,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
 
         return {
           ...updateMap(state, { ...state.map, blocks }),
-          historySession: { kind: "resize", blockIds: [action.blockId] },
+          historySession: { kind: incKind, blockIds: [action.blockId] },
         }
       }
 
@@ -140,16 +155,10 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         return mergeBlock(block, normalized)
       })
 
-      const isPureSizeUpdate =
-        action.updates.size !== undefined && Object.keys(action.updates).every((k) => k === "size")
+      const incKind = getIncrementalUpdateKind(action.updates)
 
-      if (isPureSizeUpdate) {
-        const isSameSession =
-          state.historySession?.kind === "resize" &&
-          state.historySession.blockIds.length === action.blockIds.length &&
-          state.historySession.blockIds.every((id) => selectedIds.has(id))
-
-        if (isSameSession) {
+      if (incKind) {
+        if (isSameHistorySession(state.historySession, incKind, action.blockIds)) {
           return {
             ...state,
             map: { ...state.map, blocks },
@@ -159,7 +168,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
 
         return {
           ...updateMap(state, { ...state.map, blocks }),
-          historySession: { kind: "resize", blockIds: [...action.blockIds] },
+          historySession: { kind: incKind, blockIds: [...action.blockIds] },
         }
       }
 
@@ -270,7 +279,19 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           rotation: normalizedRot,
         }
       })
-      return updateMap(state, { ...state.map, blocks }, state.selectedBlockIds)
+
+      if (isSameHistorySession(state.historySession, "rotation", action.blockIds)) {
+        return {
+          ...state,
+          map: { ...state.map, blocks },
+          isDirty: true,
+        }
+      }
+
+      return {
+        ...updateMap(state, { ...state.map, blocks }, state.selectedBlockIds),
+        historySession: { kind: "rotation", blockIds: [...action.blockIds] },
+      }
     }
     case "FLIP_BLOCKS": {
       const selectedIds = new Set(action.blockIds)

@@ -129,8 +129,12 @@ describe("editorReducer", () => {
 
   it("caps undo history at 30 entries and clears redo after a new edit", () => {
     let state = createEditorState(makeMap())
-    for (let hp = 2; hp <= 40; hp += 1) {
-      state = editorReducer(state, { type: "UPDATE_BLOCK", blockId: "a", updates: { hp } })
+    for (let i = 2; i <= 40; i += 1) {
+      state = editorReducer(state, {
+        type: "UPDATE_BLOCK",
+        blockId: i % 2 === 0 ? "a" : "b",
+        updates: { hp: (i % 8) + 1 },
+      })
     }
     expect(state.history.past).toHaveLength(30)
     state = editorReducer(state, { type: "UNDO" })
@@ -838,6 +842,61 @@ describe("editorReducer", () => {
     // Second undo undos the entire resize session back to initial
     state = editorReducer(state, { type: "UNDO" })
     expect(state.map.blocks[0]!.size.width).not.toBe(70)
+  })
+
+  it("coalesces consecutive group rotation updates into a single undo step", () => {
+    let state = createEditorState(makeMap())
+    state = editorReducer(state, { type: "SELECT_BLOCKS", blockIds: ["a", "b"] })
+
+    // Several group rotations (e.g. quick buttons +45°, +45°, +90°)
+    state = editorReducer(state, {
+      type: "ROTATE_GROUP",
+      blockIds: ["a", "b"],
+      center: { x: 150, y: 100 },
+      angle: Math.PI / 4,
+    })
+    state = editorReducer(state, {
+      type: "ROTATE_GROUP",
+      blockIds: ["a", "b"],
+      center: { x: 150, y: 100 },
+      angle: Math.PI / 4,
+    })
+    // Slider adjustment on rotation
+    state = editorReducer(state, {
+      type: "UPDATE_BLOCKS",
+      blockIds: ["a", "b"],
+      updates: { rotation: Math.PI },
+    })
+
+    expect(state.history.past).toHaveLength(1)
+    expect(state.map.blocks[0]!.rotation).toBe(Math.PI)
+
+    // Single undo restores back to original
+    state = editorReducer(state, { type: "UNDO" })
+    expect(state.map.blocks[0]!.rotation ?? 0).toBe(0)
+    expect(state.map.blocks[1]!.rotation ?? 0).toBe(0)
+  })
+
+  it("coalesces consecutive HP adjustments into a single undo step", () => {
+    let state = createEditorState(makeMap())
+    const initialHp = state.map.blocks[0]!.hp
+    state = editorReducer(state, { type: "SELECT_BLOCKS", blockIds: ["a", "b"] })
+
+    // User tries different HP values (slider / buttons: 2, 3, 5, 8)
+    for (const hp of [2, 3, 5, 8]) {
+      state = editorReducer(state, {
+        type: "UPDATE_BLOCKS",
+        blockIds: ["a", "b"],
+        updates: { hp },
+      })
+    }
+
+    expect(state.history.past).toHaveLength(1)
+    expect(state.map.blocks[0]!.hp).toBe(8)
+
+    // Single undo restores back to initial HP
+    state = editorReducer(state, { type: "UNDO" })
+    expect(state.map.blocks[0]!.hp).toBe(initialHp)
   })
 })
 
