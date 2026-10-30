@@ -6,7 +6,6 @@ import type { PlayerBlockEffect, PlayerBlockSpec } from "../../game/mapSpec"
 
 import { clampPosition } from "./editorState"
 import {
-  areBlocksTouching,
   blockCorners,
   getBlocksBoundingBox,
   getBlocksBoundingCenter,
@@ -36,6 +35,8 @@ interface DragState {
   lastStepSize?: number
   center?: { x: number; y: number }
   rotationAngle?: number
+  isAdditive?: boolean
+  initialSelectedIds?: string[]
 }
 
 interface CanvasContextMenu {
@@ -96,11 +97,14 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       const isCtrl = e.ctrlKey || e.metaKey || e.key === "Control" || e.key === "Meta"
       setIsCtrlDown(isCtrl)
     }
+    const handleBlur = () => setIsCtrlDown(false)
     window.addEventListener("keydown", handleKey)
     window.addEventListener("keyup", handleKey)
+    window.addEventListener("blur", handleBlur)
     return () => {
       window.removeEventListener("keydown", handleKey)
       window.removeEventListener("keyup", handleKey)
+      window.removeEventListener("blur", handleBlur)
     }
   }, [])
 
@@ -203,7 +207,20 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     ) {
       drawGroupRotateHud(context, dragRef.current.center, dragRef.current.rotationAngle)
     }
-    if (marquee) drawMarquee(context, marquee.start, marquee.end)
+    if (marquee) {
+      const isAdditive = Boolean(dragRef.current?.isAdditive)
+      const rect = normalizeRect(marquee.start, marquee.end)
+      const intersecting = state.map.blocks.filter((b) => intersectsBlock(rect, b))
+      if (rect.width >= 2 || rect.height >= 2) {
+        for (const b of intersecting) {
+          const alreadySelected = state.selectedBlockIds.includes(b.id)
+          if (!alreadySelected) {
+            drawBlockHighlight(context, b, isAdditive ? "#42ffb0" : "#35e0ff", 18)
+          }
+        }
+      }
+      drawMarquee(context, marquee.start, marquee.end, isAdditive, intersecting.length)
+    }
     if (state.pastePhantom) {
       const targetPos = phantomPos ?? lastPointerPos.current
       const center = getBlocksBoundingCenter(state.pastePhantom)
@@ -229,14 +246,8 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       }
     }
 
-    // Ctrl-hover illumination when there are already selected blocks
-    if (
-      isCtrlDown &&
-      state.selectedBlockIds.length > 0 &&
-      !dragRef.current &&
-      !state.pastePhantom &&
-      lastPointerPos.current
-    ) {
+    // Ctrl-hover illumination when holding Ctrl
+    if (isCtrlDown && !dragRef.current && !state.pastePhantom && lastPointerPos.current) {
       const point = lastPointerPos.current
       if (isInsideWorld(point)) {
         const hovered = hitTest(state.map.blocks, point)
@@ -244,42 +255,10 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
           const isSelected = state.selectedBlockIds.includes(hovered.id)
           if (isSelected) {
             drawBlockHighlight(context, hovered, "#ff6b6b", 16)
-            drawCtrlTooltip(context, point, "[-] Исключить из группы (Ctrl+клик)", "#ff6b6b")
+            drawCtrlTooltip(context, point, "[-] Исключить блок · Ctrl+клик", "#ff6b6b")
           } else {
-            const logicalGroup = state.map.groups?.find((g) => g.blockIds.includes(hovered.id))
-            let targetGroup: PlayerBlockSpec[] = []
-            if (logicalGroup) {
-              targetGroup = state.map.blocks.filter((b) => logicalGroup.blockIds.includes(b.id))
-            } else {
-              targetGroup = findConnectedCluster(state.map.blocks, hovered)
-            }
-            if (targetGroup.length === 0) targetGroup = [hovered]
-
-            for (const b of targetGroup) {
-              drawBlockHighlight(context, b, "#42ffb0", 16)
-            }
-
-            const unionBlocks = [...selected, ...targetGroup]
-            const unionBbox = getBlocksBoundingBox(unionBlocks)
-            context.save()
-            context.strokeStyle = "rgba(66, 255, 176, 0.85)"
-            context.lineWidth = 1.5
-            context.setLineDash([5, 5])
-            context.shadowColor = "rgba(66, 255, 176, 0.4)"
-            context.shadowBlur = 10
-            context.strokeRect(
-              unionBbox.minX - 10,
-              unionBbox.minY - 10,
-              unionBbox.width + 20,
-              unionBbox.height + 20
-            )
-            context.restore()
-
-            const label =
-              targetGroup.length > 1
-                ? `[+] Добавить группу (${targetGroup.length} бл.) · Ctrl+клик`
-                : `[+] Добавить в группу · Ctrl+клик`
-            drawCtrlTooltip(context, point, label, "#42ffb0")
+            drawBlockHighlight(context, hovered, "#42ffb0", 16)
+            drawCtrlTooltip(context, point, "[+] Добавить блок · Ctrl+клик", "#42ffb0")
           }
         }
       }
@@ -558,6 +537,24 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
       if (block) dispatch({ type: "DELETE_BLOCK", blockId: block.id })
       return
     }
+    const isAdditive = Boolean(event.shiftKey || event.ctrlKey || event.metaKey || isCtrlDown)
+
+    if (isAdditive) {
+      dragRef.current = {
+        kind: "marquee",
+        blockIds: [],
+        startX: point.x,
+        startY: point.y,
+        originals: [],
+        moved: false,
+        isAdditive: true,
+        initialSelectedIds: [...state.selectedBlockIds],
+        source: block,
+      }
+      setMarquee({ start: point, end: point })
+      return
+    }
+
     if (!block) {
       dispatch({ type: "SELECT_BLOCKS", blockIds: [] })
       dragRef.current = {
@@ -567,23 +564,10 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
         startY: point.y,
         originals: [],
         moved: false,
+        isAdditive: false,
+        initialSelectedIds: [],
       }
       setMarquee({ start: point, end: point })
-      return
-    }
-    if (event.shiftKey || event.ctrlKey || event.metaKey) {
-      if (state.selectedBlockIds.includes(block.id)) {
-        dispatch({ type: "TOGGLE_BLOCK_SELECTION", blockId: block.id })
-      } else {
-        const logicalGroup = state.map.groups?.find((g) => g.blockIds.includes(block.id))
-        const targetGroup = logicalGroup
-          ? state.map.blocks.filter((b) => logicalGroup.blockIds.includes(b.id))
-          : findConnectedCluster(state.map.blocks, block)
-        const newIds = Array.from(
-          new Set([...state.selectedBlockIds, ...targetGroup.map((b) => b.id)])
-        )
-        dispatch({ type: "SELECT_BLOCKS", blockIds: newIds })
-      }
       return
     }
     const isAlreadySelected = state.selectedBlockIds.includes(block.id)
@@ -619,23 +603,33 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
 
     const drag = dragRef.current
     if (!drag) {
+      const isCtrl = Boolean(event.ctrlKey || event.metaKey || isCtrlDown)
       const selected = state.map.blocks.filter((item) => state.selectedBlockIds.includes(item.id))
       const isGroupClone = selected.length > 1 && isGroupCloneHandle(selected, point)
       const isGroupRotate = selected.length > 1 && isGroupRotateHandle(selected, point)
       const isSingleClone = selected.length === 1 && isCloneHandle(selected[0]!, point)
       const handle = selected.length === 1 ? hitTestTransformHandle(selected[0]!, point) : null
-      event.currentTarget.style.cursor =
-        isGroupClone || isSingleClone
-          ? "copy"
-          : isGroupRotate || handle?.kind === "rotate"
-            ? "grab"
-            : handle
-              ? "nwse-resize"
-              : "default"
+      const hoveredBlock = hitTest(state.map.blocks, point)
+
+      if (isCtrl) {
+        event.currentTarget.style.cursor = hoveredBlock ? "pointer" : "crosshair"
+      } else {
+        event.currentTarget.style.cursor =
+          isGroupClone || isSingleClone
+            ? "copy"
+            : isGroupRotate || handle?.kind === "rotate"
+              ? "grab"
+              : handle
+                ? "nwse-resize"
+                : hoveredBlock
+                  ? "pointer"
+                  : "default"
+      }
       return
     }
     if (Math.hypot(point.x - drag.startX, point.y - drag.startY) > 2) drag.moved = true
     if (drag.kind === "marquee") {
+      event.currentTarget.style.cursor = "crosshair"
       setMarquee({ start: { x: drag.startX, y: drag.startY }, end: point })
       return
     }
@@ -757,17 +751,32 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
           dispatch({ type: "SELECT_BLOCK", blockId: clicked.id })
         }
       }
+      if (drag.isAdditive) {
+        if (drag.source) {
+          dispatch({ type: "TOGGLE_BLOCK_SELECTION", blockId: drag.source.id })
+        }
+      } else if (drag.kind === "marquee") {
+        dispatch({ type: "SELECT_BLOCKS", blockIds: [] })
+      }
       return
     }
     if (drag.kind === "marquee") {
-      dispatch({
-        type: "SELECT_BLOCKS",
-        blockIds: state.map.blocks
-          .filter((block) =>
-            intersectsBlock(normalizeRect({ x: drag.startX, y: drag.startY }, point), block)
-          )
-          .map((block) => block.id),
-      })
+      const rect = normalizeRect({ x: drag.startX, y: drag.startY }, point)
+      const newlyIntersected = state.map.blocks
+        .filter((block) => intersectsBlock(rect, block))
+        .map((block) => block.id)
+
+      if (drag.isAdditive) {
+        const initial = drag.initialSelectedIds ?? []
+        const combined = Array.from(new Set([...initial, ...newlyIntersected]))
+        dispatch({ type: "SELECT_BLOCKS", blockIds: combined })
+        const addedCount = newlyIntersected.filter((id) => !initial.includes(id)).length
+        if (addedCount > 0) {
+          showNotice(`Добавлено в выделение: +${addedCount} бл. (всего: ${combined.length})`)
+        }
+      } else {
+        dispatch({ type: "SELECT_BLOCKS", blockIds: newlyIntersected })
+      }
     } else if (drag.kind === "clone") {
       if (drag.originals.length > 1) {
         if (drag.groupDeltas?.length) {
@@ -1135,16 +1144,88 @@ function drawTransformHandles(context: CanvasRenderingContext2D, block: PlayerBl
 function drawMarquee(
   context: CanvasRenderingContext2D,
   start: { x: number; y: number },
-  end: { x: number; y: number }
+  end: { x: number; y: number },
+  isAdditive = false,
+  count = 0
 ) {
   const rect = normalizeRect(start, end)
+  if (rect.width < 2 && rect.height < 2) return
   context.save()
-  context.fillStyle = "rgba(53,224,255,0.12)"
-  context.strokeStyle = "#35e0ff"
-  context.lineWidth = 2
-  context.setLineDash([8, 5])
-  context.fillRect(rect.x, rect.y, rect.width, rect.height)
-  context.strokeRect(rect.x, rect.y, rect.width, rect.height)
+
+  if (isAdditive) {
+    context.fillStyle = "rgba(66, 255, 176, 0.12)"
+    context.strokeStyle = "#42ffb0"
+    context.lineWidth = 2
+    context.setLineDash([8, 5])
+    context.shadowColor = "#42ffb0"
+    context.shadowBlur = 8
+    context.fillRect(rect.x, rect.y, rect.width, rect.height)
+    context.strokeRect(rect.x, rect.y, rect.width, rect.height)
+
+    // Corner HUD Badge
+    context.shadowBlur = 0
+    context.setLineDash([])
+    const label = count > 0 ? `[+] Добавить: +${count} бл.` : "[+] Добавление в группу"
+    context.font = "bold 12px sans-serif"
+    const tw = context.measureText(label).width
+    const bw = tw + 14
+    const bh = 22
+    let bx = rect.x
+    let by = rect.y - bh - 4
+    if (by < HUD_BOTTOM) by = rect.y + rect.height + 4
+    if (bx + bw > WORLD_WIDTH) bx = WORLD_WIDTH - bw - 8
+
+    context.fillStyle = "rgba(4, 24, 18, 0.94)"
+    context.beginPath()
+    if (typeof context.roundRect === "function") {
+      context.roundRect(bx, by, bw, bh, 4)
+    } else {
+      context.rect(bx, by, bw, bh)
+    }
+    context.fill()
+    context.strokeStyle = "#42ffb0"
+    context.lineWidth = 1.5
+    context.stroke()
+    context.fillStyle = "#42ffb0"
+    context.textAlign = "center"
+    context.textBaseline = "middle"
+    context.fillText(label, bx + bw / 2, by + bh / 2)
+  } else {
+    context.fillStyle = "rgba(53, 224, 255, 0.12)"
+    context.strokeStyle = "#35e0ff"
+    context.lineWidth = 2
+    context.setLineDash([8, 5])
+    context.fillRect(rect.x, rect.y, rect.width, rect.height)
+    context.strokeRect(rect.x, rect.y, rect.width, rect.height)
+
+    if (count > 0 && rect.width > 40 && rect.height > 40) {
+      context.setLineDash([])
+      const label = `Выделение: ${count} бл.`
+      context.font = "bold 12px sans-serif"
+      const tw = context.measureText(label).width
+      const bw = tw + 14
+      const bh = 22
+      let bx = rect.x
+      let by = rect.y - bh - 4
+      if (by < HUD_BOTTOM) by = rect.y + rect.height + 4
+      if (bx + bw > WORLD_WIDTH) bx = WORLD_WIDTH - bw - 8
+      context.fillStyle = "rgba(7, 19, 27, 0.9)"
+      context.beginPath()
+      if (typeof context.roundRect === "function") {
+        context.roundRect(bx, by, bw, bh, 4)
+      } else {
+        context.rect(bx, by, bw, bh)
+      }
+      context.fill()
+      context.strokeStyle = "rgba(53, 224, 255, 0.6)"
+      context.lineWidth = 1
+      context.stroke()
+      context.fillStyle = "#52f5ff"
+      context.textAlign = "center"
+      context.textBaseline = "middle"
+      context.fillText(label, bx + bw / 2, by + bh / 2)
+    }
+  }
   context.restore()
 }
 
@@ -1180,24 +1261,6 @@ function isCloneHandle(block: PlayerBlockSpec, point: { x: number; y: number }) 
       localY - (block.size.height / 2 + offset)
     ) <= 13
   )
-}
-
-function findConnectedCluster(
-  blocks: PlayerBlockSpec[],
-  start: PlayerBlockSpec
-): PlayerBlockSpec[] {
-  const visited = new Set<string>([start.id])
-  const queue = [start]
-  while (queue.length > 0) {
-    const curr = queue.shift()!
-    for (const b of blocks) {
-      if (!visited.has(b.id) && areBlocksTouching(curr, b, 8)) {
-        visited.add(b.id)
-        queue.push(b)
-      }
-    }
-  }
-  return blocks.filter((b) => visited.has(b.id))
 }
 
 function drawBlockHighlight(
