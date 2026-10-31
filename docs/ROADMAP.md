@@ -171,7 +171,7 @@
 | **Сюжетные терминалы в событиях**                 |    🟢 Готово     |    P1     | `src/game/campaignEvents.ts`, `campaignFlow.ts`               |
 | **Score Breakdown (детализация очков)**           |    🟢 Готово     |    P1     | `src/game/game/runFlow.ts`, `src/ui/screens/overlays.tsx`     |
 | **Дерево синергий перков**                        |    🟢 Готово     |    P2     | `src/game/synergies.ts`, `collide.ts`, `hud.tsx`              |
-| **Ежедневные испытания (Daily Runs)**             | ⚪ Запланировано |    P2     | `src/game/game.ts`, `supabase/functions/scores/`              |
+| **Ежедневные испытания (Daily Runs)**             |    🟢 Готово     |    P2     | `src/game/daily.ts`, `DailyRunModal.tsx`, `scores/`           |
 | **OAuth авторизация (Yandex / VK ID)**            | ⚪ Запланировано |    P2     | `src/game/account.ts`, `supabase/`                            |
 | **Прямоугольные формы в редакторе**               |    🟢 Готово     |    P2     | `src/ui/editor/`, `src/game/mapAdapter.ts`                    |
 | **Выбор целей в редакторе (клик / Space)**        |    🟢 Готово     |    P2     | `src/ui/editor/targetSelection.ts`, `EditorCanvas.tsx`        |
