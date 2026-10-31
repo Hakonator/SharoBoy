@@ -11,6 +11,7 @@ import { EditorMapsModal } from "./EditorMapsModal"
 import { EditorPrefabsModal } from "./EditorPrefabsModal"
 import { EditorPublishModal } from "./EditorPublishModal"
 import { createEditorState, editorReducer, saveEditorDraft } from "./editorState"
+import { resolveEditorKey, type EditorGameKey } from "./editorKeys"
 import { EditorToolbar } from "./EditorToolbar"
 import {
   createDefaultMap,
@@ -89,6 +90,41 @@ export function EditorView({
       const isKeyI =
         event.code === "KeyI" || event.key.toLowerCase() === "i" || event.key.toLowerCase() === "ш"
 
+      // Редактор — модальный оверлей над меню, а игровой ввод слушает `window`.
+      // Без перехвата `Space`/`Enter` уходят в `InputController.primaryAction()` и
+      // запускают кампанию (открывается карта вместо редактора).
+      const gameKey: EditorGameKey | null =
+        event.code === "Space" || event.key === " "
+          ? "space"
+          : event.key === "Enter" || event.code === "NumpadEnter"
+            ? "enter"
+            : event.code === "KeyM"
+              ? "mute"
+              : event.code === "KeyN"
+                ? "music"
+                : event.code === "KeyP"
+                  ? "pause"
+                  : null
+
+      if (gameKey && !isCtrlOrMeta) {
+        const interactiveTarget =
+          target instanceof HTMLElement &&
+          Boolean(target.closest('button, a, [role="button"], [role="menuitem"]'))
+        const decision = resolveEditorKey({
+          key: gameKey,
+          winCondition: state.map.winCondition,
+          selectedBlockIds: state.selectedBlockIds,
+          interactiveTarget,
+          repeat: event.repeat,
+        })
+        if (decision.preventDefault) event.preventDefault()
+        event.stopPropagation()
+        if (decision.toggleTargetIds) {
+          dispatch({ type: "TOGGLE_TARGETS", blockIds: decision.toggleTargetIds })
+        }
+        return
+      }
+
       if (isCtrlOrMeta && isKeyA) {
         event.preventDefault()
         dispatch({ type: "SELECT_BLOCKS", blockIds: state.map.blocks.map((b) => b.id) })
@@ -114,18 +150,6 @@ export function EditorView({
           event.preventDefault()
           dispatch({ type: "DELETE_SELECTED_BLOCKS" })
         }
-      } else if (event.code === "Space" || event.key === " ") {
-        // Пробел: в режиме «Целевые блоки» переключает цель у всей группы.
-        if (state.map.winCondition.kind !== "targets" || state.selectedBlockIds.length === 0) return
-        if (
-          target instanceof HTMLElement &&
-          target.closest('button, a, [role="button"], [role="menuitem"]')
-        ) {
-          return
-        }
-        event.preventDefault()
-        if (event.repeat) return
-        dispatch({ type: "TOGGLE_TARGETS", blockIds: state.selectedBlockIds })
       } else if (event.key === "Escape") {
         if (state.pastePhantom) {
           event.preventDefault()
@@ -139,8 +163,10 @@ export function EditorView({
         else onClose()
       }
     }
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
+    // Capture-фаза: обработчик игрового ввода висит на `window` в bubble-фазе и
+    // регистрируется раньше, поэтому «догнать» его можно только перехватом.
+    window.addEventListener("keydown", onKeyDown, true)
+    return () => window.removeEventListener("keydown", onKeyDown, true)
   }, [
     onClose,
     showJson,
