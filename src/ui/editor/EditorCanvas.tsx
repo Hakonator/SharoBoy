@@ -741,7 +741,7 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     }
   }
 
-  const finishDrag = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const finishDrag = (event: React.PointerEvent<HTMLCanvasElement>, cancelled = false) => {
     const drag = dragRef.current
     dragRef.current = null
     setDragPreview(null)
@@ -752,6 +752,7 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
     const point = toWorldPoint(event)
     if (!point) return
     if (!drag.moved) {
+      if (cancelled) return
       if (drag.kind === "move" && drag.blockIds.length > 1) {
         const clicked = hitTest(state.map.blocks, point)
         if (clicked && drag.blockIds.includes(clicked.id)) {
@@ -764,6 +765,20 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
         }
       } else if (drag.kind === "marquee") {
         dispatch({ type: "SELECT_BLOCKS", blockIds: [] })
+      }
+      // В режиме «Целевые блоки» обычный клик по блоку (без перетаскивания)
+      // переключает галочку цели в списке инспектора.
+      if (state.map.winCondition.kind === "targets") {
+        const clickedTarget = hitTest(state.map.blocks, point)
+        if (clickedTarget) {
+          const wasTarget = state.map.winCondition.targetIds.includes(clickedTarget.id)
+          dispatch({ type: "TOGGLE_TARGET", blockId: clickedTarget.id })
+          showNotice(
+            wasTarget
+              ? `Блок ${clickedTarget.id} снят с целей.`
+              : `Блок ${clickedTarget.id} отмечен целью.`
+          )
+        }
       }
       return
     }
@@ -915,6 +930,25 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
               >
                 📋 Дублировать
               </ContextMenuButton>
+              {state.map.winCondition.kind === "targets" && (
+                <ContextMenuButton
+                  onClick={() => {
+                    const blockId = contextMenu.blockId!
+                    const condition = state.map.winCondition
+                    const isTarget =
+                      condition.kind === "targets" && condition.targetIds.includes(blockId)
+                    dispatch({ type: "TOGGLE_TARGET", blockId })
+                    showNotice(
+                      isTarget ? `Блок ${blockId} снят с целей.` : `Блок ${blockId} отмечен целью.`
+                    )
+                    setContextMenu(null)
+                  }}
+                >
+                  {state.map.winCondition.targetIds.includes(contextMenu.blockId!)
+                    ? "🎯 Снять цель"
+                    : "🎯 Отметить целью"}
+                </ContextMenuButton>
+              )}
               <ContextMenuButton
                 onClick={() => {
                   const block = state.map.blocks.find((item) => item.id === contextMenu.blockId)
@@ -1015,9 +1049,15 @@ export function EditorCanvas({ state, dispatch, className = "" }: EditorCanvasPr
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={finishDrag}
-        onPointerCancel={finishDrag}
+        onPointerCancel={(event) => finishDrag(event, true)}
         onContextMenu={onContextMenu}
       />
+      {state.map.winCondition.kind === "targets" && (
+        <span className="pointer-events-none absolute bottom-2 left-3 rounded border border-amber-400/40 bg-ink/85 px-2 py-1 text-[11px] text-amber-200">
+          🎯 Цели: {state.map.winCondition.targetIds.length} / {state.map.blocks.length} · клик по
+          блоку, Space — вся группа
+        </span>
+      )}
       <span className="pointer-events-none absolute bottom-2 right-3 rounded bg-ink/80 px-2 py-1 font-mono text-xs text-dim">
         1920 × 1080
       </span>
@@ -1052,6 +1092,13 @@ function drawWorld(
   for (const block of state.map.blocks) {
     if (draggedBlockIds.has(block.id)) continue
     drawBlock(context, block, state.selectedBlockIds.includes(block.id))
+  }
+  if (state.map.winCondition.kind === "targets") {
+    const targetIds = new Set(state.map.winCondition.targetIds)
+    for (const block of state.map.blocks) {
+      if (!targetIds.has(block.id) || draggedBlockIds.has(block.id)) continue
+      drawTargetMarker(context, block)
+    }
   }
   drawPaddleZone(context)
 }
@@ -1322,6 +1369,37 @@ function drawBlockHighlight(
   context.fillStyle = color
   context.globalAlpha = 0.22
   context.fill()
+  context.restore()
+}
+
+function drawTargetMarker(context: CanvasRenderingContext2D, block: PlayerBlockSpec) {
+  const halfW = block.size.width / 2
+  const halfH = block.size.height / 2
+  context.save()
+  context.translate(block.position.x, block.position.y)
+  context.rotate(block.rotation ?? 0)
+  context.setLineDash([7, 5])
+  context.strokeStyle = "#ffc94d"
+  context.lineWidth = 2
+  context.strokeRect(-halfW - 6, -halfH - 6, halfW * 2 + 12, halfH * 2 + 12)
+  context.restore()
+
+  // Значок цели держим не повёрнутым вместе с блоком, чтобы «Ц» всегда читалась.
+  const badgeX = block.position.x - halfW - 6
+  const badgeY = block.position.y - halfH - 6
+  context.save()
+  context.beginPath()
+  context.arc(badgeX, badgeY, 11, 0, Math.PI * 2)
+  context.fillStyle = "#ffc94d"
+  context.fill()
+  context.strokeStyle = "#3a2600"
+  context.lineWidth = 2
+  context.stroke()
+  context.fillStyle = "#3a2600"
+  context.font = "bold 14px sans-serif"
+  context.textAlign = "center"
+  context.textBaseline = "middle"
+  context.fillText("Ц", badgeX, badgeY)
   context.restore()
 }
 

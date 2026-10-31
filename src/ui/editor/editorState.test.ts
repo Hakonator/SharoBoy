@@ -968,3 +968,88 @@ describe("resize handle cursors", () => {
     expect(getResizeCursor(block.position, corners[1]!)).toBe("nwse-resize")
   })
 })
+
+describe("editorReducer — целевые блоки", () => {
+  function targetsMap(): PlayerMapSpec {
+    return {
+      version: 1,
+      id: "editor-targets",
+      metadata: { title: "Targets" },
+      blocks: [
+        {
+          id: "a",
+          position: { x: 100, y: 200 },
+          shape: "ellipse",
+          size: { width: 40, height: 30 },
+          hp: 1,
+        },
+        {
+          id: "b",
+          position: { x: 300, y: 200 },
+          shape: "circle",
+          size: { width: 30, height: 30 },
+          hp: 2,
+        },
+        {
+          id: "c",
+          position: { x: 500, y: 200 },
+          shape: "rect",
+          size: { width: 60, height: 40 },
+          hp: 3,
+        },
+      ],
+      winCondition: { kind: "targets", targetIds: [] },
+    }
+  }
+
+  function targetIds(state: { map: PlayerMapSpec }): string[] {
+    return state.map.winCondition.kind === "targets" ? state.map.winCondition.targetIds : []
+  }
+
+  it("starts with no targets so checkboxes are initially unchecked", () => {
+    const state = createEditorState(targetsMap())
+    expect(targetIds(state)).toEqual([])
+  })
+
+  it("toggles a single target from a canvas click and undoes it in one step", () => {
+    const initial = createEditorState(targetsMap())
+    const marked = editorReducer(initial, { type: "TOGGLE_TARGET", blockId: "b" })
+    expect(targetIds(marked)).toEqual(["b"])
+    expect(marked.history.past).toHaveLength(1)
+    expect(targetIds(editorReducer(marked, { type: "UNDO" }))).toEqual([])
+    expect(targetIds(editorReducer(marked, { type: "TOGGLE_TARGET", blockId: "b" }))).toEqual([])
+  })
+
+  it("marks the whole selected group with Space and clears it on the second press", () => {
+    let state = createEditorState(targetsMap())
+    state = editorReducer(state, { type: "TOGGLE_TARGETS", blockIds: ["a", "c"] })
+    expect(targetIds(state)).toEqual(["a", "c"])
+    state = editorReducer(state, { type: "TOGGLE_TARGETS", blockIds: ["a", "c"] })
+    expect(targetIds(state)).toEqual([])
+  })
+
+  it("adds the group to existing targets when only part of it is marked", () => {
+    let state = createEditorState(targetsMap())
+    state = editorReducer(state, { type: "TOGGLE_TARGET", blockId: "a" })
+    state = editorReducer(state, { type: "TOGGLE_TARGETS", blockIds: ["a", "c"] })
+    expect(targetIds(state)).toEqual(["a", "c"])
+  })
+
+  it("keeps target ids in map order and replaces them with SET_TARGETS", () => {
+    let state = createEditorState(targetsMap())
+    state = editorReducer(state, { type: "TOGGLE_TARGET", blockId: "c" })
+    state = editorReducer(state, { type: "TOGGLE_TARGET", blockId: "a" })
+    expect(targetIds(state)).toEqual(["a", "c"])
+    state = editorReducer(state, { type: "SET_TARGETS", blockIds: ["c", "b", "c"] })
+    expect(targetIds(state)).toEqual(["b", "c"])
+    state = editorReducer(state, { type: "SET_TARGETS", blockIds: [] })
+    expect(targetIds(state)).toEqual([])
+  })
+
+  it("ignores target actions when the win condition is all-destructible", () => {
+    const state = createEditorState({ ...targetsMap(), winCondition: { kind: "all-destructible" } })
+    expect(editorReducer(state, { type: "TOGGLE_TARGET", blockId: "a" })).toBe(state)
+    expect(editorReducer(state, { type: "TOGGLE_TARGETS", blockIds: ["a"] })).toBe(state)
+    expect(editorReducer(state, { type: "SET_TARGETS", blockIds: ["a"] })).toBe(state)
+  })
+})

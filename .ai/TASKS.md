@@ -38,6 +38,93 @@ Assigned to: Luna
 
 ## Последние выполненные задачи (подробные карточки)
 
+### T-051: Выбор целей кликом по блоку и группой через Space в редакторе карт
+
+Status: done
+Priority: medium
+Assigned to: Luna
+
+Описание:
+В режиме условия победы «Целевые блоки» список `targetIds` заполнялся всеми блоками
+автоматически, поэтому выбрать отдельные цели было невозможно. Нужно: список целей
+изначально пуст, клик по блоку на поле переключает галочку соответствующей записи,
+а выделенная группа отмечается/снимается одним нажатием `Space` (умный переключатель:
+отмечены все — снять, иначе отметить всю группу).
+
+1. Чистая логика выбора целей (`src/ui/editor/targetSelection.ts`):
+   - `getTargetsCondition`, `orderTargetIds`, `toggleTargetId`, `toggleTargetIds`,
+     `replaceTargetIds`;
+   - `targetIds` всегда нормализуется к порядку блоков карты (контракт `blocks` ↔ `targetIds`).
+2. Редьюсер (`editorState.ts`, `types.ts`): действия `TOGGLE_TARGET`, `TOGGLE_TARGETS`,
+   `SET_TARGETS`; каждое — ровно один шаг `Ctrl+Z`; в режиме `all-destructible` игнорируются.
+3. Инспектор (`EditorInspector.tsx`):
+   - при переключении условия на «Целевые блоки» список целей создаётся пустым;
+   - единая панель `TargetsPicker` доступна в свойствах карты, свойствах блока и групповом
+     инспекторе: счётчик `N / M`, кнопки «Все блоки» / «Снять все» / «Отметить выделение»,
+     прокручиваемый список галочек с подсветкой выделенных блоков и предупреждение о пустом списке.
+4. Холст (`EditorCanvas.tsx`):
+   - обычный клик по блоку (без перетаскивания) переключает цель;
+   - отмеченные блоки подсвечены янтарной пунктирной рамкой и значком «Ц»;
+   - счётчик-подсказка внизу холста и пункт «🎯 Отметить целью / Снять цель» в ПКМ-меню;
+   - `pointercancel` цель не переключает.
+5. Клавиатура (`EditorView.tsx`): `Space` переключает цели всех выделенных блоков,
+   не перехватывается у кнопок/ссылок, автоповтор игнорируется.
+6. Валидатор (`mapValidator.ts`): новый код `NO_TARGETS` — условие «Целевые блоки» с пустым
+   `targetIds` не проходит проверку (иначе `every` по пустому массиву делает карту мгновенно
+   пройденной).
+7. Тесты: `targetSelection.test.ts` (+7), редьюсер (+6), инспектор (+3), валидатор (+1).
+   Все 83 файла / 756 тестов проходят, `typecheck`, `lint`, `prettier` чистые.
+
+Allowed files:
+
+- src/ui/editor/targetSelection.ts
+- src/ui/editor/targetSelection.test.ts
+- src/ui/editor/types.ts
+- src/ui/editor/editorState.ts
+- src/ui/editor/editorState.test.ts
+- src/ui/editor/EditorInspector.tsx
+- src/ui/editor/EditorInspector.test.tsx
+- src/ui/editor/EditorCanvas.tsx
+- src/ui/editor/EditorView.tsx
+- src/game/mapValidator.ts
+- src/game/mapValidator.test.ts
+- docs/CHANGELOG.md
+- docs/ROADMAP.md
+- .ai/DECISIONS.md
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Forbidden files:
+
+- src/game/game/updateStep.ts
+- src/game/game/modes.ts
+- vite.config.ts
+- tsconfig.json
+- package.json
+
+Acceptance criteria:
+
+- [x] При выборе условия «Целевые блоки» список целей пуст, галочки не стоят
+- [x] Клик по блоку на холсте переключает его галочку в списке целей инспектора
+- [x] Перетаскивание и `pointercancel` цель не переключают
+- [x] `Space` отмечает всю выделенную группу, повторное нажатие снимает отметки
+- [x] Отмеченные цели видны на холсте (янтарная рамка и значок «Ц»)
+- [x] `Ctrl+Z` отменяет переключение целей за один шаг
+- [x] Пустой список целей блокирует запуск/публикацию карты (`NO_TARGETS`)
+- [x] `npm run typecheck`, `npm run lint`, `npm test` проходят (83 файла, 756 тестов)
+
+Test plan:
+`npm run typecheck`, `npm run lint`, `npm test`
+
+Verification commands:
+npm run typecheck
+npm run lint:check
+npm run format:check
+npm test
+
+---
+
 ### T-039: Расширение каталога реликвий (4 → 8) и HUD-индикация артефактов забега
 
 Status: done
@@ -241,97 +328,6 @@ npm test
 
 ---
 
-### T-037: Взрывной шар «Плазменный заряд» (roadmap 3.1, ингредиент 2)
-
-Status: done
-Priority: high
-Assigned to: Luna
-
-Описание:
-
-Второй шар. В отличие от клинка не проникает, а бьёт по площади: после
-обычного отскока и урона по блоку удара подрывает соседей в радиусе.
-
-1. Новый тип бонуса `explosive` («ВЗРЫВ») и таймер `Game.explosiveUntil`.
-2. Логика (`physics/collide.ts`, после `damageBlock`): взрыв радиусом 72
-   наносит урон 1 всем живым блокам в радиусе, кроме блока удара.
-   - взрывной урон идёт с `allowBrittle = false`, иначе получаем каскад
-     «взрыв → хрупкий блок → цепная детонация → снова взрыв» и вечный цикл;
-   - лимит 8 целей за взрыв, чтобы не убивать кадр на плотных рядах;
-   - минибоссы, бомбы и фазовые неактивные блоки исключены.
-3. Переиспользовать существующие рычаги: `damageBlock` и `fx.rings`/`fx.burst`
-   (никакой новой системы взрывов не создавать — `boomQueue` занят бомбами).
-4. Каркас по образцу T-036: `PowerType`, `POWER_META`, таблица дропа,
-   `applyPower`, `explosiveActive()` в `PhysicsWorld` и `hosts.ts`,
-   сброс в `loseLife`/`clearAllEffects`, цвет в `render/projectiles.ts`,
-   `explosiveOn` в `HudData` и `hud.tsx`.
-5. Баланс: длительность 8 с, вес в таблице 8, радиус 72, урон 1.
-
-Точки внедрения: взрыв — в `physics/collide.ts` в ветви обычного отскока сразу
-после `damageBlock` (`collideBlocks`), по образцу взрыва по площади у `brittle`
-(`physics/destruction.ts`, ветка `b.sp.brittle`). Каркас бонуса — по образцу
-уже реализованного `pierce` из T-036 (`pierceActive` в `physics.ts`,
-реализация в `game/hosts.ts`, таймер в `game.ts`, сбросы в `game/runFlow.ts`,
-цвет в `render/projectiles.ts`, `pierceOn` в `HudData` → здесь `explosiveOn`).
-
-Allowed files:
-
-- src/game/types.ts
-- src/game/palette.ts
-- src/game/physics.ts
-- src/game/physics/collide.ts
-- src/game/physics/collide.test.ts
-- src/game/physics.test.ts
-- src/game/physics/spark.test.ts
-- src/game/physics/frost.test.ts
-- src/game/game.ts
-- src/game/game/hosts.ts
-- src/game/game/runFlow.ts
-- src/game/game/hudSync.ts
-- src/game/game/drawScene.ts
-- src/game/powers.ts
-- src/game/powers/apply.ts
-- src/game/powers/table.ts
-- src/game/powers/table.test.ts
-- src/game/powers.test.ts
-- src/game/render/projectiles.ts
-- src/ui/screens/hud.tsx
-- src/App.tsx
-- src/ui/screens/MenuCosmetics.test.tsx
-- src/ui/screens/SettingsModal.test.tsx
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Forbidden files:
-
-- vite.config.ts
-- tsconfig.json
-- package.json
-
-Dependencies: T-036 (общий каркас типа бонуса и таймера)
-
-Acceptance criteria:
-
-- [x] Бонус `explosive` выпадает и отображается иконкой «ВЗРЫВ»
-- [x] Попадание подрывает соседей в радиусе 72 на урон 1
-- [x] Блок удара не получает двойной урон
-- [x] Каскад с хрупкими блоками не зацикливается (лимит целей, `allowBrittle = false`)
-- [x] Минибоссы, бомбы и неактивные фазовые блоки взрывом не задеваются
-- [x] Эффект сбрасывается при потере жизни и между уровнями
-- [x] `npm run typecheck`, `npm run lint`, `npm test` проходят (74 файла, 607 тестов)
-
-Test plan:
-`npm run typecheck`, `npm run lint`, `npm test`
-
-Verification commands:
-npm run typecheck
-npm run lint:check
-npm run format:check
-npm test
-
----
-
 ## Выполнено ранее (архив)
 
 Карточки удалены при чистке файла; подробности каждой задачи — в `.ai/STATE.md`
@@ -339,6 +335,7 @@ npm test
 
 | Задача | Что сделано                                                                 |
 | ------ | --------------------------------------------------------------------------- |
+| T-037  | Взрывной шар «Плазменный заряд» (roadmap 3.1, ингредиент 2)                 |
 | T-036  | Проникающий шар «Кинетический клинок» (roadmap 3.1, ингредиент 1)           |
 | T-035  | Прозрачный экран детального подсчёта очков (Score Breakdown) (roadmap 2.3)  |
 | T-034  | Сюжетные терминалы станции «СФЕРА-1080» в событиях кампании (roadmap 2.2)   |

@@ -72,6 +72,9 @@ export type EditorAction =
   | { type: "ADD_BLOCK"; block?: Partial<PlayerBlockSpec>; position: { x: number; y: number } }
   | { type: "UPDATE_BLOCK"; blockId: string; updates: PlayerBlockUpdates }
   | { type: "UPDATE_BLOCKS"; blockIds: string[]; updates: PlayerBlockUpdates }
+  | { type: "TOGGLE_TARGET"; blockId: string }
+  | { type: "TOGGLE_TARGETS"; blockIds: string[] }
+  | { type: "SET_TARGETS"; blockIds: string[] }
   | {
       type: "SET_BLOCKS_EFFECT"
       blockIds: string[]

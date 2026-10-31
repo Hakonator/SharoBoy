@@ -114,6 +114,18 @@ export function EditorView({
           event.preventDefault()
           dispatch({ type: "DELETE_SELECTED_BLOCKS" })
         }
+      } else if (event.code === "Space" || event.key === " ") {
+        // Пробел: в режиме «Целевые блоки» переключает цель у всей группы.
+        if (state.map.winCondition.kind !== "targets" || state.selectedBlockIds.length === 0) return
+        if (
+          target instanceof HTMLElement &&
+          target.closest('button, a, [role="button"], [role="menuitem"]')
+        ) {
+          return
+        }
+        event.preventDefault()
+        if (event.repeat) return
+        dispatch({ type: "TOGGLE_TARGETS", blockIds: state.selectedBlockIds })
       } else if (event.key === "Escape") {
         if (state.pastePhantom) {
           event.preventDefault()
@@ -136,6 +148,7 @@ export function EditorView({
     showPrefabsModal,
     showPublish,
     state.map.blocks,
+    state.map.winCondition,
     state.selectedBlockIds,
     state.pastePhantom,
   ])

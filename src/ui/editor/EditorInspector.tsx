@@ -5,6 +5,7 @@ import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapWinCondition } from "
 
 import { defaultEffect } from "./editorState"
 import { getBlocksBoundingBox, getBlocksBoundingCenter } from "./EditorCanvas"
+import { getTargetsCondition } from "./targetSelection"
 import type { EditorAction, EditorInspectorProps, EditorState, PlayerBlockUpdates } from "./types"
 
 export function EditorInspector({ state, dispatch, author }: EditorInspectorProps) {
@@ -58,9 +59,11 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
           <select
             className={INPUT_CLASS}
             onChange={(event) => {
+              // Цели выбираются вручную: при включении режима список пуст,
+              // а галочки ставятся кликом по блоку на поле или клавишей Space.
               const winCondition: PlayerMapWinCondition =
                 event.target.value === "targets"
-                  ? { kind: "targets", targetIds: state.map.blocks.map((item) => item.id) }
+                  ? { kind: "targets", targetIds: [] }
                   : { kind: "all-destructible" }
               dispatch({ type: "UPDATE_METADATA", winCondition })
             }}
@@ -70,35 +73,7 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
             <option value="targets">Целевые блоки</option>
           </select>
         </Field>
-        {state.map.winCondition.kind === "targets" && (
-          <div className="space-y-2 rounded-lg border border-line p-3">
-            <p className="hud-label">Цели</p>
-            {state.map.blocks.map((item) => (
-              <label key={item.id} className="flex items-center gap-2 text-xs">
-                <input
-                  checked={
-                    state.map.winCondition.kind === "targets" &&
-                    state.map.winCondition.targetIds.includes(item.id)
-                  }
-                  className="accent-cyan-neon"
-                  onChange={(event) => {
-                    if (state.map.winCondition.kind !== "targets") return
-                    const current = state.map.winCondition.targetIds
-                    const targetIds = event.target.checked
-                      ? [...current, item.id]
-                      : current.filter((id) => id !== item.id)
-                    dispatch({
-                      type: "UPDATE_METADATA",
-                      winCondition: { kind: "targets", targetIds },
-                    })
-                  }}
-                  type="checkbox"
-                />
-                <span>{item.id}</span>
-              </label>
-            ))}
-          </div>
-        )}
+        <TargetsPicker dispatch={dispatch} state={state} />
         <div className="grid grid-cols-2 gap-2 text-center">
           <Stat label="Блоки" value={state.map.blocks.length} />
           <Stat label="Сумма HP" value={totalHp} />
@@ -134,6 +109,7 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
           HP {block.hp}
         </span>
       </div>
+      <TargetsPicker dispatch={dispatch} state={state} />
       <NumberField
         label=""
         min={1}
@@ -869,6 +845,111 @@ function EffectTuning({
   )
 }
 
+/**
+ * Панель целей: единый список блоков-целей, доступный и в свойствах карты,
+ * и при выделении блока/группы. Клик по блоку на поле и клавиша Space работают
+ * через редьюсер, поэтому галочки в списке всегда отражают состояние карты.
+ */
+function TargetsPicker({
+  state,
+  dispatch,
+}: {
+  state: EditorState
+  dispatch: (action: EditorAction) => void
+}) {
+  const condition = getTargetsCondition(state.map.winCondition)
+  if (!condition) return null
+
+  const targetSet = new Set(condition.targetIds)
+  const selectedIds = state.selectedBlockIds
+  const selectedSet = new Set(selectedIds)
+  const selectedTargets = selectedIds.filter((id) => targetSet.has(id)).length
+  const allSelectedAreTargets = selectedIds.length > 0 && selectedTargets === selectedIds.length
+  const noTargets = condition.targetIds.length === 0
+  const allMarked =
+    state.map.blocks.length > 0 && condition.targetIds.length === state.map.blocks.length
+
+  return (
+    <section className="space-y-2 rounded-lg border border-amber-400/35 bg-amber-400/5 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="hud-label text-amber-200">🎯 Цели</p>
+        <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold text-amber-200">
+          {condition.targetIds.length} / {state.map.blocks.length}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        <button
+          className="rounded border border-line bg-abyss px-2 py-0.5 text-[11px] text-foam transition-colors hover:border-amber-400 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={state.map.blocks.length === 0 || allMarked}
+          onClick={() =>
+            dispatch({ type: "SET_TARGETS", blockIds: state.map.blocks.map((item) => item.id) })
+          }
+          type="button"
+        >
+          Все блоки
+        </button>
+        <button
+          className="rounded border border-line bg-abyss px-2 py-0.5 text-[11px] text-dim transition-colors hover:border-punch/60 hover:text-punch disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={noTargets}
+          onClick={() => dispatch({ type: "SET_TARGETS", blockIds: [] })}
+          type="button"
+        >
+          Снять все
+        </button>
+        {selectedIds.length > 0 && (
+          <button
+            className="rounded border border-cyan-neon/40 bg-cyan-neon/10 px-2 py-0.5 text-[11px] text-cyan-neon transition-colors hover:bg-cyan-neon/20"
+            onClick={() => dispatch({ type: "TOGGLE_TARGETS", blockIds: selectedIds })}
+            title="Space — переключить все выделенные блоки"
+            type="button"
+          >
+            {allSelectedAreTargets
+              ? `Снять с выделения (${selectedIds.length})`
+              : `Отметить выделение (${selectedIds.length})`}
+          </button>
+        )}
+      </div>
+      <p className="text-[10px] leading-snug text-dim">
+        Клик по блоку на поле ставит или снимает галочку.{" "}
+        <kbd className="rounded bg-abyss px-1 text-[10px] text-foam">Space</kbd> — переключить все
+        выделенные блоки разом: если отмечены все — снимает, иначе отмечает всю группу.
+      </p>
+      {noTargets && (
+        <p className="rounded border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[10px] text-amber-200">
+          Ни одна цель не выбрана: без целей карта не пройдёт валидацию перед запуском и
+          публикацией.
+        </p>
+      )}
+      <div className="max-h-44 space-y-0.5 overflow-y-auto pr-1">
+        {state.map.blocks.map((item) => {
+          const checked = targetSet.has(item.id)
+          const isSelected = selectedSet.has(item.id)
+          return (
+            <label
+              key={item.id}
+              className={`flex cursor-pointer items-center gap-2 rounded px-1.5 py-0.5 text-xs transition-colors hover:bg-amber-400/10 ${
+                checked ? "text-amber-100" : "text-dim"
+              } ${isSelected ? "ring-1 ring-cyan-neon/60" : ""}`}
+            >
+              <input
+                checked={checked}
+                className="accent-amber-400"
+                onChange={() => dispatch({ type: "TOGGLE_TARGET", blockId: item.id })}
+                type="checkbox"
+              />
+              <span className="flex-1 truncate font-mono">{item.id}</span>
+              <span className="text-[10px] text-dim">HP {item.hp}</span>
+            </label>
+          )
+        })}
+        {state.map.blocks.length === 0 && (
+          <p className="px-1 text-[11px] text-dim">На карте ещё нет блоков.</p>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function GroupInspector({
   state,
   dispatch,
@@ -953,6 +1034,8 @@ function GroupInspector({
           {count} бл.
         </span>
       </div>
+
+      <TargetsPicker dispatch={dispatch} state={state} />
 
       <div className="grid grid-cols-2 gap-2 pt-1 border-t border-line/40">
         <button

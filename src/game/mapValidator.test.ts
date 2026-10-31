@@ -109,6 +109,16 @@ describe("validatePlayerMapSpec", () => {
     )
   })
 
+  it("requires at least one target block for the targets win condition", () => {
+    const empty = makeMap({ winCondition: { kind: "targets", targetIds: [] } })
+    expect(validatePlayerMapSpec(empty)).toContainEqual(
+      expect.objectContaining({ path: "winCondition.targetIds", code: "NO_TARGETS" })
+    )
+
+    const withTarget = makeMap({ winCondition: { kind: "targets", targetIds: ["block-1"] } })
+    expect(validatePlayerMapSpec(withTarget)).toEqual([])
+  })
+
   it("rejects inconsistent group membership", () => {
     const map = makeMap({ groups: [{ id: "group-1", blockIds: ["block-1"] }] })
 

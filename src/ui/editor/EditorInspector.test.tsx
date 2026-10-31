@@ -122,4 +122,42 @@ describe("EditorInspector", () => {
     expect(html).toContain("Выбрано ровно 2 блока")
     expect(html).toContain("Связать в пару порталов")
   })
+
+  it("renders the targets picker with unchecked checkboxes in targets mode", () => {
+    const map = makeTestMap()
+    map.winCondition = { kind: "targets", targetIds: [] }
+    const state = createEditorState(map)
+    const html = renderToStaticMarkup(
+      <EditorInspector author="Игрок" dispatch={() => {}} state={state} />
+    )
+    expect(html).toContain("🎯 Цели")
+    expect(html).toContain("0 / 3")
+    expect(html).toContain("Все блоки")
+    expect(html).toContain("Снять все")
+    expect(html).toContain('type="checkbox"')
+    expect((html.match(/checked=""/g) ?? []).length).toBe(0)
+    expect(html).toContain("Ни одна цель не выбрана")
+  })
+
+  it("reflects the selected targets and group toggle in the picker", () => {
+    const map = makeTestMap()
+    map.winCondition = { kind: "targets", targetIds: ["b1"] }
+    let state = createEditorState(map)
+    state = editorReducer(state, { type: "SELECT_BLOCKS", blockIds: ["b1", "b2"] })
+    const html = renderToStaticMarkup(
+      <EditorInspector author="Игрок" dispatch={() => {}} state={state} />
+    )
+    expect(html).toContain("1 / 3")
+    expect(html).toContain("Отметить выделение (2)")
+    expect((html.match(/checked=""/g) ?? []).length).toBe(1)
+    expect(html).not.toContain("Ни одна цель не выбрана")
+  })
+
+  it("hides the targets picker when all destructible blocks are the goal", () => {
+    const state = createEditorState(makeTestMap())
+    const html = renderToStaticMarkup(
+      <EditorInspector author="Игрок" dispatch={() => {}} state={state} />
+    )
+    expect(html).not.toContain("🎯 Цели")
+  })
 })

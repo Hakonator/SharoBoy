@@ -7,6 +7,7 @@ export type MapValidationErrorCode =
   | "DUPLICATE_GROUP_MEMBERSHIP"
   | "UNKNOWN_GROUP"
   | "UNKNOWN_BLOCK"
+  | "NO_TARGETS"
   | "INVALID_PORTAL_PAIR"
   | "INVALID_NUMBER"
   | "OUT_OF_RANGE"
@@ -202,6 +203,16 @@ export function validatePlayerMapSpec(spec: PlayerMapSpec): MapValidationError[]
         )
       }
     }
+  }
+
+  if (spec.winCondition.kind === "targets" && spec.winCondition.targetIds.length === 0) {
+    /* Пустой список целей делает карту мгновенно пройденной (`every` по пустому
+       массиву истинно), поэтому такой контракт не допускаем. */
+    addError(
+      "winCondition.targetIds",
+      "NO_TARGETS",
+      "Для условия «Целевые блоки» выберите хотя бы один целевой блок."
+    )
   }
 
   for (const [index, targetId] of (spec.winCondition.kind === "targets"

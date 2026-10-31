@@ -2,6 +2,12 @@ import type { PlayerBlockEffect, PlayerBlockSpec, PlayerMapSpec } from "../../ga
 import { PADDLE_ZONE_TOP } from "../../game/mapValidator"
 
 import { areBlocksTouching, getBlocksBoundingBox, WORLD_WIDTH } from "./geometry"
+import {
+  orderTargetIds,
+  replaceTargetIds,
+  toggleTargetId,
+  toggleTargetIds,
+} from "./targetSelection"
 import type { EditorAction, EditorState, HistorySession, PlayerBlockUpdates } from "./types"
 
 export const EDITOR_DRAFT_STORAGE_KEY = "sharoboy_custom_map_draft"
@@ -867,6 +873,29 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           ),
         },
       })
+    }
+    case "TOGGLE_TARGET": {
+      const winCondition = state.map.winCondition
+      if (winCondition.kind !== "targets") return state
+      const targetIds = orderTargetIds(
+        state.map,
+        toggleTargetId(winCondition.targetIds, action.blockId)
+      )
+      return updateMap(state, { ...state.map, winCondition: { kind: "targets", targetIds } })
+    }
+    case "TOGGLE_TARGETS": {
+      const winCondition = state.map.winCondition
+      if (winCondition.kind !== "targets") return state
+      const targetIds = orderTargetIds(
+        state.map,
+        toggleTargetIds(winCondition.targetIds, action.blockIds)
+      )
+      return updateMap(state, { ...state.map, winCondition: { kind: "targets", targetIds } })
+    }
+    case "SET_TARGETS": {
+      if (state.map.winCondition.kind !== "targets") return state
+      const targetIds = orderTargetIds(state.map, replaceTargetIds(action.blockIds))
+      return updateMap(state, { ...state.map, winCondition: { kind: "targets", targetIds } })
     }
     case "UPDATE_METADATA": {
       const map: PlayerMapSpec = {
