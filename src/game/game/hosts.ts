@@ -25,7 +25,7 @@ import { pushHud } from "./hudSync"
 import { blockSpawnTop, blockTop } from "./paddleControl"
 import { isDebugEffectActive } from "./debug"
 import { damageMiniboss } from "./minibossRuntime"
-import { addRawScore, addScore, onBombHitPaddle, onBossKilled } from "./runFlow"
+import { addRawScore, addScore, gameModifiers, onBombHitPaddle, onBossKilled } from "./runFlow"
 
 export function makeBossHost(g: Game): BossHost {
   return {
@@ -81,8 +81,8 @@ export function makeBossHost(g: Game): BossHost {
     onBossKilled: () => onBossKilled(g),
     pushHud: () => pushHud(g),
     killBoss: () => g.bossSys.kill(),
-    bossFuryActive: () => hasModifier(g.campaignModifiers, "boss_fury"),
-    powersDisabled: () => hasModifier(g.campaignModifiers, "no_powers"),
+    bossFuryActive: () => hasModifier(gameModifiers(g), "boss_fury"),
+    powersDisabled: () => hasModifier(gameModifiers(g), "no_powers"),
   }
 }
 /** Хост для PowersSystem: таймеры спавна, поля эффектов и последствия. */
@@ -250,8 +250,8 @@ export function makePowersHost(g: Game): PowersWorld {
     sfx: g.sfx,
     addCoins: (n) => addCoins(g, n),
     addScore: (n, x, y, color, size) => addScore(g, n, x, y, color, size),
-    isIronman: () => hasModifier(g.campaignModifiers, "ironman"),
-    powersDisabled: () => hasModifier(g.campaignModifiers, "no_powers"),
+    isIronman: () => hasModifier(gameModifiers(g), "ironman"),
+    powersDisabled: () => hasModifier(gameModifiers(g), "no_powers"),
     /** Игрок подобрал бонус: цель «Охотник за бонусами» двигается только на настоящих бонусах. */
     onPowerPicked: (type) => {
       if (type === "coin") return
@@ -449,7 +449,7 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     onPaddleBounce: () => {
       g.bossCleanHits = 0
-      if (hasModifier(g.campaignModifiers, "hyper_speed")) {
+      if (hasModifier(gameModifiers(g), "hyper_speed")) {
         for (const b of g.balls) {
           b.speed = Math.min(b.speed * 1.025, 1200)
         }
@@ -546,11 +546,11 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
         pushHud(g)
       }
     },
-    heavyGravityActive: () => hasModifier(g.campaignModifiers, "heavy_gravity"),
-    glassPaddleActive: () => hasModifier(g.campaignModifiers, "glass_paddle"),
-    invertedControlsActive: () => hasModifier(g.campaignModifiers, "inverted_controls"),
-    hyperSpeedActive: () => hasModifier(g.campaignModifiers, "hyper_speed"),
-    lowBounceActive: () => hasModifier(g.campaignModifiers, "low_bounce"),
+    heavyGravityActive: () => hasModifier(gameModifiers(g), "heavy_gravity"),
+    glassPaddleActive: () => hasModifier(gameModifiers(g), "glass_paddle"),
+    invertedControlsActive: () => hasModifier(gameModifiers(g), "inverted_controls"),
+    hyperSpeedActive: () => hasModifier(gameModifiers(g), "hyper_speed"),
+    lowBounceActive: () => hasModifier(gameModifiers(g), "low_bounce"),
     isSniperActive: () => isKineticSniperActive(g),
     isChainResonanceActive: () => isChainResonanceActive(g),
     isJuggernautActive: () => isGravitationalJuggernautActive(g),

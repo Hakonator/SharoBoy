@@ -70,6 +70,18 @@ export interface IntermediateScoreData {
   readonly eventDescription?: string
 }
 
+/** Состояние черновика мутаторов бесконечного режима (T-056). */
+export interface WaveDraftData {
+  /** Номер завершённой боссовой волны, после которой открыт выбор. */
+  readonly wave: number
+  /** Три предлагаемых мутатора. */
+  readonly options: readonly CampaignModifierId[]
+  /** Уже взятые в этом забеге мутаторы. */
+  readonly taken: readonly CampaignModifierId[]
+  /** Сколько выборов останется после этого, если выбрать сейчас. */
+  readonly remainingPicks: number
+}
+
 export type Phase = "menu" | "playing" | "paused" | "over" | "won" | "map"
 
 /** Форма верхней поверхности ракетки. Единая формула поверхности —
@@ -150,6 +162,10 @@ export interface HudData {
   activeSynergies?: SynergyId[]
   /** Активное испытание узла (если бой идёт на узле-челлендже). */
   activeChallenge?: ActiveChallengeHud | null
+  /** Открытый черновик мутаторов после боссовой волны бесконечного режима. */
+  waveDraft?: WaveDraftData | null
+  /** Мутаторы, взятые в черновике бесконечного режима (в множители не входят). */
+  draftModifiers?: readonly CampaignModifierId[]
   /** Активная входящая трансляция/сообщение босса текущего уровня. */
   bossTransmission?: BossTransmissionData | null
   /** @deprecated Псевдоним для bossTransmission. */

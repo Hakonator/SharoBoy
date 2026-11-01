@@ -142,6 +142,11 @@ export function HudOverlay({
       </div>
     ) : null
   const { crystalMultiplier } = computeRunMultipliers(hud.campaignModifiers ?? [])
+  /* Мутаторы черновика (T-056) показываем в бейдже отдельными иконками,
+     не подмешивая их в множитель наград. */
+  const draftIcons = (hud.draftModifiers ?? [])
+    .map((id) => CAMPAIGN_MODIFIERS_MAP[id]?.icon ?? "🧬")
+    .join(" ")
   const relicsChip =
     (hud.mode === "campaign" || hud.mode === "daily") && (hud.activeRelics?.length ?? 0) > 0 ? (
       <div
@@ -200,17 +205,19 @@ export function HudOverlay({
       </div>
     ) : null
   const mutatorBadge =
-    (hud.campaignModifiers?.length ?? 0) > 0 ? (
+    (hud.campaignModifiers?.length ?? 0) > 0 || draftIcons ? (
       <div
         className={`hud-chip hidden sm:flex items-center gap-1.5 border-purple-500/30 bg-purple-950/30 ${pad}`}
         title={(hud.campaignModifiers ?? [])
           .map((m) => CAMPAIGN_MODIFIERS_MAP[m]?.title ?? m)
+          .concat((hud.draftModifiers ?? []).map((m) => CAMPAIGN_MODIFIERS_MAP[m]?.title ?? m))
           .join(", ")}
       >
         <div className="hud-label text-purple-300">Мутаторы</div>
         <div className={`font-display ${val} leading-none font-bold text-purple-200`}>
           ×{crystalMultiplier.toFixed(2)}
         </div>
+        {draftIcons && <div className="text-xs leading-none">{draftIcons}</div>}
       </div>
     ) : null
   const rightControls = (

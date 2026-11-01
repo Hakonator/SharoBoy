@@ -165,6 +165,8 @@ export function pushHud(g: Game) {
     campaignShop: g.campaignShop,
     campaignModifiers: g.campaignModifiers?.length ? [...g.campaignModifiers] : undefined,
     activeChallenge: g.activeChallenge ? formatChallengeHud(g.activeChallenge) : null,
+    waveDraft: g.waveDraft,
+    draftModifiers: g.draftModifiers?.length ? [...g.draftModifiers] : undefined,
     bossTransmission: g.bossTransmission,
     bossDialog: g.bossTransmission,
     finalBossDefeated: g.finalBossDefeated,

@@ -3,6 +3,7 @@ import type { MapPlaylistSpec, PlayerMapSpec } from "../mapSpec"
 import { mapSpecToBlocks } from "../mapAdapter"
 import type { CampaignModifierId } from "../campaignModifiers"
 import { getDailyRunInfo, markTodayDailyPlayed } from "../daily"
+import { daySeed } from "../utils"
 
 import { applyTrack } from "./audioControls"
 import { startCampaignMap } from "./campaignFlow"
@@ -53,6 +54,9 @@ export function startEndless(g: Game) {
   g.wave = 1
   g.waveSpec = { name: "ВОЛНА 1", speed: 400 }
   resetRun(g)
+  /* Сид черновика фиксируется на старте: наборы опций совпадают у всех, кто
+     начал забег в тот же день, и не зависят от порядка кликов. */
+  g.draftSeed = daySeed()
   buildWave(g, 1)
   applyUpgrades(g)
   if (g.tacticalModules.magnetStart) {

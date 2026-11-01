@@ -18,6 +18,7 @@ import { hasModifier } from "../campaignModifiers"
 import { BRITTLE_RADIUS_MULT } from "../blockKinds"
 
 import { pushHud } from "./hudSync"
+import { gameModifiers } from "./runFlow"
 import { resetMiniboss } from "./minibossRuntime"
 import { blockTop } from "./paddleControl"
 import { decorateBlocks } from "./blockSpawn"
@@ -60,7 +61,7 @@ export function buildFromSpec(g: Game, spec: LevelSpec) {
   }
   // спецблоки §6: только для обычных уровней (не боссовых арен)
   if (!("boss" in spec)) decorateLevel(g)
-  if (hasModifier(g.campaignModifiers, "dense_armor")) {
+  if (hasModifier(gameModifiers(g), "dense_armor")) {
     for (const b of g.blocks) {
       if (!b.isMiniboss && !b.isTentacle && !b.isClaw) {
         b.hp += 1
@@ -68,7 +69,7 @@ export function buildFromSpec(g: Game, spec: LevelSpec) {
       }
     }
   }
-  if (hasModifier(g.campaignModifiers, "brittle_world")) makeWorldBrittle(g.blocks)
+  if (hasModifier(gameModifiers(g), "brittle_world")) makeWorldBrittle(g.blocks)
   g.blocksInitial = Math.max(1, g.blocks.length)
 }
 
@@ -229,7 +230,7 @@ export function serveBall(g: Game) {
   /* Единый масштаб мира (viewport.ts): скорость одна на всех экранах —
        поле в мировых единицах имеет сопоставимые пропорции. */
   let speed = base
-  if (hasModifier(g.campaignModifiers, "hyper_speed")) {
+  if (hasModifier(gameModifiers(g), "hyper_speed")) {
     speed *= 1.25
   }
   /* Старт: шар на поверхности ракетки (купол выше грани, чаша — ниже). */

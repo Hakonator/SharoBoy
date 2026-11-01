@@ -3,7 +3,9 @@ import { BASE_BALL_RADIUS, BIG_BALL_RADIUS } from "../physics"
 import { LEVELS } from "../levels"
 import { rand, lsSet } from "../utils"
 import { nodeById } from "../campaignMap"
-import { computeRunMultipliers, hasModifier } from "../campaignModifiers"
+import { computeRunMultipliers, hasModifier, CAMPAIGN_MODIFIERS_MAP } from "../campaignModifiers"
+import type { CampaignModifierId } from "../campaignModifiers"
+import { DRAFT_MAX_PICKS, applyDraftPick, isDraftWave, rollDraftOptions } from "../endlessDraft"
 import { recordChallengeBallLost } from "../campaignChallenges"
 import { isAbsoluteBulwarkActive } from "../synergies"
 import {
@@ -27,6 +29,10 @@ export function resetRun(g: Game) {
   resetRunStats(g)
   g.intermediateScore = null
   g.intermediateScoreContinue = null
+  /* Черновик бесконечного режима живёт ровно один забег. */
+  g.draftModifiers = []
+  g.waveDraft = null
+  g.draftWaveHandled = 0
   g.levelScoreStart = 0
   g.levelBlocksStart = 0
   g.customWinCondition = null
@@ -348,7 +354,93 @@ export function onLevelCleared(g: Game) {
   })
 }
 
+/**
+ * Насколько «Гипер-разгон» ускоряет уже летящий шар при выборе в черновике
+ * (совпадает с множителем стартовой скорости в `serveBall`).
+ */
+const HYPER_SPEED_BALL_MULT = 1.25
+
+/* ---------- черновик мутаторов бесконечного режима (T-056) ---------- */
+
+/**
+ * Действующие в текущем забеге мутаторы: выбранные в кампании плюс взятые
+ * в черновике бесконечного режима. Именно этот список видят все проверки
+ * `hasModifier`; множители очков продолжают считать только `campaignModifiers`,
+ * поэтому рекорды бесконечного режима остаются сравнимыми.
+ */
+export function gameModifiers(g: Game): CampaignModifierId[] {
+  if (!g.draftModifiers?.length) return g.campaignModifiers ?? []
+  const all = [...(g.campaignModifiers ?? [])]
+  for (const id of g.draftModifiers) {
+    if (!all.includes(id)) all.push(id)
+  }
+  return all
+}
+
+/**
+ * Открывает выбор мутатора после боссовой волны (5, 10, 15…).
+ * Возвращает true, если выбор действительно открыт.
+ */
+export function openWaveDraft(g: Game, clearedWave = g.wave): boolean {
+  if (g.mode !== "endless") return false
+  if (!isDraftWave(clearedWave)) return false
+  if (g.draftWaveHandled === clearedWave) return false
+  const taken = g.draftModifiers ?? []
+  const options = rollDraftOptions(g.draftSeed || 1, clearedWave, taken)
+  g.draftWaveHandled = clearedWave
+  if (options.length === 0) return false
+  g.waveDraft = {
+    wave: clearedWave,
+    options,
+    taken: [...taken],
+    remainingPicks: Math.max(0, DRAFT_MAX_PICKS - taken.length - 1),
+  }
+  g.sfx.levelClear()
+  pushHud(g)
+  return true
+}
+
+/**
+ * Применяет выбор из черновика. Возвращает true, если мутатор действительно взят.
+ * Все побочные эффекты, которых требует выбранный мутатор (жизни, скорость шара),
+ * применяются здесь — ровно один раз.
+ */
+export function pickWaveDraft(g: Game, pick: CampaignModifierId | null): boolean {
+  if (!g.waveDraft) return false
+  const before = g.draftModifiers ?? []
+  const after = applyDraftPick(before, pick)
+  if (pick && after.length > before.length) {
+    /* Разово догоняем последствия, которые в кампании применяются на старте. */
+    if (pick === "dense_armor") {
+      for (const b of g.blocks) b.hp += 1
+    }
+    if (pick === "hyper_speed") {
+      for (const ball of g.balls) ball.speed *= HYPER_SPEED_BALL_MULT
+    }
+    /* `glass_paddle` не трогаем: ширину ракетки каждый кадр пересчитывает
+       `Physics.updatePaddle` от `baseW`, а хост читает объединённый список
+       мутаторов — эффект включится сам на следующем кадре. */
+    if (pick === "low_bounce" || pick === "heavy_gravity") {
+      /* Эти мутаторы читаются физикой каждый кадр — разовых правок не нужно. */
+    }
+    g.fx.popups.push({
+      x: g.w / 2,
+      y: g.h * 0.42,
+      text: `МУТАТОР: ${CAMPAIGN_MODIFIERS_MAP[pick]?.title ?? pick}!`,
+      color: CAMPAIGN_MODIFIERS_MAP[pick]?.badgeColor ?? "#a855f7",
+      t: 0,
+      size: 22,
+    })
+    g.sfx.power()
+  }
+  g.draftModifiers = after
+  g.waveDraft = null
+  pushHud(g)
+  return after.length > before.length
+}
+
 export function advanceEndlessWave(g: Game) {
+  const clearedWave = g.wave
   g.wave++
   g.bulwarkBlockedThisLevel = false
   g.notifiedSynergies?.clear()
@@ -360,6 +452,10 @@ export function advanceEndlessWave(g: Game) {
   g.balls = []
   serveBall(g)
   setBanner(g, g.wave % 5 === 0 ? `ВОЛНА ${g.wave} — БОСС!` : `ВОЛНА ${g.wave}`)
+  /* Выбор выдаётся за **пройденную** волну-босса: `g.wave` уже указывает на
+     следующую, поэтому передаём номер зачищенной волны. Порядок подачи шара
+     и баннера не меняется. */
+  openWaveDraft(g, clearedWave)
   pushHud(g)
 }
 
@@ -491,7 +587,7 @@ export function loseLife(g: Game) {
       pushHud(g)
     })
   }
-  if (hasModifier(g.campaignModifiers, "ironman")) {
+  if (hasModifier(gameModifiers(g), "ironman")) {
     g.lives = 0
   } else {
     g.lives--
@@ -583,7 +679,7 @@ export function loseLife(g: Game) {
   // Ситуативная механика: «Тактическое снабжение» (Tactical Aid)
   // При критическом положении (осталась 1 жизнь) игроку сбрасывается спасительный бонус.
   // Мутатор «Сухой закон» отключает и его — иначе правило теряет смысл.
-  if (hasModifier(g.campaignModifiers, "no_powers")) {
+  if (hasModifier(gameModifiers(g), "no_powers")) {
     /* поддержка не выдаётся */
   } else if (g.lives === 1) {
     const aidType = g.shield === 0 ? "shield" : "wide"

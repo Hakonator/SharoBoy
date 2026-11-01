@@ -14,6 +14,7 @@ import {
   TopSubmit,
   SettingsModal,
   DailyRunModal,
+  WaveDraftModal,
 } from "./ui/screens"
 import { CommunityMaps } from "./ui/screens/communityMaps"
 import { AdminPanel } from "./ui/screens/AdminPanel"
@@ -434,6 +435,10 @@ export default function App() {
           data={hud.intermediateScore}
           onContinue={() => g()?.continueFromIntermediateScore()}
         />
+      )}
+
+      {hud.waveDraft && (
+        <WaveDraftModal data={hud.waveDraft} onPick={(id) => g()?.pickWaveDraft(id)} />
       )}
     </div>
   )

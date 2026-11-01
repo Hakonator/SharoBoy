@@ -35,7 +35,15 @@ import type {
   RunScoreBreakdown,
 } from "./types"
 import type { Ball, Block, Bubble, HudData, MouthBubble, PaddleShapeKind } from "./types"
-import type { PaddleState, Phase, PowerUp, Projectile, ScoreEntry, SparkHit } from "./types"
+import type {
+  PaddleState,
+  Phase,
+  PowerUp,
+  Projectile,
+  ScoreEntry,
+  SparkHit,
+  WaveDraftData,
+} from "./types"
 import type { CampaignMap } from "./campaignMap"
 import type { MapPlaylistSpec, PlayerMapSpec } from "./mapSpec"
 import type { LevelSpec } from "./levels"
@@ -103,13 +111,13 @@ import {
 } from "./game/debug"
 import { setMusicVolume, setSfxVolume, toggleMute, toggleMusic } from "./game/audioControls"
 import { pushHud } from "./game/hudSync"
-import { launch } from "./game/runFlow"
+import { launch, pickWaveDraft } from "./game/runFlow"
 import { FPS_LS_KEY } from "./game/debug"
 import { update, gameLoop } from "./game/updateStep"
 import { draw } from "./game/drawScene"
 
 export { UPGRADES_ENABLED, UPGRADE_DEFS } from "./upgrades"
-export type { Block, HudData, Phase, PowerType, ScoreEntry } from "./types"
+export type { Block, HudData, Phase, PowerType, ScoreEntry, WaveDraftData } from "./types"
 export { FPS_LS_KEY } from "./game/debug"
 
 export class Game {
@@ -349,6 +357,19 @@ export class Game {
   campaignVisible: number[] = []
   /** Активные модификаторы (мутаторы) текущего забега кампании. */
   campaignModifiers: CampaignModifierId[] = []
+  /**
+   * Мутаторы, взятые в черновике бесконечного режима (T-056). Держим отдельно от
+   * `campaignModifiers`, чтобы бонусы драфта **не** попадали в множители очков и
+   * рекорды бесконечного режима оставались сравнимыми — при этом все проверки
+   * `hasModifier` видят объединённый список (см. `gameModifiers()`).
+   */
+  draftModifiers: CampaignModifierId[] = []
+  /** Открытый выбор мутатора после боссовой волны (UI-модалка). */
+  waveDraft: WaveDraftData | null = null
+  /** Сид забега для детерминированного черновика (фиксируется на старте). */
+  draftSeed = 0
+  /** Волна, для которой выбор уже выдан (защита от повторного открытия). */
+  draftWaveHandled = 0
   /** Активное квестовое испытание на текущем боевом узле карты. */
   activeChallenge: ActiveChallengeState | null = null
   /** Раскладка текущего боя (null вне карты и на узле финального босса). */
@@ -586,6 +607,10 @@ export class Game {
     this.sfx.ui()
     action?.()
     pushHud(this)
+  }
+  /** Выбор мутатора в черновике бесконечного режима (T-056); null — пропустить. */
+  pickWaveDraft(pick: CampaignModifierId | null) {
+    pickWaveDraft(this, pick)
   }
   launch() {
     launch(this)
