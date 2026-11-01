@@ -72,6 +72,8 @@ export interface PowersWorld {
   isIronman?(): boolean
   /** Мутатор «Сухой закон»: бонусы не выпадают ниоткуда. */
   powersDisabled?(): boolean
+  /** Бонус подобран (нужно испытанию «Охотник за бонусами»). */
+  onPowerPicked?(type: PowerType): void
 }
 
 export class PowersSystem {
@@ -233,6 +235,7 @@ export class PowersSystem {
         pw.x < p.x + p.w / 2 + 14
       ) {
         pw.taken = true
+        this.g.onPowerPicked?.(pw.type)
         this.applyPower(pw.type)
       }
     }

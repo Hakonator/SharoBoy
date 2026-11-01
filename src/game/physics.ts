@@ -132,6 +132,10 @@ export interface PhysicsWorld {
   onClutchSave?(): void
   onCritHit?(): void
   onBlockDestroyed?(): void
+  /** Испытание «Цепной мастер»: каскад цепной хрупкости сработал (аргумент — число задетых блоков). */
+  onChainDetonation?(affected: number): void
+  /** Испытание «Взломщик брони»: снято N единиц брони блока. */
+  onArmorBroken?(units: number): void
   heavyGravityActive?(): boolean
   glassPaddleActive?(): boolean
   invertedControlsActive?(): boolean

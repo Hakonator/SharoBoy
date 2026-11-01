@@ -6,7 +6,36 @@
 
 import { mulberry32 } from "./utils"
 
-export type ChallengeKind = "speed_clear" | "flawless" | "survive_time" | "crit_hunter"
+export type ChallengeKind =
+  | "speed_clear"
+  | "flawless"
+  | "survive_time"
+  | "crit_hunter"
+  | "power_hunter"
+  | "chain_master"
+  | "armor_breaker"
+
+/**
+ * Полный набор видов испытаний. Порядок фиксирован: выбор идёт по индексу
+ * `floor(rng() * POOL.length)`, поэтому перестановка сломала бы детерминизм
+ * уже сгенерированных карт (узел генерируется из сида и яруса, см. `campaignMapLayout`).
+ */
+export const CHALLENGE_KINDS: readonly ChallengeKind[] = [
+  "speed_clear",
+  "flawless",
+  "survive_time",
+  "crit_hunter",
+  "power_hunter",
+  "chain_master",
+  "armor_breaker",
+]
+
+/**
+ * Доля видов для яруса: ярусы 3–4 разыгрывают только классическую четвёрку,
+ * чтобы ранние узлы не требовали бонусов, до которых игрок ещё не добрался.
+ * С яруса 5 (`CHALLENGE_FULL_POOL_TIER`) пул полный.
+ */
+export const CHALLENGE_FULL_POOL_TIER = 5
 
 export interface CampaignChallenge {
   readonly kind: ChallengeKind
@@ -42,7 +71,8 @@ export interface ActiveChallengeHud {
  */
 export function createCampaignChallenge(seed: number, tier: number): CampaignChallenge {
   const rng = mulberry32(seed)
-  const kinds: ChallengeKind[] = ["speed_clear", "flawless", "survive_time", "crit_hunter"]
+  // Классическая четвёрка — на ранних ярусах, полный пул — с CHALLENGE_FULL_POOL_TIER.
+  const kinds = tier >= CHALLENGE_FULL_POOL_TIER ? CHALLENGE_KINDS : CHALLENGE_KINDS.slice(0, 4)
   const kind = kinds[Math.floor(rng() * kinds.length)]
 
   // Мета-кристаллы: 1 на Актах 1-2, 2 на поздних ярусах (tier >= 18)
@@ -91,6 +121,43 @@ export function createCampaignChallenge(seed: number, tier: number): CampaignCha
         description: `Нанесите ${critTarget} критических сэйва или отскока`,
         targetValue: critTarget,
         rewardCrystals,
+        rewardMeta,
+      }
+    }
+    case "power_hunter": {
+      // Бонусов за бой падает заметно меньше, чем блоков, поэтому цель скромная,
+      // но растёт с ярусом и мотивирует ловить дропы, а не зачищать вслепую.
+      const powerTarget = 3 + Math.min(3, Math.floor(tier / 8))
+      return {
+        kind,
+        title: "ОХОТНИК ЗА БОНУСАМИ",
+        description: `Соберите ${powerTarget} бонуса за бой`,
+        targetValue: powerTarget,
+        rewardCrystals: rewardCrystals + 5,
+        rewardMeta,
+      }
+    }
+    case "chain_master": {
+      // Одна цепная детонация — это каскад от хрупкого/огненного/взрывного удара.
+      const chainTarget = tier < 10 ? 3 : 5
+      return {
+        kind,
+        title: "ЦЕПНОЙ МАСТЕР",
+        description: `Вызовите ${chainTarget} цепных детонаций`,
+        targetValue: chainTarget,
+        rewardCrystals: rewardCrystals + 10,
+        rewardMeta,
+      }
+    }
+    case "armor_breaker": {
+      // Броня (щиты блоков) появляется с 3-го уровня и утолщается на поздних ярусах.
+      const armorTarget = 3 + Math.min(5, Math.floor(tier / 4))
+      return {
+        kind,
+        title: "ВЗЛОМЩИК БРОНИ",
+        description: `Снимите ${armorTarget} единиц брони с блоков`,
+        targetValue: armorTarget,
+        rewardCrystals: rewardCrystals + 5,
         rewardMeta,
       }
     }
@@ -156,20 +223,75 @@ export function updateActiveChallenge(
   }
 }
 
-/** Регистрация критического сэйва / удара для челленджа "crit_hunter". */
-export function recordChallengeCrit(
+/**
+ * Виды испытаний, у которых прогресс копится по событиям (подбор бонуса, цепная
+ * детонация, снятая броня), а не по таймеру. Для них `completed` — единственный
+ * признак успеха: потеря шара испытание не проваливает.
+ */
+export function isCollectiveChallenge(kind: ChallengeKind): boolean {
+  return (
+    kind === "crit_hunter" ||
+    kind === "power_hunter" ||
+    kind === "chain_master" ||
+    kind === "armor_breaker"
+  )
+}
+
+/** Общий инкремент счётчика и завершение при достижении цели. */
+function advanceChallenge(
   active: ActiveChallengeState,
+  kind: ChallengeKind,
+  amount: number,
   onTargetReached?: () => void
 ): void {
-  if (active.failed || active.def.kind !== "crit_hunter") return
-  active.progress++
+  if (active.failed || active.def.kind !== kind) return
+  active.progress += amount
   if (active.progress >= active.def.targetValue && !active.completed) {
     active.completed = true
     onTargetReached?.()
   }
 }
 
-/** Регистрация падения мяча: проваливает flawless и survive_time. */
+/** Регистрация критического сэйва / удара для челленджа "crit_hunter". */
+export function recordChallengeCrit(
+  active: ActiveChallengeState,
+  onTargetReached?: () => void
+): void {
+  advanceChallenge(active, "crit_hunter", 1, onTargetReached)
+}
+
+/** Регистрация подобранного бонуса для челленджа "power_hunter". */
+export function recordChallengePower(
+  active: ActiveChallengeState,
+  onTargetReached?: () => void
+): void {
+  advanceChallenge(active, "power_hunter", 1, onTargetReached)
+}
+
+/** Регистрация цепной детонации для челленджа "chain_master". */
+export function recordChallengeChain(
+  active: ActiveChallengeState,
+  onTargetReached?: () => void
+): void {
+  advanceChallenge(active, "chain_master", 1, onTargetReached)
+}
+
+/** Регистрация снятой брони (в единицах щитов) для челленджа "armor_breaker". */
+export function recordChallengeArmor(
+  active: ActiveChallengeState,
+  amount: number,
+  onTargetReached?: () => void
+): void {
+  const units = Number.isFinite(amount) ? Math.floor(Math.max(0, amount)) : 0
+  if (units <= 0) return
+  advanceChallenge(active, "armor_breaker", units, onTargetReached)
+}
+
+/**
+ * Регистрация падения мяча: проваливает flawless и survive_time.
+ * Счётные виды (криты, бонусы, цепи, броня) шар не теряют — у них цель набирается
+ * событиями, иначе испытание было бы непроходимым при обычной игре.
+ */
 export function recordChallengeBallLost(active: ActiveChallengeState, onFail?: () => void): void {
   if (active.failed) return
   if (active.def.kind === "flawless" || active.def.kind === "survive_time") {
@@ -211,6 +333,21 @@ export function formatChallengeHud(active: ActiveChallengeState): ActiveChalleng
       }
       case "crit_hunter": {
         statusText = `🎯 ${progress} / ${def.targetValue}`
+        progressRatio = Math.min(1, progress / def.targetValue)
+        break
+      }
+      case "power_hunter": {
+        statusText = `🎁 ${progress} / ${def.targetValue}`
+        progressRatio = Math.min(1, progress / def.targetValue)
+        break
+      }
+      case "chain_master": {
+        statusText = `💥 ${progress} / ${def.targetValue}`
+        progressRatio = Math.min(1, progress / def.targetValue)
+        break
+      }
+      case "armor_breaker": {
+        statusText = `🛡 ${progress} / ${def.targetValue}`
         progressRatio = Math.min(1, progress / def.targetValue)
         break
       }

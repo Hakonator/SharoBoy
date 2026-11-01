@@ -56,6 +56,8 @@ export function damageBlock(
     const absorbed = Math.min(b.sp.armor, dmg)
     b.sp.armor -= absorbed
     dmg -= absorbed
+    // Испытание «Взломщик брони»: считаем именно снятые щиты, а не силу удара.
+    if (absorbed > 0) g.onArmorBroken?.(absorbed)
     b.flash = 1
     const pan = clamp((b.x / g.w) * 2 - 1, -0.85, 0.85)
     if (dmg <= 0) {
@@ -110,6 +112,9 @@ export function damageBlock(
         if (candidates.length >= BRITTLE_CHAIN_MAX) break
       }
       for (const other of candidates) damageBlock(g, other, chainDamage, false)
+      // Цепная детонация состоялась: засчитываем испытание один раз на каскад
+      // (рекурсивные звенья идут с allowBrittle = false и хука не достигают).
+      if (candidates.length > 0) g.onChainDetonation?.(candidates.length)
     }
   }
   b.dead = true

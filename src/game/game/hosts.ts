@@ -5,7 +5,12 @@ import type { PhysicsWorld } from "../physics"
 import type { WeaponsWorld } from "../weapons"
 import { queueSparkChain, sparkChainTargets } from "../physics/spark"
 import { hasModifier } from "../campaignModifiers"
-import { recordChallengeCrit } from "../campaignChallenges"
+import {
+  recordChallengeArmor,
+  recordChallengeChain,
+  recordChallengeCrit,
+  recordChallengePower,
+} from "../campaignChallenges"
 import {
   isAbsoluteBulwarkActive,
   isChainResonanceActive,
@@ -247,6 +252,23 @@ export function makePowersHost(g: Game): PowersWorld {
     addScore: (n, x, y, color, size) => addScore(g, n, x, y, color, size),
     isIronman: () => hasModifier(g.campaignModifiers, "ironman"),
     powersDisabled: () => hasModifier(g.campaignModifiers, "no_powers"),
+    /** Игрок подобрал бонус: цель «Охотник за бонусами» двигается только на настоящих бонусах. */
+    onPowerPicked: (type) => {
+      if (type === "coin") return
+      if (!g.activeChallenge) return
+      recordChallengePower(g.activeChallenge, () => {
+        g.fx.popups.push({
+          x: g.w / 2,
+          y: g.h * 0.44,
+          text: "ЦЕЛЬ ПО БОНУСАМ ДОСТИГНУТА! 🎁",
+          color: "#ffd700",
+          t: 0,
+          size: 22,
+        })
+        g.sfx.win()
+        pushHud(g)
+      })
+    },
     pushHud: () => pushHud(g),
     get buffDurationMult() {
       return 1 + 0.25 * (g.upgrades.buffDuration ?? 0)
@@ -475,6 +497,38 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     onBlockDestroyed: () => {
       g.runBlocksDestroyed++
+    },
+    /** Цепная мастер: один каскад = один шаг испытания, независимо от числа блоков. */
+    onChainDetonation: () => {
+      if (!g.activeChallenge) return
+      recordChallengeChain(g.activeChallenge, () => {
+        g.fx.popups.push({
+          x: g.w / 2,
+          y: g.h * 0.44,
+          text: "ЦЕЛЬ ПО ЦЕПЯМ ДОСТИГНУТА! 💥",
+          color: "#ffd700",
+          t: 0,
+          size: 22,
+        })
+        g.sfx.win()
+        pushHud(g)
+      })
+    },
+    /** Взломщик брони: считаем снятые щиты блоков. */
+    onArmorBroken: (units) => {
+      if (!g.activeChallenge) return
+      recordChallengeArmor(g.activeChallenge, units, () => {
+        g.fx.popups.push({
+          x: g.w / 2,
+          y: g.h * 0.44,
+          text: "БРОНЯ ВЗЛОМАНА! 🛡",
+          color: "#ffd700",
+          t: 0,
+          size: 22,
+        })
+        g.sfx.win()
+        pushHud(g)
+      })
     },
     onCritHit: () => {
       if (g.activeChallenge) {

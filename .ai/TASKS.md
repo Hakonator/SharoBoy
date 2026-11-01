@@ -36,46 +36,6 @@ T-052 выполнена 01.11.2026 (карточка ниже, в «После�
 `npm run typecheck` → `npm run lint:check` → `npm run format:check` → `npm run test`.
 Общие запреты: `vite.config.ts`, `tsconfig.json`, `package.json`, `supabase/**`, `.github/**`.
 
-### T-053: Челлендж-узлы 4 → 7 видов
-
-Status: draft · Priority: high · Сложность: S · Зависимости: — · Волна 1
-
-Описание:
-В `ChallengeKind` добавляются три вида: `power_hunter` («собрать N бонусов»), `chain_master`
-(«вызвать N цепных детонаций»), `armor_breaker` («снять N единиц брони»). Механика узлов,
-награды и HUD-плашка уже есть — нужны новые условия и хуки.
-
-1. `createCampaignChallenge`: расширить пул видов, задать титулы/описания и `targetValue`
-   с масштабированием по ярусу; награды — по текущей формуле.
-2. Новые фиксаторы прогресса по образцу `recordChallengeCrit`: `recordChallengePower`,
-   `recordChallengeChain`, `recordChallengeArmor`.
-3. Точки вызова: подбор бонуса и урон по броне в `game/hosts.ts`, цепная детонация в
-   `physics/spark.ts` / `physics/destruction.ts`.
-4. `updateActiveChallenge` и `formatChallengeHud` — статусы новых видов; провал по потере
-   шара (`recordChallengeBallLost`) остаётся только у `flawless`/`survive_time`.
-
-Allowed files:
-
-- src/game/campaignChallenges.ts
-- src/game/campaignChallenges.test.ts
-- src/game/game/hosts.ts
-- src/game/physics/spark.ts
-- src/game/physics/destruction.ts
-- src/game/campaignMapLayout.ts
-- src/ui/screens/hud.tsx
-- docs/ROADMAP.md
-- docs/CHANGELOG.md
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Приёмка:
-
-- [ ] новые виды детерминированно появляются по сиду узла (тест на выбор и на прогресс)
-- [ ] каждый вид можно завершить и провалить в юнит-тесте
-- [ ] награды начисляются ровно один раз за узел
-- [ ] существующие 4 вида ведут себя как раньше
-
 ### T-054: «Последний рубеж» боссов
 
 Status: draft · Priority: high · Сложность: S · Зависимости: — · Волна 1
@@ -409,6 +369,53 @@ Allowed files:
 ---
 
 ## Последние выполненные задачи (подробные карточки)
+
+### T-053: Челлендж-узлы 4 → 7 видов
+
+Status: done · Priority: high · Сложность: S · Зависимости: — · Волна 1
+
+Итог (01.11.2026):
+Три новых вида испытаний, порог пула по ярусу, счётные фиксаторы прогресса и три хука
+движка. Тестов +13 (84 файла / 786 тестов), `typecheck`, `lint`, `prettier` чистые.
+
+Детали реализации:
+
+1. `campaignChallenges.ts`: `CHALLENGE_KINDS` (7 видов, порядок фиксирован — выбор идёт по
+   индексу `floor(rng() * pool.length)`, перестановка сломала бы детерминизм карт) и
+   `CHALLENGE_FULL_POOL_TIER = 5`: ярусы 3–4 разыгрывают классическую четвёрку.
+2. Цели и награды: `power_hunter` 3–6 бонусов (+5 💎), `chain_master` 3/5 детонаций (+10 💎),
+   `armor_breaker` 3–8 единиц брони (+5 💎); `rewardMeta` по прежней формуле (2 при tier ≥ 18).
+3. Фиксаторы через общий `advanceChallenge`: `recordChallengePower`, `recordChallengeChain`,
+   `recordChallengeArmor` (мусорные/нулевые значения игнорируются, награда — ровно один раз).
+4. Провал: `recordChallengeBallLost` по-прежнему только `flawless`/`survive_time`; добавлен
+   предикат `isCollectiveChallenge(kind)` для счётных видов.
+5. Хуки: `PowersWorld.onPowerPicked(type)` вызывается до применения эффекта;
+   `PhysicsWorld.onArmorBroken(units)` — по фактически поглощённым щитам;
+   `PhysicsWorld.onChainDetonation(affected)` — один раз на каскад (рекурсия идёт с
+   `allowBrittle = false`, поэтому хук не повторяется).
+6. `formatChallengeHud`: статусы `🎁 N / M`, `💥 N / M`, `🛡 N / M`.
+
+Allowed files:
+
+- src/game/campaignChallenges.ts
+- src/game/campaignChallenges.test.ts
+- src/game/game/hosts.ts
+- src/game/physics/spark.ts
+- src/game/physics/destruction.ts
+- src/game/campaignMapLayout.ts
+- src/ui/screens/hud.tsx
+- docs/ROADMAP.md
+- docs/CHANGELOG.md
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Приёмка:
+
+- [x] новые виды детерминированно появляются по сиду узла (тест на выбор и на прогресс)
+- [x] каждый вид можно завершить и провалить в юнит-тесте
+- [x] награды начисляются ровно один раз за узел
+- [x] существующие 4 вида ведут себя как раньше
 
 ### T-052: Мутаторы кампании 6 → 10
 
