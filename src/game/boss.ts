@@ -14,6 +14,12 @@ import { clearCryo, cryoTurbinesAlive, stepCryoDrone } from "./bossCryo"
 import { clearLamprey, lampreyDamageMult, lampreyHeadExposed, stepLamprey } from "./bossLamprey"
 import { bossPhases, type BossPhases } from "./bossVariants"
 
+/**
+ * Множитель интервала бомб при мутаторе «Ярость бездны» (`boss_fury`):
+ * 0.7 — бомбы летят на 30% чаще на всех стадиях боя.
+ */
+export const BOSS_FURY_BOMB_MULT = 0.7
+
 /** Хост-интерфейс: то, что системе босса нужно от движка. */
 export interface BossHost {
   readonly w: number
@@ -43,6 +49,10 @@ export interface BossHost {
    * уборка арены и дроп бонусов остались едиными.
    */
   killBoss(): void
+  /** Мутатор «Ярость бездны»: босс бросает бомбы заметно чаще. */
+  bossFuryActive?(): boolean
+  /** Мутатор «Сухой закон»: штатный дроп бонусов из босса отключён. */
+  powersDisabled?(): boolean
 }
 
 export class BossSystem {
@@ -173,22 +183,27 @@ export class BossSystem {
       // В бою с углублёнными фазами бонусы падают чаще (общий интервал ниже).
       bo.dropTimer = (angry ? 3.6 : 5) * (this.phases.count > 1 ? 0.8 : 1)
       const types: PowerType[] = ["fast", "shrink", "fast", "shrink", "fast"]
-      this.g.powers.push({
-        x: bo.x,
-        y: bo.y + bo.r + 10,
-        vy: 150,
-        type: types[Math.floor(Math.random() * types.length)],
-        t: 0,
-      })
+      if (!this.g.powersDisabled?.()) {
+        this.g.powers.push({
+          x: bo.x,
+          y: bo.y + bo.r + 10,
+          vy: 150,
+          type: types[Math.floor(Math.random() * types.length)],
+          t: 0,
+        })
+      }
     }
 
     // Боссы со щупальцами/бомбами: периодически бросают бомбы в ракетку.
     const bombEvery = bo.bombEvery ?? (bo.isOctopus ? 5.2 : 0)
     if (bombEvery > 0) {
-      bo.bombTimer = (bo.bombTimer ?? bombEvery) - dt
+      // Мутатор «Ярость бездны»: интервал заметно короче на всех стадиях боя.
+      const furyMult = this.g.bossFuryActive?.() ? BOSS_FURY_BOMB_MULT : 1
+      bo.bombTimer = (bo.bombTimer ?? bombEvery * furyMult) - dt
       if (bo.bombTimer <= 0) {
         // В агрессии бомбы летят вдвое чаще, в промежуточной — на 30% чаще.
-        bo.bombTimer = angry ? bombEvery / 2 : mid ? bombEvery * 0.7 : bombEvery
+        const stage = angry ? bombEvery / 2 : mid ? bombEvery * 0.7 : bombEvery
+        bo.bombTimer = stage * furyMult
         // Создаём бомбу, летящую в направлении ракетки
         const paddle = this.g.paddle
         const dx = paddle.x - bo.x

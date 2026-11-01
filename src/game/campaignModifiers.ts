@@ -5,7 +5,36 @@
  */
 
 export type CampaignModifierId =
-  "ironman" | "heavy_gravity" | "hyper_speed" | "dense_armor" | "glass_paddle" | "inverted_controls"
+  | "ironman"
+  | "heavy_gravity"
+  | "hyper_speed"
+  | "dense_armor"
+  | "glass_paddle"
+  | "inverted_controls"
+  | "no_powers"
+  | "brittle_world"
+  | "low_bounce"
+  | "boss_fury"
+
+/**
+ * Дата ввода в пул новых мутаторов (T-052), UTC.
+ *
+ * Ежедневные испытания выбирают пару мутаторов детерминированно от даты, поэтому
+ * расширение пула переписало бы задним числом уже сыгранные дни (другие мутаторы,
+ * другие множители, другие рекорды). Для дат **до** этой эпохи используется
+ * исторический пул из 6 мутаторов — наборы остаются теми же, что и в момент игры.
+ */
+export const MODIFIER_POOL_EPOCH = "2026-11-01"
+
+/** Исторический состав пула (6 мутаторов) — действовал до `MODIFIER_POOL_EPOCH`. */
+export const LEGACY_MODIFIER_IDS: readonly CampaignModifierId[] = [
+  "ironman",
+  "heavy_gravity",
+  "hyper_speed",
+  "dense_armor",
+  "glass_paddle",
+  "inverted_controls",
+]
 
 export interface CampaignModifierDef {
   readonly id: CampaignModifierId
@@ -73,6 +102,42 @@ export const CAMPAIGN_MODIFIERS: readonly CampaignModifierDef[] = [
     scoreBonus: 0.6,
     crystalBonus: 0.6,
     badgeColor: "#fb923c",
+  },
+  {
+    id: "no_powers",
+    title: "Сухой закон",
+    desc: "Бонусы не выпадают вообще: ни из блоков, ни с неба, ни от босса. Только чистая механика шара.",
+    icon: "🚫",
+    scoreBonus: 0.45,
+    crystalBonus: 0.45,
+    badgeColor: "#94a3b8",
+  },
+  {
+    id: "brittle_world",
+    title: "Хрупкий мир",
+    desc: "Каждый обычный блок арены цепной: разрушение взрывает соседей в радиусе.",
+    icon: "💥",
+    scoreBonus: 0.4,
+    crystalBonus: 0.4,
+    badgeColor: "#fbbf24",
+  },
+  {
+    id: "low_bounce",
+    title: "Вязкая бездна",
+    desc: "Вертикальный отскок ослаблен на 20%: шар летит низко и чаще проваливается к бездне.",
+    icon: "🕳",
+    scoreBonus: 0.25,
+    crystalBonus: 0.25,
+    badgeColor: "#64748b",
+  },
+  {
+    id: "boss_fury",
+    title: "Ярость бездны",
+    desc: "Боссы бросают бомбы и мины на 30% чаще. Следи за небом!",
+    icon: "🔥",
+    scoreBonus: 0.35,
+    crystalBonus: 0.35,
+    badgeColor: "#ef4444",
   },
 ]
 

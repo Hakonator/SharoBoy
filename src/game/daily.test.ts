@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import {
+  getDailyModifierPool,
   getDailyModifiers,
   getDailyRunInfo,
   getDailyTimeUntilReset,
   hasPlayedTodayDaily,
+  isoDay,
   markTodayDailyPlayed,
 } from "./daily"
+import { CAMPAIGN_MODIFIERS, LEGACY_MODIFIER_IDS, MODIFIER_POOL_EPOCH } from "./campaignModifiers"
 import { daySeed, formatDayDate } from "./utils"
 
 function makeStorage(initial: Record<string, string> = {}) {
@@ -67,6 +70,44 @@ describe("Daily Runs Engine (T-041, §3.2 Roadmap)", () => {
       const mods2 = getDailyModifiers(d2)
       // На разных сидах мутаторы или их порядок различаются
       expect(mods1[0] !== mods2[0] || mods1[1] !== mods2[1]).toBe(true)
+    })
+  })
+
+  describe("Эпоха пула мутаторов (T-052)", () => {
+    it("isoDay отдаёт дату UTC в формате YYYY-MM-DD", () => {
+      expect(isoDay(new Date(Date.UTC(2026, 10, 1, 23, 59, 0)))).toBe("2026-11-01")
+    })
+
+    it("для дат до эпохи используется исторический пул из 6 мутаторов", () => {
+      const before = new Date(Date.UTC(2026, 9, 20, 12, 0, 0))
+      expect(getDailyModifierPool(before)).toEqual(LEGACY_MODIFIER_IDS)
+      expect(getDailyModifierPool(before)).toHaveLength(6)
+    })
+
+    it("для дат начиная с эпохи — полный текущий пул", () => {
+      const epoch = new Date(`${MODIFIER_POOL_EPOCH}T00:00:00Z`)
+      const pool = getDailyModifierPool(epoch)
+      expect(pool).toHaveLength(CAMPAIGN_MODIFIERS.length)
+      expect(pool).toHaveLength(10)
+      expect(pool).toEqual(CAMPAIGN_MODIFIERS.map((m) => m.id))
+    })
+
+    it("набор дня до эпохи не меняется от расширения пула", () => {
+      const before = new Date(Date.UTC(2026, 9, 20, 12, 0, 0))
+      const mods = getDailyModifiers(before)
+      // Те же два мутатора, что выбирались при пуле из 6 элементов.
+      expect(mods).toHaveLength(2)
+      for (const id of mods) expect(LEGACY_MODIFIER_IDS).toContain(id)
+      expect(new Set(mods).size).toBe(2)
+    })
+
+    it("после эпохи новые мутаторы попадают в ротацию", () => {
+      const seen = new Set<string>()
+      for (let day = 1; day <= 60; day++) {
+        const date = new Date(Date.UTC(2026, 10, day, 12, 0, 0))
+        for (const id of getDailyModifiers(date)) seen.add(id)
+      }
+      expect(seen.size).toBeGreaterThan(6)
     })
   })
 

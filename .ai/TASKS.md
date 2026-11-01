@@ -20,65 +20,21 @@
 ## Готово к работе
 
 Очередь зафиксирована 31.10.2026 (план «геймплейное разнообразие» T-052…T-061).
-Все карточки в статусе `draft`: реализация начинается после утверждения пользователем
+T-052 выполнена 01.11.2026 (карточка ниже, в «Последние выполненные задачи»).
+Остальные карточки в статусе `draft`: реализация начинается после утверждения пользователем
 и перевода карточки в `ready` (AD-027, п. 3). Порядок — волнами; внутри волны задачи
 независимы. Если по ходу выяснятся побочные правки, под них заводится промежуточная
 карточка вида `T-0XXa` (не расширяя исходную).
 
 Порядок исполнения:
 
-- **Волна 1 (P0, все S):** T-052 → T-053 → T-054 → T-055.
+- **Волна 1 (P0, все S):** ~~T-052~~ (done) → T-053 → T-054 → T-055.
 - **Волна 2 (P1, M):** T-056 (после T-052) → T-057 → T-058 → T-059.
 - **Волна 3 (P2, L):** T-060 → T-061.
 
 Общий пакет проверок для каждой задачи:
 `npm run typecheck` → `npm run lint:check` → `npm run format:check` → `npm run test`.
 Общие запреты: `vite.config.ts`, `tsconfig.json`, `package.json`, `supabase/**`, `.github/**`.
-
-### T-052: Мутаторы кампании 6 → 10
-
-Status: draft · Priority: high · Сложность: S · Зависимости: — · Волна 1
-
-Описание:
-Пул `CampaignModifierId` расширяется четырьмя правилами — вариативность растёт сразу в трёх
-режимах, потому что кампания, ежедневное испытание и бесконечный режим читают
-`g.campaignModifiers` через `hasModifier` (`levelBuild.ts`, `hosts.ts`, `runFlow.ts`).
-
-1. `no_powers` «Сухой закон»: бонусы не выпадают (`powers.ts::dropPower`, `periodicPowerDrop`),
-   не летят «спас-бонусы» из `runFlow.ts` и отрицательные дропы босса (`boss.ts`); +45% к очкам
-   и кристаллам.
-2. `brittle_world` «Хрупкий мир»: после сборки боя все обычные блоки получают `sp.brittle`
-   с радиусом по умолчанию — по образцу `dense_armor` в `game/levelBuild.ts`.
-3. `low_bounce` «Вязкая бездна»: вертикальный отскок от ракетки и потолка ×0.8
-   (`physics/collide.ts`); +25% к очкам.
-4. `boss_fury` «Ярость бездны»: интервал бомб `bombEvery` ×0.7 (`boss.ts`), +35% к очкам.
-5. Эпоха пула: `MODIFIER_POOL_EPOCH` (дата релиза UTC) в `campaignModifiers.ts`, чтобы
-   daily-наборы для дат до эпохи не пересчитывались (`daily.ts::getDailyModifiers`).
-
-Allowed files:
-
-- src/game/campaignModifiers.ts
-- src/game/campaignModifiers.test.ts
-- src/game/daily.ts
-- src/game/daily.test.ts
-- src/game/powers.ts
-- src/game/powers/table.ts
-- src/game/game/levelBuild.ts
-- src/game/physics/collide.ts
-- src/game/boss.ts
-- src/ui/screens/hud.tsx
-- docs/ROADMAP.md
-- docs/CHANGELOG.md
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Приёмка:
-
-- [ ] 4 новых мутатора доступны в выборе, в HUD-бейджах и в daily-пуле
-- [ ] каждый эффект покрыт юнит-тестом (множители, дроп бонусов, хрупкость, интервал бомб)
-- [ ] daily-набор для дат до `MODIFIER_POOL_EPOCH` не меняется (тест)
-- [ ] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
 
 ### T-053: Челлендж-узлы 4 → 7 видов
 
@@ -454,6 +410,57 @@ Allowed files:
 
 ## Последние выполненные задачи (подробные карточки)
 
+### T-052: Мутаторы кампании 6 → 10
+
+Status: done · Priority: high · Сложность: S · Зависимости: — · Волна 1
+
+Итог (01.11.2026):
+Четыре новых мутатора в пуле, ежедневный пул закреплён «эпохой», чтобы прошлые дни не
+пересчитывались. Тестов +10 (84 файла / 773 теста), `typecheck`, `lint`, `prettier` чистые.
+
+Детали реализации:
+
+1. `campaignModifiers.ts`: id `no_powers` (+45%), `brittle_world` (+40%), `low_bounce` (+25%),
+   `boss_fury` (+35%); `MODIFIER_POOL_EPOCH = "2026-11-01"` и `LEGACY_MODIFIER_IDS` (6 старых).
+2. `daily.ts`: `isoDay(date)` и `getDailyModifierPool(date)` — до эпохи исторический пул,
+   начиная с эпохи полный; `getDailyRunInfo` использует тот же `isoDay`.
+3. `powers.ts`: хост-флаг `powersDisabled()`; `dropPower` и `periodicPowerDrop` выходят сразу.
+4. `game/levelBuild.ts`: `makeWorldBrittle` после `dense_armor` — `sp.brittle` радиус
+   `2.5 × max(rx, ry)`, урон 1; минибоссы/щупальца/клешни/бомбы/миньоны не затрагиваются.
+5. `physics/collide.ts`: `LOW_BOUNCE_VY_MULT = 0.8` и `dampBounceVy` (сохраняет знак, не гасит
+   слабый отскок ниже 40 px/с). Применено на 4 путях отскока от ракетки (вращение, арканоид,
+   купол, чаша) и к потолку в `physics.ts::updateBall`.
+6. `boss.ts`: `BOSS_FURY_BOMB_MULT = 0.7` в интервале бомб (первый бросок + все стадии);
+   штатный дроп бонусов босса уважает `powersDisabled`.
+7. `game/runFlow.ts`: «Тактическое снабжение» при 1–2 жизнях не выдаётся под `no_powers`.
+8. `game/hosts.ts`: `powersDisabled`, `lowBounceActive`, `bossFuryActive` в хостах
+   бонусов/физики/босса.
+
+Allowed files:
+
+- src/game/campaignModifiers.ts
+- src/game/campaignModifiers.test.ts
+- src/game/daily.ts
+- src/game/daily.test.ts
+- src/game/powers.ts
+- src/game/powers/table.ts
+- src/game/game/levelBuild.ts
+- src/game/physics/collide.ts
+- src/game/boss.ts
+- src/ui/screens/hud.tsx
+- docs/ROADMAP.md
+- docs/CHANGELOG.md
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Приёмка:
+
+- [x] 4 новых мутатора доступны в выборе, в HUD-бейджах и в daily-пуле
+- [x] каждый эффект покрыт юнит-тестом (множители, дроп бонусов, хрупкость, отскок, интервал бомб)
+- [x] daily-набор для дат до `MODIFIER_POOL_EPOCH` не меняется (тест)
+- [x] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
+
 ### T-051: Выбор целей кликом по блоку и группой через Space в редакторе карт
 
 Status: done
@@ -549,6 +556,7 @@ npm test
 | Задача | Что сделано                                                                               |
 | ------ | ----------------------------------------------------------------------------------------- |
 | T-040  | Движок синергий перков, бонусов и реликвий (§3.1): 6 синергий, боевые эффекты, HUD-бейджи |
+| T-039  | Расширение каталога реликвий (4 → 8) и HUD-индикация артефактов забега                    |
 | T-039  | Расширение каталога реликвий (4 → 8) и HUD-индикация артефактов забега                    |
 | T-038b | Блок тактических модулей платформы (включаемые апгрейды в паузе)                          |
 | T-038  | Увеличенный шар «Гравитационное ядро» (roadmap 3.1, ингредиент 3)                         |

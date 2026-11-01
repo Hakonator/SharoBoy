@@ -22,7 +22,7 @@ import {
   collideBoss as bossBounce,
   collidePaddle as paddleBounce,
 } from "./physics/collide"
-import { isBlockPhaseActive } from "./physics/collide"
+import { isBlockPhaseActive, LOW_BOUNCE_VY_MULT } from "./physics/collide"
 import {
   damageBlock as applyBlockDamage,
   finishSpinDeaths as applySpinDeathFinisher,
@@ -136,6 +136,8 @@ export interface PhysicsWorld {
   glassPaddleActive?(): boolean
   invertedControlsActive?(): boolean
   hyperSpeedActive?(): boolean
+  /** Мутатор «Вязкая бездна»: вертикальный отскок от ракетки и потолка ослаблен. */
+  lowBounceActive?(): boolean
   /** Активна синергия «Кинетический Снайпер» (удвоенный лимит пробития, лазерный прицел). */
   isSniperActive?(): boolean
   /** Активна синергия «Цепной Резонанс» (расширенный AoE взрыв 108 px, каскадная детонация цепных блоков). */
@@ -337,7 +339,7 @@ export class Physics {
       }
       if (ball.y - ball.r < g.blockTop) {
         ball.y = g.blockTop + ball.r
-        ball.vy = Math.abs(ball.vy)
+        ball.vy = Math.abs(ball.vy) * (g.lowBounceActive?.() ? LOW_BOUNCE_VY_MULT : 1)
         ball.squash = 1
         ball.pierceLeft = undefined
         g.sfx.wall(clamp((ball.x / g.w) * 2 - 1, -0.85, 0.85))

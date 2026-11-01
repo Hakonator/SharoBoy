@@ -7,6 +7,8 @@
 
 import {
   CAMPAIGN_MODIFIERS,
+  LEGACY_MODIFIER_IDS,
+  MODIFIER_POOL_EPOCH,
   type CampaignModifierDef,
   type CampaignModifierId,
 } from "./campaignModifiers"
@@ -31,19 +33,35 @@ export interface DailyRunInfo {
   readonly totalCrystalBonus: number
 }
 
+/** Дата дня в формате ISO (UTC): "YYYY-MM-DD". */
+export function isoDay(date: Date): string {
+  const day = String(date.getUTCDate()).padStart(2, "0")
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0")
+  return `${date.getUTCFullYear()}-${month}-${day}`
+}
+
 /**
- * Детерминированно выбирает 2 различных мутатора из пула CAMPAIGN_MODIFIERS
- * для заданного календарного дня по UTC.
+ * Пул мутаторов дня: для дат до `MODIFIER_POOL_EPOCH` — исторический состав (6),
+ * после — полный текущий пул. Так расширение пула не переписывает прошлые дни.
+ */
+export function getDailyModifierPool(date = new Date()): readonly CampaignModifierId[] {
+  if (isoDay(date) < MODIFIER_POOL_EPOCH) return LEGACY_MODIFIER_IDS
+  return CAMPAIGN_MODIFIERS.map((m) => m.id)
+}
+
+/**
+ * Детерминированно выбирает 2 различных мутатора из пула для заданного
+ * календарного дня по UTC.
  */
 export function getDailyModifiers(date = new Date()): CampaignModifierId[] {
   const seed = daySeed(date)
   const rng = mulberry32(seed * 7919 + 1013)
-  const pool = [...CAMPAIGN_MODIFIERS]
+  const pool = [...getDailyModifierPool(date)]
   const idx1 = Math.floor(rng() * pool.length)
   const mod1 = pool.splice(idx1, 1)[0]
   const idx2 = Math.floor(rng() * pool.length)
   const mod2 = pool[idx2]
-  return [mod1.id, mod2.id]
+  return [mod1, mod2]
 }
 
 /**
@@ -89,10 +107,7 @@ export function getDailyRunInfo(date = new Date()): DailyRunInfo {
   const totalScoreBonus = modifierDefs.reduce((acc, m) => acc + m.scoreBonus, 0)
   const totalCrystalBonus = modifierDefs.reduce((acc, m) => acc + m.crystalBonus, 0)
 
-  const day = String(date.getUTCDate()).padStart(2, "0")
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0")
-  const year = date.getUTCFullYear()
-  const isoDate = `${year}-${month}-${day}`
+  const isoDate = isoDay(date)
   const dateFormatted = formatDayDate(date)
 
   return {

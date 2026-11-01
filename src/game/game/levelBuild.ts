@@ -15,6 +15,7 @@ import { buildCryoDrone } from "../bossCryo"
 import { buildLamprey } from "../bossLamprey"
 import type { LevelSpec } from "../levels"
 import { hasModifier } from "../campaignModifiers"
+import { BRITTLE_RADIUS_MULT } from "../blockKinds"
 
 import { pushHud } from "./hudSync"
 import { resetMiniboss } from "./minibossRuntime"
@@ -67,7 +68,21 @@ export function buildFromSpec(g: Game, spec: LevelSpec) {
       }
     }
   }
+  if (hasModifier(g.campaignModifiers, "brittle_world")) makeWorldBrittle(g.blocks)
   g.blocksInitial = Math.max(1, g.blocks.length)
+}
+
+/**
+ * Мутатор «Хрупкий мир»: каждый обычный блок превращается в цепной, чтобы
+ * разрушение разлеталось по арене. Радиус по умолчанию — как у хрупкого блока
+ * из расстановки спецблоков, поэтому прочность и броню не трогаем.
+ */
+function makeWorldBrittle(blocks: Block[]) {
+  for (const b of blocks) {
+    if (b.dead || b.isMiniboss || b.isTentacle || b.isClaw || b.bomb || b.minionOrbit) continue
+    if (b.sp?.brittle) continue
+    b.sp = { ...b.sp, brittle: { radius: Math.max(b.rx, b.ry) * BRITTLE_RADIUS_MULT, damage: 1 } }
+  }
 }
 
 /** Детерминированная расстановка спецблоков: кампания — по уровню, бесконечный — по волне. */

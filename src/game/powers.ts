@@ -70,6 +70,8 @@ export interface PowersWorld {
   buffDurationMult?: number
   coinMagnetLevel?: number
   isIronman?(): boolean
+  /** Мутатор «Сухой закон»: бонусы не выпадают ниоткуда. */
+  powersDisabled?(): boolean
 }
 
 export class PowersSystem {
@@ -171,6 +173,7 @@ export class PowersSystem {
 
   dropPower(x: number, y: number) {
     const g = this.g
+    if (this.powersBlocked()) return
     if (Math.random() < 0.12) {
       const type = this.pickPowerType()
       const skip =
@@ -188,6 +191,7 @@ export class PowersSystem {
     g.skyDropTimer -= dt
     if (g.skyDropTimer > 0) return
     g.skyDropTimer = rand(18, 27)
+    if (this.powersBlocked()) return
     if (g.powers.length >= 6) return
     const type = this.pickPowerType()
     const x = rand(60, g.w - 60)
@@ -233,6 +237,11 @@ export class PowersSystem {
       }
     }
     g.powers = g.powers.filter((pw) => !pw.taken && pw.y < g.h + 40)
+  }
+
+  /** Мутатор «Сухой закон» отключает все источники бонусов. */
+  private powersBlocked(): boolean {
+    return Boolean(this.g.powersDisabled?.())
   }
 
   /** Применение эффекта бонуса — см. powers/apply.ts. */

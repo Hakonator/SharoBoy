@@ -76,6 +76,8 @@ export function makeBossHost(g: Game): BossHost {
     onBossKilled: () => onBossKilled(g),
     pushHud: () => pushHud(g),
     killBoss: () => g.bossSys.kill(),
+    bossFuryActive: () => hasModifier(g.campaignModifiers, "boss_fury"),
+    powersDisabled: () => hasModifier(g.campaignModifiers, "no_powers"),
   }
 }
 /** Хост для PowersSystem: таймеры спавна, поля эффектов и последствия. */
@@ -244,6 +246,7 @@ export function makePowersHost(g: Game): PowersWorld {
     addCoins: (n) => addCoins(g, n),
     addScore: (n, x, y, color, size) => addScore(g, n, x, y, color, size),
     isIronman: () => hasModifier(g.campaignModifiers, "ironman"),
+    powersDisabled: () => hasModifier(g.campaignModifiers, "no_powers"),
     pushHud: () => pushHud(g),
     get buffDurationMult() {
       return 1 + 0.25 * (g.upgrades.buffDuration ?? 0)
@@ -493,6 +496,7 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     glassPaddleActive: () => hasModifier(g.campaignModifiers, "glass_paddle"),
     invertedControlsActive: () => hasModifier(g.campaignModifiers, "inverted_controls"),
     hyperSpeedActive: () => hasModifier(g.campaignModifiers, "hyper_speed"),
+    lowBounceActive: () => hasModifier(g.campaignModifiers, "low_bounce"),
     isSniperActive: () => isKineticSniperActive(g),
     isChainResonanceActive: () => isChainResonanceActive(g),
     isJuggernautActive: () => isGravitationalJuggernautActive(g),

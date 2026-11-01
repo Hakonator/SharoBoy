@@ -81,6 +81,28 @@ export const THERMAL_SHOCK_STEAM_MAX_TARGETS = 8
  */
 export const THERMAL_SHOCK_STEAM_DAMAGE = 2
 
+/**
+ * Множитель вертикальной составляющей отскока при мутаторе «Вязкая бездна»
+ * (`low_bounce`): шар летит ниже, и его чаще приходится ловить сэйвом.
+ */
+export const LOW_BOUNCE_VY_MULT = 0.8
+
+/**
+ * Ослабляет вертикальный импульс отскока при мутаторе «Вязкая бездна».
+ * Сохраняет знак и не даёт шару «залипнуть» в горизонтали: если после
+ * ослабления вертикальная скорость почти исчезла, возвращает исходную —
+ * иначе шар начинает ползти вдоль плоскости и уровень ломается.
+ */
+export function dampBounceVy(
+  world: { lowBounceActive?(): boolean },
+  vy: number,
+  minVy = 40
+): number {
+  if (!world.lowBounceActive?.()) return vy
+  const damped = vy * LOW_BOUNCE_VY_MULT
+  return Math.abs(damped) < minVy ? vy : damped
+}
+
 /** Ситуативная механика: «Критический сэйв» (Clutch Rebound).
  *  Активируется при отскоке шара от самого края платформы (|rel| >= 0.78),
  *  либо в опасной ситуации при 1 жизни (|rel| >= 0.70), либо гарантированно
@@ -184,7 +206,7 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
     // Страховка: отскок не должен отправлять мяч вниз
     if (rvy > 0) rvy = -rvy
     ball.vx = rvx
-    ball.vy = rvy
+    ball.vy = dampBounceVy(g, rvy)
   } else {
     // Классический арканоидный отскок (как в изначальной версии): угол зависит
     // от точки попадания (rel·1.05 рад ≈ ±60°) и от скорости движения ракетки —
@@ -192,7 +214,7 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
     const ang = -Math.PI / 2 + rot + rel * 1.05 + clamp(p.vx * 0.0004, -0.3, 0.3)
     const sp = Math.hypot(ball.vx, ball.vy) || ball.speed
     ball.vx = Math.cos(ang) * sp
-    ball.vy = Math.sin(ang) * sp
+    ball.vy = dampBounceVy(g, Math.sin(ang) * sp)
     // Страховка: отскок не должен отправлять мяч вниз (при сильном наклоне)
     if (ball.vy > 0) {
       const s2 = Math.hypot(ball.vx, ball.vy) || 1
@@ -255,7 +277,7 @@ export function collidePaddleShape(
   // Страховка: поверхность всегда отбрасывает мяч вверх
   if (rvy > 0) rvy = -rvy
   ball.vx = rvx
-  ball.vy = rvy
+  ball.vy = dampBounceVy(g, rvy)
   // Скорость не должна упасть ниже нормы (плоский удар в вершину формы)
   const sp = Math.hypot(ball.vx, ball.vy)
   const minSpeed = ball.speed * 0.8
