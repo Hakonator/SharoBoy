@@ -26,6 +26,12 @@ export interface BossVariant {
   /** Доля HP, при которой босс «злится» (0.4 = при 40% здоровья). */
   angryAt: number
   /**
+   * Доля HP, при которой босс один раз за бой входит в «последний рубеж»
+   * (по умолчанию `BOSS_LAST_STAND_AT`): бомбы чаще, на орбите подкрепление,
+   * баннер и кольца. Боссы без бомб и миньонов получают только визуальный сигнал.
+   */
+  lastStandAt: number
+  /**
    * Сколько состояний фазы проходить до «злой» (1 — обычный бой, 2 — углублённые
    * фазы: на высоком ярусе Акта и/или с мутаторами бой идёт через
    * промежуточную фазу — босс сильнее, но и награда выше).
@@ -60,6 +66,14 @@ const KIND_DEFAULTS: Record<
 export const BOSS_MID_PHASE_AT = 0.72
 /** Потолок множителя награды за углублённые фазы. */
 export const BOSS_REWARD_MULT_MAX = 1.6
+/**
+ * «Последний рубеж»: доля HP, на которой босс один раз за бой «вспыхивает».
+ * Порог ниже любого `angryAt`, поэтому последний рубеж всегда наступает уже
+ * внутри «злой» фазы и не подменяет её.
+ */
+export const BOSS_LAST_STAND_AT = 0.12
+/** Корректировка порога для боссов с углублёнными фазами (бой и так длиннее). */
+export const BOSS_LAST_STAND_PHASE_SHIFT = 0.02
 
 /**
  * Сколько фаз у босса на этом ярусе: 2 (углублённые фазы) — последние ярусы
@@ -137,6 +151,9 @@ export function fixedVariant(
     tentacles: d.tentacles,
     bombEvery: d.bombEvery,
     angryAt: phases > 1 ? clamp(d.angryAt + 0.1, 0.4, 0.7) : d.angryAt,
+    // Углублённые фазы затягивают бой — последний рубеж сдвигается чуть раньше,
+    // чтобы финал не превращался в «дожёвывание» остатка HP.
+    lastStandAt: phases > 1 ? BOSS_LAST_STAND_AT + BOSS_LAST_STAND_PHASE_SHIFT : BOSS_LAST_STAND_AT,
     phases,
     rewardMult: Math.min(BOSS_REWARD_MULT_MAX, 1 + (phases - 1) * 0.3),
   }

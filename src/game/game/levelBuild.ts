@@ -188,6 +188,7 @@ export function buildLampreyBossLevel(g: Game, variant: BossVariant) {
   g.blocks = []
   const { boss, blocks } = buildLamprey(g.w, g.h, blockTop(g), variant.hp)
   boss.angryAt = variant.angryAt
+  boss.lastStandAt = variant.lastStandAt
   g.bossSys.setPhases(variant)
   g.bossSys.spawn(boss)
   g.blocks = blocks
@@ -261,7 +262,7 @@ export function serveBall(g: Game) {
 export function buildOctopusBoss(
   g: Game,
   hp = 50,
-  opts?: { tentacles?: number; bombEvery?: number; angryAt?: number }
+  opts?: { tentacles?: number; bombEvery?: number; angryAt?: number; lastStandAt?: number }
 ): BossState {
   const octoHp = hp
   // Создаём щупальца вокруг тела босса — каждый из нескольких сегментов-шариков,
@@ -349,6 +350,7 @@ export function buildOctopusBoss(
     totalTentacles: tentacleCount,
     bombEvery: opts?.bombEvery,
     angryAt: opts?.angryAt,
+    lastStandAt: opts?.lastStandAt,
   } as BossState & { isOctopus: true }
 }
 
@@ -360,7 +362,7 @@ export function buildOctopusBoss(
 export function buildJellyfishBoss(
   g: Game,
   hp = 50,
-  opts?: { tentacles?: number; angryAt?: number }
+  opts?: { tentacles?: number; angryAt?: number; lastStandAt?: number }
 ): BossState {
   const tentacleCount = opts?.tentacles ?? JELLY_TENTACLES
   const bodyX = g.w / 2
@@ -384,6 +386,7 @@ export function buildJellyfishBoss(
     chargeT: 0,
     bombEvery: 0, // вместо бомб — молнии из отростков
     angryAt: opts?.angryAt,
+    lastStandAt: opts?.lastStandAt,
   }
   for (let i = 0; i < tentacleCount; i++) {
     for (let seg = 0; seg < JELLY_SEG_COUNT; seg++) {

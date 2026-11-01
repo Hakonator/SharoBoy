@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  BOSS_LAST_STAND_AT,
+  BOSS_LAST_STAND_PHASE_SHIFT,
   BOSS_REWARD_MULT_MAX,
   bossPhases,
   bossPhasesFor,
@@ -117,6 +119,38 @@ describe("углублённые фазы боссов", () => {
     const v = pickBossVariant(4242, 1, 2)
     expect(v.phases).toBe(2)
     expect(["octopus", "crab", "lamprey"]).toContain(v.kind)
+  })
+})
+
+describe("«Последний рубеж» в вариантах боссов", () => {
+  it("по умолчанию порог — BOSS_LAST_STAND_AT для всех 8 боссов", () => {
+    expect(BOSS_LAST_STAND_AT).toBe(0.12)
+    const kinds = [
+      "king",
+      "jellyfish",
+      "cryo",
+      "octopus",
+      "crab",
+      "lamprey",
+      "kraken",
+      "chrono",
+    ] as const
+    for (const kind of kinds) {
+      expect(fixedVariant(kind, 1).lastStandAt).toBe(BOSS_LAST_STAND_AT)
+      expect(pickBossVariant(777, 1).lastStandAt).toBeGreaterThan(0)
+    }
+  })
+
+  it("углублённые фазы сдвигают последний рубеж раньше и он ниже любого angryAt", () => {
+    const single = fixedVariant("kraken", 2)
+    const deep = fixedVariant("kraken", 2, { phases: 2 })
+    expect(single.lastStandAt).toBe(BOSS_LAST_STAND_AT)
+    expect(deep.lastStandAt).toBe(BOSS_LAST_STAND_AT + BOSS_LAST_STAND_PHASE_SHIFT)
+    // Боевой порядок фаз: промежуточная → «злая» → последний рубеж.
+    for (const v of [single, deep]) {
+      expect(v.lastStandAt).toBeLessThan(v.angryAt)
+      expect(v.lastStandAt).toBeGreaterThan(0)
+    }
   })
 })
 

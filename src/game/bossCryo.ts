@@ -65,7 +65,7 @@ export function buildCryoDrone(
   w: number,
   h: number,
   hp = 60,
-  opts?: { bombEvery?: number; angryAt?: number }
+  opts?: { bombEvery?: number; angryAt?: number; lastStandAt?: number }
 ): { boss: BossState; blocks: Block[] } {
   const bodyX = w / 2
   const bodyY = h * 0.24
@@ -86,6 +86,7 @@ export function buildCryoDrone(
     // вместо мин — ледяные преграды (см. stepCryoDrone)
     bombEvery: opts?.bombEvery ?? 0,
     angryAt: opts?.angryAt ?? 0.5,
+    lastStandAt: opts?.lastStandAt,
   }
 
   const blocks: Block[] = []

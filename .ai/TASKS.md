@@ -36,43 +36,6 @@ T-052 выполнена 01.11.2026 (карточка ниже, в «После�
 `npm run typecheck` → `npm run lint:check` → `npm run format:check` → `npm run test`.
 Общие запреты: `vite.config.ts`, `tsconfig.json`, `package.json`, `supabase/**`, `.github/**`.
 
-### T-054: «Последний рубеж» боссов
-
-Status: draft · Priority: high · Сложность: S · Зависимости: — · Волна 1
-
-Описание:
-При падении HP босса ниже порога он один раз за бой входит в «последний рубеж»: бомбы чаще,
-на орбите появляется подкрепление, включаются баннер и кольца. Сейчас у боссов есть только
-`angryAt`, поэтому конец боя «вянет».
-
-1. `BossVariant` и `KIND_DEFAULTS` (`bossVariants.ts`): поле `lastStandAt` (по умолчанию 0.12)
-   с корректировкой для фазовых боссов.
-2. `BossState` (`types.ts`): флаг `lastStand`; срабатывание в `boss.ts` рядом с логикой
-   `angryAt`, интервал бомб ×0.6, `+2` миньона при наличии орбиты.
-3. Оповещение: баннер и кольца через `hudSync.ts`, звук `sfx.power()`.
-4. Боссы без бомб и миньонов получают только визуальный сигнал — без изменения баланса.
-
-Allowed files:
-
-- src/game/bossVariants.ts
-- src/game/bossVariants.test.ts
-- src/game/types.ts
-- src/game/boss.ts
-- src/game/boss.test.ts
-- src/game/game/hudSync.ts
-- docs/ROADMAP.md
-- docs/CHANGELOG.md
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Приёмка:
-
-- [ ] «последний рубеж» срабатывает ровно один раз за бой (тест на повторный вызов)
-- [ ] не конфликтует с промежуточной фазой (`phases > 1`) и с агрессией
-- [ ] боссы без бомб получают только визуальный сигнал
-- [ ] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
-
 ### T-055: Ранг сектора S / A / B
 
 Status: draft · Priority: medium · Сложность: S · Зависимости: — · Волна 1
@@ -194,43 +157,6 @@ Allowed files:
 - [ ] синергия появляется в HUD-бейджах и срабатывает только при обоих ингредиентах (тест)
 - [ ] боевые эффекты покрыты тестами (включая взаимодействие с существующими синергиями)
 - [ ] балансовые числа зафиксированы в карточке и в CHANGELOG
-
-### T-058: Минибоссы 2 → 4
-
-Status: draft · Priority: medium · Сложность: M · Зависимости: — · Волна 2
-
-Описание:
-К «Рыбе-шару» и «Медузе» добавляются двое: «Панцирный краб» (тело с вращающимся слабым
-местом) и «Скользкий угорь» (двигается по горизонтали рывками). Появление, pity-система и
-награда за уничтожение остаются прежними.
-
-1. `minibosses.ts`: новые значения `MinibossKind`, HP-кривая по ярусу, поведение (угол слабого
-   места у краба, тайминг рывков у угря) — чистыми функциями.
-2. Спавн и рантайм: `game/runFlow.ts` / `game/minibossRuntime.ts` (позиция, движение, урон в
-   пул HP), шанс дуэта и pity не меняются.
-3. Рендер: силуэты существ в соответствующем модуле `src/game/render/` по образцу текущих.
-4. HUD-полоска HP и дроп жизни (`MINIBOSS_LIFE_CHANCE`) работают без изменений.
-
-Allowed files:
-
-- src/game/minibosses.ts
-- src/game/minibosses.test.ts
-- src/game/game/minibossRuntime.ts
-- src/game/game/minibossRuntime.test.ts
-- src/game/render/
-- src/game/types.ts
-- docs/ROADMAP.md
-- docs/CHANGELOG.md
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Приёмка:
-
-- [ ] новые существа появляются с той же частотой, что и старые (детерминированный тест)
-- [ ] урон идёт в пул HP существа, уничтожение даёт жизнь по прежнему шансу
-- [ ] поведение (слабое место / рывки) проверено юнит-тестами
-- [ ] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
 
 ### T-059: Ежедневные задания (bounties)
 
@@ -370,6 +296,51 @@ Allowed files:
 
 ## Последние выполненные задачи (подробные карточки)
 
+### T-054: «Последний рубеж» боссов
+
+Status: done · Priority: high · Сложность: S · Зависимости: — · Волна 1
+
+Итог (01.11.2026):
+Одноразовое событие при HP ниже порога: баннер, двойное кольцо, звук, ускорение бомб и
+подкрепление на орбите. Баланс боссов без бомб/миньонов не меняется — только визуал.
+Тестов +7 (84 файла / 793 теста), `typecheck`, `lint`, `prettier` чистые.
+
+Детали реализации:
+
+1. `bossVariants.ts`: `BOSS_LAST_STAND_AT = 0.12`, `BOSS_LAST_STAND_PHASE_SHIFT = 0.02`;
+   `BossVariant.lastStandAt`, у фазовых боссов (`phases > 1`) порог выше на 0.02, но всегда
+   ниже `angryAt` — порядок фаз «промежуточная → злая → последний рубеж» сохраняется.
+2. `types.ts`: `BossState.lastStandAt` (порог с арены), `lastStand` (событие израсходовано),
+   `lastStandBombAccelerated` (идущий таймер бомбы уже ускорен).
+3. `boss.ts`: срабатывание в `step()` рядом с `angryAt`; `startLastStand()` — баннер-попап,
+   два кольца, взрыв искр, встряска, вспышка, `sfx.power()`; `LAST_STAND_BOMB_MULT = 0.6`
+   (перемножается с `BOSS_FURY_BOMB_MULT`), ускоряется и уже идущий таймер (разово);
+   `LAST_STAND_MINIONS = 2` миньона на орбите (радиус 120, скорость 1.05) — обычные
+   `minionOrbit`-блоки, их штатно добивают и сметают при смерти босса.
+4. Порог прокинут через конструкторы арен (`buildCrabBoss`, `buildChronoBoss`,
+   `buildCryoDrone`, `buildOctopusBoss`, `buildJellyfishBoss`, `buildLampreyBoss`).
+
+Allowed files:
+
+- src/game/bossVariants.ts
+- src/game/bossVariants.test.ts
+- src/game/types.ts
+- src/game/boss.ts
+- src/game/boss.test.ts
+- src/game/game/hudSync.ts
+- docs/ROADMAP.md
+- docs/CHANGELOG.md
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Приёмка:
+
+- [x] «последний рубеж» срабатывает ровно один раз за бой (тест на повторный вызов)
+- [x] не конфликтует с промежуточной фазой (`phases > 1`) и с агрессией
+- [x] боссы без бомб получают только визуальный сигнал
+- [x] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
+
 ### T-053: Челлендж-узлы 4 → 7 видов
 
 Status: done · Priority: high · Сложность: S · Зависимости: — · Волна 1
@@ -468,91 +439,6 @@ Allowed files:
 - [x] daily-набор для дат до `MODIFIER_POOL_EPOCH` не меняется (тест)
 - [x] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
 
-### T-051: Выбор целей кликом по блоку и группой через Space в редакторе карт
-
-Status: done
-Priority: medium
-Assigned to: Luna
-
-Описание:
-В режиме условия победы «Целевые блоки» список `targetIds` заполнялся всеми блоками
-автоматически, поэтому выбрать отдельные цели было невозможно. Нужно: список целей
-изначально пуст, клик по блоку на поле переключает галочку соответствующей записи,
-а выделенная группа отмечается/снимается одним нажатием `Space` (умный переключатель:
-отмечены все — снять, иначе отметить всю группу).
-
-1. Чистая логика выбора целей (`src/ui/editor/targetSelection.ts`):
-   - `getTargetsCondition`, `orderTargetIds`, `toggleTargetId`, `toggleTargetIds`,
-     `replaceTargetIds`;
-   - `targetIds` всегда нормализуется к порядку блоков карты (контракт `blocks` ↔ `targetIds`).
-2. Редьюсер (`editorState.ts`, `types.ts`): действия `TOGGLE_TARGET`, `TOGGLE_TARGETS`,
-   `SET_TARGETS`; каждое — ровно один шаг `Ctrl+Z`; в режиме `all-destructible` игнорируются.
-3. Инспектор (`EditorInspector.tsx`):
-   - при переключении условия на «Целевые блоки» список целей создаётся пустым;
-   - единая панель `TargetsPicker` доступна в свойствах карты, свойствах блока и групповом
-     инспекторе: счётчик `N / M`, кнопки «Все блоки» / «Снять все» / «Отметить выделение»,
-     прокручиваемый список галочек с подсветкой выделенных блоков и предупреждение о пустом списке.
-4. Холст (`EditorCanvas.tsx`):
-   - обычный клик по блоку (без перетаскивания) переключает цель;
-   - отмеченные блоки подсвечены янтарной пунктирной рамкой и значком «Ц»;
-   - счётчик-подсказка внизу холста и пункт «🎯 Отметить целью / Снять цель» в ПКМ-меню;
-   - `pointercancel` цель не переключает.
-5. Клавиатура (`EditorView.tsx`): `Space` переключает цели всех выделенных блоков,
-   не перехватывается у кнопок/ссылок, автоповтор игнорируется.
-6. Валидатор (`mapValidator.ts`): новый код `NO_TARGETS` — условие «Целевые блоки» с пустым
-   `targetIds` не проходит проверку (иначе `every` по пустому массиву делает карту мгновенно
-   пройденной).
-7. Тесты: `targetSelection.test.ts` (+7), редьюсер (+6), инспектор (+3), валидатор (+1).
-   Все 83 файла / 756 тестов проходят, `typecheck`, `lint`, `prettier` чистые.
-
-Allowed files:
-
-- src/ui/editor/targetSelection.ts
-- src/ui/editor/targetSelection.test.ts
-- src/ui/editor/types.ts
-- src/ui/editor/editorState.ts
-- src/ui/editor/editorState.test.ts
-- src/ui/editor/EditorInspector.tsx
-- src/ui/editor/EditorInspector.test.tsx
-- src/ui/editor/EditorCanvas.tsx
-- src/ui/editor/EditorView.tsx
-- src/game/mapValidator.ts
-- src/game/mapValidator.test.ts
-- docs/CHANGELOG.md
-- docs/ROADMAP.md
-- .ai/DECISIONS.md
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Forbidden files:
-
-- src/game/game/updateStep.ts
-- src/game/game/modes.ts
-- vite.config.ts
-- tsconfig.json
-- package.json
-
-Acceptance criteria:
-
-- [x] При выборе условия «Целевые блоки» список целей пуст, галочки не стоят
-- [x] Клик по блоку на холсте переключает его галочку в списке целей инспектора
-- [x] Перетаскивание и `pointercancel` цель не переключают
-- [x] `Space` отмечает всю выделенную группу, повторное нажатие снимает отметки
-- [x] Отмеченные цели видны на холсте (янтарная рамка и значок «Ц»)
-- [x] `Ctrl+Z` отменяет переключение целей за один шаг
-- [x] Пустой список целей блокирует запуск/публикацию карты (`NO_TARGETS`)
-- [x] `npm run typecheck`, `npm run lint`, `npm test` проходят (83 файла, 756 тестов)
-
-Test plan:
-`npm run typecheck`, `npm run lint`, `npm test`
-
-Verification commands:
-npm run typecheck
-npm run lint:check
-npm run format:check
-npm test
-
 ---
 
 ## Выполнено ранее (архив)
@@ -602,3 +488,4 @@ npm test
 | T-002  | Валидатор карт (Этап A2)                                                                  |
 | T-001  | Типы Authoring Spec (`PlayerMapSpec`, Этап A1)                                            |
 | T-000  | Инициализация проекта                                                                     |
+| T-051  | Выбор целей кликом по блоку и группой через Space в редакторе карт                        |

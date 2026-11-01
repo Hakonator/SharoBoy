@@ -20,7 +20,7 @@ export function buildChronoBoss(
   w: number,
   h: number,
   hp = 65,
-  opts?: { minions?: number; angryAt?: number }
+  opts?: { minions?: number; angryAt?: number; lastStandAt?: number }
 ): { boss: BossState; blocks: Block[] } {
   const bodyX = w / 2
   const bodyY = h * 0.22
@@ -39,6 +39,7 @@ export function buildChronoBoss(
     chronoRifts: [],
     chronoTimer: 2.0, // первая воронка появится быстро
     angryAt: opts?.angryAt ?? 0.5,
+    lastStandAt: opts?.lastStandAt,
   }
 
   const blocks: Block[] = []

@@ -12,13 +12,24 @@ import { stepCrab } from "./bossCrab"
 import { stepChrono } from "./bossChrono"
 import { clearCryo, cryoTurbinesAlive, stepCryoDrone } from "./bossCryo"
 import { clearLamprey, lampreyDamageMult, lampreyHeadExposed, stepLamprey } from "./bossLamprey"
-import { bossPhases, type BossPhases } from "./bossVariants"
+import { bossPhases, BOSS_LAST_STAND_AT, type BossPhases } from "./bossVariants"
 
 /**
  * Множитель интервала бомб при мутаторе «Ярость бездны» (`boss_fury`):
  * 0.7 — бомбы летят на 30% чаще на всех стадиях боя.
  */
 export const BOSS_FURY_BOMB_MULT = 0.7
+
+/**
+ * «Последний рубеж»: во сколько раз чаще босс бросает бомбы после включения.
+ * Порог HP — `BOSS_LAST_STAND_AT` (см. bossVariants), событие одноразовое.
+ */
+export const LAST_STAND_BOMB_MULT = 0.6
+/** Сколько миньонов подкрепления появляется на орбите в последнем рубеже. */
+export const LAST_STAND_MINIONS = 2
+/** Радиус орбиты и скорость подкрепления (как у штатных миньонов арены). */
+export const LAST_STAND_ORBIT_RADIUS = 120
+export const LAST_STAND_ORBIT_SPEED = 1.05
 
 /** Хост-интерфейс: то, что системе босса нужно от движка. */
 export interface BossHost {
@@ -100,6 +111,15 @@ export class BossSystem {
       this.g.sfx.bossPhase(
         bo.isChrono ? "chrono" : bo.isOctopus || bo.isJellyfish ? "kraken" : "king"
       )
+    }
+    /* «Последний рубеж»: одноразовое событие внутри «злой» фазы (порог ниже
+       любого angryAt). Бомбы летят чаще, на орбите появляется подкрепление,
+       играют баннер и кольца. Боссы без бомб и миньонов получают только
+       визуальный сигнал — баланс их боя не меняется. */
+    const lastStandAt = bo.lastStandAt ?? BOSS_LAST_STAND_AT
+    if (!bo.lastStand && frac < lastStandAt) {
+      bo.lastStand = true
+      this.startLastStand(bo)
     }
     const amp = clamp(this.g.w * 0.26, 120, 420)
     /* Патруль по горизонтали: фаза накапливается интегрированием частоты, а сама
@@ -199,11 +219,24 @@ export class BossSystem {
     if (bombEvery > 0) {
       // Мутатор «Ярость бездны»: интервал заметно короче на всех стадиях боя.
       const furyMult = this.g.bossFuryActive?.() ? BOSS_FURY_BOMB_MULT : 1
-      bo.bombTimer = (bo.bombTimer ?? bombEvery * furyMult) - dt
+      // Последний рубеж: ещё чаще, чем в агрессии (перемножается с мутатором).
+      const lastStandMult = bo.lastStand ? LAST_STAND_BOMB_MULT : 1
+      // Уже идущий таймер тоже ускоряется вместе с частотой: множитель рубежа
+      // применяется разово в момент включения, чтобы следующая бомба пришла
+      // раньше, а не только через полный цикл.
+      if (bo.bombTimer === undefined) {
+        bo.bombTimer = bombEvery * furyMult * lastStandMult - dt
+      } else {
+        bo.bombTimer -= dt
+        if (bo.lastStand && !bo.lastStandBombAccelerated) {
+          bo.lastStandBombAccelerated = true
+          bo.bombTimer *= LAST_STAND_BOMB_MULT
+        }
+      }
       if (bo.bombTimer <= 0) {
         // В агрессии бомбы летят вдвое чаще, в промежуточной — на 30% чаще.
         const stage = angry ? bombEvery / 2 : mid ? bombEvery * 0.7 : bombEvery
-        bo.bombTimer = stage * furyMult
+        bo.bombTimer = stage * furyMult * lastStandMult
         // Создаём бомбу, летящую в направлении ракетки
         const paddle = this.g.paddle
         const dx = paddle.x - bo.x
@@ -235,6 +268,62 @@ export class BossSystem {
         } as Block & { bombVx: number; bombVy: number; hitsPaddle: true })
       }
     }
+  }
+
+  /**
+   * Событие «последнего рубежа»: баннер, кольца, звук, подкрепление на орбите.
+   * Вызывается ровно один раз за бой (флаг `boss.lastStand` ставится до вызова).
+   */
+  private startLastStand(bo: BossState) {
+    const g = this.g
+    // Подкрепление — обычные миньоны орбиты: их движение и добивание уже
+    // обрабатывает штатный цикл (boss.step / damageBlock / kill).
+    const orbit = Math.min(LAST_STAND_ORBIT_RADIUS, Math.max(0, (bo.baseY - g.blockTop) / 1.6))
+    if (orbit > 0) {
+      for (let i = 0; i < LAST_STAND_MINIONS; i++) {
+        g.blocks.push({
+          x: bo.x,
+          y: bo.y,
+          rx: 15,
+          ry: 15,
+          rot: 0,
+          circle: true,
+          hp: 2,
+          maxHp: 2,
+          tier: 2,
+          flash: 1,
+          seed: Math.random() * 1000,
+          dead: false,
+          x0: bo.x,
+          swayAmp: 0,
+          swayFreq: 0,
+          swayPh: 0,
+          bomb: false,
+          splits: false,
+          minionOrbit: {
+            ang: (i * Math.PI * 2) / LAST_STAND_MINIONS,
+            rad: orbit,
+            dir: i % 2 ? 1 : -1,
+            speed: LAST_STAND_ORBIT_SPEED,
+          },
+        })
+      }
+    }
+    g.fx.popups.push({
+      x: bo.x,
+      y: bo.y - bo.r - 26,
+      text: "ПОСЛЕДНИЙ РУБЕЖ!",
+      color: "#ff2a6d",
+      t: 0,
+      size: 26,
+    })
+    g.fx.rings.push({ x: bo.x, y: bo.y, r: 12, maxR: 220, color: "rgba(255,42,109,0.9)", t: 0 })
+    g.fx.rings.push({ x: bo.x, y: bo.y, r: 6, maxR: 150, color: "rgba(255,201,77,0.8)", t: 0 })
+    g.fx.burst(bo.x, bo.y, "#ff2a6d", 28, 340)
+    g.shake = Math.min(g.shake + 10, 16)
+    g.flash = Math.max(g.flash, 0.5)
+    g.sfx.power()
+    g.pushHud()
   }
 
   /** Урон боссу; fromWeapon — от лазера/ракет (с кулдауном), иначе от шара; isCrit — критический урон ×3. */
