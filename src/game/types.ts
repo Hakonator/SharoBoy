@@ -11,7 +11,7 @@ import type { CampaignModifierId } from "./campaignModifiers"
 import type { ActiveChallengeHud } from "./campaignChallenges"
 import type { BossVariantKind } from "./bossVariants"
 import type { BossDialogData, BossTransmissionData } from "./bossDialogs"
-import type { RunScoreBreakdown, ScoreBreakdownItem } from "./scoreBreakdown"
+import type { RunScoreBreakdown, ScoreBreakdownItem, SectorRank } from "./scoreBreakdown"
 import type { TacticalModulesSettings } from "./tacticalModules"
 import type { CampaignRelicId, CampaignRelicsState } from "./campaignRelics"
 import type { SynergyId } from "./synergies"
@@ -53,6 +53,12 @@ export interface IntermediateScoreData {
   readonly isFastClear: boolean
   /** Время прохождения уровня в секундах. */
   readonly timeSeconds: number
+  /** Ранг сектора S/A/B (нет на поражении и там, где эталон не задан). */
+  readonly sectorRank?: SectorRank | null
+  /** Кристаллы, доставшиеся за ранг сектора (S +4, A +2). */
+  readonly sectorRankCrystals?: number
+  /** Эталонное время сектора, сек (для подсказки в окне разбора). */
+  readonly sectorParSeconds?: number
   /** Процент бонуса мутаторов. */
   readonly mutatorBonusPercent: number
   /** Награды кристаллами (если кампания). */

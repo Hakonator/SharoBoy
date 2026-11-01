@@ -10,7 +10,9 @@ import {
   BONUS_PER_SHIELD,
   applyFinalScoreBreakdown,
   computeScoreBreakdown,
+  computeSectorRank,
   resetRunStats,
+  sectorRankCrystals,
 } from "./scoreBreakdown"
 
 function makeMockGame(overrides: Partial<Game> = {}): Game {
@@ -183,5 +185,64 @@ describe("resetRunStats", () => {
     expect(g.runFastClears).toBe(0)
     expect(g.runSectorStartTime).toBe(0)
     expect(g.scoreBreakdown).toBeNull()
+  })
+})
+
+describe("computeSectorRank", () => {
+  const base = { timeSeconds: 30, par: 45, lostBall: false, maxCombo: 10 }
+
+  it("S — без потерь, время ≤ par и комбо ≥ 8", () => {
+    expect(computeSectorRank(base)).toBe("S")
+    // границы: ровно par и ровно 8 комбо ещё тянут S
+    expect(computeSectorRank({ ...base, timeSeconds: 45, maxCombo: 8 })).toBe("S")
+  })
+
+  it("комбо ниже порога снижает S до A, если время уложилось в 1.25 × par", () => {
+    expect(computeSectorRank({ ...base, maxCombo: 7 })).toBe("A")
+    expect(computeSectorRank({ ...base, maxCombo: 0 })).toBe("A")
+  })
+
+  it("A — без потерь и время ≤ 1.25 × par; граница включающая", () => {
+    // 1.25 × 45 = 56.25
+    expect(computeSectorRank({ ...base, timeSeconds: 56, maxCombo: 2 })).toBe("A")
+    expect(computeSectorRank({ ...base, timeSeconds: 56.25, maxCombo: 2 })).toBe("A")
+    expect(computeSectorRank({ ...base, timeSeconds: 56.3, maxCombo: 2 })).toBe("B")
+  })
+
+  it("потеря шара закрывает S и A независимо от времени и комбо", () => {
+    expect(computeSectorRank({ ...base, lostBall: true })).toBe("B")
+    expect(computeSectorRank({ ...base, lostBall: true, timeSeconds: 5, maxCombo: 30 })).toBe("B")
+  })
+
+  it("поражение не даёт ранга вовсе", () => {
+    expect(computeSectorRank(base, { won: false })).toBeNull()
+    expect(computeSectorRank({ ...base, lostBall: true }, { won: false })).toBeNull()
+  })
+
+  it("без эталона (par ≤ 0) остаётся только B", () => {
+    expect(computeSectorRank({ ...base, par: 0 })).toBe("B")
+    expect(computeSectorRank({ ...base, par: -10 })).toBe("B")
+  })
+
+  it("нечисловое время или эталон не дают S/A (защита от испорченной статистики)", () => {
+    expect(computeSectorRank({ ...base, timeSeconds: Number.NaN })).toBe("B")
+    expect(computeSectorRank({ ...base, timeSeconds: Number.POSITIVE_INFINITY })).toBe("B")
+    expect(computeSectorRank({ ...base, par: Number.NaN })).toBe("B")
+    // Ноль и отрицательное время — валидные числа, но эталон всё равно решает.
+    expect(computeSectorRank({ ...base, timeSeconds: 0 })).toBe("S")
+    expect(computeSectorRank({ ...base, timeSeconds: -5 })).toBe("S")
+  })
+
+  it("бонус кристаллов: S +4, A +2, B и null — без награды", () => {
+    expect(sectorRankCrystals("S")).toBe(4)
+    expect(sectorRankCrystals("A")).toBe(2)
+    expect(sectorRankCrystals("B")).toBe(0)
+    expect(sectorRankCrystals(null)).toBe(0)
+    expect(sectorRankCrystals(undefined)).toBe(0)
+  })
+
+  it("детерминирован: одинаковый ввод даёт одинаковый ранг", () => {
+    const a = computeSectorRank(base)
+    for (let i = 0; i < 5; i++) expect(computeSectorRank(base)).toBe(a)
   })
 })

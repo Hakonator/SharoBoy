@@ -241,6 +241,31 @@ describe("IntermediateScoreModal", () => {
     expect(html).toContain("+5")
     expect(html).toContain("+25% Мутаторы")
   })
+
+  it("показывает бейдж ранга сектора и награду кристаллами за ранг", () => {
+    const html = renderToStaticMarkup(
+      <IntermediateScoreModal
+        data={{ ...mockScoreData, sectorRank: "S", sectorRankCrystals: 4, sectorParSeconds: 45 }}
+        onContinue={() => {}}
+      />
+    )
+    expect(html).toContain("sector-rank-badge")
+    expect(html).toContain("Ранг сектора")
+    expect(html).toContain("эталон 45 с")
+    expect(html).toContain("Ранг S")
+    expect(html).toContain("+4")
+  })
+
+  it("не рисует бейдж ранга, когда ранга нет (поражение)", () => {
+    const html = renderToStaticMarkup(
+      <IntermediateScoreModal
+        data={{ ...mockScoreData, sectorRank: null, sectorRankCrystals: 0 }}
+        onContinue={() => {}}
+      />
+    )
+    expect(html).not.toContain("sector-rank-badge")
+    expect(html).not.toContain("Ранг сектора")
+  })
 })
 
 describe("PauseScreen & TacticalModulesPanel", () => {

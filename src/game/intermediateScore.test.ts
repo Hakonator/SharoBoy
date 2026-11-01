@@ -149,6 +149,59 @@ describe("Промежуточный подсчёт очков после уро
     expect(game.balls[0].stuck).toBe(true)
   })
 
+  it("ранг сектора попадает в окно промежуточного счёта и его бонус начисляется один раз", () => {
+    const { g } = makeEnv()
+    const game = g as unknown as Game
+    game.mode = "campaign"
+    game.campaign = null
+    game.level = 1
+    game.phase = "playing"
+    game.score = 800
+    game.levelScoreStart = 0
+    game.levelLostBall = false
+    game.runMaxCombo = 10
+    game.crystals = 0
+    game.crystalsRunTotal = 0
+    // Сектор пройден за 20 с при эталоне 45 с и комбо 10 → ранг S (+4 кристалла).
+    game.runSectorStartTime = 100
+    game.time = 120
+
+    onLevelCleared(game)
+
+    expect(game.intermediateScore?.sectorRank).toBe("S")
+    expect(game.intermediateScore?.sectorRankCrystals).toBe(4)
+    expect(game.intermediateScore?.sectorParSeconds).toBe(45)
+    expect(game.crystals).toBe(4)
+
+    // Окно промежуточного счёта по тому же сектору бонус не дублирует.
+    showIntermediateScore(game, () => {})
+    expect(game.crystals).toBe(4)
+  })
+
+  it("потеря шара или медленный сектор — ранг B без бонуса кристаллов", () => {
+    const { g } = makeEnv()
+    const game = g as unknown as Game
+    game.score = 500
+    game.levelScoreStart = 0
+    game.runMaxCombo = 12
+    game.crystals = 0
+    // Медленно: 200 с при эталоне 45 с.
+    game.runSectorStartTime = 10
+    game.time = 210
+    showIntermediateScore(game, () => {})
+    expect(game.intermediateScore?.sectorRank).toBe("B")
+    expect(game.intermediateScore?.sectorRankCrystals).toBe(0)
+    expect(game.crystals).toBe(0)
+
+    // Быстро и с комбо, но шар потерян — S и A недоступны.
+    game.levelLostBall = true
+    game.runSectorStartTime = 10
+    game.time = 20
+    showIntermediateScore(game, () => {})
+    expect(game.intermediateScore?.sectorRank).toBe("B")
+    expect(game.crystals).toBe(0)
+  })
+
   it("debugSkipLevel сбрасывает transition, bannerTimer и countdown для мгновенного перехода", () => {
     const { g } = makeEnv()
     const game = g as unknown as Game

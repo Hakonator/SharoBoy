@@ -9,7 +9,9 @@ import { isAbsoluteBulwarkActive } from "../synergies"
 import {
   applyFinalScoreBreakdown,
   computeScoreBreakdown,
+  computeSectorRank,
   resetRunStats,
+  sectorRankCrystals,
   FAST_CLEAR_PAR_SECONDS,
 } from "../scoreBreakdown"
 
@@ -403,6 +405,40 @@ export function showIntermediateScore(
     g.runSectorStartTime > 0 ? Math.max(0, Math.round(g.time - g.runSectorStartTime)) : 0
   const isDirectLevel = !g.campaign
 
+  /* Ранг сектора считается ровно здесь и один раз: окно промежуточного счёта —
+     единственная точка показа результата сектора. Кристаллы за ранг начисляются
+     в том же вызове, поэтому повторный показ окна по тому же сектору бонус не
+     дублирует (новый сектор начинается с нового runSectorStartTime). */
+  const sectorPar = FAST_CLEAR_PAR_SECONDS
+  const sectorRank = computeSectorRank(
+    {
+      timeSeconds: elapsed,
+      par: sectorPar,
+      lostBall: !isClean,
+      maxCombo: g.runMaxCombo ?? 0,
+    },
+    { won: true }
+  )
+  const rankCrystals = sectorRankCrystals(sectorRank)
+  /* Кристаллы выдаются один раз на сектор: идентификатор сектора — время его
+     старта. Повторная отрисовка окна (или повторный вызов для того же сектора)
+     показывает ту же награду, но не начисляет её снова. */
+  const sectorId = g.runSectorStartTime ?? 0
+  const alreadyAwarded = g.sectorRankAwardedFor === sectorId
+  if (rankCrystals > 0 && !alreadyAwarded) {
+    g.sectorRankAwardedFor = sectorId
+    g.addCrystals(rankCrystals)
+    g.fx.popups.push({
+      x: g.w / 2,
+      y: g.h * 0.38,
+      text: `РАНГ ${sectorRank}! +${rankCrystals} 💎`,
+      color: sectorRank === "S" ? "#ffc94d" : "#5dffb0",
+      t: 0,
+      size: 22,
+    })
+    g.sfx.power()
+  }
+
   g.intermediateScore = {
     title: context?.title ?? (isDirectLevel ? `УРОВЕНЬ ${g.level} ЗАВЕРШЁН` : "СЕКТОР ЗАЧИЩЕН"),
     subtitle: context?.subtitle ?? (isDirectLevel ? LEVELS[g.level - 1]?.name : undefined),
@@ -418,6 +454,9 @@ export function showIntermediateScore(
     isCleanClear: isClean,
     isFastClear: isFast,
     timeSeconds: elapsed,
+    sectorRank,
+    sectorRankCrystals: rankCrystals,
+    sectorParSeconds: sectorPar,
     mutatorBonusPercent: breakdown.mutatorBonusPercent,
     crystalsEarned: context?.crystals,
     metaCrystalsEarned: context?.metaCrystals,

@@ -36,42 +36,6 @@ T-052 выполнена 01.11.2026 (карточка ниже, в «После�
 `npm run typecheck` → `npm run lint:check` → `npm run format:check` → `npm run test`.
 Общие запреты: `vite.config.ts`, `tsconfig.json`, `package.json`, `supabase/**`, `.github/**`.
 
-### T-055: Ранг сектора S / A / B
-
-Status: draft · Priority: medium · Сложность: S · Зависимости: — · Волна 1
-
-Описание:
-Чистая функция ранга по статистике сектора (время, потерянные шары, максимальное комбо) и
-бонус кристаллов за высокий ранг. Ранг показывается в окне промежуточного счёта.
-
-1. `scoreBreakdown.ts`: `computeSectorRank({ timeSeconds, par, lostBall, maxCombo })`
-   → `"S" | "A" | "B" | null`. S — без потерь, время ≤ par, комбо ≥ 8; A — без потерь и
-   ≤ 1.25 × par; B — победа в остальных случаях; `null` при поражении.
-2. `game/runFlow.ts`: ранг попадает в `g.intermediateScore`, бонус кристаллов начисляется
-   один раз (S +4, A +2).
-3. `ui/screens/overlays.tsx`: бейдж ранга и строка в детализации очков.
-
-Allowed files:
-
-- src/game/scoreBreakdown.ts
-- src/game/scoreBreakdown.test.ts
-- src/game/game/runFlow.ts
-- src/game/types.ts
-- src/ui/screens/overlays.tsx
-- src/ui/screens/overlays.test.tsx
-- docs/ROADMAP.md
-- docs/CHANGELOG.md
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Приёмка:
-
-- [ ] ранг детерминирован от статистики сектора, границы покрыты тестами
-- [ ] бонус кристаллов начисляется ровно один раз
-- [ ] на поражении ранг не показывается
-- [ ] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
-
 ### T-056: Бесконечный режим — драфт мутаторов каждые 5 волн
 
 Status: draft · Priority: high · Сложность: M · Зависимости: T-052 · Волна 2
@@ -296,6 +260,51 @@ Allowed files:
 
 ## Последние выполненные задачи (подробные карточки)
 
+### T-055: Ранг сектора S / A / B
+
+Status: done · Priority: medium · Сложность: S · Зависимости: — · Волна 1
+
+Итог (01.11.2026):
+Чистая функция ранга по статистике сектора, бонус кристаллов ровно один раз за сектор,
+бейдж ранга и строка награды в окне промежуточного счёта. Тестов +13 (84 файла / 806 тестов).
+
+Детали реализации:
+
+1. `scoreBreakdown.ts`: `SectorRankInput`, `SectorRank = "S" | "A" | "B"`,
+   `computeSectorRank(input, opts?)` и `sectorRankCrystals(rank)`. Пороги-константы:
+   `SECTOR_RANK_S_COMBO = 8`, `SECTOR_RANK_A_PAR_MULT = 1.25`,
+   `SECTOR_RANK_CRYSTALS = { S: 4, A: 2, B: 0 }`. `null` — при поражении (`{ won: false }`)
+   и для испорченной статистики (NaN/∞ время или эталон); `par <= 0` даёт `B`;
+   `lostBall` закрывает S и A.
+2. `game/runFlow.ts`: рант считается в `showIntermediateScore` (единственная точка показа
+   результата сектора), кладётся в `g.intermediateScore` (`sectorRank`,
+   `sectorRankCrystals`, `sectorParSeconds`), кристаллы начисляются через `g.addCrystals`.
+   Идемпотентность — новое поле `Game.sectorRankAwardedFor` (идентификатор сектора =
+   `runSectorStartTime`), сбрасывается в `resetRunStats`.
+3. `ui/screens/overlays.tsx`: круглый бейдж ранга (S золотой, A мятный, B циановый),
+   подсказка «эталон 45 с · время N с», строка «Ранг S 💎 +4» в блоке сводки.
+
+Allowed files:
+
+- src/game/scoreBreakdown.ts
+- src/game/scoreBreakdown.test.ts
+- src/game/game/runFlow.ts
+- src/game/types.ts
+- src/ui/screens/overlays.tsx
+- src/ui/screens/overlays.test.tsx
+- docs/ROADMAP.md
+- docs/CHANGELOG.md
+- .ai/TASKS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Приёмка:
+
+- [x] ранг детерминирован от статистики сектора, границы покрыты тестами
+- [x] бонус кристаллов начисляется ровно один раз
+- [x] на поражении ранг не показывается
+- [x] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
+
 ### T-054: «Последний рубеж» боссов
 
 Status: done · Priority: high · Сложность: S · Зависимости: — · Волна 1
@@ -388,59 +397,6 @@ Allowed files:
 - [x] награды начисляются ровно один раз за узел
 - [x] существующие 4 вида ведут себя как раньше
 
-### T-052: Мутаторы кампании 6 → 10
-
-Status: done · Priority: high · Сложность: S · Зависимости: — · Волна 1
-
-Итог (01.11.2026):
-Четыре новых мутатора в пуле, ежедневный пул закреплён «эпохой», чтобы прошлые дни не
-пересчитывались. Тестов +10 (84 файла / 773 теста), `typecheck`, `lint`, `prettier` чистые.
-
-Детали реализации:
-
-1. `campaignModifiers.ts`: id `no_powers` (+45%), `brittle_world` (+40%), `low_bounce` (+25%),
-   `boss_fury` (+35%); `MODIFIER_POOL_EPOCH = "2026-11-01"` и `LEGACY_MODIFIER_IDS` (6 старых).
-2. `daily.ts`: `isoDay(date)` и `getDailyModifierPool(date)` — до эпохи исторический пул,
-   начиная с эпохи полный; `getDailyRunInfo` использует тот же `isoDay`.
-3. `powers.ts`: хост-флаг `powersDisabled()`; `dropPower` и `periodicPowerDrop` выходят сразу.
-4. `game/levelBuild.ts`: `makeWorldBrittle` после `dense_armor` — `sp.brittle` радиус
-   `2.5 × max(rx, ry)`, урон 1; минибоссы/щупальца/клешни/бомбы/миньоны не затрагиваются.
-5. `physics/collide.ts`: `LOW_BOUNCE_VY_MULT = 0.8` и `dampBounceVy` (сохраняет знак, не гасит
-   слабый отскок ниже 40 px/с). Применено на 4 путях отскока от ракетки (вращение, арканоид,
-   купол, чаша) и к потолку в `physics.ts::updateBall`.
-6. `boss.ts`: `BOSS_FURY_BOMB_MULT = 0.7` в интервале бомб (первый бросок + все стадии);
-   штатный дроп бонусов босса уважает `powersDisabled`.
-7. `game/runFlow.ts`: «Тактическое снабжение» при 1–2 жизнях не выдаётся под `no_powers`.
-8. `game/hosts.ts`: `powersDisabled`, `lowBounceActive`, `bossFuryActive` в хостах
-   бонусов/физики/босса.
-
-Allowed files:
-
-- src/game/campaignModifiers.ts
-- src/game/campaignModifiers.test.ts
-- src/game/daily.ts
-- src/game/daily.test.ts
-- src/game/powers.ts
-- src/game/powers/table.ts
-- src/game/game/levelBuild.ts
-- src/game/physics/collide.ts
-- src/game/boss.ts
-- src/ui/screens/hud.tsx
-- docs/ROADMAP.md
-- docs/CHANGELOG.md
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Приёмка:
-
-- [x] 4 новых мутатора доступны в выборе, в HUD-бейджах и в daily-пуле
-- [x] каждый эффект покрыт юнит-тестом (множители, дроп бонусов, хрупкость, отскок, интервал бомб)
-- [x] daily-набор для дат до `MODIFIER_POOL_EPOCH` не меняется (тест)
-- [x] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
-
----
-
 ## Выполнено ранее (архив)
 
 Карточки удалены при чистке файла; подробности каждой задачи — в `.ai/STATE.md`
@@ -488,4 +444,6 @@ Allowed files:
 | T-002  | Валидатор карт (Этап A2)                                                                  |
 | T-001  | Типы Authoring Spec (`PlayerMapSpec`, Этап A1)                                            |
 | T-000  | Инициализация проекта                                                                     |
+| T-052  | Мутаторы кампании 6 → 10 (no_powers, brittle_world, low_bounce, boss_fury)                |
+| T-052  | Мутаторы кампании 6 → 10 (no_powers, brittle_world, low_bounce, boss_fury)                |
 | T-051  | Выбор целей кликом по блоку и группой через Space в редакторе карт                        |

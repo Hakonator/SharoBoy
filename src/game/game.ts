@@ -150,6 +150,12 @@ export class Game {
   runSectorsCleared = 0
   runFastClears = 0
   runSectorStartTime = 0
+  /**
+   * Сектор (время старта), за который бонус ранга уже начислен. Окно
+   * промежуточного счёта может перерисовываться, а бонус обязан выдаваться
+   * ровно один раз на сектор.
+   */
+  sectorRankAwardedFor: number | null = null
   scoreBreakdown: RunScoreBreakdown | null = null
   /** Промежуточный подсчёт накапливаемых очков после завершения уровня. */
   intermediateScore: IntermediateScoreData | null = null

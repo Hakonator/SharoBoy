@@ -14,6 +14,68 @@ export const BONUS_PER_CLUTCH = 400
 export const BONUS_PER_FAST_CLEAR = 600
 export const FAST_CLEAR_PAR_SECONDS = 45
 
+/** «Бонус за план сектора» — начисление ранга в общем счёте забега. */
+export interface SectorRankInput {
+  /** Время прохождения сектора, сек. */
+  readonly timeSeconds: number
+  /** Эталонное время сектора (par), сек. */
+  readonly par: number
+  /** Был ли потерян шар на секторе. */
+  readonly lostBall: boolean
+  /** Максимальное комбо за сектор. */
+  readonly maxCombo: number
+}
+
+/** Ранг сектора: S — образцовый, A — уверенный, B — победа; null — поражение. */
+export type SectorRank = "S" | "A" | "B"
+
+/** Порог комбо для ранга S. */
+export const SECTOR_RANK_S_COMBO = 8
+/** Множитель эталонного времени, ниже которого сектор ещё тянет на A. */
+export const SECTOR_RANK_A_PAR_MULT = 1.25
+/** Надбавка кристаллами за ранг сектора. */
+export const SECTOR_RANK_CRYSTALS: Readonly<Record<SectorRank, number>> = {
+  S: 4,
+  A: 2,
+  B: 0,
+}
+
+/**
+ * Ранг сектора по статистике боя — чистая функция без побочных эффектов.
+ *
+ * - `S` — ни одного потерянного шара, время уложилось в par и комбо ≥ 8;
+ * - `A` — ни одного потерянного шара и время не больше 1.25 × par;
+ * - `B` — победа в остальных случаях (медленно, с потерями или без комбо);
+ * - `null` — сектор проигран: ранг не показывается и бонуса нет.
+ *
+ * @param opts.lostBall был ли потерян шар на секторе (true → S и A недоступны)
+ * @param opts.won исход сектора; вычисляется из прочих полей, если не задан
+ */
+export function computeSectorRank(
+  input: SectorRankInput,
+  opts?: { won?: boolean }
+): SectorRank | null {
+  const won = opts?.won ?? true
+  if (!won) return null
+  if (input.lostBall) return "B"
+  // Нечисловое время (NaN/∞) — не повод выдавать S/A за «нулевое» время:
+  // статистика испорчена, сектор оценивается как обычная победа.
+  if (!Number.isFinite(input.timeSeconds) || !Number.isFinite(input.par)) return "B"
+  const ran = Math.max(0, input.timeSeconds)
+  // par = 0 означает «эталон не задан»: сравнивать не с чем, остаётся B.
+  const par = Math.max(0, input.par)
+  if (par <= 0) return "B"
+  if (ran <= par && input.maxCombo >= SECTOR_RANK_S_COMBO) return "S"
+  if (ran <= par * SECTOR_RANK_A_PAR_MULT) return "A"
+  return "B"
+}
+
+/** Кристаллы за ранг сектора (S +4, A +2, B — без бонуса). */
+export function sectorRankCrystals(rank: SectorRank | null | undefined): number {
+  if (!rank) return 0
+  return SECTOR_RANK_CRYSTALS[rank] ?? 0
+}
+
 export interface ScoreBreakdownItem {
   readonly id: string
   readonly label: string
@@ -256,5 +318,6 @@ export function resetRunStats(g: Game) {
   g.runSectorsCleared = 0
   g.runFastClears = 0
   g.runSectorStartTime = 0
+  g.sectorRankAwardedFor = null
   g.scoreBreakdown = null
 }

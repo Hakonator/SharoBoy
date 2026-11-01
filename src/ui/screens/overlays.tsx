@@ -745,6 +745,32 @@ export function IntermediateScoreModal({
         <h2 className="font-display text-xl sm:text-2xl font-bold uppercase tracking-wider text-cyan-neon drop-shadow-[0_0_12px_rgba(34,211,238,0.6)]">
           {data.title}
         </h2>
+        {data.sectorRank && (
+          <div className="mt-2 flex items-center justify-center gap-2">
+            <span
+              data-testid="sector-rank-badge"
+              className={
+                "inline-flex h-11 w-11 items-center justify-center rounded-full border-2 font-display text-xl font-bold " +
+                (data.sectorRank === "S"
+                  ? "border-amber-400/70 bg-amber-400/20 text-amber-300 shadow-[0_0_18px_rgba(251,191,36,0.55)]"
+                  : data.sectorRank === "A"
+                    ? "border-mint/60 bg-mint/15 text-mint shadow-[0_0_14px_rgba(93,255,176,0.4)]"
+                    : "border-cyan-500/50 bg-cyan-500/10 text-cyan-neon")
+              }
+              title={`Ранг сектора: ${data.sectorRank}`}
+            >
+              {data.sectorRank}
+            </span>
+            <span className="text-left text-[11px] font-sans text-foam/70">
+              Ранг сектора
+              {data.sectorParSeconds ? (
+                <span className="block text-[10px] text-foam/45">
+                  эталон {data.sectorParSeconds} с · время {data.timeSeconds} с
+                </span>
+              ) : null}
+            </span>
+          </div>
+        )}
         {data.subtitle && <p className="mt-0.5 text-xs text-foam/60 font-sans">{data.subtitle}</p>}
         {data.eventDescription && (
           <p className="mt-3 text-sm italic text-foam/80 font-sans border-t border-foam/10 pt-2 px-2">
@@ -833,6 +859,15 @@ export function IntermediateScoreModal({
             <div className="rounded-lg border border-purple-400/20 bg-purple-400/5 px-2.5 py-1.5">
               <span className="text-[10px] text-purple-300/70 block font-sans">Кристаллы</span>
               <span className="font-bold text-purple-300">💎 +{data.crystalsEarned}</span>
+            </div>
+          )}
+
+          {data.sectorRankCrystals !== undefined && data.sectorRankCrystals > 0 && (
+            <div className="rounded-lg border border-amber-400/25 bg-amber-400/5 px-2.5 py-1.5">
+              <span className="text-[10px] text-amber-300/70 block font-sans">
+                Ранг {data.sectorRank}
+              </span>
+              <span className="font-bold text-amber-300">💎 +{data.sectorRankCrystals}</span>
             </div>
           )}
 
