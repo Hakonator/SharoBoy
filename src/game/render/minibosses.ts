@@ -4,6 +4,8 @@ import { clamp } from "../utils"
 import { roundRect, type Ctx } from "./shapes"
 import { drawFish } from "./fish"
 import { drawJelly } from "./jelly"
+import { drawCrab } from "./minibossCrab"
+import { drawEel } from "./minibossEel"
 
 /**
  * Отрисовка минибоссов: блоки существа не рисуются генериком, вместо этого
@@ -22,11 +24,13 @@ export function drawMinibosses(ctx: Ctx, blocks: Block[], time: number) {
     else groups.set(key, [b])
   }
   for (const group of groups.values()) {
-    if (group.some((p) => p.mbPart === "dome")) drawJelly(ctx, group, time)
+    // Диспетчеризация по «якорной» части силуэта: у каждого вида она своя,
+    // и группа без неё не рисуется вовсе (иначе неполное существо проваливалось
+    // в чужой рендер и становилось «невидимкой» с живой HP-полоской).
+    if (group.some((p) => p.mbPart === "shell")) drawCrab(ctx, group, time)
+    else if (group.some((p) => p.mbPart === "eel_head")) drawEel(ctx, group, time)
+    else if (group.some((p) => p.mbPart === "dome")) drawJelly(ctx, group, time)
     else if (group.some((p) => p.mbPart === "body")) drawFish(ctx, group, time)
-    // Группа без ключевых частей (dome/body) не рисуется вовсе: иначе неполная
-    // медуза проваливалась в drawFish и существо становилось «невидимкой»
-    // с живой HP-полоской (баг дуэта рыба+медуза в одной точке).
   }
 }
 

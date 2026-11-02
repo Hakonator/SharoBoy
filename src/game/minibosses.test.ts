@@ -1,19 +1,27 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  buildArmoredCrab,
+  buildEel,
   buildFish,
   buildJelly,
   carveLevelBlocks,
+  isMinibossWeakPart,
   minibossChance,
   minibossHpFor,
   MINIBOSS_DUET_SHIFT,
   MINIBOSS_HP_FIRST,
   MINIBOSS_HP_LAST,
+  MINIBOSS_KINDS,
   MINIBOSS_LIFE_CHANCE,
   MINIBOSS_NODE_CHANCE,
   MINIBOSS_PITY_STEP,
   minibossName,
   rollMinibossLive,
+  CRAB_ARMOR,
+  CRAB_SHARD_COUNT,
+  EEL_DASH_DURATION,
+  EEL_DASH_TELEGRAPH,
 } from "./minibosses"
 import { mulberry32 } from "./utils"
 import { MAP_TIERS } from "./campaignMap"
@@ -120,22 +128,23 @@ describe("minibosses", () => {
       kinds.add(roll.kinds[0])
       if (roll.kinds.length === 2) duets++
     }
-    expect(kinds).toEqual(new Set(["fish", "jelly"]))
+    expect(kinds).toEqual(new Set(MINIBOSS_KINDS))
     expect(duets).toBeGreaterThan(0)
     expect(duets / hits).toBeLessThan(0.5)
   })
 
-  it("в дуэте всегда рыба и медуза вместе", () => {
-    // последовательность: появление → рыба → дуэт сработал
+  it("в дуэте всегда два РАЗНЫХ существа из пула", () => {
+    // последовательность: появление → вид №0 (рыба) → дуэт сработал
     const seq = [0, 0, 0]
     let i = 0
     const duet = rollMinibossLive(0, () => seq[i++])
-    expect(new Set(duet.kinds)).toEqual(new Set(["fish", "jelly"]))
-    // появление → медуза → дуэта нет
+    expect(duet.kinds).toEqual(["fish", "jelly"])
+    expect(duet.kinds[0]).not.toBe(duet.kinds[1])
+    // появление → вид №3 (угорь) → дуэта нет
     const seq2 = [0, 0.9, 0.9]
     i = 0
     const single = rollMinibossLive(0, () => seq2[i++])
-    expect(single.kinds).toEqual(["jelly"])
+    expect(single.kinds).toEqual(["slippery_eel"])
   })
 
   it("HP минибосса плавно растёт от 20 на первых ярусах до 100 в конце", () => {
@@ -242,5 +251,72 @@ describe("minibosses", () => {
   it("имена существ заданы", () => {
     expect(minibossName("fish")).toBe("РЫБА-ШАР")
     expect(minibossName("jelly")).toBe("МЕДУЗА")
+    expect(minibossName("armored_crab")).toBe("ПАНЦИРНЫЙ КРАБ")
+    expect(minibossName("slippery_eel")).toBe("СКОЛЬЗКИЙ УГОРЬ")
+  })
+})
+
+describe("T-058: новые минибоссы", () => {
+  it("пул видов фиксирован: классическая пара остаётся первыми двумя", () => {
+    // Порядок — контракт: выбор идёт по индексу, старые карты должны играться
+    // так же, поэтому новые виды только дописываются в конец.
+    expect(MINIBOSS_KINDS.slice(0, 2)).toEqual(["fish", "jelly"])
+    expect(MINIBOSS_KINDS).toEqual(["fish", "jelly", "armored_crab", "slippery_eel"])
+  })
+
+  it("оба новых вида собираются в корректные существа", () => {
+    expectValidCreature(buildArmoredCrab(W, H, TOP))
+    expectValidCreature(buildEel(W, H, TOP))
+  })
+
+  it("у краба есть корпус, панцирь, две клешни, щель и глаза", () => {
+    const crab = buildArmoredCrab(W, H, TOP)
+    const partOf = (s: string) => crab.filter((b) => b.mbPart === s).length
+    expect(partOf("crab_body")).toBe(3)
+    expect(partOf("shell")).toBe(3)
+    expect(partOf("claw")).toBe(2)
+    expect(partOf("gap")).toBe(1)
+    expect(partOf("eye")).toBe(2)
+    // щель — уязвимая точка, остальные части бронированы
+    expect(isMinibossWeakPart("gap")).toBe(true)
+    expect(isMinibossWeakPart("shell")).toBe(false)
+    expect(isMinibossWeakPart("claw")).toBe(false)
+  })
+
+  it("у угря есть голова, цепочка сегментов и хвостовые плавники", () => {
+    const eel = buildEel(W, H, TOP)
+    expect(eel.filter((b) => b.mbPart === "eel_head").length).toBe(1)
+    expect(eel.filter((b) => b.mbPart === "eel_seg").length).toBe(7)
+    expect(eel.filter((b) => b.mbPart === "eel_fin").length).toBe(2)
+    // сегменты идут от головы к хвосту без разрывов
+    const segs = eel
+      .filter((b) => b.mbPart === "eel_seg")
+      .map((b) => b.x)
+      .sort((a, b) => b - a)
+    expect(segs[0]).toBeGreaterThan(segs[segs.length - 1])
+    for (let i = 1; i < segs.length; i++) expect(segs[i - 1] - segs[i]).toBeCloseTo(20, 5)
+  })
+
+  it("балансовые числа новых видов зафиксированы", () => {
+    expect(CRAB_ARMOR).toBe(3)
+    expect(CRAB_SHARD_COUNT).toBe(2)
+    expect(EEL_DASH_TELEGRAPH).toBe(0.6)
+    expect(EEL_DASH_DURATION).toBe(0.55)
+  })
+
+  it("каждый вид пула достижим при фиксированной последовательности rand", () => {
+    // индекс вида = floor(rand * 4): 0 → fish, 0.3 → jelly, 0.55 → crab, 0.9 → eel
+    const cases: [number, string][] = [
+      [0.05, "fish"],
+      [0.3, "jelly"],
+      [0.55, "armored_crab"],
+      [0.9, "slippery_eel"],
+    ]
+    for (const [kindRoll, expected] of cases) {
+      const seq = [0, kindRoll, 0.9]
+      let i = 0
+      const roll = rollMinibossLive(0, () => seq[i++]!)
+      expect(roll.kinds).toEqual([expected])
+    }
   })
 })

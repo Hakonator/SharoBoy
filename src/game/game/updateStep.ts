@@ -7,6 +7,7 @@ import { updateActiveChallenge } from "../campaignChallenges"
 
 import { pushHud, syncEffectsHud } from "./hudSync"
 import { applyFishWake, updateMouthBubbles } from "./minibossFx"
+import { updateMinibosses } from "./minibossRuntime"
 import { stepBlock } from "./blockMotion"
 import { updatePaddleRotation } from "./paddleControl"
 import { draw } from "./drawScene"
@@ -211,6 +212,7 @@ export function update(g: Game, dt: number) {
 
   updateMouthBubbles(g, dt)
   applyFishWake(g, dt)
+  updateMinibosses(g, dt)
 
   if (
     isLevelCleared &&

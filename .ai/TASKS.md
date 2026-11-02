@@ -186,7 +186,31 @@ Allowed files:
 
 ### T-058: Минибоссы 2 → 4 (панцирный краб, скользкий угорь)
 
-Status: draft · Priority: medium · Сложность: M · Зависимости: — · Волна 2
+Status: done · Priority: medium · Сложность: M · Зависимости: — · Волна 2
+
+Итог (02.11.2026):
+Четыре вида минибоссов вместо двух; 87 файлов / 862 теста (+18 к T-057).
+
+**Поправка к плану (роль архитектора):** исходный список `allowed_files` был
+неполным — он не покрывал ни пул видов (`minibosses.ts`), ни рендер, ни кадровый
+хук. Реализация без них невозможна: новый вид без билдера не появится, а без
+рендера существо будет «невидимкой» с живой HP-полоской (известный регресс).
+Фактический список файлов — ниже; `bossCrab.ts` и `bossVariants.ts` не менялись:
+это боссы Актов, а не минибоссы, переиспользовать их силуэты было бы неверно.
+
+Баланс (зафиксирован):
+
+| Параметр                | Значение                                      |
+| ----------------------- | --------------------------------------------- |
+| `CRAB_ARMOR`            | 3 единицы урона до пролома                    |
+| `CRAB_SHARD_COUNT`      | 2 осколка                                     |
+| `CRAB_SHARD_SPEED`      | 250 px/с (вниз, ±45% по X)                    |
+| `EEL_DASH_INTERVAL`     | 3.4 с между рывками                           |
+| `EEL_DASH_TELEGRAPH`    | 0.6 с телеграф                                |
+| `EEL_DASH_DURATION`     | 0.55 с неуязвимость                           |
+| `EEL_DASH_REACH`        | вылет 110 px к ракетке                        |
+| `EEL_DASH_REFLECT_MULT` | ×1.35 к скорости шара (потолок 1200)          |
+| HP обоих видов          | общий `minibossHpFor(tier)` — 20…100 по ярусу |
 
 Описание:
 Минибоссов сейчас два вида. Добавляются два новых на уже готовом движке минибоссов
@@ -200,28 +224,40 @@ Status: draft · Priority: medium · Сложность: M · Зависимос
    (порядок `MINIBOSS_KINDS` фиксирован — только дописывание в конец).
 4. Баланс (HP, тайминги рывка, число осколков) зафиксировать в карточке и CHANGELOG.
 
-Allowed files:
+Allowed files (фактические, см. поправку выше):
 
-- src/game/minibossRuntime.ts
-- src/game/minibossRuntime.test.ts
-- src/game/bossVariants.ts
-- src/game/bossVariants.test.ts
-- src/game/bossCrab.ts
+- src/game/minibosses.ts
+- src/game/minibosses.test.ts
+- src/game/game/minibossRuntime.ts
+- src/game/game/minibossRuntime.test.ts
+- src/game/game/updateStep.ts
 - src/game/types.ts
-- src/game/game/levelBuild.ts
+- src/game/render/minibosses.ts
+- src/game/render/minibossCrab.ts
+- src/game/render/minibossEel.ts
 - docs/ROADMAP.md
 - docs/CHANGELOG.md
 - .ai/TASKS.md
+- .ai/DECISIONS.md
 - .ai/STATE.md
 - memory-bank/activeContext.md
+- memory-bank/progress.md
 
 Приёмка:
 
-- [ ] оба минибосса детерминированно появляются по сиду (тест выбора)
-- [ ] броня краба и рывок угря покрыты юнит-тестами (включая неуязвимость на рывке)
-- [ ] существующие 2 минибосса ведут себя как раньше
-- [ ] балансовые числа зафиксированы в карточке и в CHANGELOG
-- [ ] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
+- [x] оба минибосса детерминированно появляются по сиду (тест выбора)
+      — `MINIBOSS_KINDS` фиксирован, вид берётся по `floor(rand() * 4)`;
+      тест «каждый вид пула достижим» проверяет все четыре индекса.
+- [x] броня краба и рывок угря покрыты юнит-тестами (включая неуязвимость на рывке)
+      — щель бьётся мимо брони, удар в панцирь не трогает HP, пролом даёт ровно
+      2 осколка; угорь: idle → telegraph → dash, урон на рывке не проходит,
+      шар ускоряется ×1.35, после рывка возвращается в idle и снова уязвим.
+- [x] существующие 2 минибосса ведут себя как раньше
+      — прежние 18 тестов `minibosses.test.ts` / `minibossRuntime.test.ts`
+      проходят; изменены только два теста, кодировавших пул из 2 видов
+      (`new Set(["fish","jelly"])` → `new Set(MINIBOSS_KINDS)` и вид №3 в ролле).
+- [x] балансовые числа зафиксированы в карточке и в CHANGELOG
+- [x] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
 
 ### T-059: Ежедневные задания (bounties)
 

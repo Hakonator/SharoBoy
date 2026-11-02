@@ -311,18 +311,51 @@ export interface Block {
   /** Номер существа в уровне (минибоссов может быть несколько) — привязка HP. */
   mbGroup?: number
   /** Роль части существа минибосса — для специализированной отрисовки силуэта. */
-  mbPart?: "body" | "tail" | "dorsal" | "pectoral" | "eye" | "dome" | "fringe" | "tentacle"
+  mbPart?:
+    | "body"
+    | "tail"
+    | "dorsal"
+    | "pectoral"
+    | "eye"
+    | "dome"
+    | "fringe"
+    | "tentacle"
+    | "crab_body"
+    | "shell"
+    | "claw"
+    | "gap"
+    | "eel_head"
+    | "eel_seg"
+    | "eel_fin"
 }
+
+/** Вид мини-босса кампании (зеркало `MinibossKind` из `minibosses.ts`). */
+export type MinibossKindId = "fish" | "jelly" | "armored_crab" | "slippery_eel"
 
 /** Пузырёк воздуха, выпускаемый рыбой-минибоссом изо рта. */
 /** Существо-минибосс в текущем уровне: HP-пул и центр для дропа жизни. */
 export interface MinibossCreature {
-  kind: "fish" | "jelly"
+  kind: MinibossKindId
   group: number
   hp: number
   maxHp: number
   dropX: number
   dropY: number
+  /**
+   * Остаток брони («Панцирный краб», 0 у остальных видов). Пока броня не снята,
+   * урон по корпусу и клешням гасится, а уязвима только щель между клешнями.
+   */
+  armor?: number
+  /** Фаза рывка «Скользкого угря»: idle → telegraph → dash → idle. */
+  dashState?: "idle" | "telegraph" | "dash"
+  /** Секунд до конца текущей фазы рывка (telegraph/dash). */
+  dashLeft?: number
+  /** Секунд до следующей попытки рывка (в фазе idle). */
+  dashCooldown?: number
+  /** Направление рывка по X: −1 влево, +1 вправо. */
+  dashDir?: number
+  /** Во время рывка существо неуязвимо и отбивает шар ускоренным. */
+  invulnerable?: boolean
 }
 
 export interface MouthBubble {

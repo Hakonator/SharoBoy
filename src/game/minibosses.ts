@@ -11,10 +11,22 @@
  *
  * Чистые функции без обращений к движку — модуль тестируется автономно.
  */
-import type { Block } from "./types"
+import type { Block, MinibossKindId } from "./types"
 import { clamp, rand } from "./utils"
 
-export type MinibossKind = "fish" | "jelly"
+export type MinibossKind = MinibossKindId
+
+/**
+ * Порядок видов фиксирован: `rollMinibossLive` выбирает вид по индексу
+ * `floor(rng() * MINIBOSS_KINDS.length)`, поэтому перестановка поменяла бы
+ * исход уже сгенерированных карт. Новые виды **дописываются в конец**.
+ */
+export const MINIBOSS_KINDS: readonly MinibossKind[] = [
+  "fish",
+  "jelly",
+  "armored_crab",
+  "slippery_eel",
+]
 
 /** Шанс появления минибосса в обычном узле кампании (≈20%). */
 export const MINIBOSS_NODE_CHANCE = 0.2
@@ -28,6 +40,8 @@ export const MINIBOSS_DUET_SHIFT = 0.22
 const NAMES: Record<MinibossKind, string> = {
   fish: "РЫБА-ШАР",
   jelly: "МЕДУЗА",
+  armored_crab: "ПАНЦИРНЫЙ КРАБ",
+  slippery_eel: "СКОЛЬЗКИЙ УГОРЬ",
 }
 
 export function minibossName(kind: MinibossKind): string {
@@ -60,9 +74,16 @@ export function rollMinibossLive(
   rand: () => number = Math.random
 ): { kinds: MinibossKind[]; pity: number } {
   if (rand() >= minibossChance(pity)) return { kinds: [], pity: Math.max(0, pity) + 1 }
-  const kind: MinibossKind = rand() < 0.5 ? "fish" : "jelly"
+  // Вид выбирается по индексу в фиксированном пуле MINIBOSS_KINDS.
+  const idx = Math.min(
+    MINIBOSS_KINDS.length - 1,
+    Math.max(0, Math.floor(rand() * MINIBOSS_KINDS.length))
+  )
+  const kind = MINIBOSS_KINDS[idx]!
   if (rand() < MINIBOSS_DUET_CHANCE) {
-    return { kinds: [kind, kind === "fish" ? "jelly" : "fish"], pity: 0 }
+    // Второй вид — следующий по кругу: в дуэте всегда два РАЗНЫХ существа.
+    const other = MINIBOSS_KINDS[(idx + 1) % MINIBOSS_KINDS.length]!
+    return { kinds: [kind, other], pity: 0 }
   }
   return { kinds: [kind], pity: 0 }
 }
@@ -227,7 +248,105 @@ export function buildJelly(w: number, h: number, top: number, group = 0, cx = w 
   return blocks
 }
 
-/** Консервативная проверка пересечения двух эллипсов с небольшим зазором. */
+/* ---------- «Панцирный краб» и «Скользкий угорь» (T-058) ---------- */
+
+/** Броня «Панцирного краба»: сколько единиц урона гасит панцирь до первого пролома. */
+export const CRAB_ARMOR = 3
+/** Сколько осколков-снарядов вылетает из панциря при его разрушении. */
+export const CRAB_SHARD_COUNT = 2
+/** Скорость осколков-снарядов, px/с. */
+export const CRAB_SHARD_SPEED = 250
+
+/** Сколько секунд «Скользкий угорь» плавает между рывками. */
+export const EEL_DASH_INTERVAL = 3.4
+/** Телеграф рывка: сколько секунд угорь «напрягается» перед броском. */
+export const EEL_DASH_TELEGRAPH = 0.6
+/** Длительность самого рывка (в это время угорь неуязвим). */
+export const EEL_DASH_DURATION = 0.55
+/** Насколько далеко угорь уходит в сторону ракетки на рывке, px. */
+export const EEL_DASH_REACH = 110
+/** Множитель скорости шара, который отбивается о неуязвимого угря. */
+export const EEL_DASH_REFLECT_MULT = 1.35
+
+/**
+ * «Панцирный краб»: приземистый корпус, три панцирные пластины сверху,
+ * две клешни по бокам и узкая щель между ними — единственная уязвимая точка,
+ * пока броня цела. Панцирь — тир 3 (розовый), корпус и клешни — 2, щель — 1.
+ */
+export function buildArmoredCrab(
+  w: number,
+  h: number,
+  top: number,
+  group = 0,
+  cx = w / 2
+): Block[] {
+  const cy = Math.min(top + 175, h * 0.42)
+  const S = { swayAmp: Math.max(20, w / 2 - 150), swayFreq: 0.13 }
+  const p = (
+    x: number,
+    y: number,
+    rx: number,
+    ry: number,
+    tier: 1 | 2 | 3,
+    part: Block["mbPart"],
+    rot?: number
+  ) => makePart({ x: cx + x, y: cy + y, rx, ry, tier, part, rot, group, ...S })
+  return [
+    // корпус: широкий низкий овал
+    p(0, 10, 62, 26, 2, "crab_body"),
+    p(-30, 6, 34, 22, 2, "crab_body"),
+    p(30, 6, 34, 22, 2, "crab_body"),
+    // панцирь: три пластины, перекрывающиеся «черепицей»
+    p(-28, -14, 28, 15, 3, "shell", -0.18),
+    p(0, -20, 30, 17, 3, "shell"),
+    p(28, -14, 28, 15, 3, "shell", 0.18),
+    // клешни по бокам, развёрнутые к ракетке
+    p(-70, -2, 22, 15, 2, "claw", -0.5),
+    p(70, -2, 22, 15, 2, "claw", 0.5),
+    // щель между клешнями: узкая уязвимая полоса под панцирем
+    p(0, 16, 12, 8, 1, "gap"),
+    // глаза на стебельках
+    p(-16, -34, 6, 6, 3, "eye"),
+    p(16, -34, 6, 6, 3, "eye"),
+  ]
+}
+
+/**
+ * «Скользкий угорь»: вытянутое тело из цепочки сегментов, голова с глазами
+ * и хвостовой плавник. Рывок в сторону ракетки делает его неуязвимым.
+ * Голова — тир 3, тело — 2, хвост — 1.
+ */
+export function buildEel(w: number, h: number, top: number, group = 0, cx = w / 2): Block[] {
+  const cy = Math.min(top + 160, h * 0.4)
+  const S = { swayAmp: Math.max(24, w / 2 - 130), swayFreq: 0.16 }
+  const p = (
+    x: number,
+    y: number,
+    rx: number,
+    ry: number,
+    tier: 1 | 2 | 3,
+    part: Block["mbPart"],
+    rot?: number
+  ) => makePart({ x: cx + x, y: cy + y, rx, ry, tier, part, rot, group, ...S })
+  const blocks: Block[] = [p(72, 0, 20, 15, 3, "eel_head"), p(56, -10, 6, 6, 3, "eye")]
+  // тело: цепочка сегментов, сужающаяся к хвосту
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6
+    const rx = 17 - t * 6
+    const ry = 14 - t * 5
+    blocks.push(p(46 - i * 20, Math.sin(i * 0.9) * 4, rx, ry, i < 3 ? 2 : 1, "eel_seg"))
+  }
+  // хвостовой плавник
+  blocks.push(p(-96, 2, 14, 9, 1, "eel_fin", 0.4))
+  blocks.push(p(-96, -2, 14, 9, 1, "eel_fin", -0.4))
+  return blocks
+}
+
+/** Части существа, попадание в которые считается попаданием в уязвимую точку. */
+export function isMinibossWeakPart(part: Block["mbPart"]): boolean {
+  return part === "gap"
+}
+
 function ellipsesOverlap(a: Block, b: Block, pad = 2): boolean {
   const rx = a.rx + b.rx + pad
   const ry = a.ry + b.ry + pad

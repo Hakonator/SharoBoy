@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest"
 
 import { makeEnv } from "../frameInvariant.helpers"
+import {
+  CRAB_ARMOR,
+  CRAB_SHARD_COUNT,
+  EEL_DASH_DURATION,
+  EEL_DASH_INTERVAL,
+  EEL_DASH_TELEGRAPH,
+  MINIBOSS_KINDS,
+} from "../minibosses"
 
-import { addMiniboss, killMiniboss, resetMiniboss } from "./minibossRuntime"
+import {
+  addMiniboss,
+  damageMiniboss,
+  killMiniboss,
+  resetMiniboss,
+  updateMinibosses,
+} from "./minibossRuntime"
 
 /** Регресс «невидимой медузы»: дуэт рыба+медуза не должен уродовать существа. */
 describe("addMiniboss: дуэт двух существ в уровне", () => {
@@ -123,4 +137,241 @@ describe("addMiniboss: дуэт двух существ в уровне", () => 
       game.destroy()
     }
   })
+})
+
+/** T-058: «Панцирный краб». */
+describe("T-058: Панцирный краб — броня и осколки", () => {
+  function crabEnv() {
+    const env = makeEnv()
+    const { game } = env
+    resetMiniboss(game)
+    game.phase = "playing"
+    game.mode = "campaign"
+    game.blocks = game.blocks.filter((b) => !b.isMiniboss)
+    addMiniboss(game, "armored_crab", 40)
+    return env
+  }
+
+  it("приходит в бой с CRAB_ARMOR и уязвим только в щель", () => {
+    const { game, restoreRandom } = crabEnv()
+    try {
+      const creature = game.minibosses[0]!
+      expect(creature.kind).toBe("armored_crab")
+      expect(creature.armor).toBe(CRAB_ARMOR)
+
+      const shell = game.blocks.find((b) => b.mbGroup === creature.group && b.mbPart === "shell")!
+      const gap = game.blocks.find((b) => b.mbGroup === creature.group && b.mbPart === "gap")!
+
+      // Удар в панцирь гасит броню, но не HP.
+      const hpBefore = creature.hp
+      damageMiniboss(game, 1, shell)
+      expect(creature.armor).toBe(CRAB_ARMOR - 1)
+      expect(creature.hp).toBe(hpBefore)
+
+      // Удар в щель проходит мимо брони прямо в HP.
+      const armorBefore = creature.armor
+      damageMiniboss(game, 2, gap)
+      expect(creature.armor).toBe(armorBefore)
+      expect(creature.hp).toBe(hpBefore - 2)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  it("пролом панциря выбрасывает ровно CRAB_SHARD_COUNT осколков к ракетке", () => {
+    const { game, restoreRandom } = crabEnv()
+    try {
+      const creature = game.minibosses[0]!
+      const shell = game.blocks.find((b) => b.mbGroup === creature.group && b.mbPart === "shell")!
+      const blocksBefore = game.blocks.length
+
+      damageMiniboss(game, CRAB_ARMOR, shell)
+      expect(creature.armor).toBe(0)
+
+      const shards = game.blocks.filter((b) => b.bomb && b.hitsPaddle)
+      expect(shards).toHaveLength(CRAB_SHARD_COUNT)
+      expect(game.blocks.length).toBe(blocksBefore + CRAB_SHARD_COUNT)
+      // Осколки летят вниз и расходятся в стороны.
+      expect(shards.every((s) => (s.bombVy ?? 0) > 0)).toBe(true)
+      expect(new Set(shards.map((s) => Math.sign(s.bombVx ?? 0)))).toEqual(new Set([-1, 1]))
+      // Броня не задела HP самого краба.
+      expect(creature.hp).toBe(40)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  it("лишний урон после снятия брони переходит в HP существа", () => {
+    const { game, restoreRandom } = crabEnv()
+    try {
+      const creature = game.minibosses[0]!
+      const shell = game.blocks.find((b) => b.mbGroup === creature.group && b.mbPart === "shell")!
+      damageMiniboss(game, CRAB_ARMOR + 4, shell)
+      expect(creature.armor).toBe(0)
+      expect(creature.hp).toBe(36)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+})
+
+/** T-058: «Скользкий угорь». */
+describe("T-058: Скользкий угорь — телеграф, рывок и неуязвимость", () => {
+  function eelEnv() {
+    const env = makeEnv()
+    const { game } = env
+    resetMiniboss(game)
+    game.phase = "playing"
+    game.mode = "campaign"
+    game.blocks = game.blocks.filter((b) => !b.isMiniboss)
+    addMiniboss(game, "slippery_eel", 40)
+    return env
+  }
+
+  it("стартует в idle с отсчётом до первого рывка", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const creature = game.minibosses[0]!
+      expect(creature.kind).toBe("slippery_eel")
+      expect(creature.dashState).toBe("idle")
+      expect(creature.dashCooldown).toBe(EEL_DASH_INTERVAL)
+      expect(creature.invulnerable).toBeFalsy()
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  it("через EEL_DASH_INTERVAL уходит в телеграф, затем в рывок и становится неуязвим", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const creature = game.minibosses[0]!
+      updateMinibosses(game, EEL_DASH_INTERVAL + 0.01)
+      expect(creature.dashState).toBe("telegraph")
+      expect(creature.invulnerable).toBeFalsy()
+      // урон в телеграфе ещё проходит
+      const head = game.blocks.find((b) => b.mbPart === "eel_head")!
+      damageMiniboss(game, 1, head)
+      expect(creature.hp).toBe(39)
+
+      updateMinibosses(game, EEL_DASH_TELEGRAPH + 0.01)
+      expect(creature.dashState).toBe("dash")
+      expect(creature.invulnerable).toBe(true)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  /** Продвигает угря до фазы рывка: idle → telegraph → dash. */
+  function advanceToDash(game: Parameters<typeof updateMinibosses>[0]) {
+    updateMinibosses(game, EEL_DASH_INTERVAL + 0.01)
+    updateMinibosses(game, EEL_DASH_TELEGRAPH + 0.01)
+  }
+
+  it("на рывке урон не проходит, а шар ускоряется", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const creature = game.minibosses[0]!
+      advanceToDash(game)
+      expect(creature.dashState).toBe("dash")
+
+      const head = game.blocks.find((b) => b.mbPart === "eel_head")!
+      game.balls = [
+        {
+          x: head.x,
+          y: head.y,
+          vx: 200,
+          vy: -200,
+          r: 8,
+          speed: 400,
+          stuck: false,
+          stuckOffset: 0,
+          trail: [],
+          squash: 1,
+          sinceHit: 0,
+        },
+      ]
+      const hpBefore = creature.hp
+      damageMiniboss(game, 5, head)
+      expect(creature.hp).toBe(hpBefore)
+      expect(game.balls[0]!.speed).toBeCloseTo(400 * 1.35)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  it("после рывка возвращается в idle и снова уязвим", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const creature = game.minibosses[0]!
+      advanceToDash(game)
+      expect(creature.invulnerable).toBe(true)
+      updateMinibosses(game, EEL_DASH_DURATION + 0.02)
+      expect(creature.dashState).toBe("idle")
+      expect(creature.invulnerable).toBe(false)
+      expect(creature.dashCooldown).toBe(EEL_DASH_INTERVAL)
+
+      const head = game.blocks.find((b) => b.mbPart === "eel_head")!
+      const hpBefore = creature.hp
+      damageMiniboss(game, 1, head)
+      expect(creature.hp).toBe(hpBefore - 1)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  it("рывок сдвигает существо к ракетке и возвращает на место", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const creature = game.minibosses[0]!
+      const head = game.blocks.find((b) => b.mbPart === "eel_head")!
+      const startX = head.x
+      // Ракетка правее существа — рывок должен увести угря вправо.
+      game.paddle.x = game.w - 60
+      advanceToDash(game)
+      updateMinibosses(game, EEL_DASH_DURATION * 0.5)
+      expect(head.x).not.toBeCloseTo(startX)
+      // назад — ровно на исходную позицию
+      updateMinibosses(game, EEL_DASH_DURATION)
+      expect(head.x).toBeCloseTo(startX)
+      expect(creature.dashDir).toBe(0)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+})
+
+/** T-058: общий цикл для всех четырёх видов. */
+describe("T-058: все виды проходят общий цикл минибоссов", () => {
+  for (const kind of MINIBOSS_KINDS) {
+    it(`«${kind}»: появляется, получает урон и умирает целиком`, () => {
+      const { game, restoreRandom } = makeEnv()
+      try {
+        resetMiniboss(game)
+        game.phase = "playing"
+        game.mode = "campaign"
+        game.blocks = game.blocks.filter((b) => !b.isMiniboss)
+        addMiniboss(game, kind, 10)
+        const creature = game.minibosses[0]!
+        expect(creature.maxHp).toBe(10)
+        const own = game.blocks.filter((b) => (b.mbGroup ?? 0) === creature.group)
+        expect(own.length).toBeGreaterThan(3)
+        expect(own.every((b) => b.isMiniboss === true)).toBe(true)
+
+        damageMiniboss(game, 100, own[0]!)
+        expect(game.minibosses).toHaveLength(0)
+        expect(game.blocks.filter((b) => (b.mbGroup ?? 0) === creature.group)).toHaveLength(0)
+      } finally {
+        restoreRandom()
+        game.destroy()
+      }
+    })
+  }
 })
