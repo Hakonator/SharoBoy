@@ -6,12 +6,23 @@
  *    обновлением (stale-while-revalidate);
  *  - кросс-доменные запросы (Supabase, Google Fonts) не перехватываем.
  *
- * При выпуске новой версии достаточно поднять CACHE_VERSION — при активации
- * старые кэши удаляются, а skipWaiting+clients.claim подхватывают обновление.
+ * ПЛЕЙСХОЛДЕРЫ НИЖЕ ПОДСТАВЛЯЕТ СБОРКА (AD-036):
+ *   __CACHE_VERSION__ — номер прогона деплой-воркфлоу (github.run_number).
+ *   __CACHE_SCOPE__   — путь scope сборки: "" для корня сайта, "beta-" для /beta/.
+ * Оба маркера заменяются плагином в vite.config.js при `npm run build`, поэтому
+ * каждый деплой публикует НОВЫЙ sw.js: браузер видит байтовое отличие, ставит
+ * новую версию, а `activate` удаляет все кэши прошлых сборок. Раньше
+ * CACHE_VERSION был захардкожен ("sharoboy-v1"), SW не обновлялся никогда и
+ * stale-while-revalidate навсегда отдавал старый бандл — в игре оставался
+ * прежний номер билда (инцидент 02.11.2026: деплой 357, в игре 356).
+ *
+ * Префикс scope нужен потому, что обе сборки (корень и /beta/) живут на одном
+ * origin `*.github.io` и делят ХРАНИЛИЩЕ кэшей. Без префикса beta и stable
+ * удаляли кэши друг друга при активации.
  */
-const CACHE_VERSION = "sharoboy-v1";
-const SCOPE_URL = new URL(self.registration.scope);
-const INDEX_URL = new URL("index.html", SCOPE_URL).href;
+const CACHE_VERSION = "sharoboy-__CACHE_SCOPE____CACHE_VERSION__"
+const SCOPE_URL = new URL(self.registration.scope)
+const INDEX_URL = new URL("index.html", SCOPE_URL).href
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -19,33 +30,31 @@ self.addEventListener("install", (event) => {
       .open(CACHE_VERSION)
       .then((cache) => cache.addAll([INDEX_URL, new URL("manifest.webmanifest", SCOPE_URL).href]))
       .then(() => self.skipWaiting())
-  );
-});
+  )
+})
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))))
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)))
+      )
       .then(() => self.clients.claim())
-  );
-});
+  )
+})
 
 self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  if (req.method !== "GET") return;
+  const req = event.request
+  if (req.method !== "GET") return
 
-  const url = new URL(req.url);
-  if (url.origin !== location.origin) return; // Supabase / шрифты — мимо кэша
+  const url = new URL(req.url)
+  if (url.origin !== location.origin) return // Supabase / шрифты — мимо кэша
 
-  // Переход по адресу игры: сеть, при отсутствии сети — сохранённая оболочка
-  if (req.mode === "navigate") {
-    event.respondWith(
-      fetch(req).catch(() =>
-        caches.match(INDEX_URL).then((r) => r || caches.match(SCOPE_URL.href))
-      )
-    );
-    return;
+  // Переход по адресу игры и явный запрос оболочки: сеть в приоритете.
+  if (req.mode === "navigate" || url.pathname === new URL(INDEX_URL).pathname) {
+    event.respondWith(networkFirst(req))
+    return
   }
 
   // Ассеты: мгновенно из кэша, параллельно обновляем копию в фоне
@@ -54,13 +63,31 @@ self.addEventListener("fetch", (event) => {
       const refresh = fetch(req)
         .then((resp) => {
           if (resp && resp.status === 200 && resp.type === "basic") {
-            const copy = resp.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+            const copy = resp.clone()
+            caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy))
           }
-          return resp;
+          return resp
         })
-        .catch(() => cached);
-      return cached || refresh;
+        .catch(() => cached)
+      return cached || refresh
     })
-  );
-});
+  )
+})
+
+/**
+ * Сеть в приоритете, кэш — только резерв (офлайн). Ответ из сети обновляет
+ * сохранённую копию, поэтому офлайн-запуск после успешной загрузки актуален.
+ * Через networkFirst идёт и навигация, и явный запрос index.html: оболочка
+ * ссылается на хешированные ассеты, и устаревший HTML утащил бы старый бандл.
+ */
+function networkFirst(req) {
+  return fetch(req)
+    .then((resp) => {
+      if (resp && resp.status === 200 && resp.type === "basic") {
+        const copy = resp.clone()
+        caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy))
+      }
+      return resp
+    })
+    .catch(() => caches.match(req).then((cached) => cached || caches.match(INDEX_URL)))
+}

@@ -101,6 +101,18 @@ jobs:
         with:
           name: site-stable
           path: main-src/dist
+      # AD-036: имя кэша в sw.js обязано содержать номер сборки. Незаменённый
+      # плейсхолдер вернул бы «залипание» на прошлом билде — ловим это здесь,
+      # а не в проде.
+      - name: Проверка версии сервис-воркера (main)
+        working-directory: main-src
+        run: |
+          set -euo pipefail
+          SW=dist/sw.js
+          grep -q "__CACHE_" "$SW" && { echo "::error::В $SW остались плейсхолдеры"; exit 1; }
+          grep -q "sharoboy-${{ github.run_number }}" "$SW" || {
+            echo "::error::В $SW нет версии сборки ${{ github.run_number }}"; exit 1; }
+          echo "sw.js: $(grep 'const CACHE_VERSION' "$SW")"
 
   # --- Бета-версия (beta) → подкаталог /beta/ ---
   build-beta:
@@ -147,6 +159,17 @@ jobs:
         with:
           name: site-beta
           path: beta-src/dist
+      # AD-036: у беты имя кэша обязано иметь префикс scope, иначе она делит
+      # кэш с корневой сборкой и они удаляют кэши друг друга при активации.
+      - name: Проверка версии сервис-воркера (beta)
+        working-directory: beta-src
+        run: |
+          set -euo pipefail
+          SW=dist/sw.js
+          grep -q "__CACHE_" "$SW" && { echo "::error::В $SW остались плейсхолдеры"; exit 1; }
+          grep -q "sharoboy-beta-${{ github.run_number }}" "$SW" || {
+            echo "::error::В $SW нет beta-версии сборки ${{ github.run_number }}"; exit 1; }
+          echo "sw.js: $(grep 'const CACHE_VERSION' "$SW")"
 
   # --- Склейка сайта и подготовка артефакта Pages ---
   # Деплой Pages атомарен: артефакт заменяет сайт ЦЕЛИКОМ, поэтому в site/

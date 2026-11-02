@@ -348,6 +348,60 @@ Allowed files:
 - [ ] архитектурное решение по вводу зафиксировано в `.ai/DECISIONS.md` (новый AD)
 - [ ] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
 
+### T-062: Свежая сборка доезжает до игрока (service worker: версия кэша + scope)
+
+Status: done · Priority: high (инцидент) · Сложность: M · Зависимости: — · Баг-фикс деплоя
+
+Итог (02.11.2026): деплой 357 публиковался, а в браузере игрока оставался билд 356.
+
+Причина: `public/sw.js` с захардкоженным `CACHE_VERSION = "sharoboy-v1"` и ассетами
+по stale-while-revalidate. Воркер не менялся ни на одном релизе → браузер не ставил
+новую версию, `activate` не чистил кэши, старый бандл отдавался из кэша вечно.
+Вторая проблема: корень сайта и `/beta/` живут на одном origin и делили один ключ
+кэша — при активации удаляли кэши друг друга.
+
+Сделано (варианты A + C):
+
+- `public/sw.js`: имя кэша `sharoboy-__CACHE_SCOPE____CACHE_VERSION__`; оболочка
+  (`navigate` + явный `index.html`) переведена на network-first, ассеты остались
+  stale-while-revalidate; офлайн-резерв сохранён.
+- `vite.config.js`: плагин `serviceWorkerVersion()` на `closeBundle` подставляет
+  `VITE_BUILD_VERSION` (в CI — `github.run_number`) и префикс scope из `GH_PAGES_BASE`.
+- `src/main.tsx`: регистрация с `updateViaCache: "none"` + `reg.update()` и
+  однократный `location.reload()` по `controllerchange`.
+- `.github/workflows/deploy.yml`: шаг «Проверка версии сервис-воркера» в обоих
+  job'ах — пайплайн падает при незаменённых плейсхолдерах.
+- `src/serviceWorker.test.ts`: 8 тестов на контракт SW (маркеры, порядок замен,
+  отсутствие старого литерала, стратегии, очистка кэшей).
+- AD-036 в `.ai/DECISIONS.md`.
+
+Проверено: beta-сборка → `sharoboy-beta-999`, stable → `sharoboy-555`, маркеров
+в `dist/sw.js` не остаётся; 87 файлов / 872 теста, typecheck/eslint/prettier зелёные.
+
+Allowed files (фактические):
+
+- public/sw.js
+- vite.config.js
+- src/main.tsx
+- src/serviceWorker.test.ts
+- .github/workflows/deploy.yml
+- docs/CHANGELOG.md
+- docs/ROADMAP.md
+- .ai/TASKS.md
+- .ai/DECISIONS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+- memory-bank/progress.md
+
+Приёмка:
+
+- [x] имя кэша уникально для каждой сборки (номер прогона подставляется в CI)
+- [x] кэши корня и `/beta/` разведены и не удаляют друг друга
+- [x] оболочка приходит из сети, ассеты по-прежнему стартуют из кэша
+- [x] клиент подхватывает обновление без ручной чистки кэша
+- [x] пайплайн падает, если версия в `sw.js` не подставилась
+- [x] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
+
 ### T-061: Мутатор `dark_arena` («Слепой сектор»)
 
 Status: draft · Priority: low · Сложность: L · Зависимости: — (желательно после T-052) · Волна 3

@@ -96,10 +96,25 @@ if (rootEl) {
 
 // PWA: сервис-воркер только в продакшен-сборке (в dev он мешает HMR).
 // BASE_URL учитывает путь GitHub Pages («/SharoBoy/» или «/SharoBoy/beta/»).
+//
+// AD-036: имя кэша в sw.js содержит номер сборки, поэтому каждая выкатка
+// публикует новый воркер. Регистрация с `updateViaCache: "none"` гарантирует,
+// что сам sw.js не залипнет в HTTP-кэше, а `controllerchange` перезагружает
+// страницу один раз — сразу после активации новой версии. Без этого игрок
+// оставался на прошлом бандле до третьей перезагрузки (инцидент 02.11.2026).
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    // Первый запуск тоже даёт controllerchange — не перезагружаемся на установке.
+    const hadController = Boolean(navigator.serviceWorker.controller)
+    let reloading = false
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController || reloading) return
+      reloading = true
+      window.location.reload()
+    })
     navigator.serviceWorker
-      .register(`${import.meta.env.BASE_URL}sw.js`)
+      .register(`${import.meta.env.BASE_URL}sw.js`, { updateViaCache: "none" })
+      .then((reg) => reg.update())
       .catch((err) => console.warn("[ШАРОБОЙ] сервис-воркер не зарегистрирован:", err))
   })
 }
