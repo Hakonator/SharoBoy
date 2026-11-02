@@ -389,111 +389,16 @@ Allowed files:
 
 ---
 
-## Заблокировано
-
-Нет.
-
----
-
-## Последние выполненные задачи (подробные карточки)
-
-### T-055: Ранг сектора S / A / B
-
-Status: done · Priority: medium · Сложность: S · Зависимости: — · Волна 1
-
-Итог (01.11.2026):
-Чистая функция ранга по статистике сектора, бонус кристаллов ровно один раз за сектор,
-бейдж ранга и строка награды в окне промежуточного счёта. Тестов +13 (84 файла / 806 тестов).
-
-Детали реализации:
-
-1. `scoreBreakdown.ts`: `SectorRankInput`, `SectorRank = "S" | "A" | "B"`,
-   `computeSectorRank(input, opts?)` и `sectorRankCrystals(rank)`. Пороги-константы:
-   `SECTOR_RANK_S_COMBO = 8`, `SECTOR_RANK_A_PAR_MULT = 1.25`,
-   `SECTOR_RANK_CRYSTALS = { S: 4, A: 2, B: 0 }`. `null` — при поражении (`{ won: false }`)
-   и для испорченной статистики (NaN/∞ время или эталон); `par <= 0` даёт `B`;
-   `lostBall` закрывает S и A.
-2. `game/runFlow.ts`: рант считается в `showIntermediateScore` (единственная точка показа
-   результата сектора), кладётся в `g.intermediateScore` (`sectorRank`,
-   `sectorRankCrystals`, `sectorParSeconds`), кристаллы начисляются через `g.addCrystals`.
-   Идемпотентность — новое поле `Game.sectorRankAwardedFor` (идентификатор сектора =
-   `runSectorStartTime`), сбрасывается в `resetRunStats`.
-3. `ui/screens/overlays.tsx`: круглый бейдж ранга (S золотой, A мятный, B циановый),
-   подсказка «эталон 45 с · время N с», строка «Ранг S 💎 +4» в блоке сводки.
-
-Allowed files:
-
-- src/game/scoreBreakdown.ts
-- src/game/scoreBreakdown.test.ts
-- src/game/game/runFlow.ts
-- src/game/types.ts
-- src/ui/screens/overlays.tsx
-- src/ui/screens/overlays.test.tsx
-- docs/ROADMAP.md
-- docs/CHANGELOG.md
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Приёмка:
-
-- [x] ранг детерминирован от статистики сектора, границы покрыты тестами
-- [x] бонус кристаллов начисляется ровно один раз
-- [x] на поражении ранг не показывается
-- [x] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
-
-### T-054: «Последний рубеж» боссов
-
-Status: done · Priority: high · Сложность: S · Зависимости: — · Волна 1
-
-Итог (01.11.2026):
-Одноразовое событие при HP ниже порога: баннер, двойное кольцо, звук, ускорение бомб и
-подкрепление на орбите. Баланс боссов без бомб/миньонов не меняется — только визуал.
-Тестов +7 (84 файла / 793 теста), `typecheck`, `lint`, `prettier` чистые.
-
-Детали реализации:
-
-1. `bossVariants.ts`: `BOSS_LAST_STAND_AT = 0.12`, `BOSS_LAST_STAND_PHASE_SHIFT = 0.02`;
-   `BossVariant.lastStandAt`, у фазовых боссов (`phases > 1`) порог выше на 0.02, но всегда
-   ниже `angryAt` — порядок фаз «промежуточная → злая → последний рубеж» сохраняется.
-2. `types.ts`: `BossState.lastStandAt` (порог с арены), `lastStand` (событие израсходовано),
-   `lastStandBombAccelerated` (идущий таймер бомбы уже ускорен).
-3. `boss.ts`: срабатывание в `step()` рядом с `angryAt`; `startLastStand()` — баннер-попап,
-   два кольца, взрыв искр, встряска, вспышка, `sfx.power()`; `LAST_STAND_BOMB_MULT = 0.6`
-   (перемножается с `BOSS_FURY_BOMB_MULT`), ускоряется и уже идущий таймер (разово);
-   `LAST_STAND_MINIONS = 2` миньона на орбите (радиус 120, скорость 1.05) — обычные
-   `minionOrbit`-блоки, их штатно добивают и сметают при смерти босса.
-4. Порог прокинут через конструкторы арен (`buildCrabBoss`, `buildChronoBoss`,
-   `buildCryoDrone`, `buildOctopusBoss`, `buildJellyfishBoss`, `buildLampreyBoss`).
-
-Allowed files:
-
-- src/game/bossVariants.ts
-- src/game/bossVariants.test.ts
-- src/game/types.ts
-- src/game/boss.ts
-- src/game/boss.test.ts
-- src/game/game/hudSync.ts
-- docs/ROADMAP.md
-- docs/CHANGELOG.md
-- .ai/TASKS.md
-- .ai/STATE.md
-- memory-bank/activeContext.md
-
-Приёмка:
-
-- [x] «последний рубеж» срабатывает ровно один раз за бой (тест на повторный вызов)
-- [x] не конфликтует с промежуточной фазой (`phases > 1`) и с агрессией
-- [x] боссы без бомб получают только визуальный сигнал
-- [x] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
-
 ## Выполнено ранее (архив)
 
-Карточки удалены при чистке файла; подробности каждой задачи — в `.ai/STATE.md`
-(раздел «Текущая фаза») и `memory-bank/progress.md`.
+Карточки удалены при чистке файла (договорённость 24.10.2026): подробные карточки живут
+только у трёх последних выполненных задач, остальные — строкой в таблице ниже. Полные
+результаты по каждой задаче — в `.ai/STATE.md` («Текущая фаза») и `memory-bank/progress.md`.
 
 | Задача | Что сделано                                                                               |
 | ------ | ----------------------------------------------------------------------------------------- |
+| T-055  | Ранг сектора S / A / B на промежуточном счёте                                             |
+| T-054  | «Последний рубеж» боссов (одноразовый enrage при HP ≤ 12%)                                |
 | T-053  | Челлендж-узлы 4 → 7 видов (power_hunter, chain_master, armor_breaker)                     |
 | T-040  | Движок синергий перков, бонусов и реликвий (§3.1): 6 синергий, боевые эффекты, HUD-бейджи |
 | T-039  | Расширение каталога реликвий (4 → 8) и HUD-индикация артефактов забега                    |
