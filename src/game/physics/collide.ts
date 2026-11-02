@@ -82,6 +82,26 @@ export const THERMAL_SHOCK_STEAM_MAX_TARGETS = 8
 export const THERMAL_SHOCK_STEAM_DAMAGE = 2
 
 /**
+ * Радиус огненного следа при синергии «Термокопьё».
+ */
+export const THERMAL_LANCE_RADIUS = 40
+
+/**
+ * Лимит целей огненного следа при синергии «Термокопьё».
+ */
+export const THERMAL_LANCE_MAX_TARGETS = 8
+
+/**
+ * Урон огненного следа при синергии «Термокопьё».
+ */
+export const THERMAL_LANCE_DAMAGE = 1
+
+/**
+ * Длительность огненного следа при синергии «Термокопьё», сек.
+ */
+export const THERMAL_LANCE_DURATION = 1.5
+
+/**
  * Множитель вертикальной составляющей отскока при мутаторе «Вязкая бездна»
  * (`low_bounce`): шар летит ниже, и его чаще приходится ловить сэйвом.
  */
@@ -421,6 +441,9 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
       if (wasFrozen || Boolean(g.isThermalShockActive?.())) {
         applyThermalShockSteamAoE(g, b)
       }
+      if (g.isThermalLanceActive?.()) {
+        applyThermalLanceAoE(g, b)
+      }
       continue
     }
     // морозный мяч: живой блок и соседи замораживаются вместо урона,
@@ -463,6 +486,9 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
         damageBlock(g, b, dmg, true, Math.atan2(ball.vy, ball.vx))
         if (isSniper) {
           g.fx.burst(b.x, b.y, "#00f5d4", 8, 160)
+        }
+        if (g.isThermalLanceActive?.()) {
+          applyThermalLanceAoE(g, b)
         }
         continue
       }
@@ -582,6 +608,49 @@ export function applyThermalShockSteamAoE(g: PhysicsWorld, source: Block) {
   for (const other of candidates) {
     if (!other.dead) {
       damageBlock(g, other, THERMAL_SHOCK_STEAM_DAMAGE, true)
+    }
+  }
+}
+
+/**
+ * Огненный термический след синергии «Термокопьё»:
+ * Срабатывает при пробивании блоков огненным проникающим шаром.
+ * Наносит урон 1 в радиусе 40 px и создаёт термические кольца и искры.
+ */
+export function applyThermalLanceAoE(g: PhysicsWorld, source: Block) {
+  const pan = clamp((source.x / g.w) * 2 - 1, -0.85, 0.85)
+  g.sfx.burn(pan)
+  g.fx.burst(source.x, source.y, "#ff5722", 12, 170)
+  g.fx.burst(source.x, source.y, "#ffc107", 8, 120)
+  g.fx.rings.push({
+    x: source.x,
+    y: source.y,
+    r: 4,
+    maxR: THERMAL_LANCE_RADIUS,
+    color: "rgba(255, 87, 34, 0.9)",
+    t: 0,
+  })
+  g.fx.rings.push({
+    x: source.x,
+    y: source.y,
+    r: 2,
+    maxR: THERMAL_LANCE_RADIUS * 0.7,
+    color: "rgba(255, 193, 7, 0.85)",
+    t: 0,
+  })
+
+  const candidates: Block[] = []
+  for (const other of g.blocks) {
+    if (other === source || other.dead || other.isMiniboss || other.bomb) continue
+    if (other.sp?.phase && !isBlockPhaseActive(other, g.time)) continue
+    if (Math.hypot(other.x - source.x, other.y - source.y) > THERMAL_LANCE_RADIUS) continue
+    candidates.push(other)
+    if (candidates.length >= THERMAL_LANCE_MAX_TARGETS) break
+  }
+
+  for (const other of candidates) {
+    if (!other.dead) {
+      damageBlock(g, other, THERMAL_LANCE_DAMAGE, true)
     }
   }
 }
@@ -768,6 +837,21 @@ export function collideBoss(g: PhysicsWorld, ball: Ball) {
       r: 6,
       maxR: 70,
       color: "rgba(255, 122, 54, 0.9)",
+      t: 0,
+    })
+  }
+  const isThermalLance = Boolean(g.isThermalLanceActive?.())
+  if (isThermalLance) {
+    dmg += 2
+    g.shake = Math.min(g.shake + 3, 8)
+    g.hitStop = Math.max(g.hitStop, 0.04)
+    g.fx.burst(bo.x, bo.y, "#ff5722", 16, 220)
+    g.fx.rings.push({
+      x: bo.x,
+      y: bo.y,
+      r: 8,
+      maxR: 80,
+      color: "rgba(255, 87, 34, 0.9)",
       t: 0,
     })
   }

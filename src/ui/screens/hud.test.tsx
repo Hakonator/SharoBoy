@@ -129,7 +129,7 @@ describe("HudOverlay: кнопка быстрого пропуска уровн�
   it("отображает бейджи активных реликвий с иконками и подсказками в HUD кампании", () => {
     const hud = makeHud("playing")
     hud.mode = "campaign"
-    hud.activeRelics = ["relic_frost", "relic_bulwark"]
+    hud.activeRelics = ["relic_frost", "relic_bulwark", "relic_kindle", "relic_anchor"]
 
     const html = renderToStaticMarkup(
       <HudOverlay
@@ -150,8 +150,12 @@ describe("HudOverlay: кнопка быстрого пропуска уровн�
     expect(html).toContain("Реликвии")
     expect(html).toContain("❄️")
     expect(html).toContain("🏰")
+    expect(html).toContain("🧨")
+    expect(html).toContain("⚓")
     expect(html).toContain("Крио-резонатор:")
     expect(html).toContain("Броневой бастион:")
+    expect(html).toContain("Тлеющий фитиль:")
+    expect(html).toContain("Глубинный якорь:")
   })
 
   it("отображает бейджи активных синергий с иконками, названиями и подсказками", () => {
@@ -163,6 +167,7 @@ describe("HudOverlay: кнопка быстрого пропуска уровн�
       "thermal_shock",
       "supernova",
       "absolute_bulwark",
+      "thermal_lance",
     ]
 
     const html = renderToStaticMarkup(
@@ -188,18 +193,21 @@ describe("HudOverlay: кнопка быстрого пропуска уровн�
     expect(html).toContain("🌡️")
     expect(html).toContain("☀️")
     expect(html).toContain("🛡️")
+    expect(html).toContain("🔱")
     expect(html).toContain("СНАЙПЕР")
     expect(html).toContain("РЕЗОНАНС")
     expect(html).toContain("ДЖАГГЕРНАУТ")
     expect(html).toContain("ТЕРМОШОК")
     expect(html).toContain("СВЕРХНОВАЯ")
     expect(html).toContain("БАСТИОН")
+    expect(html).toContain("ТЕРМОКОПЬЁ")
     expect(html).toContain("Кинетический Снайпер")
     expect(html).toContain("Цепной Резонанс")
     expect(html).toContain("Гравитационный Джаггернаут")
     expect(html).toContain("Термический Шок")
     expect(html).toContain("Сверхновая")
     expect(html).toContain("Абсолютный Бастион")
+    expect(html).toContain("Термокопьё")
   })
 
   it("отображает бейдж ежедневного испытания в HUD при mode === daily", () => {

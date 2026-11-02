@@ -1,4 +1,5 @@
 import type { Game } from "../game"
+import type { Ball } from "../types"
 import type { BossHost } from "../boss"
 import type { PowersWorld } from "../powers"
 import type { PhysicsWorld } from "../physics"
@@ -18,6 +19,7 @@ import {
   isKineticSniperActive,
   isSupernovaActive,
   isThermalShockActive,
+  isThermalLanceActive,
 } from "../synergies"
 
 import { addCoins } from "./progress"
@@ -281,6 +283,7 @@ export function makePowersHost(g: Game): PowersWorld {
 
 /** Хост для Physics: кинематика ракетки/шара, предикаты эффектов, колбэки. */
 export function makePhysicsHost(g: Game): PhysicsWorld {
+  const anchorOriginalSpeed = new WeakMap<Ball, number>()
   return {
     get aimAngle() {
       return g.aimAngle
@@ -312,6 +315,18 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     input: g.input,
     get balls() {
+      if (g.campaignRelics?.relicAnchor) {
+        const isLastLife = g.lives === 1
+        for (const b of g.balls) {
+          if (isLastLife && !anchorOriginalSpeed.has(b)) {
+            anchorOriginalSpeed.set(b, b.speed)
+            b.speed *= 0.85
+          } else if (!isLastLife && anchorOriginalSpeed.has(b)) {
+            b.speed = anchorOriginalSpeed.get(b)!
+            anchorOriginalSpeed.delete(b)
+          }
+        }
+      }
       return g.balls
     },
     get blocks() {
@@ -347,6 +362,9 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     set combo(v) {
       g.combo = v
       if (v > g.runMaxCombo) g.runMaxCombo = v
+      if (g.campaignRelics?.relicKindle && g.combo >= 5) {
+        g.fireUntil = Math.max(g.fireUntil, g.time + 3)
+      }
     },
     get shake() {
       return g.shake
@@ -557,6 +575,7 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     isThermalShockActive: () => isThermalShockActive(g),
     isSupernovaActive: () => isSupernovaActive(g),
     isAbsoluteBulwarkActive: () => isAbsoluteBulwarkActive(g),
+    isThermalLanceActive: () => isThermalLanceActive(g),
     pushHud: () => pushHud(g),
   }
 }

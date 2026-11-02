@@ -154,6 +154,8 @@ export interface PhysicsWorld {
   isSupernovaActive?(): boolean
   /** Активна синергия «Абсолютный Бастион» (гарантированный крит-сэйв ×2 на каждый отскок и поглощение бомб). */
   isAbsoluteBulwarkActive?(): boolean
+  /** Активна синергия «Термокопьё» (огненный термический след при пробивании). */
+  isThermalLanceActive?(): boolean
   pushHud(): void
   /** Множитель урона шара (отладка: увеличивается клавишей NumpadSubtract). */
   readonly debugBallDamage: number

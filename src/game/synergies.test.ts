@@ -9,13 +9,14 @@ import {
   isKineticSniperActive,
   isSupernovaActive,
   isThermalShockActive,
+  isThermalLanceActive,
   type SynergyDetectorState,
   type SynergyId,
 } from "./synergies"
 
 describe("Synergies Engine (T-040, §3.1 Roadmap)", () => {
   describe("Метаданные синергий", () => {
-    it("содержит описания для всех 6 синергий дорожной карты", () => {
+    it("содержит описания для всех 7 синергий дорожной карты", () => {
       const ids: SynergyId[] = [
         "kinetic_sniper",
         "chain_resonance",
@@ -23,6 +24,7 @@ describe("Synergies Engine (T-040, §3.1 Roadmap)", () => {
         "thermal_shock",
         "supernova",
         "absolute_bulwark",
+        "thermal_lance",
       ]
       for (const id of ids) {
         const meta = SYNERGIES_META[id]
@@ -246,12 +248,66 @@ describe("Synergies Engine (T-040, §3.1 Roadmap)", () => {
     })
   })
 
+  describe("«Термокопьё» (Thermal Lance)", () => {
+    it("не активен, если нет проникающего шара", () => {
+      expect(isThermalLanceActive({ time: 5, pierceUntil: 0, fireUntil: 10 })).toBe(false)
+    })
+
+    it("не активен, если нет огня", () => {
+      expect(isThermalLanceActive({ time: 5, pierceUntil: 10, fireUntil: 0 })).toBe(false)
+    })
+
+    it("активен при сочетании pierceUntil и fireUntil", () => {
+      expect(isThermalLanceActive({ time: 5, pierceUntil: 10, fireUntil: 10 })).toBe(true)
+    })
+
+    it("активен при pierceUntil и relicFire с комбо >= 3", () => {
+      expect(
+        isThermalLanceActive({
+          time: 5,
+          pierceUntil: 10,
+          fireUntil: 0,
+          combo: 3,
+          campaignRelics: { relicFire: true },
+        })
+      ).toBe(true)
+    })
+
+    it("не активен при pierceUntil и relicFire с комбо < 3", () => {
+      expect(
+        isThermalLanceActive({
+          time: 5,
+          pierceUntil: 10,
+          fireUntil: 0,
+          combo: 2,
+          campaignRelics: { relicFire: true },
+        })
+      ).toBe(false)
+    })
+
+    it("поддерживает функциональные геттеры pierceActive и fireActive", () => {
+      expect(
+        isThermalLanceActive({
+          pierceActive: () => true,
+          fireActive: () => true,
+        })
+      ).toBe(true)
+
+      expect(
+        isThermalLanceActive({
+          pierceActive: () => false,
+          fireActive: () => true,
+        })
+      ).toBe(false)
+    })
+  })
+
   describe("getActiveSynergies", () => {
     it("возвращает пустой массив при отсутствии активных компонентов", () => {
       expect(getActiveSynergies({ time: 10 })).toEqual([])
     })
 
-    it("корректно возвращает все 6 одновременно активных синергий", () => {
+    it("корректно возвращает все 7 одновременно активных синергий", () => {
       const state: SynergyDetectorState = {
         time: 10,
         pierceUntil: 20,
@@ -272,7 +328,8 @@ describe("Synergies Engine (T-040, §3.1 Roadmap)", () => {
       expect(active).toContain("thermal_shock")
       expect(active).toContain("supernova")
       expect(active).toContain("absolute_bulwark")
-      expect(active).toHaveLength(6)
+      expect(active).toContain("thermal_lance")
+      expect(active).toHaveLength(7)
     })
   })
 })

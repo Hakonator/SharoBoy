@@ -11,6 +11,8 @@ export type CampaignRelicId =
   | "relic_combo"
   | "relic_bulwark"
   | "relic_overdrive"
+  | "relic_kindle"
+  | "relic_anchor"
 
 export interface CampaignRelicsState {
   relicShield?: boolean
@@ -21,6 +23,8 @@ export interface CampaignRelicsState {
   relicCombo?: boolean
   relicBulwark?: boolean
   relicOverdrive?: boolean
+  relicKindle?: boolean
+  relicAnchor?: boolean
 }
 
 export interface RelicMeta {
@@ -97,6 +101,22 @@ export const CAMPAIGN_RELICS_META: Record<CampaignRelicId, RelicMeta> = {
     icon: "🔋",
     color: "#ec4899",
   },
+  relic_kindle: {
+    id: "relic_kindle",
+    name: "Тлеющий фитиль",
+    shortName: "ФИТИЛЬ",
+    desc: "При комбо ≥ 5 включает огненный шар на 3 с.",
+    icon: "🧨",
+    color: "#fb923c",
+  },
+  relic_anchor: {
+    id: "relic_anchor",
+    name: "Глубинный якорь",
+    shortName: "ЯКОРЬ",
+    desc: "На последней жизни шар замедляется на 15%.",
+    icon: "⚓",
+    color: "#38bdf8",
+  },
 }
 
 export const RELIC_ID_TO_KEY: Record<CampaignRelicId, keyof CampaignRelicsState> = {
@@ -108,6 +128,8 @@ export const RELIC_ID_TO_KEY: Record<CampaignRelicId, keyof CampaignRelicsState>
   relic_combo: "relicCombo",
   relic_bulwark: "relicBulwark",
   relic_overdrive: "relicOverdrive",
+  relic_kindle: "relicKindle",
+  relic_anchor: "relicAnchor",
 }
 
 export const RELIC_KEY_TO_ID: Record<keyof CampaignRelicsState, CampaignRelicId> = {
@@ -119,6 +141,8 @@ export const RELIC_KEY_TO_ID: Record<keyof CampaignRelicsState, CampaignRelicId>
   relicCombo: "relic_combo",
   relicBulwark: "relic_bulwark",
   relicOverdrive: "relic_overdrive",
+  relicKindle: "relic_kindle",
+  relicAnchor: "relic_anchor",
 }
 
 /** Получить список ID активных реликвий из объекта состояния. */

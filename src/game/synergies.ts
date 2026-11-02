@@ -14,6 +14,7 @@ export type SynergyId =
   | "thermal_shock"
   | "supernova"
   | "absolute_bulwark"
+  | "thermal_lance"
 
 export interface SynergyMeta {
   readonly id: SynergyId
@@ -87,6 +88,16 @@ export const SYNERGIES_META: Record<SynergyId, SynergyMeta> = {
     color: "#10b981",
     glowColor: "rgba(16, 185, 129, 0.45)",
   },
+  thermal_lance: {
+    id: "thermal_lance",
+    name: "Термокопьё",
+    shortName: "ТЕРМОКОПЬЁ",
+    desc: "Пробивание + Огонь: пробивание оставляет огненный след с уроном 1 в радиусе 40 px на 1.5 с.",
+    ingredients: ["Кинетический клинок", "Огненный шар"],
+    icon: "🔱",
+    color: "#ff5722",
+    glowColor: "rgba(255, 87, 34, 0.45)",
+  },
 }
 
 /** Состояние игры, достаточное для детекции активных синергий. */
@@ -111,6 +122,8 @@ export interface SynergyDetectorState {
         relicShield?: boolean
         relicFire?: boolean
         relicFrost?: boolean
+        relicKindle?: boolean
+        relicAnchor?: boolean
       }
     | null
   campaignModifiers?: readonly string[] | null
@@ -219,6 +232,20 @@ export function isAbsoluteBulwarkActive(g: SynergyDetectorState): boolean {
   return Boolean(hasShield && hasWideOrBulwark)
 }
 
+/**
+ * 7. «Термокопьё»:
+ * Проникающий шар («Кинетический клинок») + Огненный шар (бонус, перк или реликвии «Огненная амбра» / «Тлеющий фитиль»).
+ */
+export function isThermalLanceActive(g: SynergyDetectorState): boolean {
+  const pierce = g.pierceActive ? g.pierceActive() : (g.pierceUntil ?? 0) > (g.time ?? 0)
+  if (!pierce) return false
+  const fire = g.fireActive
+    ? g.fireActive()
+    : (g.fireUntil ?? 0) > (g.time ?? 0) ||
+      Boolean(g.campaignRelics?.relicFire && (g.combo ?? 0) >= 3)
+  return Boolean(fire)
+}
+
 /** Возвращает список идентификаторов всех синергий, активных в текущий момент. */
 export function getActiveSynergies(g: SynergyDetectorState): SynergyId[] {
   const active: SynergyId[] = []
@@ -228,5 +255,6 @@ export function getActiveSynergies(g: SynergyDetectorState): SynergyId[] {
   if (isThermalShockActive(g)) active.push("thermal_shock")
   if (isSupernovaActive(g)) active.push("supernova")
   if (isAbsoluteBulwarkActive(g)) active.push("absolute_bulwark")
+  if (isThermalLanceActive(g)) active.push("thermal_lance")
   return active
 }

@@ -26,9 +26,14 @@ import {
   THERMAL_SHOCK_STEAM_DAMAGE,
   THERMAL_SHOCK_STEAM_MAX_TARGETS,
   THERMAL_SHOCK_STEAM_RADIUS,
+  THERMAL_LANCE_DAMAGE,
+  THERMAL_LANCE_DURATION,
+  THERMAL_LANCE_MAX_TARGETS,
+  THERMAL_LANCE_RADIUS,
   applyClutchRebound,
   applyExplosiveBallAoE,
   applyThermalShockSteamAoE,
+  applyThermalLanceAoE,
   collideBlocks,
   collideBoss,
   collidePaddle,
@@ -529,6 +534,53 @@ describe("Синергии боевых механик (T-040, §3.1 Roadmap)", 
 
       expect(ball.clutchHits).toBe(2)
       expect(clutchCalled).toBe(true)
+    })
+  })
+
+  describe("«Термокопьё» (Thermal Lance)", () => {
+    it("соответствует спецификации: радиус следа 40, урон 1, лимит 8, длительность 1.5", () => {
+      expect(THERMAL_LANCE_RADIUS).toBe(40)
+      expect(THERMAL_LANCE_DAMAGE).toBe(1)
+      expect(THERMAL_LANCE_MAX_TARGETS).toBe(8)
+      expect(THERMAL_LANCE_DURATION).toBe(1.5)
+    })
+
+    it("термический след поражает блоки в радиусе 40 px на урон 1", () => {
+      const source = makeBlock(200, 300)
+      const near = makeBlock(200, 330) // расстояние 30 (<= 40)
+      const far = makeBlock(200, 355) // расстояние 55 (> 40)
+
+      const world = makeWorld([source, near, far], false)
+      applyThermalLanceAoE(world, source)
+
+      expect(near.hp).toBe(4) // 5 - 1
+      expect(far.hp).toBe(5) // не задет
+    })
+
+    it("наносит +2 дополнительный урон по боссу при активной синергии", () => {
+      let bossDamageDealt = 0
+      const world = makeWorld([], false)
+      ;(world as unknown as { boss: unknown }).boss = {
+        x: 200,
+        y: 100,
+        r: 40,
+        hp: 100,
+        maxHp: 100,
+        kind: "kraken",
+        state: "idle",
+      } as unknown as PhysicsWorld["boss"]
+      world.damageBoss = (dmg: number) => {
+        bossDamageDealt += dmg
+      }
+      world.isThermalLanceActive = () => true
+
+      const ball = makeBall(200, 145)
+      ball.vy = -300
+      collideBoss(world, ball)
+
+      // Обычный урон 1 + бонус 2 от Термокопья = 3
+      expect(bossDamageDealt).toBe(3)
+      expect(world.shake).toBeGreaterThanOrEqual(3)
     })
   })
 })

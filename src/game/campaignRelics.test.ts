@@ -10,6 +10,7 @@ import {
 import { SHOP_CATALOG, canBuyCampaignShopItem, buyCampaignShopItem } from "./campaignShop"
 import { loseLife, onBombHitPaddle, resetRun } from "./game/runFlow"
 import { launchNodeBattle } from "./game/campaignFlow"
+import { makePhysicsHost } from "./game/hosts"
 import { pushHud } from "./game/hudSync"
 import type { Game } from "./game"
 import type { CampaignShopItem, HudData } from "./types"
@@ -114,9 +115,9 @@ function makeMockGame(over: Partial<Game> = {}): Game {
 }
 
 describe("campaignRelics: метаданные и каталог", () => {
-  it("содержит ровно 8 реликвий в мета-каталоге", () => {
+  it("содержит ровно 10 реликвий в мета-каталоге", () => {
     const ids = Object.keys(CAMPAIGN_RELICS_META) as CampaignRelicId[]
-    expect(ids).toHaveLength(8)
+    expect(ids).toHaveLength(10)
     expect(ids).toContain("relic_shield")
     expect(ids).toContain("relic_spark")
     expect(ids).toContain("relic_fire")
@@ -125,6 +126,8 @@ describe("campaignRelics: метаданные и каталог", () => {
     expect(ids).toContain("relic_combo")
     expect(ids).toContain("relic_bulwark")
     expect(ids).toContain("relic_overdrive")
+    expect(ids).toContain("relic_kindle")
+    expect(ids).toContain("relic_anchor")
   })
 
   it("проверяет взаимно-однозначное соответствие ключей и ID", () => {
@@ -144,13 +147,21 @@ describe("campaignRelics: метаданные и каталог", () => {
       relicShield: true,
       relicFrost: true,
       relicOverdrive: true,
+      relicKindle: true,
+      relicAnchor: true,
     })
-    expect(active).toEqual(["relic_shield", "relic_frost", "relic_overdrive"])
+    expect(active).toEqual([
+      "relic_shield",
+      "relic_frost",
+      "relic_overdrive",
+      "relic_kindle",
+      "relic_anchor",
+    ])
   })
 
-  it("SHOP_CATALOG содержит все 8 реликвий с валидными ценами", () => {
+  it("SHOP_CATALOG содержит все 10 реликвий с валидными ценами", () => {
     const relicItems = SHOP_CATALOG.filter((item) => item.category === "relic")
-    expect(relicItems).toHaveLength(8)
+    expect(relicItems).toHaveLength(10)
     const relicIds = relicItems.map((r) => r.id)
     expect(relicIds).toEqual([
       "relic_shield",
@@ -161,11 +172,15 @@ describe("campaignRelics: метаданные и каталог", () => {
       "relic_combo",
       "relic_bulwark",
       "relic_overdrive",
+      "relic_kindle",
+      "relic_anchor",
     ])
     for (const item of relicItems) {
       expect(item.basePrice).toBeGreaterThan(0)
       expect(item.desc.length).toBeGreaterThan(10)
     }
+    expect(SHOP_CATALOG.find((i) => i.id === "relic_kindle")?.basePrice).toBe(42)
+    expect(SHOP_CATALOG.find((i) => i.id === "relic_anchor")?.basePrice).toBe(48)
   })
 })
 
@@ -255,6 +270,54 @@ describe("campaignRelics: магазин кампании и покупка", ()
     expect(canBuyCampaignShopItem(g, shopItem).canBuy).toBe(true)
     expect(buyCampaignShopItem(g, "relic_overdrive")).toBe(true)
     expect(g.campaignRelics.relicOverdrive).toBe(true)
+  })
+
+  it("покупка relic_kindle и relic_anchor активирует соответствующие флаги в campaignRelics", () => {
+    const g = makeMockGame({
+      crystals: 150,
+      campaignRelics: {},
+    })
+    const kindleItem = SHOP_CATALOG.find((i) => i.id === "relic_kindle")!
+    const anchorItem = SHOP_CATALOG.find((i) => i.id === "relic_anchor")!
+    const shopItemKindle: CampaignShopItem = {
+      id: kindleItem.id,
+      name: kindleItem.name,
+      desc: kindleItem.desc,
+      price: kindleItem.basePrice,
+      category: kindleItem.category,
+      icon: kindleItem.icon,
+      relic: true,
+      sold: false,
+    }
+    const shopItemAnchor: CampaignShopItem = {
+      id: anchorItem.id,
+      name: anchorItem.name,
+      desc: anchorItem.desc,
+      price: anchorItem.basePrice,
+      category: anchorItem.category,
+      icon: anchorItem.icon,
+      relic: true,
+      sold: false,
+    }
+    g.campaignShop = {
+      nodeId: 2,
+      name: "Лавка",
+      items: [shopItemKindle, shopItemAnchor],
+    }
+
+    expect(canBuyCampaignShopItem(g, shopItemKindle).canBuy).toBe(true)
+    expect(buyCampaignShopItem(g, "relic_kindle")).toBe(true)
+    expect(g.campaignRelics.relicKindle).toBe(true)
+    expect(g.crystals).toBe(150 - 42)
+
+    expect(canBuyCampaignShopItem(g, shopItemAnchor).canBuy).toBe(true)
+    expect(buyCampaignShopItem(g, "relic_anchor")).toBe(true)
+    expect(g.campaignRelics.relicAnchor).toBe(true)
+    expect(g.crystals).toBe(150 - 42 - 48)
+
+    // Повторная покупка запрещена
+    expect(canBuyCampaignShopItem(g, shopItemKindle).canBuy).toBe(false)
+    expect(canBuyCampaignShopItem(g, shopItemAnchor).canBuy).toBe(false)
   })
 })
 
@@ -367,6 +430,8 @@ describe("campaignRelics: механики в бою", () => {
         relicShield: true,
         relicFrost: true,
         relicOverdrive: true,
+        relicKindle: true,
+        relicAnchor: true,
       },
       onHud: (hud: HudData) => {
         capturedHud = hud
@@ -375,6 +440,95 @@ describe("campaignRelics: механики в бою", () => {
 
     pushHud(g)
     expect(capturedHud).toBeTruthy()
-    expect(capturedHud!.activeRelics).toEqual(["relic_shield", "relic_frost", "relic_overdrive"])
+    expect(capturedHud!.activeRelics).toEqual([
+      "relic_shield",
+      "relic_frost",
+      "relic_overdrive",
+      "relic_kindle",
+      "relic_anchor",
+    ])
+  })
+
+  it("relic_kindle: при комбо >= 5 включает огненный шар на 3 с", () => {
+    const g = makeMockGame({
+      time: 10,
+      combo: 0,
+      fireUntil: 0,
+      campaignRelics: { relicKindle: true },
+    })
+    const host = makePhysicsHost(g)
+
+    // При комбо < 5 огонь не включается
+    host.combo = 4
+    expect(g.fireUntil).toBe(0)
+    expect(host.fireActive()).toBe(false)
+
+    // При достижении комбо >= 5 огонь включается на 3 сек (time 10 + 3 = 13)
+    host.combo = 5
+    expect(g.fireUntil).toBe(13)
+    expect(host.fireActive()).toBe(true)
+
+    // Пока таймер не истёк, огонь остаётся активным
+    g.time = 12.5
+    expect(host.fireActive()).toBe(true)
+
+    // После истечения таймера огонь выключается
+    g.time = 13.5
+    expect(host.fireActive()).toBe(false)
+
+    // Без реликвии комбо >= 5 не активирует fireUntil
+    const gWithoutRelic = makeMockGame({
+      time: 10,
+      combo: 0,
+      fireUntil: 0,
+      campaignRelics: {},
+    })
+    const hostWithout = makePhysicsHost(gWithoutRelic)
+    hostWithout.combo = 5
+    expect(gWithoutRelic.fireUntil).toBe(0)
+    expect(hostWithout.fireActive()).toBe(false)
+  })
+
+  it("relic_anchor: на последней жизни шар замедляется на 15%", () => {
+    const ball = {
+      x: 400,
+      y: 800,
+      vx: 0,
+      vy: -500,
+      r: 9,
+      speed: 500,
+      stuck: false,
+      stuckOffset: 0,
+      trail: [],
+      squash: 0,
+      sinceHit: 0,
+    }
+    const g = makeMockGame({
+      lives: 3,
+      balls: [ball],
+      campaignRelics: { relicAnchor: true },
+    })
+    const host = makePhysicsHost(g)
+
+    // При 3 жизнях скорость шара номинальная (500)
+    expect(host.balls[0].speed).toBe(500)
+
+    // При потере жизней до 1 («последняя жизнь») скорость снижается на 15% (500 * 0.85 = 425)
+    g.lives = 1
+    expect(host.balls[0].speed).toBeCloseTo(425, 1)
+
+    // При восстановлении жизней (например, починка/апгрейд до 2) скорость возвращается к норме
+    g.lives = 2
+    expect(host.balls[0].speed).toBeCloseTo(500, 1)
+
+    // Без реликвии при 1 жизни замедление не происходит
+    const ball2 = { ...ball, speed: 500 }
+    const gWithout = makeMockGame({
+      lives: 1,
+      balls: [ball2],
+      campaignRelics: {},
+    })
+    const hostWithout = makePhysicsHost(gWithout)
+    expect(hostWithout.balls[0].speed).toBe(500)
   })
 })

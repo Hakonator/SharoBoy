@@ -144,6 +144,24 @@ export const SHOP_CATALOG: ShopCatalogEntry[] = [
     icon: "life",
     relic: true,
   },
+  {
+    id: "relic_kindle",
+    name: "Тлеющий фитиль",
+    desc: "Реликвия: при комбо ≥ 5 включает огненный шар на 3 с.",
+    basePrice: 42,
+    category: "relic",
+    icon: "fire",
+    relic: true,
+  },
+  {
+    id: "relic_anchor",
+    name: "Глубинный якорь",
+    desc: "Реликвия: на последней жизни шар замедляется на 15%.",
+    basePrice: 48,
+    category: "relic",
+    icon: "shield",
+    relic: true,
+  },
 ]
 
 /**
@@ -301,6 +319,12 @@ export function buyCampaignShopItem(g: Game, itemId: string): boolean {
       break
     case "relic_overdrive":
       g.campaignRelics.relicOverdrive = true
+      break
+    case "relic_kindle":
+      g.campaignRelics.relicKindle = true
+      break
+    case "relic_anchor":
+      g.campaignRelics.relicAnchor = true
       break
   }
 
