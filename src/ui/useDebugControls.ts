@@ -59,6 +59,12 @@ export function useDebugControls(gameRef: RefObject<Game | null>) {
     } else if (debugBoss === "minibossJelly") {
       game.debugBossType = null
       game.spawnDebugMiniboss("jelly")
+    } else if (debugBoss === "minibossCrab") {
+      game.debugBossType = null
+      game.spawnDebugMiniboss("armored_crab")
+    } else if (debugBoss === "minibossEel") {
+      game.debugBossType = null
+      game.spawnDebugMiniboss("slippery_eel")
     } else if (debugBoss === "specialBlocks") {
       game.debugBossType = null
       game.spawnDebugSpecialBlocks()

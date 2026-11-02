@@ -281,6 +281,10 @@ export function MenuDebug({
                     label: "Медуза (мини)",
                     icon: <IconJelly className="h-3.5 w-3.5" />,
                   },
+                  // Новые виды минибоссов (T-058). Эмодзи 🦀 уже занят боссом
+                  // Акта 2, поэтому «мини» явно указано в подписи.
+                  { id: "minibossCrab", label: "🦀 Краб (мини)" },
+                  { id: "minibossEel", label: "🐍 Угорь (мини)" },
                   { id: "specialBlocks", label: "Спецблоки (стенд)" },
                 ] as BossOption[]
               ).map((b) => (

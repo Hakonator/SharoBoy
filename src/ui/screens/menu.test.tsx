@@ -5,6 +5,7 @@ import type { HudData } from "../../game/types"
 import { ControlsPanel } from "../icons"
 
 import { MenuScreen } from "./menu"
+import { MenuDebug } from "./menuPanels"
 
 const hud = {
   phase: "menu",
@@ -200,5 +201,37 @@ describe("MenuScreen: справка по управлению под спосо
   it("отображает кнопку запуска ежедневного испытания", () => {
     const html = renderMenu()
     expect(html).toContain("📅 Ежедневное")
+  })
+})
+
+describe("MenuDebug: выбор минибосса в отладке", () => {
+  const renderDebug = () =>
+    renderToStaticMarkup(
+      <MenuDebug
+        debug
+        onToggleDebug={() => {}}
+        debugBoss=""
+        onSelectDebugBoss={() => {}}
+        isDebugEffectActive={() => false}
+        onToggleDebugEffect={() => {}}
+        onDebugStartGame={() => {}}
+      />
+    )
+
+  it("предлагает запустить каждый из четырёх видов минибоссов", () => {
+    const html = renderDebug()
+    // T-058: новые виды обязаны быть в панели, иначе их не проверить вживую.
+    expect(html).toContain('value="minibossFish"')
+    expect(html).toContain('value="minibossJelly"')
+    expect(html).toContain('value="minibossCrab"')
+    expect(html).toContain('value="minibossEel"')
+  })
+
+  it("подписывает новых минибоссов так, чтобы их не путать с боссами Актов", () => {
+    const html = plain(renderDebug())
+    // 🦀 уже занят «Меха-Крабом» (босс Акта 2) — «мини» в подписи обязательно.
+    expect(html).toContain("🦀 Краб (мини)")
+    expect(html).toContain("🐍 Угорь (мини)")
+    expect(html).toContain("🦀 Меха-Краб (Акт 2)")
   })
 })
