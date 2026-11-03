@@ -185,6 +185,7 @@ jobs:
     if: >-
       ${{
         always() && !cancelled() &&
+        needs.build-stable.result != 'cancelled' && needs.build-beta.result != 'cancelled' &&
         (needs.build-stable.result == 'success' || needs.build-beta.result == 'success')
       }}
     runs-on: ubuntu-latest
@@ -192,6 +193,11 @@ jobs:
       contents: write
       actions: read
     steps:
+      # КОРЕНЬ САЙТА. Строго обязателен: Pages-деплой заменяет сайт целиком,
+      # поэтому без корня публикация унесла бы с собой стабильную версию.
+      # Раньше этот шаг молча ничего не делал, когда build-stable был skipped:
+      # site/ оставался без index.html, и публикация падала уже после успешной
+      # сборки beta (инцидент сборки 360).
       - name: Свежая сборка main → корень сайта
         if: needs.build-stable.result == 'success'
         uses: actions/download-artifact@v4
@@ -203,16 +209,50 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           ART_ID=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=site-stable&per_page=100" \
             --jq '[.artifacts[] | select(.expired == false)][0].id' 2>/dev/null || true)
           if [ -z "$ART_ID" ] || [ "$ART_ID" = "null" ]; then
-            echo "::error::Сборка main в этом прогоне не выполнялась, а прошлой зелёной сборки нет — корень сайта нечем заполнить."
-            exit 1
+            # Зелёной сборки main ещё не было (сейчас деплоится только beta).
+            # Это НЕ повод валить публикацию: корень просто остаётся прежним —
+            # его сохранит шаг «Сохранение текущего корня сайта».
+            echo "::warning::Сборки main нет — корень сайта сохраняем от прошлой публикации."
+            echo "root_available=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           echo "Используем артефакт #$ART_ID последней зелёной сборки main."
           gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip" > /tmp/site-stable.zip
           mkdir -p site
           unzip -q /tmp/site-stable.zip -d site
+          echo "root_available=true" >> "$GITHUB_OUTPUT"
+        id: root-fallback
+      # Корень сайта не удалось взять из артефакта main (его ещё ни разу не
+      # собирали). Pages публикует сайт АТОМАРНО, поэтому сохраняем корень из
+      # уже опубликованной gh-pages: иначе beta-деплой затёр бы стабильную
+      # версию файлами одной беты.
+      - name: Сохранение текущего корня сайта
+        if: needs.build-stable.result != 'success' && steps.root-fallback.outputs.root_available != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages >/dev/null 2>&1; then
+            git clone -q --depth 1 --branch gh-pages \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ../published-gh-pages
+            mkdir -p site
+            # Берём ВСЁ, кроме beta/ (её перезапишет свежая сборка ниже).
+            (cd ../published-gh-pages && tar -cf - --exclude=./.git --exclude=./beta .) | tar -xf - -C site
+            echo "Корень сайта сохранён из gh-pages."
+          else
+            echo "::warning::Ветки gh-pages ещё нет — корень сайта будет пустым (первая публикация)."
+          fi
+      # --- ФОЛБЭКИ ВЕРСИЙ ---
+      # Каждая версия берётся из артефакта ТОЛЬКО текущего прогона. Раньше здесь
+      # брался «последний не-протухший артефакт вообще», поэтому пустая или
+      # полупустая сборка могла подменить опубликованную версию чужой
+      # (инцидент сборки 360: в site/ не оказалось корня сайта).
+      # Если артефакта этого прогона нет — версия остаётся в том виде, в каком
+      # уже лежит в gh-pages: шаг сохранения ниже кладёт её обратно.
       - name: Свежая сборка beta → /beta/
         if: needs.build-beta.result == 'success'
         uses: actions/download-artifact@v4
@@ -224,16 +264,38 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           ART_ID=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=site-beta&per_page=100" \
-            --jq '[.artifacts[] | select(.expired == false)][0].id' 2>/dev/null || true)
+            --jq "[.artifacts[] | select(.expired == false and .workflow_run.id == $GITHUB_RUN_ID)][0].id" \
+            2>/dev/null || true)
           if [ -z "$ART_ID" ] || [ "$ART_ID" = "null" ]; then
-            echo "::error::Сборка beta в этом прогоне не выполнялась, а прошлой зелёной сборки нет — /beta/ нечем заполнить."
-            exit 1
+            echo "::warning::Свежей сборки beta в этом прогоне нет — /beta/ берём из опубликованной gh-pages."
+            echo "beta_available=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-          echo "Используем артефакт #$ART_ID последней зелёной сборки beta."
+          echo "Используем артефакт #$ART_ID сборки beta этого прогона."
           gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip" > /tmp/site-beta.zip
           mkdir -p site/beta
           unzip -q /tmp/site-beta.zip -d site/beta
+          echo "beta_available=true" >> "$GITHUB_OUTPUT"
+        id: beta-fallback
+      - name: Сохранение опубликованной /beta/
+        if: needs.build-beta.result != 'success' && steps.beta-fallback.outputs.beta_available != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages >/dev/null 2>&1; then
+            git clone -q --depth 1 --branch gh-pages \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ../published-for-beta
+            mkdir -p site/beta
+            if [ -d ../published-for-beta/beta ]; then
+              (cd ../published-for-beta/beta && tar -cf - .) | tar -xf - -C site/beta
+              echo "Опубликованная /beta/ сохранена."
+            else
+              echo "::warning::В gh-pages нет /beta/ — версия будет отсутствовать."
+            fi
+          fi
       - name: Загрузка собранного сайта как артефакта
         uses: actions/upload-artifact@v4
         with:
@@ -251,6 +313,21 @@ jobs:
           set -euo pipefail
           cd site
 
+          # Страховка: без корневого index.html публикация навсегда лишила бы
+          # сайт стабильной версии (Pages заменяет сайт целиком).
+          if [ ! -f index.html ]; then
+            echo "::error::В site/ нет index.html — публикация унесла бы корень сайта. Останавливаюсь."
+            exit 1
+          fi
+          if [ ! -d beta ]; then
+            echo "::warning::В site/ нет /beta/ — на сайте останется только стабильная версия."
+          fi
+
+          # Артефакты прошлых прогонов могли принести с собой .git (репозиторий
+          # gh-pages целиком) — вычищаем, иначе git init создаст вложенный
+          # репозиторий, и публикация уедет не туда.
+          rm -rf .git
+
           # Ветка gh-pages уже существует? Если нет — публикуем в первый раз.
           if git ls-remote --exit-code "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages >/dev/null 2>&1; then
             # Ветка есть. Скачиваем её в отдельную папку для сравнения.
@@ -267,9 +344,8 @@ jobs:
             echo "Ветки gh-pages ещё нет — публикуем в первый раз."
           fi
 
-          git init -q
+          git init -q -b gh-pages
           git add -A
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
             commit -qm "deploy: ${{ github.ref_name }} @ ${GITHUB_SHA:0:7}"
-          git branch -M gh-pages
           git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
