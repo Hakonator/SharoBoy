@@ -327,6 +327,17 @@ export interface Block {
     | "eel_head"
     | "eel_seg"
     | "eel_fin"
+  /**
+   * Направление «лицом» для существ с выраженной передней частью (−1 влево,
+   * +1 вправо). Пишет `updateMinibosses` по фактическому движению, читает
+   * рендер: силуэт отражается, чтобы существо не «плыло задом».
+   */
+  mbFacing?: 1 | -1
+  /** Текущее смещение покачивания минибосса от `x0` (пишет `stepBlock`). */
+  mbSwayOffset?: number
+  /** Разрешённый диапазон суммарного смещения минибосса от `x0`. */
+  mbSwayMin?: number
+  mbSwayMax?: number
 }
 
 /** Вид мини-босса кампании (зеркало `MinibossKind` из `minibosses.ts`). */
@@ -356,6 +367,10 @@ export interface MinibossCreature {
   dashDir?: number
   /** Во время рывка существо неуязвимо и отбивает шар ускоренным. */
   invulnerable?: boolean
+  /** Направление движения силуэта: −1 влево, +1 вправо (см. `Block.mbFacing`). */
+  facing?: 1 | -1
+  /** Средний X группы в прошлом кадре — база для вычисления направления. */
+  lastX?: number
 }
 
 export interface MouthBubble {

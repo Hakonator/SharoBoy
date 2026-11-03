@@ -6,6 +6,7 @@ import {
   CRAB_SHARD_COUNT,
   EEL_DASH_DURATION,
   EEL_DASH_INTERVAL,
+  EEL_DASH_REACH,
   EEL_DASH_TELEGRAPH,
   MINIBOSS_KINDS,
 } from "../minibosses"
@@ -374,4 +375,90 @@ describe("T-058: все виды проходят общий цикл миниб
       }
     })
   }
+})
+
+/** T-063: доработка угря — разворот силуэта и рывок без телепорта. */
+describe("T-063: угорь разворачивается и не телепортируется на рывке", () => {
+  function eelEnv() {
+    const env = makeEnv()
+    const { game } = env
+    resetMiniboss(game)
+    game.phase = "playing"
+    game.mode = "campaign"
+    game.blocks = game.blocks.filter((b) => !b.isMiniboss)
+    addMiniboss(game, "slippery_eel", 40)
+    return env
+  }
+
+  it("направление силуэта следует за движением, а не «плывёт задом»", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const creature = game.minibosses[0]!
+      const group = game.blocks.filter((b) => (b.mbGroup ?? 0) === creature.group)
+
+      // существо сместилось влево — нос должен смотреть влево
+      for (const b of group) b.x = b.x0 - 80
+      updateMinibosses(game, 0.016)
+      expect(creature.facing).toBe(-1)
+      expect(group.every((b) => b.mbFacing === -1)).toBe(true)
+
+      // и обратно вправо — силуэт разворачивается
+      for (const b of group) b.x = b.x0 + 60
+      updateMinibosses(game, 0.016)
+      expect(creature.facing).toBe(1)
+      expect(group.every((b) => b.mbFacing === 1)).toBe(true)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  it("живой центр обновляется каждый кадр — телеграф не появляется в стороне", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const creature = game.minibosses[0]!
+      const group = game.blocks.filter((b) => (b.mbGroup ?? 0) === creature.group)
+      for (const b of group) b.x = b.x0 + 120
+      updateMinibosses(game, 0.016)
+      const mean = group.reduce((s, b) => s + b.x, 0) / group.length
+      expect(creature.dropX).toBeCloseTo(mean, 5)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  it("старт рывка не двигает существо: смещение складывается с покачиванием", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const creature = game.minibosses[0]!
+      const group = game.blocks.filter((b) => (b.mbGroup ?? 0) === creature.group)
+      const head = group.find((b) => b.mbPart === "eel_head")!
+      // Имитируем покачивание: существо патрулирует левее своей базы.
+      for (const b of group) {
+        b.mbSwayOffset = -120
+        b.mbSwayMin = -400
+        b.mbSwayMax = 400
+        b.x = b.x0 - 120
+      }
+      game.paddle.x = game.w - 60
+      updateMinibosses(game, EEL_DASH_INTERVAL + 0.01) // idle → telegraph
+      const xAtTelegraph = head.x
+      updateMinibosses(game, EEL_DASH_TELEGRAPH + 0.01) // telegraph → dash
+      expect(creature.dashState).toBe("dash")
+      // Главный регресс: переход в рывок не должен прыгать к базовой позиции.
+      expect(head.x).toBeCloseTo(xAtTelegraph)
+
+      // на пике вылет добавляется к текущему покачиванию, а не заменяет его
+      updateMinibosses(game, EEL_DASH_DURATION * 0.5)
+      expect(head.x).toBeCloseTo(head.x0 - 120 + EEL_DASH_REACH, 0)
+
+      // после рывка — ровно на точку патруля
+      updateMinibosses(game, EEL_DASH_DURATION)
+      expect(head.x).toBeCloseTo(head.x0 - 120, 0)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
 })

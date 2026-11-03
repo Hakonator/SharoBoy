@@ -41,6 +41,12 @@ export function stepBlock(g: Game, b: Block, dt: number) {
         (minOffset + maxOffset) / 2 +
         (Math.sin(t * b.swayFreq + b.swayPh) * (maxOffset - minOffset)) / 2
       b.x = b.x0 + offset
+      // База покачивания запоминается на блоке: рывок угря добавляется ПОВЕРХ
+      // неё (`moveCreatureGroup`), поэтому старт рывка не «телепортирует»
+      // существо из текущей точки патруля к его базовой позиции.
+      b.mbSwayOffset = offset
+      b.mbSwayMin = minOffset
+      b.mbSwayMax = maxOffset
     } else {
       b.x = clamp(b.x0 + rawOffset, b.rx + 4, g.w - b.rx - 4)
     }

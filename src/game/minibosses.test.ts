@@ -283,11 +283,12 @@ describe("T-058: новые минибоссы", () => {
     expect(isMinibossWeakPart("claw")).toBe(false)
   })
 
-  it("у угря есть голова, цепочка сегментов и хвостовые плавники", () => {
+  it("у угря есть нос, цепочка сегментов и хвост", () => {
     const eel = buildEel(W, H, TOP)
     expect(eel.filter((b) => b.mbPart === "eel_head").length).toBe(1)
     expect(eel.filter((b) => b.mbPart === "eel_seg").length).toBe(7)
-    expect(eel.filter((b) => b.mbPart === "eel_fin").length).toBe(2)
+    // Хвост — один блок: прежние две «лопасти» рисовались как ножницы.
+    expect(eel.filter((b) => b.mbPart === "eel_fin").length).toBe(1)
     // сегменты идут от головы к хвосту без разрывов
     const segs = eel
       .filter((b) => b.mbPart === "eel_seg")
@@ -295,6 +296,36 @@ describe("T-058: новые минибоссы", () => {
       .sort((a, b) => b - a)
     expect(segs[0]).toBeGreaterThan(segs[segs.length - 1])
     for (let i = 1; i < segs.length; i++) expect(segs[i - 1] - segs[i]).toBeCloseTo(20, 5)
+  })
+
+  it("силуэт угря зеркально симметричен — разворот не разъезжается с хитбоксами", () => {
+    const eel = buildEel(W, H, TOP)
+    const cx =
+      (Math.min(...eel.map((b) => b.x - b.rx)) + Math.max(...eel.map((b) => b.x + b.rx))) / 2
+    const geo = (dx: number, rx: number, ry: number) => `${dx.toFixed(3)}|${rx}|${ry}`
+    const present = new Set(eel.map((b) => geo(b.x - cx, b.rx, b.ry)))
+    // Рендер отражает силуэт по mbFacing: у каждой части обязана быть
+    // зеркальная пара того же размера, иначе голова «уедет» с хитбокса.
+    for (const b of eel) {
+      expect(present.has(geo(cx - b.x, b.rx, b.ry))).toBe(true)
+    }
+    // нос и хвост — один размер
+    const head = eel.find((b) => b.mbPart === "eel_head")!
+    const fin = eel.find((b) => b.mbPart === "eel_fin")!
+    expect(fin.rx).toBe(head.rx)
+    expect(fin.ry).toBe(head.ry)
+  })
+
+  it("три пластины панциря разнесены: рисуются отдельными щитками", () => {
+    const shells = buildArmoredCrab(W, H, TOP)
+      .filter((b) => b.mbPart === "shell")
+      .sort((a, b) => a.x - b.x)
+    expect(shells).toHaveLength(3)
+    for (let i = 1; i < shells.length; i++) {
+      // центр соседней пластины вынесен дальше её собственного радиуса —
+      // иначе пластины перекрываются в один купол
+      expect(shells[i]!.x - shells[i - 1]!.x).toBeGreaterThan(shells[i - 1]!.rx)
+    }
   })
 
   it("балансовые числа новых видов зафиксированы", () => {
