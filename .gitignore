@@ -4,6 +4,9 @@ dist/
 build/
 *.log
 
+# Временные стенды визуальной проверки (scripts/preview-minibosses.mjs)
+.tmp-*/
+
 # Environment variables (Supabase keys, etc.)
 .env
 .env.*

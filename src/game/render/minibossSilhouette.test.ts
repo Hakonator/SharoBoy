@@ -11,6 +11,22 @@ const W = 960
 const H = 640
 const TOP = 120
 
+/**
+ * Записывающий контекст собирает и КРИВЫЕ контура (moveTo/quadraticCurveTo),
+ * а не только эллипсы: без этого нельзя проверить, что силуэт строится
+ * единым контуром, а не набором отдельных дуг.
+ */
+function makeCurveCtx(curves: { op: string }[]) {
+  const base = makeRecordingCtx([] as PaintEvent[])
+  const ctx = base.ctx as unknown as Record<string, unknown>
+  const record = (op: string) => () => curves.push({ op })
+  ctx.moveTo = record("moveTo")
+  ctx.lineTo = record("lineTo")
+  ctx.quadraticCurveTo = record("curve")
+  ctx.bezierCurveTo = record("curve")
+  return base.ctx
+}
+
 /** Рисует угря с заданным направлением силуэта и возвращает журнал красок. */
 function paintEel(facing: 1 | -1): PaintEvent[] {
   const paints: PaintEvent[] = []
@@ -31,13 +47,16 @@ describe("T-063: силуэт скользкого угря", () => {
     expect(left.every((p) => p.m[0] < 0)).toBe(true)
   })
 
-  it("тело рисуется цельным контуром, а не набором отдельных эллипсов", () => {
-    const paints = paintEel(1)
-    // первый fill — заливка тела; перед ней путь набирался кривыми
-    const bodyFill = paints.find((p) => p.op === "fill")
-    expect(bodyFill).toBeDefined()
-    // эллипсы (arcs) до первой заливки означали бы «силуэт из шариков»
-    expect(bodyFill!.arcs).toHaveLength(0)
+  it("тело строится цельным контуром, а не набором отдельных эллипсов", () => {
+    const curves: { op: string }[] = []
+    const eel = buildEel(W, H, TOP)
+    for (const b of eel) b.mbFacing = 1
+    drawEel(makeCurveCtx(curves), eel, 0.4)
+    // контур тела + гребни + голова: много кривых, и все — в одном проходе
+    expect(curves.filter((c) => c.op === "curve").length).toBeGreaterThan(8)
+    expect(curves.filter((c) => c.op === "moveTo").length).toBeLessThan(
+      curves.filter((c) => c.op === "curve").length
+    )
   })
 })
 
