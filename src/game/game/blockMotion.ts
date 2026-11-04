@@ -37,9 +37,28 @@ export function stepBlock(g: Game, b: Block, dt: number) {
       }
       const minOffset = 4 - minEdge
       const maxOffset = g.w - 4 - maxEdge
-      const offset =
-        (minOffset + maxOffset) / 2 +
-        (Math.sin(t * b.swayFreq + b.swayPh) * (maxOffset - minOffset)) / 2
+      /**
+       * Амплитуда покачивания — из `swayAmp`, а НЕ из свободного места поля.
+       *
+       * Раньше размах брался как `(maxOffset - minOffset) / 2`, то есть
+       * существо прочёсывало всё поле от стены до стены, а `swayAmp`
+       * работал только выключателем (`if (b.swayAmp > 0)`). Для угря это
+       * давало размах 833 px при поле 1920 и частоте 0.34 — скорость до
+       * 283 px/с. Вместе с рывком ±110 px это читалось как «прыжок в сторону»
+       * в момент телеграфа (жалоба игрока 04.11.2026). Задумано было ±150 px.
+       *
+       * Кламп сверху оставлен: размах не может выйти за свободное место,
+       * иначе существо вылезет за стену. Для рыбы/медузы `swayAmp` и так
+       * больше половины поля, поэтому их поведение не меняется.
+       */
+      const halfRange = (maxOffset - minOffset) / 2
+      const amp = Math.min(b.swayAmp, Math.max(0, halfRange))
+      // Центр покачивания — около исходной позиции, но со сдвигом внутрь,
+      // чтобы весь размах поместился в поле.
+      const lo = minOffset + amp
+      const hi = maxOffset - amp
+      const center = lo <= hi ? clamp(0, lo, hi) : (minOffset + maxOffset) / 2
+      const offset = center + Math.sin(t * b.swayFreq + b.swayPh) * amp
       b.x = b.x0 + offset
       // База покачивания запоминается на блоке: рывок угря добавляется ПОВЕРХ
       // неё (`moveCreatureGroup`), поэтому старт рывка не «телепортирует»

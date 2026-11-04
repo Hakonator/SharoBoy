@@ -18,6 +18,7 @@ import {
   resetMiniboss,
   updateMinibosses,
 } from "./minibossRuntime"
+import { stepBlock } from "./blockMotion"
 
 /** Регресс «невидимой медузы»: дуэт рыба+медуза не должен уродовать существа. */
 describe("addMiniboss: дуэт двух существ в уровне", () => {
@@ -240,6 +241,100 @@ describe("T-058: Скользкий угорь — телеграф, рывок 
       expect(creature.dashState).toBe("idle")
       expect(creature.dashCooldown).toBe(EEL_DASH_INTERVAL)
       expect(creature.invulnerable).toBeFalsy()
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+  /**
+   * Контракт: патруль угря идёт с амплитудой `swayAmp`, а не по всему полю.
+   *
+   * Регресс 04.11.2026: `stepBlock` брал размах из свободного места поля
+   * (833 px при поле 1920), игнорируя `swayAmp = 150`. Скорость доходила до
+   * 283 px/с, и в момент телеграфа рывка это читалось как «прыжок в сторону».
+   */
+  it("на узком поле патруль ужимается и не вылезает за стены", () => {
+    const { game, restoreRandom } = makeEnv()
+    try {
+      // Телефон: поле 400 px, угорь длиной ~208 px. Размах `swayAmp` (90)
+      // сюда не влезает, поэтому он должен ужаться до свободного места.
+      resetMiniboss(game)
+      game.phase = "playing"
+      game.mode = "campaign"
+      game.blocks = game.blocks.filter((b) => !b.isMiniboss)
+      game.w = 400
+      addMiniboss(game, "slippery_eel", 40)
+      const eel = game.minibosses[0]!
+      const parts = game.blocks.filter((b) => (b.mbGroup ?? 0) === eel.group)
+      const step = 1 / 60
+
+      let maxOffset = 0
+      for (let i = 0; i < 240; i++) {
+        game.time += step
+        for (const b of game.blocks) stepBlock(game, b, step)
+        updateMinibosses(game, step)
+        maxOffset = Math.max(maxOffset, Math.abs(parts[0]!.mbSwayOffset ?? 0))
+        for (const p of parts) {
+          expect(p.x - p.rx).toBeGreaterThanOrEqual(-0.5)
+          expect(p.x + p.rx).toBeLessThanOrEqual(game.w + 0.5)
+        }
+      }
+      // Размах ужат до свободного места, но не обнулён.
+      expect(maxOffset).toBeGreaterThan(20)
+      expect(maxOffset).toBeLessThanOrEqual(parts[0]!.swayAmp + 1)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  /**
+   * Контракт: патруль угря идёт с амплитудой `swayAmp`, а не по всему полю.
+   *
+   * Регресс 04.11.2026: `stepBlock` брал размах из свободного места поля
+   * (833 px при поле 1920), игнорируя `swayAmp = 150`. Скорость доходила до
+   * 283 px/с, и в момент телеграфа рывка это читалось как «прыжок в сторону».
+   */
+  it("патруль идёт с заявленной амплитудой и не даёт скачков координаты", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const eel = game.minibosses[0]!
+      const head = game.blocks.find((b) => b.mbPart === "eel_head")!
+      const step = 1 / 60
+
+      // 1. Первый кадр выставляем как базовый: до него `mbSwayOffset` ещё нет,
+      //    и смещение с нуля — не скачок, а инициализация.
+      game.time += step
+      for (const b of game.blocks) stepBlock(game, b, step)
+      updateMinibosses(game, step)
+
+      // 2. Полный цикл: патруль → телеграф → рывок → возврат.
+      let prevX = head.x
+      let maxPatrolJump = 0
+      let maxDashJump = 0
+      let peak = 0
+      const frames =
+        Math.ceil((EEL_DASH_INTERVAL + EEL_DASH_TELEGRAPH + EEL_DASH_DURATION) / step) + 60
+      for (let i = 0; i < frames; i++) {
+        game.time += step
+        for (const b of game.blocks) stepBlock(game, b, step)
+        updateMinibosses(game, step)
+        const jump = Math.abs(head.x - prevX)
+        // Рывок — задуманный бросок с известной скоростью, его отдельно.
+        if (eel.dashState === "dash") maxDashJump = Math.max(maxDashJump, jump)
+        else maxPatrolJump = Math.max(maxPatrolJump, jump)
+        peak = Math.max(peak, Math.abs(head.mbSwayOffset ?? 0))
+        prevX = head.x
+      }
+
+      // 1. Патруль использует заявленную амплитуду, а не половину поля.
+      expect(peak).toBeLessThanOrEqual(head.swayAmp + 1)
+      // 2. Вне рывка движение непрерывно: 150 px при 0.34 рад/с дают
+      //    максимум ~0.9 px за кадр. Раньше здесь было 4.7 px (размах 833).
+      expect(maxPatrolJump, `патруль ${maxPatrolJump.toFixed(2)} px/кадр`).toBeLessThan(1.5)
+      // 3. Рывок ограничен замыслом: 110 px за 0.55 с → пик 628 px/с,
+      //    то есть ~10.5 px/кадр при 60 fps. Больше — телепорт.
+      expect(maxDashJump, `рывок ${maxDashJump.toFixed(2)} px/кадр`).toBeLessThan(11.5)
     } finally {
       restoreRandom()
       game.destroy()
