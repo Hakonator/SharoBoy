@@ -1,15 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { makeEnv } from "../frameInvariant.helpers"
-import {
-  CRAB_ARMOR,
-  CRAB_SHARD_COUNT,
-  EEL_DASH_DURATION,
-  EEL_DASH_INTERVAL,
-  EEL_DASH_REACH,
-  EEL_DASH_TELEGRAPH,
-  MINIBOSS_KINDS,
-} from "../minibosses"
+import { CRAB_ARMOR, CRAB_SHARD_COUNT, MINIBOSS_KINDS } from "../minibosses"
 
 import {
   addMiniboss,
@@ -220,262 +212,6 @@ describe("T-058: Панцирный краб — броня и осколки", 
   })
 })
 
-/** T-058: «Скользкий угорь». */
-describe("T-058: Скользкий угорь — телеграф, рывок и неуязвимость", () => {
-  function eelEnv() {
-    const env = makeEnv()
-    const { game } = env
-    resetMiniboss(game)
-    game.phase = "playing"
-    game.mode = "campaign"
-    game.blocks = game.blocks.filter((b) => !b.isMiniboss)
-    addMiniboss(game, "slippery_eel", 40)
-    return env
-  }
-
-  it("стартует в idle с отсчётом до первого рывка", () => {
-    const { game, restoreRandom } = eelEnv()
-    try {
-      const creature = game.minibosses[0]!
-      expect(creature.kind).toBe("slippery_eel")
-      expect(creature.dashState).toBe("idle")
-      expect(creature.dashCooldown).toBe(EEL_DASH_INTERVAL)
-      expect(creature.invulnerable).toBeFalsy()
-    } finally {
-      restoreRandom()
-      game.destroy()
-    }
-  })
-  /**
-   * Контракт: патруль угря идёт с амплитудой `swayAmp`, а не по всему полю.
-   *
-   * Регресс 04.11.2026: `stepBlock` брал размах из свободного места поля
-   * (833 px при поле 1920), игнорируя `swayAmp = 150`. Скорость доходила до
-   * 283 px/с, и в момент телеграфа рывка это читалось как «прыжок в сторону».
-   */
-  it("на узком поле патруль ужимается и не вылезает за стены", () => {
-    const { game, restoreRandom } = makeEnv()
-    try {
-      // Телефон: поле 400 px, угорь длиной ~208 px. Размах `swayAmp` (90)
-      // сюда не влезает, поэтому он должен ужаться до свободного места.
-      resetMiniboss(game)
-      game.phase = "playing"
-      game.mode = "campaign"
-      game.blocks = game.blocks.filter((b) => !b.isMiniboss)
-      game.w = 400
-      addMiniboss(game, "slippery_eel", 40)
-      const eel = game.minibosses[0]!
-      const parts = game.blocks.filter((b) => (b.mbGroup ?? 0) === eel.group)
-      const step = 1 / 60
-
-      let maxOffset = 0
-      for (let i = 0; i < 240; i++) {
-        game.time += step
-        for (const b of game.blocks) stepBlock(game, b, step)
-        updateMinibosses(game, step)
-        maxOffset = Math.max(maxOffset, Math.abs(parts[0]!.mbSwayOffset ?? 0))
-        for (const p of parts) {
-          expect(p.x - p.rx).toBeGreaterThanOrEqual(-0.5)
-          expect(p.x + p.rx).toBeLessThanOrEqual(game.w + 0.5)
-        }
-      }
-      // Размах ужат до свободного места, но не обнулён.
-      expect(maxOffset).toBeGreaterThan(20)
-      expect(maxOffset).toBeLessThanOrEqual(parts[0]!.swayAmp + 1)
-    } finally {
-      restoreRandom()
-      game.destroy()
-    }
-  })
-
-  /**
-   * Контракт: патруль угря идёт с амплитудой `swayAmp`, а не по всему полю.
-   *
-   * Регресс 04.11.2026: `stepBlock` брал размах из свободного места поля
-   * (833 px при поле 1920), игнорируя `swayAmp = 150`. Скорость доходила до
-   * 283 px/с, и в момент телеграфа рывка это читалось как «прыжок в сторону».
-   */
-  it("патруль идёт с заявленной амплитудой и не даёт скачков координаты", () => {
-    const { game, restoreRandom } = eelEnv()
-    try {
-      const eel = game.minibosses[0]!
-      const head = game.blocks.find((b) => b.mbPart === "eel_head")!
-      const step = 1 / 60
-
-      // 1. Первый кадр выставляем как базовый: до него `mbSwayOffset` ещё нет,
-      //    и смещение с нуля — не скачок, а инициализация.
-      game.time += step
-      for (const b of game.blocks) stepBlock(game, b, step)
-      updateMinibosses(game, step)
-
-      // 2. Полный цикл: патруль → телеграф → рывок → возврат.
-      let prevX = head.x
-      let maxPatrolJump = 0
-      let maxDashJump = 0
-      let peak = 0
-      const frames =
-        Math.ceil((EEL_DASH_INTERVAL + EEL_DASH_TELEGRAPH + EEL_DASH_DURATION) / step) + 60
-      for (let i = 0; i < frames; i++) {
-        game.time += step
-        for (const b of game.blocks) stepBlock(game, b, step)
-        updateMinibosses(game, step)
-        const jump = Math.abs(head.x - prevX)
-        // Рывок — задуманный бросок с известной скоростью, его отдельно.
-        if (eel.dashState === "dash") maxDashJump = Math.max(maxDashJump, jump)
-        else maxPatrolJump = Math.max(maxPatrolJump, jump)
-        peak = Math.max(peak, Math.abs(head.mbSwayOffset ?? 0))
-        prevX = head.x
-      }
-
-      // 1. Патруль использует заявленную амплитуду, а не половину поля.
-      expect(peak).toBeLessThanOrEqual(head.swayAmp + 1)
-      // 2. Вне рывка движение непрерывно: 150 px при 0.34 рад/с дают
-      //    максимум ~0.9 px за кадр. Раньше здесь было 4.7 px (размах 833).
-      expect(maxPatrolJump, `патруль ${maxPatrolJump.toFixed(2)} px/кадр`).toBeLessThan(1.5)
-      // 3. Рывок ограничен замыслом: 110 px за 0.55 с → пик 628 px/с,
-      //    то есть ~10.5 px/кадр при 60 fps. Больше — телепорт.
-      expect(maxDashJump, `рывок ${maxDashJump.toFixed(2)} px/кадр`).toBeLessThan(11.5)
-    } finally {
-      restoreRandom()
-      game.destroy()
-    }
-  })
-
-  it("через EEL_DASH_INTERVAL уходит в телеграф, затем в рывок и становится неуязвим", () => {
-    const { game, restoreRandom } = eelEnv()
-    try {
-      const creature = game.minibosses[0]!
-      updateMinibosses(game, EEL_DASH_INTERVAL + 0.01)
-      expect(creature.dashState).toBe("telegraph")
-      expect(creature.invulnerable).toBeFalsy()
-      // урон в телеграфе ещё проходит
-      const head = game.blocks.find((b) => b.mbPart === "eel_head")!
-      damageMiniboss(game, 1, head)
-      expect(creature.hp).toBe(39)
-
-      updateMinibosses(game, EEL_DASH_TELEGRAPH + 0.01)
-      expect(creature.dashState).toBe("dash")
-      expect(creature.invulnerable).toBe(true)
-    } finally {
-      restoreRandom()
-      game.destroy()
-    }
-  })
-
-  /** Продвигает угря до фазы рывка: idle → telegraph → dash. */
-  function advanceToDash(game: Parameters<typeof updateMinibosses>[0]) {
-    updateMinibosses(game, EEL_DASH_INTERVAL + 0.01)
-    updateMinibosses(game, EEL_DASH_TELEGRAPH + 0.01)
-  }
-
-  it("на рывке урон не проходит, а шар ускоряется", () => {
-    const { game, restoreRandom } = eelEnv()
-    try {
-      const creature = game.minibosses[0]!
-      advanceToDash(game)
-      expect(creature.dashState).toBe("dash")
-
-      const head = game.blocks.find((b) => b.mbPart === "eel_head")!
-      game.balls = [
-        {
-          x: head.x,
-          y: head.y,
-          vx: 200,
-          vy: -200,
-          r: 8,
-          speed: 400,
-          stuck: false,
-          stuckOffset: 0,
-          trail: [],
-          squash: 1,
-          sinceHit: 0,
-        },
-      ]
-      const hpBefore = creature.hp
-      damageMiniboss(game, 5, head)
-      expect(creature.hp).toBe(hpBefore)
-      expect(game.balls[0]!.speed).toBeCloseTo(400 * 1.35)
-    } finally {
-      restoreRandom()
-      game.destroy()
-    }
-  })
-
-  it("после рывка возвращается в idle и снова уязвим", () => {
-    const { game, restoreRandom } = eelEnv()
-    try {
-      const creature = game.minibosses[0]!
-      advanceToDash(game)
-      expect(creature.invulnerable).toBe(true)
-      updateMinibosses(game, EEL_DASH_DURATION + 0.02)
-      expect(creature.dashState).toBe("idle")
-      expect(creature.invulnerable).toBe(false)
-      expect(creature.dashCooldown).toBe(EEL_DASH_INTERVAL)
-
-      const head = game.blocks.find((b) => b.mbPart === "eel_head")!
-      const hpBefore = creature.hp
-      damageMiniboss(game, 1, head)
-      expect(creature.hp).toBe(hpBefore - 1)
-    } finally {
-      restoreRandom()
-      game.destroy()
-    }
-  })
-
-  it("рывок сдвигает существо к ракетке и возвращает на место", () => {
-    const { game, restoreRandom } = eelEnv()
-    try {
-      const creature = game.minibosses[0]!
-      const head = game.blocks.find((b) => b.mbPart === "eel_head")!
-      const startX = head.x
-      // Ракетка правее существа — рывок должен увести угря вправо.
-      game.paddle.x = game.w - 60
-      advanceToDash(game)
-      updateMinibosses(game, EEL_DASH_DURATION * 0.5)
-      expect(head.x).not.toBeCloseTo(startX)
-      // назад — ровно на исходную позицию
-      updateMinibosses(game, EEL_DASH_DURATION)
-      expect(head.x).toBeCloseTo(startX)
-      expect(creature.dashDir).toBe(0)
-    } finally {
-      restoreRandom()
-      game.destroy()
-    }
-  })
-
-  /**
-   * Регресс 04.11.2026: игрок видел, как при появлении круга телеграфа угорь
-   * «смещается вправо и возвращается». Смещения не было — разворачивался
-   * силуэт: `facing` считался по сдвигу центра за кадр, а рывок двигает группу
-   * программно, поэтому первый кадр броска выглядел как собственное движение.
-   */
-  it("телеграф и рывок не разворачивают силуэт — направление берётся от патруля", () => {
-    const { game, restoreRandom } = eelEnv()
-    try {
-      const creature = game.minibosses[0]!
-      // Направление, накопленное патрулём до броска.
-      const facingBefore = creature.facing
-      expect(facingBefore).toBeDefined()
-
-      updateMinibosses(game, EEL_DASH_INTERVAL + 0.01)
-      expect(creature.dashState).toBe("telegraph")
-      expect(creature.facing).toBe(facingBefore)
-
-      updateMinibosses(game, EEL_DASH_TELEGRAPH + 0.01)
-      expect(creature.dashState).toBe("dash")
-      // Первый кадр броска — самый опасный: рывок уже сдвинул группу.
-      updateMinibosses(game, 0.016)
-      expect(creature.facing).toBe(facingBefore)
-      // ...и до конца броска силуэт не переворачивается.
-      updateMinibosses(game, EEL_DASH_DURATION * 0.5)
-      expect(creature.facing).toBe(facingBefore)
-    } finally {
-      restoreRandom()
-      game.destroy()
-    }
-  })
-})
-
 /** T-058: общий цикл для всех четырёх видов. */
 describe("T-058: все виды проходят общий цикл минибоссов", () => {
   for (const kind of MINIBOSS_KINDS) {
@@ -504,8 +240,211 @@ describe("T-058: все виды проходят общий цикл миниб
   }
 })
 
-/** T-063: доработка угря — разворот силуэта и рывок без телепорта. */
-describe("T-063: угорь разворачивается и не телепортируется на рывке", () => {
+/**
+ * T-058: «Скользкий угорь» — равномерный маятник от стены к стене.
+ *
+ * История правок (жалоба игрока 04.11.2026): сначала рывок в сторону ракетки
+ * накладывался на патруль, который из-за ошибки в `stepBlock` летал по всему
+ * полю; затем патруль ужали до ±150, и угорь стал «плавать в пятачке в центре,
+ * не доплывая до краёв». По решению игрока рывок удалён целиком: остаётся
+ * одно понятное движение — через всё поле и обратно.
+ */
+describe("T-058: Скользкий угорь — равномерный проход от края к краю", () => {
+  function eelEnv(w?: number) {
+    const env = makeEnv()
+    const { game } = env
+    resetMiniboss(game)
+    game.phase = "playing"
+    game.mode = "campaign"
+    game.blocks = game.blocks.filter((b) => !b.isMiniboss)
+    if (w !== undefined) game.w = w
+    addMiniboss(game, "slippery_eel", 40)
+    return env
+  }
+
+  it("рождается без состояния рывка", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const creature = game.minibosses[0]!
+      expect(creature.kind).toBe("slippery_eel")
+      expect(creature.facing).toBe(1)
+      expect(creature.hp).toBe(40)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  /**
+   * Главный контракт после удаления рывка: угорь доходит до ОБЕИХ стен и
+   * разворачивается. Раньше он останавливался в центре поля — это и была
+   * жалоба «не доплывает до краёв».
+   */
+  it("доплывает до обеих стен и разворачивается", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const eel = game.minibosses[0]!
+      const parts = game.blocks.filter((b) => (b.mbGroup ?? 0) === eel.group)
+      const head = parts.find((b) => b.mbPart === "eel_head")!
+      const step = 1 / 60
+      // Один период покачивания = полный проход туда-обратно.
+      const frames = Math.ceil((Math.PI * 2) / head.swayFreq / step) + 30
+
+      let minLeft = Infinity
+      let maxRight = -Infinity
+      for (let i = 0; i < frames; i++) {
+        game.time += step
+        for (const b of game.blocks) stepBlock(game, b, step)
+        updateMinibosses(game, step)
+        for (const part of parts) {
+          minLeft = Math.min(minLeft, part.x - part.rx)
+          maxRight = Math.max(maxRight, part.x + part.rx)
+        }
+      }
+
+      // Упёрся в оба края: зазор до стены не больше нескольких пикселей.
+      expect(minLeft, `левый зазор ${minLeft.toFixed(1)} px`).toBeLessThan(6)
+      expect(maxRight, `правый зазор ${(game.w - maxRight).toFixed(1)} px`).toBeGreaterThan(
+        game.w - 6
+      )
+      // И не вылез за поле.
+      expect(minLeft).toBeGreaterThanOrEqual(-0.5)
+      expect(maxRight).toBeLessThanOrEqual(game.w + 0.5)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  it("на узком поле ужимается и не вылезает за стены", () => {
+    const { game, restoreRandom } = eelEnv(400)
+    try {
+      const eel = game.minibosses[0]!
+      const parts = game.blocks.filter((b) => (b.mbGroup ?? 0) === eel.group)
+      const step = 1 / 60
+
+      for (let i = 0; i < 300; i++) {
+        game.time += step
+        for (const b of game.blocks) stepBlock(game, b, step)
+        updateMinibosses(game, step)
+        for (const p of parts) {
+          expect(p.x - p.rx).toBeGreaterThanOrEqual(-0.5)
+          expect(p.x + p.rx).toBeLessThanOrEqual(game.w + 0.5)
+        }
+      }
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  /**
+   * Движение ровное: ни телепортов, ни остановок в середине поля. Скорость
+   * синуса непостоянна по определению, поэтому проверяем две вещи:
+   * 1) покадровый сдвиг не превышает физический максимум;
+   * 2) в центральной части поля скорость близка к максимальной — существо
+   *    идёт, а не топчется.
+   */
+  it("идёт ровно: без скачков и без зависаний в центре", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const eel = game.minibosses[0]!
+      const head = game.blocks.find(
+        (b) => (b.mbGroup ?? 0) === eel.group && b.mbPart === "eel_head"
+      )!
+      const step = 1 / 60
+      // Первый кадр нужен, чтобы `stepBlock` выставил `mbSwayMin/Max` — без
+      // них фактический размах неизвестен.
+      game.time += step
+      for (const b of game.blocks) stepBlock(game, b, step)
+      updateMinibosses(game, step)
+
+      // Фактический размах — из клампа `stepBlock`, а не из заявленного
+      // `swayAmp` (у угря он равен ширине поля и ужимается до стен).
+      const room = (head.mbSwayMax ?? 0) - (head.mbSwayMin ?? 0)
+      const realAmp = Math.min(room / 2, head.swayAmp)
+      const peakSpeed = realAmp * head.swayFreq // px/с в середине поля
+
+      let prevX = head.x
+      let maxJump = 0
+      let centerSpeed = 0
+      const frames = Math.ceil((Math.PI * 2) / head.swayFreq / step)
+      for (let i = 0; i < frames; i++) {
+        game.time += step
+        for (const b of game.blocks) stepBlock(game, b, step)
+        updateMinibosses(game, step)
+        maxJump = Math.max(maxJump, Math.abs(head.x - prevX))
+        // Близко к центру поля → скорость должна быть высокой. Окно широкое
+        // (±25%), потому что внутри него синус уже спадает к краям.
+        if (Math.abs(head.x - game.w / 2) < game.w * 0.25) {
+          centerSpeed = Math.max(centerSpeed, Math.abs(head.x - prevX) / step)
+        }
+        prevX = head.x
+      }
+
+      // Скачок не больше максимальной скорости синуса за кадр (+запас).
+      expect(maxJump, `макс. скачок ${maxJump.toFixed(2)} px/кадр`).toBeLessThanOrEqual(
+        peakSpeed * step + 0.5
+      )
+      // В средней половине поля скорость ≥ 85% пиковой: это проход, а не
+      // топтание. У прежнего компактного патруля (±150 у центра) здесь было
+      // бы ~10% пиковой скорости.
+      expect(centerSpeed, `скорость в центре ${centerSpeed.toFixed(0)} px/с`).toBeGreaterThan(
+        peakSpeed * 0.85
+      )
+      // Пиковая скорость физически осмысленна.
+      expect(peakSpeed).toBeGreaterThan(60)
+      expect(peakSpeed).toBeLessThan(1100)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  it("урон проходит всегда — неуязвимых фаз больше нет", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const creature = game.minibosses[0]!
+      const head = game.blocks.find((b) => b.mbPart === "eel_head")!
+      const hp0 = creature.hp
+      damageMiniboss(game, 3, head)
+      expect(creature.hp).toBe(hp0 - 3)
+      // Шар не получает «скользкого» ускорения: отскок считает обычная физика.
+      game.balls = [
+        {
+          x: head.x,
+          y: head.y,
+          vx: 200,
+          vy: -200,
+          r: 8,
+          speed: 400,
+          stuck: false,
+          stuckOffset: 0,
+          trail: [],
+          squash: 1,
+          sinceHit: 0,
+        },
+      ]
+      damageMiniboss(game, 3, head)
+      expect(game.balls[0]!.speed).toBe(400)
+      expect(creature.hp).toBe(hp0 - 6)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+})
+
+/**
+ * T-063: направление силуэта угря.
+ *
+ * Регресс 04.11.2026: игрок видел, как при появлении круга телеграфа угорь
+ * «смещается в сторону и возвращается». Смещения не было — разворачивался
+ * силуэт: `facing` считался по сдвигу центра за кадр, и любой чужой сдвиг
+ * читался как собственное движение. Теперь направление берётся из фазы
+ * покачивания (производная синуса) и от внешних сдвигов не зависит.
+ */
+describe("T-063: направление силуэта угря следует за движением", () => {
   function eelEnv() {
     const env = makeEnv()
     const { game } = env
@@ -517,13 +456,7 @@ describe("T-063: угорь разворачивается и не телепо�
     return env
   }
 
-  /**
-   * Контракт после 04.11.2026: направление берётся из **фазы патруля**
-   * (производная синуса), а не из разности позиций. Поэтому тест крутит время
-   * и проверяет, что нос смотрит туда, куда существо реально едет, — и что
-   * ручное смещение блоков направление не меняет (это была причина мигания).
-   */
-  it("направление силуэта следует за фазой патруля, а не за разностью позиций", () => {
+  it("берётся из фазы патруля, а не из разности позиций", () => {
     const { game, restoreRandom } = eelEnv()
     try {
       const creature = game.minibosses[0]!
@@ -544,8 +477,7 @@ describe("T-063: угорь разворачивается и не телепо�
       expect(creature.facing).toBe(-1)
       expect(group.every((b) => b.mbFacing === -1)).toBe(true)
 
-      // Ручной сдвиг блоков НЕ должен переворачивать силуэт: раньше именно это
-      // дёргало угря (и на рывке, и на случайных смещениях).
+      // Ручной сдвиг блоков НЕ должен переворачивать силуэт.
       const before = creature.facing
       for (const b of group) b.x = b.x0 - 80
       updateMinibosses(game, 0.016)
@@ -556,7 +488,38 @@ describe("T-063: угорь разворачивается и не телепо�
     }
   })
 
-  it("живой центр обновляется каждый кадр — телеграф не появляется в стороне", () => {
+  it("разворачивается на краях поля, а не в центре", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const creature = game.minibosses[0]!
+      const head = game.blocks.find(
+        (b) => (b.mbGroup ?? 0) === creature.group && b.mbPart === "eel_head"
+      )!
+      const step = 1 / 60
+      const frames = Math.ceil((Math.PI * 2) / head.swayFreq / step) + 10
+      let flips = 0
+      let prev = creature.facing
+
+      for (let i = 0; i < frames; i++) {
+        game.time += step
+        for (const b of game.blocks) stepBlock(game, b, step)
+        updateMinibosses(game, step)
+        if (creature.facing !== prev) {
+          flips++
+          // Разворот происходит у края: существо далеко от центра поля.
+          expect(Math.abs(creature.dropX - game.w / 2)).toBeGreaterThan(game.w * 0.2)
+          prev = creature.facing
+        }
+      }
+      expect(flips).toBeGreaterThanOrEqual(1)
+      expect(flips).toBeLessThanOrEqual(2)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
+
+  it("живой центр обновляется каждый кадр", () => {
     const { game, restoreRandom } = eelEnv()
     try {
       const creature = game.minibosses[0]!
@@ -565,40 +528,6 @@ describe("T-063: угорь разворачивается и не телепо�
       updateMinibosses(game, 0.016)
       const mean = group.reduce((s, b) => s + b.x, 0) / group.length
       expect(creature.dropX).toBeCloseTo(mean, 5)
-    } finally {
-      restoreRandom()
-      game.destroy()
-    }
-  })
-
-  it("старт рывка не двигает существо: смещение складывается с покачиванием", () => {
-    const { game, restoreRandom } = eelEnv()
-    try {
-      const creature = game.minibosses[0]!
-      const group = game.blocks.filter((b) => (b.mbGroup ?? 0) === creature.group)
-      const head = group.find((b) => b.mbPart === "eel_head")!
-      // Имитируем покачивание: существо патрулирует левее своей базы.
-      for (const b of group) {
-        b.mbSwayOffset = -120
-        b.mbSwayMin = -400
-        b.mbSwayMax = 400
-        b.x = b.x0 - 120
-      }
-      game.paddle.x = game.w - 60
-      updateMinibosses(game, EEL_DASH_INTERVAL + 0.01) // idle → telegraph
-      const xAtTelegraph = head.x
-      updateMinibosses(game, EEL_DASH_TELEGRAPH + 0.01) // telegraph → dash
-      expect(creature.dashState).toBe("dash")
-      // Главный регресс: переход в рывок не должен прыгать к базовой позиции.
-      expect(head.x).toBeCloseTo(xAtTelegraph)
-
-      // на пике вылет добавляется к текущему покачиванию, а не заменяет его
-      updateMinibosses(game, EEL_DASH_DURATION * 0.5)
-      expect(head.x).toBeCloseTo(head.x0 - 120 + EEL_DASH_REACH, 0)
-
-      // после рывка — ровно на точку патруля
-      updateMinibosses(game, EEL_DASH_DURATION)
-      expect(head.x).toBeCloseTo(head.x0 - 120, 0)
     } finally {
       restoreRandom()
       game.destroy()

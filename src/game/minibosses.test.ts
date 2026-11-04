@@ -20,8 +20,7 @@ import {
   rollMinibossLive,
   CRAB_ARMOR,
   CRAB_SHARD_COUNT,
-  EEL_DASH_DURATION,
-  EEL_DASH_TELEGRAPH,
+  EEL_SWAY_PERIOD,
 } from "./minibosses"
 import { mulberry32 } from "./utils"
 import { MAP_TIERS } from "./campaignMap"
@@ -353,8 +352,24 @@ describe("T-058: новые минибоссы", () => {
   it("балансовые числа новых видов зафиксированы", () => {
     expect(CRAB_ARMOR).toBe(3)
     expect(CRAB_SHARD_COUNT).toBe(2)
-    expect(EEL_DASH_TELEGRAPH).toBe(0.6)
-    expect(EEL_DASH_DURATION).toBe(0.55)
+    // Угорь плавает маятником через всё поле; период задаёт «ровность» хода.
+    expect(EEL_SWAY_PERIOD).toBe(9)
+  })
+
+  it("у угря нет рывка: размах равен ширине поля и клампится по стенам", () => {
+    // Амплитуда намеренно больше реального хода: `stepBlock` ужимает её до
+    // свободного места, поэтому существо доходит ровно до стен при любой
+    // ширине. Если задать размах «на глаз», на телефоне угорь будет плавать
+    // в пятачке в центре (жалоба игрока 04.11.2026).
+    for (const w of [400, 768, 1280, 1920]) {
+      const eel = buildEel(w, H, TOP)
+      expect(eel.every((b) => b.swayAmp >= w / 2)).toBe(true)
+      expect(eel.every((b) => b.swayFreq === (Math.PI * 2) / EEL_SWAY_PERIOD)).toBe(true)
+      // Период осмысленный: проход от стены к стене занимает от 2 до 10 с.
+      const halfPeriod = Math.PI / (eel[0]!.swayFreq || 1)
+      expect(halfPeriod).toBeGreaterThan(2)
+      expect(halfPeriod).toBeLessThan(10)
+    }
   })
 
   it("каждый вид пула достижим при фиксированной последовательности rand", () => {

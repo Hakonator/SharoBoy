@@ -9,15 +9,10 @@ import {
   CRAB_ARMOR,
   CRAB_SHARD_COUNT,
   CRAB_SHARD_SPEED,
-  EEL_DASH_DURATION,
-  EEL_DASH_INTERVAL,
-  EEL_DASH_REACH,
-  EEL_DASH_REFLECT_MULT,
-  EEL_DASH_TELEGRAPH,
   MINIBOSS_HP_FIRST,
   MINIBOSS_LIFE_CHANCE,
 } from "../minibosses"
-import { clamp, rand } from "../utils"
+import { rand } from "../utils"
 import type { Block, MinibossCreature } from "../types"
 import type { MinibossKind } from "../minibosses"
 import { MINIBOSS_DUET_SHIFT } from "../minibosses"
@@ -28,10 +23,8 @@ import { blockTop } from "./paddleControl"
 import { addRawScore } from "./runFlow"
 
 /**
- * Мёртвая зона производной покачивания, ниже которой направление силуэта не
- * меняется. У края патруля скорость → 0, и без порога нос дёргался бы
- * «туда-сюда» каждый кадр. Порог по производной (а не по смещению за кадр)
- * не зависит от частоты кадров и от программных сдвигов (рывок).
+ * Кламп направления силуэта. Нужен только как страховка: направление берётся
+ * из фазы покачивания, где скорость и так известна.
  */
 const EEL_FACING_EPSILON = 0.08
 
@@ -84,16 +77,9 @@ export function addMiniboss(g: Game, kind: MinibossKind, hp = MINIBOSS_HP_FIRST)
     dropY,
     // «Панцирный краб» входит в бой с бронёй; у остальных видов брони нет.
     ...(kind === "armored_crab" ? { armor: CRAB_ARMOR } : {}),
-    // «Скользкий угорь» сразу начинает отсчёт до первого рывка; направление
-    // силуэта стартует вправо и дальше следует за фактическим движением.
-    ...(kind === "slippery_eel"
-      ? {
-          dashState: "idle" as const,
-          dashCooldown: EEL_DASH_INTERVAL,
-          facing: 1 as const,
-          lastX: dropX,
-        }
-      : {}),
+    // «Скользкий угорь» плавает маятником от стены к стене: особого состояния
+    // не нужно, силуэт разворачивается по фазе покачивания (`updateMinibosses`).
+    ...(kind === "slippery_eel" ? { facing: 1 as const, lastX: dropX } : {}),
   })
   // У рыбы запоминаем точку рта (нос) — оттуда пойдут пузырьки воздуха.
   if (kind === "fish") {
@@ -127,21 +113,10 @@ export function addMiniboss(g: Game, kind: MinibossKind, hp = MINIBOSS_HP_FIRST)
  * Особые виды (T-058):
  * — «Панцирный краб» гасит урон бронёй, пока она цела; уязвима только щель
  *   между клешнями. Пролом панциря выбрасывает `CRAB_SHARD_COUNT` осколков.
- * — «Скользкий угорь» на рывке неуязвим и отбивает шар ускоренным.
  */
 export function damageMiniboss(g: Game, dmg: number, block: Block) {
   const creature = g.minibosses.find((c) => c.group === (block.mbGroup ?? 0))
   if (!creature || creature.hp <= 0) return
-
-  // Неуязвимость на рывке угря: урон не проходит, шар отлетает быстрее.
-  if (creature.invulnerable) {
-    reflectBallOffBarrier(g, block)
-    for (const b of g.blocks) {
-      if (b.isMiniboss && (b.mbGroup ?? 0) === creature.group) b.flash = 0.6
-    }
-    pushHud(g)
-    return
-  }
 
   let remaining = dmg
   // Броня краба: гасит урон по корпусу и клешням, щель бьётся всегда.
@@ -189,29 +164,6 @@ export function damageMiniboss(g: Game, dmg: number, block: Block) {
 
 function clampPan(g: Game, block: Block): number {
   return Math.max(-0.85, Math.min(0.85, (block.x / Math.max(1, g.w)) * 2 - 1))
-}
-
-/**
- * Отражение шара от неуязвимого угря: ищем шар, который только что ударил
- * (он в пределах блока) и ускоряем его. Отскок по нормали уже сделан физикой,
- * здесь добавляется только «скользкая» прибавка скорости.
- */
-function reflectBallOffBarrier(g: Game, block: Block) {
-  const reach = Math.max(block.rx, block.ry) * 2 + 24
-  for (const ball of g.balls) {
-    if (Math.hypot(ball.x - block.x, ball.y - block.y) > reach) continue
-    ball.speed = Math.min(ball.speed * EEL_DASH_REFLECT_MULT, 1200)
-  }
-  g.fx.burst(block.x, block.y, "#7dd3fc", 10, 190)
-  g.fx.rings.push({
-    x: block.x,
-    y: block.y,
-    r: 6,
-    maxR: 46,
-    color: "rgba(125, 211, 252, 0.85)",
-    t: 0,
-  })
-  g.sfx.zap?.()
 }
 
 /** Пузырьки изо рта рыбы: периодический выдох + подъём с покачиванием. */
@@ -352,17 +304,14 @@ export function spawnCrabShards(g: Game, creature: MinibossCreature) {
 }
 
 /**
- * Покадровое обновление минибоссов: живой центр существа (для телеграфа
- * рывка, осколков и дропа жизни), направление силуэта по фактическому
- * движению и машина состояний рывка угря.
+ * Покадровое обновление минибоссов: живой центр существа (для осколков краба
+ * и дропа жизни) и направление силуэта угря по фазе его покачивания.
  * Вызывается из `game/updateStep.ts` после шага блоков.
  */
 export function updateMinibosses(g: Game, dt: number) {
   if (!g.minibosses.length) return
   for (const creature of g.minibosses) {
-    updateCreatureCenter(g, creature)
-    if (creature.kind !== "slippery_eel" || creature.hp <= 0) continue
-    stepEelDash(g, creature, dt)
+    updateCreatureCenter(g, creature, dt)
   }
 }
 
@@ -379,19 +328,18 @@ export function updateMinibosses(g: Game, dt: number) {
 /**
  * Обновляет живой центр существа и направление его силуэта.
  *
- * Центр (`dropX/dropY`) нужен телеграфу рывка и эффектам: раньше он
- * вычислялся один раз при рождении, поэтому круг «предупреждения» появлялся
- * в стороне от угря, успевшего уплыть по полю.
+ * Центр (`dropX/dropY`) нужен эффектам и осколкам краба: раньше он
+ * вычислялся один раз при рождении, поэтому снаряды и дроп появлялись в
+ * стороне от успевшего уплыть существа.
  *
  * Направление (`facing`) считается **аналитически** — из производной синуса
- * покачивания, как у рыбы (`render/fish.ts`). Раньше оно определялось по
- * фактическому сдвигу центра за кадр, и это давало два дефекта (жалоба
- * 04.11.2026): силуэт мигал на каждом развороте патруля (скорость проходит
- * через ноль, и шум/рывок переключали знак), а программный сдвиг рывка
- * воспринимался как собственное движение. Производная не имеет ни одной из
- * этих проблем — она не зависит от частоты кадров и от чужих смещений.
+ * покачивания, как у рыбы (`render/fish.ts`), а не по фактическому сдвигу
+ * центра за кадр. Сдвиг давал два дефекта (жалоба 04.11.2026): силуэт мигал
+ * на каждом развороте патруля (скорость проходит через ноль, и шум
+ * переключал знак), а любое внешнее смещение воспринималось как собственное
+ * движение. Производная не зависит ни от частоты кадров, ни от чужих сдвигов.
  */
-function updateCreatureCenter(g: Game, creature: MinibossCreature) {
+function updateCreatureCenter(g: Game, creature: MinibossCreature, _dt: number) {
   const meanX = meanOfGroup(g, creature.group, "x")
   const meanY = meanOfGroup(g, creature.group, "y")
   if (meanX === null || meanY === null) return
@@ -424,82 +372,6 @@ function eelFacing(g: Game, creature: MinibossCreature): 1 | -1 | undefined {
   // существо почти стоит, и переключать нос рано.
   if (Math.abs(velocity) < EEL_FACING_EPSILON) return undefined
   return velocity > 0 ? 1 : -1
-}
-
-/** Рывок угря: idle → telegraph → dash → idle, с телеграфом перед броском. */
-function stepEelDash(g: Game, creature: MinibossCreature, dt: number) {
-  creature.dashState ??= "idle"
-  creature.dashLeft ??= 0
-  creature.dashCooldown ??= EEL_DASH_INTERVAL
-
-  if (creature.dashState === "idle") {
-    creature.dashCooldown = Math.max(0, creature.dashCooldown - dt)
-    if (creature.dashCooldown <= 0) {
-      creature.dashState = "telegraph"
-      creature.dashLeft = EEL_DASH_TELEGRAPH
-      // Круг «предупреждения» ставим сразу и ровно на текущую позицию угря.
-      g.fx.rings.push({
-        x: creature.dropX,
-        y: creature.dropY,
-        r: 8,
-        maxR: 58,
-        color: "rgba(125, 211, 252, 0.65)",
-        t: 0,
-      })
-      g.sfx.power()
-    }
-    return
-  }
-
-  creature.dashLeft = Math.max(0, creature.dashLeft - dt)
-
-  if (creature.dashState === "telegraph") {
-    if (creature.dashLeft <= 0) {
-      creature.dashState = "dash"
-      creature.dashLeft = EEL_DASH_DURATION
-      creature.dashDir = g.paddle.x >= creature.dropX ? 1 : -1
-      creature.invulnerable = true
-      g.fx.rings.push({
-        x: creature.dropX,
-        y: creature.dropY,
-        r: 8,
-        maxR: 70,
-        color: "rgba(125, 211, 252, 0.9)",
-        t: 0,
-      })
-    }
-    return
-  }
-
-  // dash: уводим всё существо в сторону ракетки, на пике — максимальный вылет.
-  const progress = 1 - creature.dashLeft / EEL_DASH_DURATION
-  const offset = (creature.dashDir ?? 1) * EEL_DASH_REACH * Math.sin(Math.PI * progress)
-  moveCreatureGroup(g, creature.group, offset)
-
-  if (creature.dashLeft <= 0) {
-    creature.dashState = "idle"
-    creature.dashCooldown = EEL_DASH_INTERVAL
-    creature.invulnerable = false
-    creature.dashDir = 0
-    moveCreatureGroup(g, creature.group, 0)
-  }
-}
-
-/**
- * Сдвигает все части существа на `offset` от их текущей базы покачивания.
- * Покачивание (`mbSwayOffset`, его пишет `stepBlock`) и рывок складываются:
- * при замене, а не сложении, старт рывка прыжком возвращал угря в центр —
- * тот самый «телепорт в сторону» после круга телеграфа.
- * Суммарный сдвиг ограничен стенами поля (диапазон `mbSwayMin…mbSwayMax`).
- */
-function moveCreatureGroup(g: Game, group: number, offset: number) {
-  for (const b of g.blocks) {
-    if (!b.isMiniboss || (b.mbGroup ?? 0) !== group) continue
-    const total = (b.mbSwayOffset ?? 0) + offset
-    const lo = b.mbSwayMin ?? -Infinity
-    const hi = b.mbSwayMax ?? Infinity
-    b.x = b.x0 + (lo <= hi ? clamp(total, lo, hi) : total)
-  }
 }
 
 function meanOfGroup(g: Game, group: number, axis: "x" | "y"): number | null {
