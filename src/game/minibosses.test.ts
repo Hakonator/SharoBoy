@@ -353,7 +353,11 @@ describe("T-058: новые минибоссы", () => {
     expect(CRAB_ARMOR).toBe(3)
     expect(CRAB_SHARD_COUNT).toBe(2)
     // Угорь плавает маятником через всё поле; период задаёт «ровность» хода.
-    expect(EEL_SWAY_PERIOD).toBe(9)
+    // 9 / 0.7 — скорость снижена на 30% относительно периода 9 (04.11.2026).
+    expect(EEL_SWAY_PERIOD).toBeCloseTo(12.857, 2)
+    // Один проход от стены к стене — около 6.4 с: не дёрганье и не вялость.
+    expect(EEL_SWAY_PERIOD / 2).toBeGreaterThan(4.5)
+    expect(EEL_SWAY_PERIOD / 2).toBeLessThan(9)
   })
 
   it("у угря нет рывка: размах равен ширине поля и клампится по стенам", () => {
