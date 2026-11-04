@@ -224,7 +224,29 @@ Allowed files (фактические, см. поправку выше):
 
 ### T-059: Ежедневные задания (bounties)
 
-Status: draft · Priority: medium · Сложность: M · Зависимости: — (желательно после T-052) · Волна 2
+Status: done · Priority: medium · Сложность: M · Зависимости: — · Волна 2
+
+Итог (04.11.2026): 90 файлов / 906 тестов; AD-047. Реализовано полностью, включая
+корректировку списка файлов (см. «Уточнение по файлам» ниже).
+
+Реализация:
+
+- `dailyQuests.ts`: пул из 5 видов (`break_blocks` 💎1, `crit_saves` 💎2,
+  `chain_cascades` 💎2, `boss_kills` 💎3, `power_ups` 💎1), набор из 3 вытягивается
+  без повторов, сид `daySeed*6151+4242` (отделён от мутаторов дня).
+- Хранилище `sharoboy-daily-quests`: `{date, progress, claimed}`; чужая дата
+  отбрасывается при чтении, прогресс обрезается по цели.
+- Счётчики: `hosts.ts` (`onBlockDestroyed`, `onClutchSave`, `onChainDetonation`,
+  `onPowerPicked`) и `runFlow.ts` (`onBossKilled`) — вызов стоит ДО проверки
+  `g.activeChallenge`, поэтому задания копятся в любом режиме.
+- Начисление: `Game.claimDailyQuests()` → `progress.claimDailyQuests` →
+  `addMetaCrystals` (сохранение и HUD в одном месте).
+- UI: `MenuDailyQuests` (блок в меню под кнопками режимов) и сводка в
+  `DailyRunModal`; кнопка «Забрать 💎 N» блокируется, пока ничего не выполнено.
+
+Тесты (+23): `dailyQuests.test.ts` (16) — детерминизм, уникальность видов, граница
+суток UTC, накопление/обрезка, изоляция дней, битые данные, одноразовость выдачи,
+частичное выполнение; `menu.test.tsx` (+5) и `DailyRunModal.test.tsx` (+2) — UI.
 
 Описание:
 Три задания дня из пула («разбить N бронированных блоков», «N крит-сэйвов», «N цепных
@@ -235,33 +257,47 @@ Status: draft · Priority: medium · Сложность: M · Зависимос
    сида дня, `recordQuestProgress(date, stats)`, `claimDailyQuestReward(date)`.
 2. Хранение — localStorage по дате (паттерн `achievements.ts`: загрузка/сохранение с
    защитой от приватного режима).
-3. Интеграция счётчиков: `game/hudSync.ts` (инкременты из боевых событий), UI — блок
-   «Задания дня» в `MenuScreen` и в `DailyRunModal`.
-4. Экономика: награда 1–3 мета-кристалла за задание, выдача строго один раз за дату.
+3. Интеграция счётчиков из боевых событий, UI — блок «Задания дня» в меню и в модалке
+   «Ежедневное».
+4. Экономика: награда 1–3 мета-кристалла за задание, выдача строго один раз за дату,
+   по кнопке «Забрать 💎» (решение игрока 04.11.2026).
+
+Уточнение по файлам (04.11.2026, при переводе в `ready`): исходный список ссылался на
+несуществующие `MenuScreen.tsx` / `MenuScreen.test.tsx`; фактическая структура —
+`menu.tsx` + `menuPanels.tsx` (панели меню). Счётчики событий ставятся в `game/hosts.ts`,
+где уже централизованы все боевые коллбэки (включая аналогичные счётчики испытаний
+`recordChallengeCrit` / `recordChallengeChain` / `recordChallengeArmor`), а не в
+`hudSync.ts` — тот отвечает за снимок HUD и достижения. `daily.ts` не меняется: `isoDay`
+и `daySeed` используются как есть.
 
 Allowed files:
 
 - src/game/dailyQuests.ts
 - src/game/dailyQuests.test.ts
-- src/game/daily.ts
-- src/game/daily.test.ts
-- src/game/game/hudSync.ts
-- src/ui/screens/MenuScreen.tsx
-- src/ui/screens/MenuScreen.test.tsx
+- src/game/game/hosts.ts
+- src/game/game/runFlow.ts
+- src/game/game/progress.ts
+- src/game/game.ts
+- src/ui/screens/menuPanels.tsx
+- src/ui/screens/menu.tsx
+- src/ui/screens/menu.test.tsx
 - src/ui/screens/DailyRunModal.tsx
 - src/ui/screens/DailyRunModal.test.tsx
+- src/App.tsx
 - docs/ROADMAP.md
 - docs/CHANGELOG.md
 - .ai/TASKS.md
+- .ai/DECISIONS.md
 - .ai/STATE.md
 - memory-bank/activeContext.md
 
 Приёмка:
 
-- [ ] задания дня детерминированы по дате и не меняются в течение суток UTC
-- [ ] прогресс не сбрасывается между сессиями и не дублируется
-- [ ] награда выдаётся ровно один раз за дату (тест)
-- [ ] задания не влияют на таблицы рекордов
+- [x] задания дня детерминированы по дате и не меняются в течение суток UTC
+- [x] прогресс не сбрасывается между сессиями и не дублируется
+- [x] награда выдаётся ровно один раз за дату (тест)
+- [x] задания не влияют на таблицы рекордов (начисляются только мета-кристаллы,
+      `saveTop` и лидерборды не затрагиваются)
 
 ### T-060: Ракетка с заряженным отскоком
 

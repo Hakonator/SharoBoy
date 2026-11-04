@@ -128,6 +128,19 @@ export default function App() {
     handleNickChange("")
   }, [handleNickChange, resetUnlocked, resetStats])
 
+  /**
+   * Награда за задания дня (T-059). Начисление идёт через движок, чтобы
+   * мета-кристаллы сохранились вместе с остальным прогрессом; повторный клик
+   * ничего не выдаёт (выдача строго один раз — проверка в `dailyQuests`).
+   */
+  const [questClaims, setQuestClaims] = useState(0)
+  const handleClaimDailyQuests = useCallback(() => {
+    const result = gameRef.current?.claimDailyQuests()
+    if (result?.ok) setQuestClaims((n) => n + 1)
+  }, [])
+  // Счётчик заставляет меню и модалку перечитать задания из хранилища после выдачи.
+  void questClaims
+
   /* Инициализация движка: без этого gameRef.current остаётся null,
      и кнопки меню (Кампания / Бесконечный) не запускают игру. */
   useEffect(() => {
@@ -255,6 +268,7 @@ export default function App() {
             onCommunityMaps={() => setShowCommunityMaps(true)}
             onAdmin={() => setShowAdminPanel(true)}
             onBuyUpgrade={(id) => g()?.buyUpgrade(id)}
+            onClaimDailyQuests={handleClaimDailyQuests}
             onBuyCosmetic={(category, id) => g()?.buyCosmeticItem(category, id)}
             onEquipCosmetic={(category, id) => g()?.equipCosmeticItem(category, id)}
             debug={debug.debug}
@@ -310,6 +324,7 @@ export default function App() {
                 g()?.startDaily()
               }}
               onClose={() => setShowDailyModal(false)}
+              onClaimQuests={handleClaimDailyQuests}
             />
           )}
         </>

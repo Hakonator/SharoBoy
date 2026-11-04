@@ -3,9 +3,10 @@ import { describe, expect, it, vi } from "vitest"
 
 import type { HudData } from "../../game/types"
 import { ControlsPanel } from "../icons"
+import type { DailyQuestDef, DailyQuestState } from "../../game/dailyQuests"
 
 import { MenuScreen } from "./menu"
-import { MenuDebug } from "./menuPanels"
+import { MenuDailyQuests, MenuDebug } from "./menuPanels"
 
 const hud = {
   phase: "menu",
@@ -66,6 +67,7 @@ const menuProps = {
   onCommunityMaps: () => {},
   onAdmin: () => {},
   onBuyUpgrade: () => {},
+  onClaimDailyQuests: () => {},
   debug: false,
   onToggleDebug: () => {},
   debugBoss: "",
@@ -233,5 +235,66 @@ describe("MenuDebug: выбор минибосса в отладке", () => {
     expect(html).toContain("🦀 Краб (мини)")
     expect(html).toContain("🐍 Угорь (мини)")
     expect(html).toContain("🦀 Меха-Краб (Акт 2)")
+  })
+
+  describe("MenuDailyQuests (T-059): блок «Задания дня»", () => {
+    const quest = (
+      kind: DailyQuestDef["kind"],
+      progress: number,
+      claimed = false
+    ): DailyQuestState => ({
+      def: {
+        kind,
+        icon: "🧱",
+        title: kind === "boss_kills" ? "Казнь босса" : "Зачистка поля",
+        goal: " разбить блоков",
+        target: 10,
+        rewardMeta: kind === "boss_kills" ? 3 : 1,
+      },
+      progress,
+      claimed,
+    })
+
+    const renderPanel = (quests: DailyQuestState[]) =>
+      plain(renderToStaticMarkup(<MenuDailyQuests onClaim={() => {}} quests={quests} />))
+
+    it("показывает все задания с прогрессом и наградой", () => {
+      const html = renderPanel([quest("break_blocks", 4), quest("boss_kills", 0)])
+      expect(html).toContain("🧱")
+      expect(html).toContain("Зачистка поля")
+      expect(html).toContain("4 / 10")
+      expect(html).toContain("0 / 10")
+      expect(html).toContain("💎 3")
+    })
+
+    it("не даёт забрать награду, пока задания не выполнены", () => {
+      const html = renderToStaticMarkup(
+        <MenuDailyQuests onClaim={() => {}} quests={[quest("break_blocks", 9)]} />
+      )
+      expect(html).toContain("Выполните задание дня")
+      // Кнопка заблокирована — иначе повторные клики висели бы без награды
+      expect(html).toContain("disabled")
+    })
+
+    it("предлагает забрать сумму только за выполненные задания", () => {
+      const html = renderToStaticMarkup(
+        <MenuDailyQuests
+          onClaim={() => {}}
+          quests={[quest("break_blocks", 10), quest("boss_kills", 10)]}
+        />
+      )
+      expect(html).toContain("Забрать 💎 4")
+    })
+
+    it("после выдачи показывает, что награды получены", () => {
+      const html = renderPanel([quest("break_blocks", 10, true)])
+      expect(html).toContain("Награды получены")
+    })
+
+    it("прогресс сверх цели не показывается больше цели", () => {
+      const html = renderPanel([quest("break_blocks", 25)])
+      expect(html).toContain("10 / 10")
+      expect(html).not.toContain("25 / 10")
+    })
   })
 })

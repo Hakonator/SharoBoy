@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import { ACHIEVEMENTS } from "../../game/achievements"
+import { getDailyQuests, type DailyQuestState } from "../../game/dailyQuests"
 import type { HudData } from "../../game/types"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "../../game/upgrades"
 import {
@@ -427,6 +428,109 @@ export function MenuAchievements({
       <MenuSection
         title="🏅 Достижения"
         badge={`${Object.keys(unlocked).length}/${ACHIEVEMENTS.length}`}
+      >
+        {content}
+      </MenuSection>
+    )
+  }
+
+  return content
+}
+
+/** Одна карточка задания дня: иконка, прогресс-бар и отметка о выдаче. */
+function DailyQuestRow({ quest }: { quest: DailyQuestState }) {
+  const { def, progress, claimed } = quest
+  const done = progress >= def.target
+  const ratio = def.target > 0 ? Math.min(1, progress / def.target) : 0
+  return (
+    <div
+      className={`rounded-lg border p-2 ${
+        claimed
+          ? "border-line/40 bg-deep/30 opacity-60"
+          : done
+            ? "border-mint/60 bg-mint/10"
+            : "border-line/50 bg-deep/40"
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <span className="flex h-5 w-5 items-center justify-center text-lg leading-none">
+          {def.icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <span
+              className={`font-display text-sm ${claimed ? "text-dim line-through" : done ? "text-mint" : "text-foam"}`}
+            >
+              {def.title}
+            </span>
+            <span className="shrink-0 font-mono text-xs text-dim tabular-nums">
+              {Math.min(progress, def.target)} / {def.target}
+            </span>
+          </div>
+          <div className="truncate text-[11px] text-dim">{def.goal}</div>
+        </div>
+        <span className="shrink-0 font-mono text-xs text-gold">💎 {def.rewardMeta}</span>
+      </div>
+      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-line/40">
+        <div
+          className={`h-full rounded-full ${claimed ? "bg-dim/50" : done ? "bg-mint" : "bg-cyan-neon"}`}
+          style={{ width: `${Math.round(ratio * 100)}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Блок «Задания дня» (T-059): три задания суток с прогрессом и одной кнопкой
+ * на весь набор. Награду можно забрать только за выполненные задания и
+ * строго один раз за дату — повторный клик ничего не выдаёт.
+ */
+export function MenuDailyQuests({
+  onClaim,
+  asSection = false,
+  quests: propQuests,
+}: {
+  /** Забрать награду за все выполненные задания дня. */
+  onClaim: () => void
+  asSection?: boolean
+  /** Готовый снимок (для тестов); без него читается из хранилища. */
+  quests?: DailyQuestState[]
+}) {
+  const quests = propQuests ?? getDailyQuests()
+  const claimable = quests.filter((q) => !q.claimed && q.progress >= q.def.target)
+  const pendingReward = claimable.reduce((acc, q) => acc + q.def.rewardMeta, 0)
+  const allClaimed = quests.every((q) => q.claimed)
+
+  const content = (
+    <div className="flex flex-col gap-1.5">
+      {quests.map((q) => (
+        <DailyQuestRow key={q.def.kind} quest={q} />
+      ))}
+      <button
+        type="button"
+        className={`mt-1 w-full rounded-lg border px-3 py-1.5 font-display text-sm ${
+          claimable.length > 0
+            ? "border-gold/70 bg-gold/15 text-gold hover:bg-gold/25"
+            : "border-line/40 bg-deep/30 text-dim"
+        }`}
+        onClick={onClaim}
+        disabled={claimable.length === 0}
+      >
+        {allClaimed
+          ? "Награды получены — до сброса"
+          : claimable.length > 0
+            ? `Забрать 💎 ${pendingReward}`
+            : "Выполните задание дня"}
+      </button>
+    </div>
+  )
+
+  if (asSection) {
+    return (
+      <MenuSection
+        title="🎯 Задания дня"
+        badge={`${quests.filter((q) => q.claimed).length}/${quests.length}`}
       >
         {content}
       </MenuSection>

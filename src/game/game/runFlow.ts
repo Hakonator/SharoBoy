@@ -7,6 +7,7 @@ import { computeRunMultipliers, hasModifier, CAMPAIGN_MODIFIERS_MAP } from "../c
 import type { CampaignModifierId } from "../campaignModifiers"
 import { DRAFT_MAX_PICKS, applyDraftPick, isDraftWave, rollDraftOptions } from "../endlessDraft"
 import { recordChallengeBallLost } from "../campaignChallenges"
+import { recordQuestProgress } from "../dailyQuests"
 import { isAbsoluteBulwarkActive } from "../synergies"
 import {
   applyFinalScoreBreakdown,
@@ -150,6 +151,8 @@ export function addRawScore(g: Game, n: number) {
 /** Смерть босса засчитана в статистику партии (для достижений). */
 export function onBossKilled(g: Game) {
   g.runBossKills++
+  // Задания дня: «Казнь босса» считает победы над боссами в любом режиме (T-059).
+  recordQuestProgress({ bossKills: 1 })
   /* Победа над боссом сама по себе закрывает уровень: `updateStep` считает
      `bossDefeated` достаточным условием и не ждёт зачистки остатков арены. */
   g.bossDefeated = true

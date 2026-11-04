@@ -60,6 +60,7 @@ import {
   applyUpgrades,
   saveProgress,
   buyCosmeticItem,
+  claimDailyQuests,
   equipCosmeticItem,
 } from "./game/progress"
 import {
@@ -548,6 +549,10 @@ export class Game {
   }
   buyUpgrade(id: string): boolean {
     return buyUpgrade(this, id)
+  }
+  /** Забрать награду за задания дня (T-059): мета-кристаллы, один раз за дату. */
+  claimDailyQuests() {
+    return claimDailyQuests(this)
   }
   buyCosmeticItem(category: CosmeticCategory, id: string): boolean {
     return buyCosmeticItem(this, category, id)

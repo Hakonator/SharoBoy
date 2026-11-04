@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 
 import { getDailyRunInfo, getDailyTimeUntilReset, type DailyRunInfo } from "../../game/daily"
+import { getDailyQuests, type DailyQuestState } from "../../game/dailyQuests"
 import type { GlobalScore } from "../../game/leaderboard"
 
 export interface DailyRunModalProps {
@@ -8,6 +9,10 @@ export interface DailyRunModalProps {
   topDaily?: GlobalScore[]
   onStart: () => void
   onClose: () => void
+  /** Забрать награду за выполненные задания дня (T-059). */
+  onClaimQuests?: () => void
+  /** Готовый снимок заданий (для тестов); без него читается из хранилища. */
+  quests?: DailyQuestState[]
 }
 
 /**
@@ -20,6 +25,8 @@ export function DailyRunModal({
   topDaily = [],
   onStart,
   onClose,
+  onClaimQuests,
+  quests: propQuests,
 }: DailyRunModalProps) {
   const [dailyInfo] = useState<DailyRunInfo>(() => propDailyInfo ?? getDailyRunInfo())
   const [countdown, setCountdown] = useState(() => getDailyTimeUntilReset().formatted)
@@ -40,6 +47,9 @@ export function DailyRunModal({
   }, [onClose])
 
   const totalScorePercent = Math.round(dailyInfo.totalScoreBonus * 100)
+  const quests = propQuests ?? getDailyQuests()
+  const claimable = quests.filter((q) => !q.claimed && q.progress >= q.def.target)
+  const pendingReward = claimable.reduce((acc, q) => acc + q.def.rewardMeta, 0)
 
   return (
     <div
@@ -150,6 +160,46 @@ export function DailyRunModal({
               Пока никто не завершил испытание сегодня. Вы можете стать первым лидером дня!
             </div>
           )}
+        </div>
+
+        {/* Задания дня (T-059) */}
+        <div className="mb-3">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="hud-label text-amber-300">🎯 ЗАДАНИЯ ДНЯ</span>
+            {claimable.length > 0 && (
+              <button
+                type="button"
+                className="rounded border border-gold/70 bg-gold/15 px-2 py-0.5 font-mono text-xs font-bold text-gold hover:bg-gold/25"
+                onClick={onClaimQuests}
+              >
+                Забрать 💎 {pendingReward}
+              </button>
+            )}
+          </div>
+          <ol className="space-y-1 rounded-lg border border-foam/10 bg-deep/40 p-2">
+            {quests.map((q) => {
+              const done = q.progress >= q.def.target
+              return (
+                <li
+                  key={q.def.kind}
+                  className="flex items-center justify-between gap-2 text-xs sm:text-sm"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="text-base leading-none">{q.def.icon}</span>
+                    <span
+                      className={`truncate ${q.claimed ? "text-foam/40 line-through" : done ? "text-mint" : "text-foam/90"}`}
+                    >
+                      {q.def.title}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-mono tabular-nums text-foam/70">
+                    {Math.min(q.progress, q.def.target)}/{q.def.target}
+                    {q.claimed && " ✓"}
+                  </span>
+                </li>
+              )
+            })}
+          </ol>
         </div>
 
         {/* Кнопки действий */}

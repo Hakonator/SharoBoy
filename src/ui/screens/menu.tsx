@@ -11,7 +11,13 @@ import type { HudData } from "../../game/types"
 import { useTouchDevice } from "../useTouchDevice"
 
 import { MenuRecords, MenuGlobalTop } from "./menuTop"
-import { MenuCornerControls, MenuDebug, MenuUpgrades, MenuAchievements } from "./menuPanels"
+import {
+  MenuCornerControls,
+  MenuDebug,
+  MenuUpgrades,
+  MenuAchievements,
+  MenuDailyQuests,
+} from "./menuPanels"
 import { MenuCosmetics } from "./MenuCosmetics"
 import type { PlayerStats } from "./types"
 
@@ -37,6 +43,7 @@ export function MenuScreen({
   onCommunityMaps,
   onAdmin,
   onBuyUpgrade,
+  onClaimDailyQuests,
   onBuyCosmetic,
   onEquipCosmetic,
   debug,
@@ -71,6 +78,8 @@ export function MenuScreen({
   onCommunityMaps: () => void
   onAdmin: () => void
   onBuyUpgrade: (id: string) => void
+  /** Забрать награду за выполненные задания дня (T-059). */
+  onClaimDailyQuests: () => void
   onBuyCosmetic?: (category: CosmeticCategory, id: string) => void
   onEquipCosmetic?: (category: CosmeticCategory, id: string) => void
   /** Режим отладки включён. */
@@ -182,6 +191,12 @@ export function MenuScreen({
               </div>
             )}
           </div>
+          {/* Задания дня — под кнопками режимов: видны сразу, без переключения вкладок */}
+          <div className="mt-3 max-w-md sm:mt-5">
+            <div className="hud-label mb-1.5 text-cyan-neon">🎯 Задания дня</div>
+            <MenuDailyQuests onClaim={onClaimDailyQuests} />
+          </div>
+
           <button
             className="mt-2 text-[11px] text-dim underline decoration-line underline-offset-4 hover:text-gold sm:mt-3 sm:text-xs"
             onClick={onAdmin}

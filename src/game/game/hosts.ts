@@ -12,6 +12,7 @@ import {
   recordChallengeCrit,
   recordChallengePower,
 } from "../campaignChallenges"
+import { recordQuestProgress } from "../dailyQuests"
 import {
   isAbsoluteBulwarkActive,
   isChainResonanceActive,
@@ -257,6 +258,8 @@ export function makePowersHost(g: Game): PowersWorld {
     /** Игрок подобрал бонус: цель «Охотник за бонусами» двигается только на настоящих бонусах. */
     onPowerPicked: (type) => {
       if (type === "coin") return
+      // Задания дня: «Собиратель» считает любые бонусы, кроме монет.
+      recordQuestProgress({ powerUps: 1 })
       if (!g.activeChallenge) return
       recordChallengePower(g.activeChallenge, () => {
         g.fx.popups.push({
@@ -498,6 +501,8 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     onClutchSave: () => {
       g.runClutchSaves++
+      // Задания дня: «На волоске» считает те же сэйвы у границы.
+      recordQuestProgress({ clutchSaves: 1 })
       if (g.activeChallenge) {
         recordChallengeCrit(g.activeChallenge, () => {
           g.fx.popups.push({
@@ -515,9 +520,13 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     onBlockDestroyed: () => {
       g.runBlocksDestroyed++
+      // Задания дня: счётчик общий с разбитыми блоками (T-059).
+      recordQuestProgress({ blocksDestroyed: 1 })
     },
     /** Цепная мастер: один каскад = один шаг испытания, независимо от числа блоков. */
     onChainDetonation: () => {
+      // Задания дня считают каскады независимо от того, идёт ли испытание.
+      recordQuestProgress({ chainDetonations: 1 })
       if (!g.activeChallenge) return
       recordChallengeChain(g.activeChallenge, () => {
         g.fx.popups.push({

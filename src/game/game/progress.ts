@@ -1,6 +1,7 @@
 import type { Game } from "../game"
 import { clamp, lsGet, lsSet } from "../utils"
 import { UPGRADE_DEFS, UPGRADES_ENABLED } from "../upgrades"
+import { claimDailyQuestReward, type QuestClaimResult } from "../dailyQuests"
 import {
   buyCosmetic,
   equipCosmetic,
@@ -43,6 +44,16 @@ export function addMetaCrystals(g: Game, n: number) {
   g.metaCrystals = (g.metaCrystals ?? 0) + Math.max(0, n)
   saveProgress(g)
   pushHud(g)
+}
+
+/**
+ * Забирает награду за выполненные задания дня (T-059).
+ * Выдача строго один раз за дату — повторный вызов вернёт `reward: 0`.
+ */
+export function claimDailyQuests(g: Game): QuestClaimResult {
+  const result = claimDailyQuestReward()
+  if (result.ok) addMetaCrystals(g, result.reward)
+  return result
 }
 /** Покупка постоянного улучшения — вызывается будущим UI прокачки. */
 export function buyUpgrade(g: Game, id: string): boolean {
