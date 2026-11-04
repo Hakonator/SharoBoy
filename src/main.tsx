@@ -99,22 +99,116 @@ if (rootEl) {
 //
 // AD-036: имя кэша в sw.js содержит номер сборки, поэтому каждая выкатка
 // публикует новый воркер. Регистрация с `updateViaCache: "none"` гарантирует,
-// что сам sw.js не залипнет в HTTP-кэше, а `controllerchange` перезагружает
-// страницу один раз — сразу после активации новой версии. Без этого игрок
-// оставался на прошлом бандле до третьей перезагрузки (инцидент 02.11.2026).
+// что сам sw.js не залипнет в HTTP-кэше.
+//
+// AD-039: новая версия НЕ перезагружает страницу сама. Раньше `controllerchange`
+// вызывал `location.reload()` безусловно — игрока выбрасывало из боя посреди
+// забега (инцидент 04.11.2026: начал на сборке 361, игра перезагрузилась на 362).
+// Теперь показываем баннер «доступно обновление»: перезагрузка — по кнопке,
+// а «Позже» оставляет воркер ждать до конца сессии.
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    // Первый запуск тоже даёт controllerchange — не перезагружаемся на установке.
+    // Первый запуск тоже даёт controllerchange — обновлением он не считается.
     const hadController = Boolean(navigator.serviceWorker.controller)
+    /** Ждёт перезагрузки: баннер уже показан игроку. */
+    let pending = false
     let reloading = false
+
+    const showUpdateBanner = (apply: () => void) => {
+      if (pending) return
+      pending = true
+      mountUpdateBanner(() => {
+        if (reloading) return
+        reloading = true
+        apply()
+      })
+    }
+
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (!hadController || reloading) return
-      reloading = true
-      window.location.reload()
+      // Новый воркер активировался и уже управляет страницей: обновление
+      // применится обычной перезагрузкой.
+      showUpdateBanner(() => window.location.reload())
     })
+
     navigator.serviceWorker
       .register(`${import.meta.env.BASE_URL}sw.js`, { updateViaCache: "none" })
-      .then((reg) => reg.update())
+      .then((reg) => {
+        reg.update().catch(() => {})
+        // Воркер уже скачан и ждёт активации (например, страница открыта давно).
+        if (reg.waiting) showUpdateBanner(() => window.location.reload())
+      })
       .catch((err) => console.warn("[ШАРОБОЙ] сервис-воркер не зарегистрирован:", err))
   })
+}
+
+/**
+ * Баннер «доступно обновление»: единственное место, где приложение само
+ * предлагает перезагрузку. Стили инлайновые — баннер живёт вне React-дерева
+ * (регистрация воркера происходит после монтирования приложения) и не должен
+ * зависеть от Tailwind-классов в момент, когда страница уже собрана.
+ */
+function mountUpdateBanner(onApply: () => void) {
+  if (document.getElementById("sharoboy-update-banner")) return
+  const box = document.createElement("div")
+  box.id = "sharoboy-update-banner"
+  box.setAttribute("role", "status")
+  box.style.cssText = [
+    "position:fixed",
+    "left:50%",
+    "bottom:22px",
+    "transform:translateX(-50%)",
+    "z-index:2147483000",
+    "display:flex",
+    "align-items:center",
+    "gap:12px",
+    "padding:10px 16px",
+    "border:1px solid rgba(53,224,255,0.45)",
+    "border-radius:10px",
+    "background:rgba(7,26,38,0.94)",
+    "color:#eaf7ff",
+    "font-family:Rubik, sans-serif",
+    "font-size:14px",
+    "box-shadow:0 8px 28px rgba(2,12,20,0.55)",
+  ].join(";")
+
+  const label = document.createElement("span")
+  label.textContent = "Доступно обновление игры"
+  box.appendChild(label)
+
+  const apply = document.createElement("button")
+  apply.type = "button"
+  apply.textContent = "Обновить"
+  apply.style.cssText = [
+    "font-family:'Russo One', sans-serif",
+    "font-size:13px",
+    "letter-spacing:0.04em",
+    "text-transform:uppercase",
+    "color:#04121c",
+    "background:#35e0ff",
+    "border:0",
+    "border-radius:6px",
+    "padding:6px 14px",
+    "cursor:pointer",
+  ].join(";")
+  apply.addEventListener("click", onApply)
+  box.appendChild(apply)
+
+  const later = document.createElement("button")
+  later.type = "button"
+  later.textContent = "Позже"
+  later.style.cssText = [
+    "font-family:Rubik, sans-serif",
+    "font-size:13px",
+    "color:#7fa6ba",
+    "background:transparent",
+    "border:1px solid rgba(127,166,186,0.4)",
+    "border-radius:6px",
+    "padding:6px 12px",
+    "cursor:pointer",
+  ].join(";")
+  later.addEventListener("click", () => box.remove())
+  box.appendChild(later)
+
+  document.body.appendChild(box)
 }

@@ -347,6 +347,38 @@ describe("T-058: Скользкий угорь — телеграф, рывок 
       game.destroy()
     }
   })
+
+  /**
+   * Регресс 04.11.2026: игрок видел, как при появлении круга телеграфа угорь
+   * «смещается вправо и возвращается». Смещения не было — разворачивался
+   * силуэт: `facing` считался по сдвигу центра за кадр, а рывок двигает группу
+   * программно, поэтому первый кадр броска выглядел как собственное движение.
+   */
+  it("телеграф и рывок не разворачивают силуэт — направление берётся от патруля", () => {
+    const { game, restoreRandom } = eelEnv()
+    try {
+      const creature = game.minibosses[0]!
+      // Направление, накопленное патрулём до броска.
+      const facingBefore = creature.facing
+      expect(facingBefore).toBeDefined()
+
+      updateMinibosses(game, EEL_DASH_INTERVAL + 0.01)
+      expect(creature.dashState).toBe("telegraph")
+      expect(creature.facing).toBe(facingBefore)
+
+      updateMinibosses(game, EEL_DASH_TELEGRAPH + 0.01)
+      expect(creature.dashState).toBe("dash")
+      // Первый кадр броска — самый опасный: рывок уже сдвинул группу.
+      updateMinibosses(game, 0.016)
+      expect(creature.facing).toBe(facingBefore)
+      // ...и до конца броска силуэт не переворачивается.
+      updateMinibosses(game, EEL_DASH_DURATION * 0.5)
+      expect(creature.facing).toBe(facingBefore)
+    } finally {
+      restoreRandom()
+      game.destroy()
+    }
+  })
 })
 
 /** T-058: общий цикл для всех четырёх видов. */

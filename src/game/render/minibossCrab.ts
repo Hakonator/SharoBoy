@@ -44,16 +44,25 @@ export function drawCrab(ctx: Ctx, parts: Block[], time: number) {
 
   if (gap) drawGap(ctx, gap, time)
 
-  // панцирь: боковые щитки под центральным — три пластины, три шва
+  // панцирь: три пластины, посаженные ВПЛОТНУЮ — единый купол с двумя швами.
+  // Боковые щитки рисуются под центральным, поэтому стык читается линией, а не
+  // зазором между отдельными «ракушками». Все три лежат на одной линии: прежний
+  // сдвиг боковых пластин вниз давал перекошенный купол.
   const order = shells.length === 3 ? [0, 2, 1] : shells.map((_, i) => i)
   for (const idx of order) {
     const s = shells[idx]!
+    const isCenter = idx === 1 || shells.length !== 3
     ctx.save()
-    ctx.translate(s.x, s.y + breathe * (idx === 1 ? 1 : 0.55) + (idx === 1 ? 0 : 2))
+    ctx.translate(s.x, s.y + breathe * (isCenter ? 1 : 0.65))
     ctx.rotate(s.rot)
-    drawPlate(ctx, s.rx, s.ry, idx === 1)
+    drawPlate(ctx, s.rx, s.ry, isCenter)
     ctx.restore()
   }
+  // швы поверх всех пластин: граница купола должна быть непрерывной линией.
+  // Пары берём по порядку слева-направо ([0,1] и [1,2]) — обход `order` дал бы
+  // второй шов между правой и центральной пластиной под неверным углом.
+  const byX = shells.slice().sort((a, b) => a.x - b.x)
+  for (let i = 1; i < byX.length; i++) drawSeam(ctx, byX[i - 1]!, byX[i]!, breathe)
 
   for (const e of eyes) drawEye(ctx, e)
 
@@ -301,8 +310,12 @@ function drawEye(ctx: Ctx, e: Block) {
 }
 
 /**
- * Щиток панциря: выгнутая верхняя кромка, ребро-киль и тёмный шов по нижнему
- * краю. Шов обязателен — без него соседние пластины сливаются в один купол.
+ * Щиток панциря: выгнутая верхняя кромка, ребро-киль и тёмная кромка по низу.
+ *
+ * Пластины садятся вплотную и перекрываются, поэтому собственный «шов» внутри
+ * щитка больше не рисуется: он давал три отдельные замкнутые ракушки с зазором
+ * (замечание 04.11.2026). Границу между пластинами рисует `drawSeam` — один
+ * непрерывный шов поверх купола.
  */
 function drawPlate(ctx: Ctx, rx: number, ry: number, isCenter: boolean) {
   ctx.beginPath()
@@ -331,14 +344,6 @@ function drawPlate(ctx: Ctx, rx: number, ry: number, isCenter: boolean) {
   ctx.lineWidth = 1.4
   ctx.stroke()
 
-  // шов по нижней кромке — граница между пластинами
-  ctx.beginPath()
-  ctx.moveTo(-rx * 0.88, ry * 0.3)
-  ctx.quadraticCurveTo(0, ry * 1.22, rx * 0.88, ry * 0.3)
-  ctx.strokeStyle = "rgba(4, 18, 26, 0.85)"
-  ctx.lineWidth = 2.2
-  ctx.stroke()
-
   // заклёпки у кромки
   ctx.fillStyle = "rgba(4, 18, 26, 0.5)"
   for (const k of [-0.5, 0, 0.5]) {
@@ -354,4 +359,25 @@ function drawPlate(ctx: Ctx, rx: number, ry: number, isCenter: boolean) {
   ctx.fillStyle = "#ffffff"
   ctx.fill()
   ctx.globalAlpha = 1
+}
+
+/**
+ * Шов между двумя соседними пластинами: короткая тёмная дуга по месту стыка.
+ *
+ * Считается из геометрии блоков (общая середина между центрами, высота — по
+ * меньшему из щитков), поэтому следует за любым изменением `shell` в данных
+ * и не дублирует построение контура щитка.
+ */
+function drawSeam(ctx: Ctx, left: Block, right: Block, breathe: number) {
+  const x = (left.x + right.x) / 2
+  const y = (left.y + right.y) / 2 + breathe * 0.8
+  const ry = Math.min(left.ry, right.ry)
+  const tilt = Math.abs((right.rot ?? 0) - (left.rot ?? 0))
+  ctx.beginPath()
+  ctx.moveTo(x + ry * 0.1, y - ry * 1.02)
+  ctx.quadraticCurveTo(x - ry * 0.16 - tilt * ry * 2, y, x + ry * 0.1, y + ry * 0.98)
+  ctx.strokeStyle = "rgba(4, 18, 26, 0.8)"
+  ctx.lineWidth = 1.8
+  ctx.lineCap = "round"
+  ctx.stroke()
 }

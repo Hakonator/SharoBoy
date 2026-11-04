@@ -376,16 +376,23 @@ export function updateMinibosses(g: Game, dt: number) {
  * разворачивается носом по ходу движения, в том числе у стен.
  */
 function updateCreatureCenter(g: Game, creature: MinibossCreature) {
+  // Смещение рывка — программный скачок группы, а не движение существа:
+  // если считать `facing` по нему, силуэт разворачивается ровно в момент
+  // телеграфа, и отражение вокруг центра тела читается как «угорь мотнулся
+  // вправо и вернулся» (жалоба 04.11.2026). Поэтому сравниваем позиции с
+  // вычтенным вкладом рывка — остаётся только настоящее покачивание.
+  const dashOffset = eelDashOffset(creature)
   const meanX = meanOfGroup(g, creature.group, "x")
   const meanY = meanOfGroup(g, creature.group, "y")
   if (meanX === null || meanY === null) return
+  const swayX = meanX - dashOffset
   if (creature.lastX !== undefined) {
-    const dx = meanX - creature.lastX
+    const dx = swayX - creature.lastX
     // Мёртвая зона: в крайних точках патруля скорость ≈ 0, без порога силуэт
     // дёргался бы «туда-сюда» на каждом кадре.
     if (Math.abs(dx) > FACING_EPSILON) creature.facing = dx > 0 ? 1 : -1
   }
-  creature.lastX = meanX
+  creature.lastX = swayX
   creature.dropX = meanX
   creature.dropY = meanY
   if (creature.kind !== "slippery_eel") return
@@ -393,6 +400,17 @@ function updateCreatureCenter(g: Game, creature: MinibossCreature) {
   for (const b of g.blocks) {
     if (b.isMiniboss && (b.mbGroup ?? 0) === creature.group) b.mbFacing = facing
   }
+}
+
+/**
+ * Текущее смещение рывка, уже применённое к группе. В покое и в телеграфе —
+ * ноль; на рывке совпадает с тем, что передаётся в `moveCreatureGroup`.
+ * Нужно, чтобы отделить программный сдвиг от собственного движения существа.
+ */
+function eelDashOffset(creature: MinibossCreature): number {
+  if (creature.kind !== "slippery_eel" || creature.dashState !== "dash") return 0
+  const progress = 1 - (creature.dashLeft ?? 0) / EEL_DASH_DURATION
+  return (creature.dashDir ?? 1) * EEL_DASH_REACH * Math.sin(Math.PI * progress)
 }
 
 /** Рывок угря: idle → telegraph → dash → idle, с телеграфом перед броском. */
