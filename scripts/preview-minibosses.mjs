@@ -96,6 +96,24 @@ if (what === "eel" || what === "all") {
   }
 }
 
+// Крупный план головы: детали (глаз, рот, стык) не видны в общем масштабе.
+{
+  const eel = buildEel(W, H, TOP, 9, W * 0.5)
+  const meanY = eel.reduce((s, b) => s + b.y, 0) / eel.length
+  const head = eel.find((b) => b.mbPart === "eel_head")
+  for (const b of eel) {
+    b.y += 330 - meanY
+    b.y0 = b.y
+    b.mbFacing = 1
+  }
+  ctx.save()
+  ctx.translate(W * 0.5, 330)
+  ctx.scale(7, 7)
+  ctx.translate(-(head.x + 20), -330)
+  drawEel(ctx, eel, 0.8)
+  ctx.restore()
+}
+
 document.title = "preview ready"
 `
 

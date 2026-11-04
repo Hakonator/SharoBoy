@@ -10,17 +10,16 @@ const WAVE_FREQ = 2.3
 /** Сдвиг фазы между соседними частями тела: чем больше, тем «змеинее» волна. */
 const WAVE_PHASE_STEP = 0.85
 /**
- * Дополнительное боковое смещение головы при «змейном» движении, px.
- * У угря голова водит из стороны в сторону заметнее тела — без этого силуэт
- * остаётся ровной «трубой» с местной рябью (замечание 04.11.2026).
- */
-const HEAD_SWAY = 2.6
-/**
  * Визуальное сужение хвоста: насколько ДОПОЛНИТЕЛЬНО утончаются узлы к концу.
  * Хитбоксы не трогаем (симметрия по `mbFacing` обязана сохраниться, AD-037),
  * но рисованное тело сужается сильнее — иначе угорь выглядит трубой.
  */
 const TAIL_TAPER = 0.34
+/**
+ * Число узлов сужения носа. Нос — продолжение той же цепочки узлов, а не
+ * отдельная фигура: больше узлов = плавнее переход в тело.
+ */
+const NOSE_NODES = 5
 
 interface Point {
   x: number
@@ -60,13 +59,15 @@ export function drawEel(ctx: Ctx, parts: Block[], time: number) {
 
   const nodes: Node[] = spine.map((p, i) => {
     const k = i / Math.max(1, spine.length - 1)
-    const wave = Math.sin(time * WAVE_FREQ - i * WAVE_PHASE_STEP) * WAVE_AMP * (0.25 + 0.75 * k)
-    // Голова водит сильнее тела: у угря это главный признак «живой змеи».
-    const headLead = i === 0 ? Math.sin(time * WAVE_FREQ * 0.7) * HEAD_SWAY : 0
-    // Тело чуть тоньше хитбокса: между блоками не должно быть «пузырей».
+    // Волна бежит по телу и РАСТЁТ от головы к хвосту: у головы амплитуда
+    // минимальна, поэтому движение там плавное по определению.
+    // Отдельное «болтание» головы (HEAD_SWAY) убрано: его частота 1.61 рад/с
+    // не кратна волне 2.3 рад/с, из-за чего возникали биения и движение
+    // выглядело дёрганым (жалоба игрока 04.11.2026).
+    const wave = Math.sin(time * WAVE_FREQ - i * WAVE_PHASE_STEP) * WAVE_AMP * (0.1 + 0.9 * k * k)
     // К хвосту утончаем дополнительно — силуэт перестаёт быть «трубой».
     const taper = 1 - TAIL_TAPER * k * k
-    return { x: p.x - cx, y: p.y + wave + headLead, ry: p.ry * 0.88 * taper }
+    return { x: p.x - cx, y: p.y + wave, ry: p.ry * 0.88 * taper }
   })
   const midY = nodes.reduce((s, n) => s + n.y, 0) / nodes.length
 
@@ -97,12 +98,63 @@ export function drawEel(ctx: Ctx, parts: Block[], time: number) {
  * Тело: одна замкнутая лента от носа к хвосту. Толщина задаётся узлами и
  * сужается к хвосту; градиент поперёк тела даёт объём.
  */
+/**
+ * Геометрия носа — ОДИН источник для контура (`drawBody`) и деталей
+ * (`drawHead`). Расхождение этих чисел сразу даёт торчащие за контур линии
+ * (скриншот 04.11.2026): рот рисовался на 3.6 px от оси там, где контур носа
+ * уже сузился до 1 px, и вылезал наружу острым шипом.
+ */
+const noseLen = (headRy: number) => headRy * 3.2
+/** Полурадиус кончика носа: не ноль, иначе контур сходится в иглу. */
+const noseTipRy = (headRy: number) => headRy * 0.12
+/**
+ * Полурадиус носа на доле `t` его длины (0 — затылок, 1 — кончик).
+ * Косинусное сужение: ровный темп, без «площадки» и без перегиба.
+ */
+function noseRy(headRy: number, t: number): number {
+  const k = (1 - Math.cos(Math.PI * t)) / 2
+  return headRy + (noseTipRy(headRy) - headRy) * k
+}
+
+/**
+ * Тело: одна замкнутая лента от носа к хвосту.
+ *
+ * Нос — ПРОДОЛЖЕНИЕ той же ленты: перед первым узлом добавляются узлы с
+ * плавно убывающим радиусом. Отдельная фигура головы давала видимый шов и
+ * торчащие кромки (история правок 04.11.2026), поэтому силуэт строится здесь
+ * и только здесь.
+ */
 function drawBody(ctx: Ctx, nodes: Node[], midY: number, thick: number) {
-  const top = nodes.map((n) => ({ x: n.x, y: n.y - n.ry }))
-  const bottom = nodes.map((n) => ({ x: n.x, y: n.y + n.ry })).reverse()
+  const head = nodes[0]!
+  const len = noseLen(head.ry)
+  // Узлы носа строим ОТ КОНЧИКА К ЗАТЫЛКУ (t убывает 1 → 0), потому что
+  // `ribbon` должен идти непрерывно: кончик → затылок → хвост.
+  //
+  // Здесь была ошибка: цикл уже шёл от кончика, а затем `nose.reverse()`
+  // разворачивал его обратно, и лента получалась «затылок → кончик → голова →
+  // хвост» — зигзаг. На экране это читалось раскрытым «клювом» из кончика
+  // (искали 20+ итераций, скриншот 04.11.2026).
+  const nose: Node[] = []
+  for (let i = NOSE_NODES; i >= 1; i--) {
+    const t = i / NOSE_NODES
+    nose.push({ x: head.x + len * t, y: head.y, ry: noseRy(head.ry, t) })
+  }
+  const ribbon: Node[] = [...nose, ...nodes]
+
+  // На самом кончике радиус мал (0.12 ry), поэтому дуга замыкания выходит
+  // угловатой «пробкой». Убираем последний узел носа из кромок: кончик
+  // рисуется отдельной дугой радиусом предыдущего узла.
+  const top = ribbon.slice(1).map((n) => ({ x: n.x, y: n.y - n.ry }))
+  const bottom = ribbon
+    .slice(1)
+    .map((n) => ({ x: n.x, y: n.y + n.ry }))
+    .reverse()
+  const tip = ribbon[1]!
   ctx.beginPath()
   traceSmooth(ctx, top, true)
   traceSmooth(ctx, bottom, false)
+  // Кончик — полукруг радиусом tip.ry: получается тупое скруглённое рыло.
+  ctx.quadraticCurveTo(tip.x + tip.ry * 1.25, tip.y, tip.x, tip.y - tip.ry)
   ctx.closePath()
   const g = ctx.createLinearGradient(0, midY - thick, 0, midY + thick)
   g.addColorStop(0, TIER[1].dark)
@@ -114,11 +166,12 @@ function drawBody(ctx: Ctx, nodes: Node[], midY: number, thick: number) {
   ctx.lineWidth = 1.4
   ctx.stroke()
 
-  // спинной блик вдоль верхней кромки
+  // спинной блик вдоль верхней кромки ТЕЛА (нос не задеваем: на голове он
+  // читался серой «каплей-нашлёпкой»)
   ctx.beginPath()
   traceSmooth(
     ctx,
-    nodes.map((n) => ({ x: n.x, y: n.y - n.ry * 0.45 })),
+    nodes.slice(1).map((n) => ({ x: n.x, y: n.y - n.ry * 0.45 })),
     true
   )
   ctx.strokeStyle = "rgba(234, 255, 244, 0.4)"
@@ -128,27 +181,50 @@ function drawBody(ctx: Ctx, nodes: Node[], midY: number, thick: number) {
 }
 
 /** Спинной плавник-складка по задней половине спины, с «лучом» внутри. */
+/**
+ * Спинной плавник-складка по средней части спины.
+ *
+ * Контур строится как ЗАМКНУТЫЙ: внешняя кромка (с подъёмом) и внутренняя
+ * (по базе). Раньше внутренняя кромка шла по `traceSmooth` БЕЗ выхода в
+ * первую точку, и `closePath` тянул прямую через весь гребень — отсюда
+ * длинные острые «лезвия» над головой (крупный план и мелкий масштаб,
+ * скриншоты 04.11.2026).
+ *
+ * Гребень лежит только на теле: первые два узла пропускаются, чтобы не
+ * цеплять голову.
+ */
 function drawRidge(ctx: Ctx, nodes: Node[], thick: number) {
-  // Гребень начинается ПОСЛЕ головы: с `nodes.length * 0.3` он стартовал ещё
-  // на голове, и у стыка торчал вертикальный треугольник (крупный план
-  // 04.11.2026). Первые два узла — голова и её стык с телом.
-  const from = Math.max(2, Math.floor(nodes.length * 0.42))
+  const from = Math.max(2, Math.floor(nodes.length * 0.35))
   const pts = nodes.slice(from)
   if (pts.length < 2) return
-  const base = pts.map((n) => ({ x: n.x, y: n.y - n.ry * 0.85 }))
+
+  const base = pts.map((n) => ({ x: n.x, y: n.y - n.ry * 0.9 }))
+  // Внешняя кромка: подъём от нуля к середине и сход на нет к хвосту.
+  const crest = pts.map((n, i) => {
+    const k = i / Math.max(1, pts.length - 1)
+    const h = thick * 0.42 * Math.sin(Math.PI * (0.12 + 0.76 * k)) * Math.min(1, k * 2.5)
+    return { x: n.x, y: n.y - n.ry - h }
+  })
+
   ctx.beginPath()
-  ctx.moveTo(pts[0]!.x, base[0]!.y)
-  // Гребень поднимается ОТ НУЛЯ к середине и сходит на нет к хвосту: резкий
-  // старт давал «плавник-обрубок» на стыке с головой.
-  for (let i = 0; i < pts.length - 1; i++) {
-    const k = i / (pts.length - 1)
-    const h = thick * 0.5 * Math.sin(Math.PI * (0.1 + 0.8 * k)) * Math.min(1, k * 2.2)
-    const nx = pts[i]!.x
-    ctx.quadraticCurveTo(nx, pts[i]!.y - pts[i]!.ry - h, pts[i + 1]!.x, base[i + 1]!.y)
+  // 1) внешняя кромка: от начала к концу
+  ctx.moveTo(crest[0]!.x, crest[0]!.y)
+  for (let i = 1; i < crest.length; i++) {
+    const mx = (crest[i - 1]!.x + crest[i]!.x) / 2
+    const my = (crest[i - 1]!.y + crest[i]!.y) / 2
+    ctx.quadraticCurveTo(crest[i - 1]!.x, crest[i - 1]!.y, mx, my)
   }
-  ctx.lineTo(pts[pts.length - 1]!.x, base[pts.length - 1]!.y)
-  traceSmooth(ctx, base.slice().reverse(), false)
+  ctx.lineTo(crest[crest.length - 1]!.x, crest[crest.length - 1]!.y)
+  // 2) замыкание по базе: от конца обратно к началу
+  ctx.lineTo(base[base.length - 1]!.x, base[base.length - 1]!.y)
+  for (let i = base.length - 1; i > 0; i--) {
+    const mx = (base[i]!.x + base[i - 1]!.x) / 2
+    const my = (base[i]!.y + base[i - 1]!.y) / 2
+    ctx.quadraticCurveTo(base[i]!.x, base[i]!.y, mx, my)
+  }
+  ctx.lineTo(base[0]!.x, base[0]!.y)
   ctx.closePath()
+
   ctx.fillStyle = "rgba(93, 255, 176, 0.42)"
   ctx.fill()
   ctx.strokeStyle = TIER[1].dark
@@ -199,76 +275,66 @@ function drawTailFin(ctx: Ctx, tail: Node, thick: number, time: number) {
 }
 
 /**
- * Голова угря: узкая, низкая и **змеиная**, а не рыбий клин.
+ * Детали головы угря: рот, глаз, жабра, блик.
  *
- * Признаки, которые делают силуэт угревым (правка 04.11.2026 по крупному
- * плану — прежняя голова читалась как щучья/барракуда):
+ * Собственного КОНТУРА у головы нет — силуэт рисует `drawBody`, и голова
+ * является продолжением тела. Раньше здесь рисовалась отдельная фигура
+ * шириной ry*3.6, и её кромки торчали «плавниками» над и под телом
+ * (скриншот 04.11.2026): голова рисовалась буквально дважды.
+ *
+ * Признаки угря (силуэт баракуды/щуки — их быть не должно):
  *  - морда УЖЕ тела и почти плоская — угорь не «высоколобый»;
  *  - кончик тупой и скруглённый, без клюва;
  *  - рот — длинная щель вдоль брюха, доходящая почти до жабер;
  *  - глаз МАЛЕНЬКИЙ (у угря он крошечный относительно головы) и высоко;
  *  - жаберное отверстие — короткая щель у самого тела.
+ *
+ * Все координаты берутся через `noseRy`/`noseLen`, чтобы линии не вылезали
+ * за контур: расхождение давало торчащие шипы.
  */
 function drawHead(ctx: Ctx, node: Node, thick: number, time: number) {
   const ry = node.ry
-  // Морда вытянутая, но НЕ выше тела: полувысота — четверть толщины.
-  const len = ry * 3.2
-  const nose = ry * 0.46
+  // Нос сужается до 0.12 радиуса, поэтому детали привязываем к САМОЙ ТОЛСТОЙ
+  // части головы, а не к длине: линии длиной в `len` (25 px) выходили далеко
+  // за силуэт и читались «раскрытой пастью» (скриншот 04.11.2026).
+  const len = ry * 1.1
   const eyeR = Math.max(1.3, thick * 0.13)
-  // Затылок уходит глубоко в первый сегмент: голова и тело — один силуэт.
-  const nape = ry * 3.6
   ctx.save()
   ctx.translate(node.x, node.y)
 
-  // --- контур: узкая плоская морда, тупой кончик, тяжёлая нижняя челюсть ---
+  // --- рот: короткая дуга у брюха, от середины головы назад ---
   ctx.beginPath()
-  ctx.moveTo(-nape, -ry * 0.42)
-  // верхняя кромка почти прямая — «змейная», без выраженного лба
-  ctx.bezierCurveTo(-ry * 1.2, -ry * 0.62, ry * 0.4, -nose * 1.02, len * 0.76, -nose * 0.78)
-  // тупой кончик: короткая дуга, скруглённая сверху вниз
-  ctx.quadraticCurveTo(len * 1.0, -nose * 0.5, len * 0.99, nose * 0.1)
-  // нижняя челюсть: чуть тяжелее и выдаётся вперёд
-  ctx.quadraticCurveTo(len * 0.96, nose * 0.62, len * 0.6, nose * 0.76)
-  ctx.bezierCurveTo(-ry * 0.2, ry * 0.86, -ry * 1.4, ry * 0.78, -nape, ry * 0.46)
-  ctx.closePath()
-  const g = ctx.createLinearGradient(0, -nose, 0, ry * 0.8)
-  g.addColorStop(0, TIER[1].light)
-  g.addColorStop(0.5, TIER[1].base)
-  g.addColorStop(1, "#0a6440")
-  ctx.fillStyle = g
-  ctx.fill()
+  ctx.moveTo(len * 0.75, ry * 0.42)
+  ctx.quadraticCurveTo(len * 0.3, ry * 0.62, -ry * 0.35, ry * 0.48)
   ctx.strokeStyle = TIER[1].dark
-  ctx.lineWidth = 1.1
-  ctx.stroke()
-
-  // --- рот: одна длинная щель вдоль брюха, до жабер ---
-  ctx.beginPath()
-  ctx.moveTo(len * 0.94, nose * 0.2)
-  ctx.quadraticCurveTo(len * 0.6, nose * 0.62, -ry * 0.35, ry * 0.44)
-  ctx.strokeStyle = TIER[1].dark
-  ctx.lineWidth = Math.max(1.1, thick * 0.085)
+  ctx.lineWidth = Math.max(1.1, thick * 0.075)
   ctx.lineCap = "round"
   ctx.stroke()
 
-  // --- блик по верху морды (влажная кожа) ---
-  ctx.globalAlpha = 0.26 + 0.08 * Math.sin(time * 2.6)
+  // --- блик по верху головы (влажная кожа) ---
+  ctx.globalAlpha = 0.2 + 0.06 * Math.sin(time * 2.6)
   ctx.beginPath()
-  ctx.ellipse(len * 0.34, -nose * 0.5, len * 0.26, nose * 0.22, -0.05, 0, Math.PI * 2)
+  ctx.ellipse(len * 0.1, -ry * 0.5, len * 0.55, ry * 0.16, -0.04, 0, Math.PI * 2)
   ctx.fillStyle = "#ffffff"
   ctx.fill()
   ctx.globalAlpha = 1
 
-  // --- жаберное отверстие: короткая щель у тела ---
+  // --- жаберное отверстие: короткая почти вертикальная щель у тела ---
+  // Высота 0.22 радиуса и полное попадание внутрь силуэта: длинная дуга
+  // выходила за контур и читалась острым шипом (скриншот 04.11.2026).
+  const gillX = -ry * 0.5
   ctx.beginPath()
-  ctx.moveTo(-ry * 0.86, -ry * 0.16)
-  ctx.quadraticCurveTo(-ry * 0.92, 0, -ry * 0.85, ry * 0.26)
-  ctx.strokeStyle = "rgba(3, 20, 14, 0.4)"
-  ctx.lineWidth = 1.05
+  ctx.moveTo(gillX, -ry * 0.2)
+  ctx.lineTo(gillX, ry * 0.22)
+  ctx.strokeStyle = "rgba(3, 20, 14, 0.22)"
+  ctx.lineWidth = 1
   ctx.stroke()
 
   // --- глаз: МАЛЕНЬКИЙ, высоко и у затылка ---
-  const eyeX = len * 0.18
-  const eyeY = -nose * 0.42
+  // Позиция привязана к радиусу головы: прежний расчёт через `noseRy` в
+  // дальней части носа давал точку почти на оси, и глаз «сползал» на кончик.
+  const eyeX = -len * 0.15
+  const eyeY = -ry * 0.46
   ctx.beginPath()
   ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI * 2)
   ctx.fillStyle = "#e8f7ff"
@@ -289,7 +355,15 @@ function drawHead(ctx: Ctx, node: Node, thick: number, time: number) {
   ctx.restore()
 }
 
-/** Плавная ломаная по серединам отрезков; `begin` — начинать ли новый путь. */
+/**
+ * Плавная ломаная по серединам отрезков; `begin` — начинать ли новый путь.
+ *
+ * Кривая проводится ЧЕРЕЗ каждую точку как опорную (`quadraticCurveTo(point,
+ * midpoint)`), поэтому последняя точка попадает на контур через отдельную
+ * дугу, а не через прямой отрезок. Прежний `lineTo(last)` после цикла
+ * дорисовывал прямую от середины последнего отрезка к концу: у носа это
+ * давало два прямых «лезвия», расходящихся из кончика (скриншоты 04.11.2026).
+ */
 function traceSmooth(ctx: Ctx, pts: Point[], begin: boolean) {
   if (!pts.length) return
   if (begin) ctx.moveTo(pts[0]!.x, pts[0]!.y)
@@ -299,6 +373,10 @@ function traceSmooth(ctx: Ctx, pts: Point[], begin: boolean) {
     const cur = pts[i]!
     ctx.quadraticCurveTo(prev.x, prev.y, (prev.x + cur.x) / 2, (prev.y + cur.y) / 2)
   }
-  const last = pts[pts.length - 1]!
-  ctx.lineTo(last.x, last.y)
+  // Последняя точка достигается дугой с опорой в предпоследней, а не отрезком.
+  const n = pts.length
+  if (n >= 2) {
+    const mid = { x: (pts[n - 2]!.x + pts[n - 1]!.x) / 2, y: (pts[n - 2]!.y + pts[n - 1]!.y) / 2 }
+    ctx.quadraticCurveTo(mid.x, mid.y, pts[n - 1]!.x, pts[n - 1]!.y)
+  }
 }

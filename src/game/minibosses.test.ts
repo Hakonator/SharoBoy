@@ -295,7 +295,25 @@ describe("T-058: новые минибоссы", () => {
       .map((b) => b.x)
       .sort((a, b) => b - a)
     expect(segs[0]).toBeGreaterThan(segs[segs.length - 1])
-    for (let i = 1; i < segs.length; i++) expect(segs[i - 1] - segs[i]).toBeCloseTo(20, 5)
+    // Шаг между сегментами равномерный. Конкретное число не фиксируем:
+    // оно подбиралось по пропорциям силуэта (SEG_STEP, см. buildEel) и
+    // менялось 04.11.2026 с 20 на 26 — «угорь» при 20 был 4.7:1, слишком
+    // толстый. Тест держит инвариант равномерности, а не балансное число.
+    const step = segs[0]! - segs[1]!
+    expect(step).toBeGreaterThan(0)
+    for (let i = 1; i < segs.length; i++) expect(segs[i - 1] - segs[i]).toBeCloseTo(step, 5)
+  })
+
+  it("угорь вытянутый: длина тела заметно больше толщины", () => {
+    const eel = buildEel(W, H, TOP)
+    const left = Math.min(...eel.map((b) => b.x - b.rx))
+    const right = Math.max(...eel.map((b) => b.x + b.rx))
+    const thickness = Math.max(...eel.map((b) => b.ry)) * 2
+    // 4.7:1 читалось как «головастик», а не угорь: при такой пропорции любой
+    // профиль носа выглядит сигарой с шипом (разбор 04.11.2026).
+    // Порог 5.5 отсекает регресс к прежним пропорциям, не фиксируя точное
+    // значение — оно ограничено мобильной шириной экрана.
+    expect((right - left) / thickness).toBeGreaterThan(5.5)
   })
 
   it("силуэт угря зеркально симметричен — разворот не разъезжается с хитбоксами", () => {
