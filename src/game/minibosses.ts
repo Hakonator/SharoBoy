@@ -326,7 +326,11 @@ export function buildArmoredCrab(
  */
 export function buildEel(w: number, h: number, top: number, group = 0, cx = w / 2): Block[] {
   const cy = Math.min(top + 160, h * 0.4)
-  const S = { swayAmp: Math.max(24, w / 2 - 130), swayFreq: 0.16 }
+  // Патруль угря компактнее и заметно бодрее прежнего (было amp ≈ w/2−130 при
+  // freq 0.16 → период ~39 с): существо подолгу «отползало» от центра и
+  // возвращалось, что читалось как рывок в сторону. Теперь амплитуда меньше
+  // трети поля, а проход занимает ~2× меньше времени.
+  const S = { swayAmp: Math.min(150, Math.max(90, w * 0.16)), swayFreq: 0.34 }
   const p = (
     x: number,
     y: number,

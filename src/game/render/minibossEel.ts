@@ -9,6 +9,18 @@ const WAVE_AMP = 4.5
 const WAVE_FREQ = 2.3
 /** Сдвиг фазы между соседними частями тела: чем больше, тем «змеинее» волна. */
 const WAVE_PHASE_STEP = 0.85
+/**
+ * Дополнительное боковое смещение головы при «змейном» движении, px.
+ * У угря голова водит из стороны в сторону заметнее тела — без этого силуэт
+ * остаётся ровной «трубой» с местной рябью (замечание 04.11.2026).
+ */
+const HEAD_SWAY = 2.6
+/**
+ * Визуальное сужение хвоста: насколько ДОПОЛНИТЕЛЬНО утончаются узлы к концу.
+ * Хитбоксы не трогаем (симметрия по `mbFacing` обязана сохраниться, AD-037),
+ * но рисованное тело сужается сильнее — иначе угорь выглядит трубой.
+ */
+const TAIL_TAPER = 0.34
 
 interface Point {
   x: number
@@ -49,8 +61,12 @@ export function drawEel(ctx: Ctx, parts: Block[], time: number) {
   const nodes: Node[] = spine.map((p, i) => {
     const k = i / Math.max(1, spine.length - 1)
     const wave = Math.sin(time * WAVE_FREQ - i * WAVE_PHASE_STEP) * WAVE_AMP * (0.25 + 0.75 * k)
+    // Голова водит сильнее тела: у угря это главный признак «живой змеи».
+    const headLead = i === 0 ? Math.sin(time * WAVE_FREQ * 0.7) * HEAD_SWAY : 0
     // Тело чуть тоньше хитбокса: между блоками не должно быть «пузырей».
-    return { x: p.x - cx, y: p.y + wave, ry: p.ry * 0.88 }
+    // К хвосту утончаем дополнительно — силуэт перестаёт быть «трубой».
+    const taper = 1 - TAIL_TAPER * k * k
+    return { x: p.x - cx, y: p.y + wave + headLead, ry: p.ry * 0.88 * taper }
   })
   const midY = nodes.reduce((s, n) => s + n.y, 0) / nodes.length
 
@@ -113,16 +129,20 @@ function drawBody(ctx: Ctx, nodes: Node[], midY: number, thick: number) {
 
 /** Спинной плавник-складка по задней половине спины, с «лучом» внутри. */
 function drawRidge(ctx: Ctx, nodes: Node[], thick: number) {
-  const from = Math.max(1, Math.floor(nodes.length * 0.3))
+  // Гребень начинается ПОСЛЕ головы: с `nodes.length * 0.3` он стартовал ещё
+  // на голове, и у стыка торчал вертикальный треугольник (крупный план
+  // 04.11.2026). Первые два узла — голова и её стык с телом.
+  const from = Math.max(2, Math.floor(nodes.length * 0.42))
   const pts = nodes.slice(from)
   if (pts.length < 2) return
   const base = pts.map((n) => ({ x: n.x, y: n.y - n.ry * 0.85 }))
   ctx.beginPath()
   ctx.moveTo(pts[0]!.x, base[0]!.y)
-  // гребень растёт к середине и сходит на нет к хвосту
+  // Гребень поднимается ОТ НУЛЯ к середине и сходит на нет к хвосту: резкий
+  // старт давал «плавник-обрубок» на стыке с головой.
   for (let i = 0; i < pts.length - 1; i++) {
     const k = i / (pts.length - 1)
-    const h = thick * 0.5 * Math.sin(Math.PI * (0.25 + 0.75 * k))
+    const h = thick * 0.5 * Math.sin(Math.PI * (0.1 + 0.8 * k)) * Math.min(1, k * 2.2)
     const nx = pts[i]!.x
     ctx.quadraticCurveTo(nx, pts[i]!.y - pts[i]!.ry - h, pts[i + 1]!.x, base[i + 1]!.y)
   }
@@ -160,8 +180,11 @@ function drawTailFin(ctx: Ctx, tail: Node, thick: number, time: number) {
   g.addColorStop(1, TIER[1].dark)
   ctx.fillStyle = g
   ctx.fill()
-  ctx.strokeStyle = TIER[1].dark
+  // Обводка только по видимой части: у затылка линия не рисуется,
+  // иначе поверх тела появлялся шов «приставленной головы».
+  ctx.clip()
   ctx.lineWidth = 1.1
+  ctx.strokeStyle = TIER[1].dark
   ctx.stroke()
   // прожилки плавника
   ctx.strokeStyle = "rgba(4, 18, 26, 0.28)"
@@ -176,77 +199,91 @@ function drawTailFin(ctx: Ctx, tail: Node, thick: number, time: number) {
 }
 
 /**
- * Голова: клин с утолщением за глазами, пасть с линией челюсти, крупный глаз
- * с белком и зрачком, жаберная щель. Все размеры — от `thick`, поэтому глаз
- * остаётся глазом на любой толщине существа.
+ * Голова угря: узкая, низкая и **змеиная**, а не рыбий клин.
+ *
+ * Признаки, которые делают силуэт угревым (правка 04.11.2026 по крупному
+ * плану — прежняя голова читалась как щучья/барракуда):
+ *  - морда УЖЕ тела и почти плоская — угорь не «высоколобый»;
+ *  - кончик тупой и скруглённый, без клюва;
+ *  - рот — длинная щель вдоль брюха, доходящая почти до жабер;
+ *  - глаз МАЛЕНЬКИЙ (у угря он крошечный относительно головы) и высоко;
+ *  - жаберное отверстие — короткая щель у самого тела.
  */
 function drawHead(ctx: Ctx, node: Node, thick: number, time: number) {
   const ry = node.ry
-  const len = ry * 2.5
-  const eyeR = Math.max(2.2, thick * 0.3)
+  // Морда вытянутая, но НЕ выше тела: полувысота — четверть толщины.
+  const len = ry * 3.2
+  const nose = ry * 0.46
+  const eyeR = Math.max(1.3, thick * 0.13)
+  // Затылок уходит глубоко в первый сегмент: голова и тело — один силуэт.
+  const nape = ry * 3.6
   ctx.save()
   ctx.translate(node.x, node.y)
 
-  // клин: широкая затылочная часть, сужение к носу
+  // --- контур: узкая плоская морда, тупой кончик, тяжёлая нижняя челюсть ---
   ctx.beginPath()
-  ctx.moveTo(-ry * 1.15, -ry * 0.75)
-  ctx.quadraticCurveTo(-ry * 0.25, -ry * 1.32, len * 0.42, -ry * 0.66)
-  ctx.quadraticCurveTo(len, -ry * 0.3, len, -ry * 0.02)
-  ctx.quadraticCurveTo(len, ry * 0.34, len * 0.4, ry * 0.66)
-  ctx.quadraticCurveTo(-ry * 0.3, ry * 1.1, -ry * 1.15, ry * 0.75)
+  ctx.moveTo(-nape, -ry * 0.42)
+  // верхняя кромка почти прямая — «змейная», без выраженного лба
+  ctx.bezierCurveTo(-ry * 1.2, -ry * 0.62, ry * 0.4, -nose * 1.02, len * 0.76, -nose * 0.78)
+  // тупой кончик: короткая дуга, скруглённая сверху вниз
+  ctx.quadraticCurveTo(len * 1.0, -nose * 0.5, len * 0.99, nose * 0.1)
+  // нижняя челюсть: чуть тяжелее и выдаётся вперёд
+  ctx.quadraticCurveTo(len * 0.96, nose * 0.62, len * 0.6, nose * 0.76)
+  ctx.bezierCurveTo(-ry * 0.2, ry * 0.86, -ry * 1.4, ry * 0.78, -nape, ry * 0.46)
   ctx.closePath()
-  const g = ctx.createLinearGradient(0, -ry * 1.2, 0, ry * 1.1)
+  const g = ctx.createLinearGradient(0, -nose, 0, ry * 0.8)
   g.addColorStop(0, TIER[1].light)
   g.addColorStop(0.5, TIER[1].base)
-  g.addColorStop(1, TIER[1].dark)
+  g.addColorStop(1, "#0a6440")
   ctx.fillStyle = g
   ctx.fill()
   ctx.strokeStyle = TIER[1].dark
-  ctx.lineWidth = 1.3
+  ctx.lineWidth = 1.1
   ctx.stroke()
 
-  // блик по верху головы
-  ctx.globalAlpha = 0.32 + 0.1 * Math.sin(time * 2.6)
+  // --- рот: одна длинная щель вдоль брюха, до жабер ---
   ctx.beginPath()
-  ctx.ellipse(len * 0.12, -ry * 0.52, len * 0.34, ry * 0.2, -0.12, 0, Math.PI * 2)
+  ctx.moveTo(len * 0.94, nose * 0.2)
+  ctx.quadraticCurveTo(len * 0.6, nose * 0.62, -ry * 0.35, ry * 0.44)
+  ctx.strokeStyle = TIER[1].dark
+  ctx.lineWidth = Math.max(1.1, thick * 0.085)
+  ctx.lineCap = "round"
+  ctx.stroke()
+
+  // --- блик по верху морды (влажная кожа) ---
+  ctx.globalAlpha = 0.26 + 0.08 * Math.sin(time * 2.6)
+  ctx.beginPath()
+  ctx.ellipse(len * 0.34, -nose * 0.5, len * 0.26, nose * 0.22, -0.05, 0, Math.PI * 2)
   ctx.fillStyle = "#ffffff"
   ctx.fill()
   ctx.globalAlpha = 1
 
-  // пасть: линия от кончика назад-вниз + тёмное «углубление» у угла
+  // --- жаберное отверстие: короткая щель у тела ---
   ctx.beginPath()
-  ctx.moveTo(len * 0.97, ry * 0.06)
-  ctx.quadraticCurveTo(len * 0.6, ry * 0.56, len * 0.18, ry * 0.62)
-  ctx.strokeStyle = TIER[1].dark
-  ctx.lineWidth = Math.max(1.4, thick * 0.14)
-  ctx.lineCap = "round"
+  ctx.moveTo(-ry * 0.86, -ry * 0.16)
+  ctx.quadraticCurveTo(-ry * 0.92, 0, -ry * 0.85, ry * 0.26)
+  ctx.strokeStyle = "rgba(3, 20, 14, 0.4)"
+  ctx.lineWidth = 1.05
   ctx.stroke()
 
-  // жаберная щель за головой
-  ctx.beginPath()
-  ctx.moveTo(-ry * 0.52, -ry * 0.62)
-  ctx.quadraticCurveTo(-ry * 0.95, 0, -ry * 0.45, ry * 0.7)
-  ctx.strokeStyle = "rgba(4, 18, 26, 0.4)"
-  ctx.lineWidth = 1.2
-  ctx.stroke()
-
-  // глаз — КРУПНЫЙ и ближе к носу, на уровне верхней трети головы
-  const eyeX = len * 0.42
-  const eyeY = -ry * 0.34
+  // --- глаз: МАЛЕНЬКИЙ, высоко и у затылка ---
+  const eyeX = len * 0.18
+  const eyeY = -nose * 0.42
   ctx.beginPath()
   ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI * 2)
-  ctx.fillStyle = "#f4fbff"
+  ctx.fillStyle = "#e8f7ff"
   ctx.fill()
-  ctx.strokeStyle = "rgba(4, 18, 26, 0.75)"
-  ctx.lineWidth = 1
+  ctx.strokeStyle = "rgba(3, 20, 14, 0.85)"
+  ctx.lineWidth = 0.9
   ctx.stroke()
+  // зрачок — вертикальный овал: у угря глаз «рыбий», не человеческий
   ctx.beginPath()
-  ctx.arc(eyeX + eyeR * 0.3, eyeY + eyeR * 0.05, eyeR * 0.62, 0, Math.PI * 2)
-  ctx.fillStyle = "#071820"
+  ctx.ellipse(eyeX + eyeR * 0.2, eyeY, eyeR * 0.44, eyeR * 0.72, 0, 0, Math.PI * 2)
+  ctx.fillStyle = "#04140f"
   ctx.fill()
   ctx.beginPath()
-  ctx.arc(eyeX + eyeR * 0.05, eyeY - eyeR * 0.34, eyeR * 0.26, 0, Math.PI * 2)
-  ctx.fillStyle = "rgba(255,255,255,0.95)"
+  ctx.arc(eyeX + eyeR * 0.02, eyeY - eyeR * 0.34, eyeR * 0.26, 0, Math.PI * 2)
+  ctx.fillStyle = "rgba(255,255,255,0.9)"
   ctx.fill()
 
   ctx.restore()

@@ -28,11 +28,12 @@ import { blockTop } from "./paddleControl"
 import { addRawScore } from "./runFlow"
 
 /**
- * Порог сдвига центра за кадр, ниже которого направление силуэта не меняется.
- * В крайних точках патруля скорость → 0, и без порога существо дёргалось бы
- * «туда-сюда» каждый кадр.
+ * Мёртвая зона производной покачивания, ниже которой направление силуэта не
+ * меняется. У края патруля скорость → 0, и без порога нос дёргался бы
+ * «туда-сюда» каждый кадр. Порог по производной (а не по смещению за кадр)
+ * не зависит от частоты кадров и от программных сдвигов (рывок).
  */
-const FACING_EPSILON = 0.05
+const EEL_FACING_EPSILON = 0.08
 
 /** Фабрика силуэта по виду существа. */
 const BUILDERS: Record<
@@ -375,42 +376,54 @@ export function updateMinibosses(g: Game, dt: number) {
  * Направление (`facing`) считается по сдвигу центра за кадр — силуэт
  * разворачивается носом по ходу движения, в том числе у стен.
  */
+/**
+ * Обновляет живой центр существа и направление его силуэта.
+ *
+ * Центр (`dropX/dropY`) нужен телеграфу рывка и эффектам: раньше он
+ * вычислялся один раз при рождении, поэтому круг «предупреждения» появлялся
+ * в стороне от угря, успевшего уплыть по полю.
+ *
+ * Направление (`facing`) считается **аналитически** — из производной синуса
+ * покачивания, как у рыбы (`render/fish.ts`). Раньше оно определялось по
+ * фактическому сдвигу центра за кадр, и это давало два дефекта (жалоба
+ * 04.11.2026): силуэт мигал на каждом развороте патруля (скорость проходит
+ * через ноль, и шум/рывок переключали знак), а программный сдвиг рывка
+ * воспринимался как собственное движение. Производная не имеет ни одной из
+ * этих проблем — она не зависит от частоты кадров и от чужих смещений.
+ */
 function updateCreatureCenter(g: Game, creature: MinibossCreature) {
-  // Смещение рывка — программный скачок группы, а не движение существа:
-  // если считать `facing` по нему, силуэт разворачивается ровно в момент
-  // телеграфа, и отражение вокруг центра тела читается как «угорь мотнулся
-  // вправо и вернулся» (жалоба 04.11.2026). Поэтому сравниваем позиции с
-  // вычтенным вкладом рывка — остаётся только настоящее покачивание.
-  const dashOffset = eelDashOffset(creature)
   const meanX = meanOfGroup(g, creature.group, "x")
   const meanY = meanOfGroup(g, creature.group, "y")
   if (meanX === null || meanY === null) return
-  const swayX = meanX - dashOffset
-  if (creature.lastX !== undefined) {
-    const dx = swayX - creature.lastX
-    // Мёртвая зона: в крайних точках патруля скорость ≈ 0, без порога силуэт
-    // дёргался бы «туда-сюда» на каждом кадре.
-    if (Math.abs(dx) > FACING_EPSILON) creature.facing = dx > 0 ? 1 : -1
-  }
-  creature.lastX = swayX
+  creature.lastX = meanX
   creature.dropX = meanX
   creature.dropY = meanY
   if (creature.kind !== "slippery_eel") return
-  const facing = creature.facing ?? 1
+  const facing = eelFacing(g, creature)
+  if (facing !== undefined) creature.facing = facing
+  const value = creature.facing ?? 1
   for (const b of g.blocks) {
-    if (b.isMiniboss && (b.mbGroup ?? 0) === creature.group) b.mbFacing = facing
+    if (b.isMiniboss && (b.mbGroup ?? 0) === creature.group) b.mbFacing = value
   }
 }
 
 /**
- * Текущее смещение рывка, уже применённое к группе. В покое и в телеграфе —
- * ноль; на рывке совпадает с тем, что передаётся в `moveCreatureGroup`.
- * Нужно, чтобы отделить программный сдвиг от собственного движения существа.
+ * Направление угря по производной его покачивания: скорость патруля
+ * пропорциональна `cos(t·swayFreq + swayPh)`. В крайних точках производная
+ * равна нулю, поэтому знак берётся только когда движение действительно есть —
+ * иначе силуэт «дребезжал» бы на месте.
  */
-function eelDashOffset(creature: MinibossCreature): number {
-  if (creature.kind !== "slippery_eel" || creature.dashState !== "dash") return 0
-  const progress = 1 - (creature.dashLeft ?? 0) / EEL_DASH_DURATION
-  return (creature.dashDir ?? 1) * EEL_DASH_REACH * Math.sin(Math.PI * progress)
+function eelFacing(g: Game, creature: MinibossCreature): 1 | -1 | undefined {
+  const head = g.blocks.find(
+    (b) => b.isMiniboss && (b.mbGroup ?? 0) === creature.group && b.mbPart === "eel_head"
+  )
+  const freq = head?.swayFreq ?? 0
+  if (!freq) return undefined
+  const velocity = Math.cos(g.time * freq + (head?.swayPh ?? 0))
+  // Мёртвая зона по производной, а не по смещению: у самого края патруля
+  // существо почти стоит, и переключать нос рано.
+  if (Math.abs(velocity) < EEL_FACING_EPSILON) return undefined
+  return velocity > 0 ? 1 : -1
 }
 
 /** Рывок угря: idle → telegraph → dash → idle, с телеграфом перед броском. */

@@ -422,23 +422,39 @@ describe("T-063: угорь разворачивается и не телепо�
     return env
   }
 
-  it("направление силуэта следует за движением, а не «плывёт задом»", () => {
+  /**
+   * Контракт после 04.11.2026: направление берётся из **фазы патруля**
+   * (производная синуса), а не из разности позиций. Поэтому тест крутит время
+   * и проверяет, что нос смотрит туда, куда существо реально едет, — и что
+   * ручное смещение блоков направление не меняет (это была причина мигания).
+   */
+  it("направление силуэта следует за фазой патруля, а не за разностью позиций", () => {
     const { game, restoreRandom } = eelEnv()
     try {
       const creature = game.minibosses[0]!
       const group = game.blocks.filter((b) => (b.mbGroup ?? 0) === creature.group)
+      const head = group.find((b) => b.mbPart === "eel_head")!
+      const freq = head.swayFreq
+      expect(freq).toBeGreaterThan(0)
 
-      // существо сместилось влево — нос должен смотреть влево
-      for (const b of group) b.x = b.x0 - 80
+      // cos(t·freq) = 1 → максимальная скорость вправо.
+      game.time = 0
+      updateMinibosses(game, 0.016)
+      expect(creature.facing).toBe(1)
+      expect(group.every((b) => b.mbFacing === 1)).toBe(true)
+
+      // cos(t·freq) = −1 → максимальная скорость влево.
+      game.time = Math.PI / freq
       updateMinibosses(game, 0.016)
       expect(creature.facing).toBe(-1)
       expect(group.every((b) => b.mbFacing === -1)).toBe(true)
 
-      // и обратно вправо — силуэт разворачивается
-      for (const b of group) b.x = b.x0 + 60
+      // Ручной сдвиг блоков НЕ должен переворачивать силуэт: раньше именно это
+      // дёргало угря (и на рывке, и на случайных смещениях).
+      const before = creature.facing
+      for (const b of group) b.x = b.x0 - 80
       updateMinibosses(game, 0.016)
-      expect(creature.facing).toBe(1)
-      expect(group.every((b) => b.mbFacing === 1)).toBe(true)
+      expect(creature.facing).toBe(before)
     } finally {
       restoreRandom()
       game.destroy()
