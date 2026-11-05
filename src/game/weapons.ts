@@ -34,6 +34,18 @@ export interface WeaponsWorld {
 export class WeaponsSystem {
   constructor(private readonly g: WeaponsWorld) {}
 
+  /** Немедленно прекращает стрельбу и сбрасывает все эффекты оружия при победе / завершении уровня. */
+  stop() {
+    const g = this.g
+    g.laserUntil = 0
+    g.laserArmed = false
+    g.laserArmedUntil = 0
+    g.laserWasOn = false
+    g.rocketUntil = 0
+    g.weaponCd = 0
+    g.projectiles = []
+  }
+
   tryFire(dt: number, fire: boolean) {
     const g = this.g
     if (g.boss) {
@@ -96,10 +108,12 @@ export class WeaponsSystem {
       // Лазерные пилоны стоят на поверхности купола (bump под точкой),
       // иначе — на плоской грани (8px над ней). Высота согласована с рендером.
       this.beamHit(p.x - p.w * 0.36)
-      this.beamHit(p.x + p.w * 0.36)
+      if (this.g.laserUntil > 0) {
+        this.beamHit(p.x + p.w * 0.36)
+      }
       p.squash = Math.max(p.squash, 0.25)
     }
-    g.laserWasOn = on
+    g.laserWasOn = on && g.laserUntil > 0
   }
 
   private beamHit(px: number) {
@@ -129,11 +143,17 @@ export class WeaponsSystem {
         color: "rgba(124,245,255,0.85)",
         t: 0,
       })
+      if (!g.boss && (g.blocks.length === 0 || g.blocks.every((b) => b.dead))) {
+        this.stop()
+      }
       return
     }
     if (g.boss && Math.abs(g.boss.x - px) < g.boss.r && g.boss.y + g.boss.r < pylonY) {
       g.damageBoss(2, true)
       g.fx.burst(px, g.boss.y + g.boss.r, "#7cf5ff", 8, 180)
+      if (!g.boss) {
+        this.stop()
+      }
     }
   }
 
@@ -193,5 +213,8 @@ export class WeaponsSystem {
       if (Math.hypot(b.x - x, b.y - y) < R + Math.max(b.rx, b.ry)) g.damageBlock(b, 3)
     }
     if (g.boss && Math.hypot(g.boss.x - x, g.boss.y - y) < R + g.boss.r) g.damageBoss(3, true)
+    if (!g.boss && (g.blocks.length === 0 || g.blocks.every((b) => b.dead))) {
+      this.stop()
+    }
   }
 }

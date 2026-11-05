@@ -492,6 +492,40 @@ Allowed files:
 - [x] визуал молний `fx.lightnings`, искры `#ffe95c`, стерео-звук `sfx.zap(pan)`
 - [x] `typecheck`, `lint:check`, `format:check`, `test` — зелёные (948 тестов)
 
+### T-065: Прекращение эффектов любого оружия после победы
+
+Status: done · Priority: high (исправление геймплейного дефекта) · Сложность: S · Зависимости: — · Оружие
+
+Итог (05.11.2026): прекращены все эффекты стрельбы лазера, ракет, снарядов, очередей взрывов и искр при выполнении условий победы. Метод `weaponsSys.stop()`, функция `stopWeaponsAndAura(g)` в `runFlow.ts`, немедленная проверка победы в `updateStep.ts`, блокировка рендера в `drawLaserBeams` и `drawScene.ts`. 92 файла / 953 теста — 100% pass.
+
+Описание:
+
+1. `src/game/weapons.ts`: добавлен метод `stop()`, сбрасывающий `laserUntil`, `laserArmed`, `laserArmedUntil`, `laserWasOn`, `rocketUntil`, `weaponCd` и очищающий массив `projectiles`. В `beamHit` и `explode` при уничтожении последнего блока арены `this.stop()` вызывается немедленно.
+2. `src/game/game/runFlow.ts`: функция `stopWeaponsAndAura(g)` глушит оружие, очищает снаряды, сегменты молний `fx.lightnings`, очереди `sparkQueue` и `boomQueue`. Вызывается в `onLevelCleared` и `showIntermediateScore`.
+3. `src/game/game/updateStep.ts`: мгновенная проверка победы `checkVictory(g)` сразу после `updateLaser` и `updateProjectiles`, заморозка шаров и вызов `stopWeaponsAndAura(g)`.
+4. `src/game/render/powers.ts` & `src/game/game/drawScene.ts`: лучи лазера скрыты при отсутствии живых блоков и при показе модальных окон победы (`intermediateScore`, `won`).
+
+Allowed files:
+
+- src/game/weapons.ts
+- src/game/weapons.test.ts
+- src/game/game/runFlow.ts
+- src/game/game/updateStep.ts
+- src/game/render/powers.ts
+- src/game/game/drawScene.ts
+- docs/CHANGELOG.md
+- .ai/TASKS.md
+- .ai/DECISIONS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Приёмка:
+
+- [x] лазер прекращает стрельбу немедленно при уничтожении последнего блока
+- [x] в окне подсчёта очков и на экране победы лучи лазера и снаряды не отображаются
+- [x] звуки лазера и ракет больше не воспроизводятся после победы
+- [x] все тесты и проверки проходят (92 файла / 953 теста)
+
 ---
 
 ## Выполнено ранее (архив)

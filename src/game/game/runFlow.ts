@@ -160,7 +160,29 @@ export function onBossKilled(g: Game) {
 
 /* ---------- переходы ---------- */
 
+/** Прекращает стрельбу и снимает все эффекты оружия и очередей при победе / завершении уровня. */
+export function stopWeaponsAndAura(g: Game): void {
+  g.weaponsSys?.stop?.()
+  g.laserUntil = 0
+  g.laserArmed = false
+  g.laserArmedUntil = 0
+  g.laserWasOn = false
+  g.rocketUntil = 0
+  g.weaponCd = 0
+  g.projectiles = []
+  if (g.fx) {
+    g.fx.lightnings = []
+  }
+  if (g.sparkQueue) {
+    g.sparkQueue.length = 0
+  }
+  if (g.boomQueue) {
+    g.boomQueue.length = 0
+  }
+}
+
 export function onLevelCleared(g: Game) {
+  stopWeaponsAndAura(g)
   g.runSectorsCleared = (g.runSectorsCleared ?? 0) + 1
   if (
     g.runSectorStartTime > 0 &&
@@ -488,6 +510,7 @@ export function showIntermediateScore(
     eventDescription?: string
   }
 ) {
+  stopWeaponsAndAura(g)
   const breakdown = computeScoreBreakdown(g)
   const prevScore = g.levelScoreStart ?? 0
   const currentScore = g.score ?? 0

@@ -12,7 +12,7 @@ import { updateMinibosses } from "./minibossRuntime"
 import { stepBlock } from "./blockMotion"
 import { updatePaddleCharge, updatePaddleRotation } from "./paddleControl"
 import { draw } from "./drawScene"
-import { loseLife, onLevelCleared } from "./runFlow"
+import { loseLife, onLevelCleared, stopWeaponsAndAura } from "./runFlow"
 
 /** Очередное звено цепи искр: молния-визуал, электрический треск и обычный урон. */
 function strikeSpark(g: Game, q: SparkHit) {
@@ -144,16 +144,16 @@ export function update(g: Game, dt: number) {
      нужно — раньше это превращалось в «босс мёртв, а уровень не кончается».
      Остатки арены убирает `BossSystem.kill()`; страховка ниже снимет то, что
      босс рисует сам, но не пометил как своё. */
-  const bossDefeated = g.bossDefeated
-  const customTargetsCleared =
-    g.customWinCondition?.kind === "targets"
-      ? g.customTargetBlocks.every((block) => block.dead)
-      : g.blocks.length === 0
-  const isLevelCleared =
-    !g.bossSys.boss &&
-    (bossDefeated || (g.mode === "custom" ? customTargetsCleared : g.blocks.length === 0))
+  const checkVictory = (): boolean => {
+    if (g.bossSys.boss) return false
+    if (g.bossDefeated) return true
+    if (g.mode === "custom" && g.customWinCondition?.kind === "targets") {
+      return g.customTargetBlocks.every((block) => block.dead)
+    }
+    return g.blocks.length === 0 || g.blocks.every((b) => b.dead)
+  }
 
-  if (isLevelCleared) {
+  const freezeBalls = () => {
     for (const ball of g.balls) {
       ball.vx = 0
       ball.vy = 0
@@ -161,6 +161,13 @@ export function update(g: Game, dt: number) {
       ball.lost = false
       ball.trail = []
     }
+  }
+
+  let isLevelCleared = checkVictory()
+
+  if (isLevelCleared) {
+    freezeBalls()
+    stopWeaponsAndAura(g)
   }
 
   const frozen = g.transition > 0 || g.bannerTimer > 1.1 || g.countdown > 0
@@ -180,6 +187,7 @@ export function update(g: Game, dt: number) {
             size: 24,
           })
           g.sfx.win()
+          stopWeaponsAndAura(g)
           pushHud(g)
         },
         onTimeExpired: () => {
@@ -199,16 +207,33 @@ export function update(g: Game, dt: number) {
     const ballStuck = g.balls.some((b) => b.stuck)
     const fire = !ballStuck && (g.input.keys.space || g.input.consumeTapFire())
     g.weaponsSys.updateLaser(fire)
-    g.weaponsSys.tryFire(dt, fire)
-    g.weaponsSys.updateProjectiles(dt)
-    if (g.bossSys.boss?.isChrono) {
-      applyChronoRiftsToBalls(g.bossSys.boss.chronoRifts, g.balls, dt)
+    if (checkVictory()) {
+      isLevelCleared = true
+      freezeBalls()
+      stopWeaponsAndAura(g)
+    } else {
+      g.weaponsSys.tryFire(dt, fire)
+      g.weaponsSys.updateProjectiles(dt)
+      if (checkVictory()) {
+        isLevelCleared = true
+        freezeBalls()
+        stopWeaponsAndAura(g)
+      } else {
+        if (g.bossSys.boss?.isChrono) {
+          applyChronoRiftsToBalls(g.bossSys.boss.chronoRifts, g.balls, dt)
+        }
+        for (const ball of g.balls) g.physics.updateBall(ball, dt)
+        updateSparkAura(g)
+        g.physics.updateBombs(dt)
+        compactInPlace(g.balls, (b) => !b.lost)
+        if (g.balls.length === 0) loseLife(g)
+        if (checkVictory()) {
+          isLevelCleared = true
+          freezeBalls()
+          stopWeaponsAndAura(g)
+        }
+      }
     }
-    for (const ball of g.balls) g.physics.updateBall(ball, dt)
-    updateSparkAura(g)
-    g.physics.updateBombs(dt)
-    compactInPlace(g.balls, (b) => !b.lost)
-    if (g.balls.length === 0) loseLife(g)
   }
 
   for (const b of g.blocks) b.flash = Math.max(0, b.flash - dt * 5)

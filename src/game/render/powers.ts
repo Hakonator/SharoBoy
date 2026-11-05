@@ -92,6 +92,7 @@ export interface LaserBeamView extends RenderView {
 
 export function drawLaserBeams(ctx: Ctx, v: LaserBeamView) {
   if (v.time >= v.laserUntil || v.hidden) return
+  if (!v.boss && (v.blocks.length === 0 || v.blocks.every((b) => b.dead))) return
   const cyc = v.time % 0.3
   if (cyc >= 0.17) return
   const onAmt = 1 - cyc / 0.17
