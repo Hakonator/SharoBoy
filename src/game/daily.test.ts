@@ -88,7 +88,7 @@ describe("Daily Runs Engine (T-041, §3.2 Roadmap)", () => {
       const epoch = new Date(`${MODIFIER_POOL_EPOCH}T00:00:00Z`)
       const pool = getDailyModifierPool(epoch)
       expect(pool).toHaveLength(CAMPAIGN_MODIFIERS.length)
-      expect(pool).toHaveLength(10)
+      expect(pool).toHaveLength(11)
       expect(pool).toEqual(CAMPAIGN_MODIFIERS.map((m) => m.id))
     })
 

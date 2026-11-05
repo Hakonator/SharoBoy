@@ -15,6 +15,7 @@ export type CampaignModifierId =
   | "brittle_world"
   | "low_bounce"
   | "boss_fury"
+  | "dark_arena"
 
 /**
  * Дата ввода в пул новых мутаторов (T-052), UTC.
@@ -138,6 +139,15 @@ export const CAMPAIGN_MODIFIERS: readonly CampaignModifierDef[] = [
     scoreBonus: 0.35,
     crystalBonus: 0.35,
     badgeColor: "#ef4444",
+  },
+  {
+    id: "dark_arena",
+    title: "Слепой сектор",
+    desc: "Арена погружена в глубокую тьму. Видна лишь область радиусом 260 px вокруг шаров и платформы.",
+    icon: "🌑",
+    scoreBonus: 0.5,
+    crystalBonus: 0.5,
+    badgeColor: "#6366f1",
   },
 ]
 

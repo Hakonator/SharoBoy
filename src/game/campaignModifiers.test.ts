@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest"
 import { BOSS_FURY_BOMB_MULT, BossSystem, type BossHost } from "./boss"
 import {
   CAMPAIGN_MODIFIERS,
+  CAMPAIGN_MODIFIERS_MAP,
   LEGACY_MODIFIER_IDS,
   computeRunMultipliers,
   hasModifier,
@@ -163,7 +164,7 @@ describe("T-052: мутаторы кампании 6 → 10", () => {
     for (const id of ["no_powers", "brittle_world", "low_bounce", "boss_fury"]) {
       expect(ids).toContain(id)
     }
-    expect(CAMPAIGN_MODIFIERS).toHaveLength(10)
+    expect(CAMPAIGN_MODIFIERS).toHaveLength(11)
     // Исторический пул остаётся подмножеством текущего — старые сейвы валидны.
     for (const id of LEGACY_MODIFIER_IDS) expect(ids).toContain(id)
 
@@ -276,5 +277,43 @@ describe("T-052: мутаторы кампании 6 → 10", () => {
     expect(furious).toBeLessThan(normal)
     // Ожидаемое соотношение — множитель интервала (шаг кадра даёт погрешность).
     expect(furious / normal).toBeCloseTo(BOSS_FURY_BOMB_MULT, 1)
+  })
+})
+
+describe("T-061: мутатор dark_arena («Слепой сектор»)", () => {
+  it("присутствует в CAMPAIGN_MODIFIERS с корректными параметрами и множителями +50%", () => {
+    const def = CAMPAIGN_MODIFIERS_MAP["dark_arena"]
+    expect(def).toBeDefined()
+    expect(def.title).toBe("Слепой сектор")
+    expect(def.icon).toBe("🌑")
+    expect(def.scoreBonus).toBe(0.5)
+    expect(def.crystalBonus).toBe(0.5)
+    expect(def.badgeColor).toBe("#6366f1")
+    expect(def.desc).toContain("260 px")
+
+    expect(CAMPAIGN_MODIFIERS.map((m) => m.id)).toContain("dark_arena")
+  })
+
+  it("computeRunMultipliers корректно рассчитывает бонус +50% очков и кристаллов", () => {
+    const single = computeRunMultipliers(["dark_arena"])
+    expect(single.scoreMultiplier).toBe(1.5)
+    expect(single.crystalMultiplier).toBe(1.5)
+
+    const combo = computeRunMultipliers(["dark_arena", "ironman"])
+    expect(combo.scoreMultiplier).toBe(2.0)
+    expect(combo.crystalMultiplier).toBe(2.0)
+  })
+
+  it("hasModifier корректно распознаёт dark_arena в наборе", () => {
+    expect(hasModifier(["dark_arena", "dense_armor"], "dark_arena")).toBe(true)
+    expect(hasModifier(["dense_armor"], "dark_arena")).toBe(false)
+    expect(hasModifier([], "dark_arena")).toBe(false)
+    expect(hasModifier(undefined, "dark_arena")).toBe(false)
+  })
+
+  it("сохранение и загрузка dark_arena через localStorage", () => {
+    saveSelectedModifiers(["dark_arena", "glass_paddle"])
+    const loaded = loadSelectedModifiers()
+    expect(loaded).toEqual(["dark_arena", "glass_paddle"])
   })
 })

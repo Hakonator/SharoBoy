@@ -6,6 +6,7 @@ import {
   drawBalls,
   drawBlocks,
   drawBoss,
+  drawDarkArena,
   drawDebugFlags,
   drawBuildVersion,
   drawFps,
@@ -27,8 +28,10 @@ import {
 } from "../render"
 import { rand } from "../utils"
 import { isKineticSniperActive } from "../synergies"
+import { hasModifier } from "../campaignModifiers"
 
 import { blockTop } from "./paddleControl"
+import { gameModifiers } from "./runFlow"
 
 export function draw(g: Game) {
   const { ctx, w, h } = g
@@ -102,6 +105,11 @@ export function draw(g: Game) {
       skin: g.cosmetics?.equipped?.paddle,
     })
   }
+
+  if (g.phase !== "menu" && g.phase !== "map" && hasModifier(gameModifiers(g), "dark_arena")) {
+    drawDarkArena(ctx, w, h, g.balls, g.paddle)
+  }
+
   drawParticles(ctx, g.fx.particles)
   drawPopups(ctx, g.fx.popups)
 
