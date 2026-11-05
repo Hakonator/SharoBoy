@@ -453,6 +453,45 @@ Allowed files:
 - [x] геометрия кругов видимости покрыта юнит-тестами
 - [x] `typecheck`, `lint:check`, `format:check`, `test` — зелёные
 
+### T-064: Постоянное улучшение «Грозовой ореол» (`sparkAura`) — разряды электрического шара при пролёте
+
+Status: done · Priority: high (запрос пользователя) · Сложность: M · Зависимости: — · Постоянные улучшения
+
+Итог (05.11.2026): реализовано постоянное улучшение глобального магазина «Грозовой ореол» (`sparkAura`, 300 монет). Электрический шар испускает дуговые молнии (1 урон) по блокам в радиусе 2 диаметров шара ($4 \times r$) во время пролёта. Кулдаун 0.35 с на каждый блок, стереопанорамирование звука `sfx.zap`, вспышки искр `#ffe95c` и сегменты молний в `fx.lightnings`. 91 файл / 948 тестов — 100% pass.
+
+Описание:
+
+1. `src/game/upgrades.ts`: добавлен `id: "sparkAura"`, название «Грозовой ореол», цена 300 монет, максимальный уровень 1.
+2. `src/game/types.ts`: в `Block` добавлено поле `sparkAuraAt?: number` для сохранения времени последнего удара.
+3. `src/game/physics/spark.ts`:
+   - `SPARK_AURA_RADIUS_RATIO = 4` (2 диаметра шара) и `SPARK_AURA_COOLDOWN = 0.35` с.
+   - `distanceToBlockSurface(ball, b)` с поддержкой кругов, прямоугольников/скруглённых прямоугольников с поворотом `rot` и эллипсов.
+   - `updateSparkAura(g)` с проверкой активности электрошара, уровня улучшения, фильтрацией нематериальных фаз/порталов и нанесением урона через `damageBlock`.
+4. `src/game/game/updateStep.ts`: подключение `updateSparkAura(g)` в шаге кадра сразу после движения шаров.
+
+Allowed files:
+
+- src/game/upgrades.ts
+- src/game/types.ts
+- src/game/physics/spark.ts
+- src/game/physics/spark.test.ts
+- src/game/game/updateStep.ts
+- src/game/upgradesCampaignBoss.test.ts
+- docs/CHANGELOG.md
+- .ai/TASKS.md
+- .ai/DECISIONS.md
+- .ai/STATE.md
+- memory-bank/activeContext.md
+
+Приёмка:
+
+- [x] улучшение доступно в магазине «⚡ Улучшения» за 300 монет
+- [x] разряды исходят только при активном электрическом шаре во время пролёта
+- [x] радиус действия точно соответствует 2 диаметрам шара ($4 \times r$)
+- [x] кулдаун 0.35 с по каждому блоку предотвращает непрерывный спам урона
+- [x] визуал молний `fx.lightnings`, искры `#ffe95c`, стерео-звук `sfx.zap(pan)`
+- [x] `typecheck`, `lint:check`, `format:check`, `test` — зелёные (948 тестов)
+
 ---
 
 ## Выполнено ранее (архив)

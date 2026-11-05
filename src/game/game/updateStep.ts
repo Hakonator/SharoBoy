@@ -4,6 +4,7 @@ import type { SparkHit } from "../types"
 import { applyChronoRiftsToBalls } from "../bossChrono"
 import { stepGravitationalFocus } from "../situational"
 import { updateActiveChallenge } from "../campaignChallenges"
+import { updateSparkAura } from "../physics/spark"
 
 import { pushHud, syncEffectsHud } from "./hudSync"
 import { applyFishWake, updateMouthBubbles } from "./minibossFx"
@@ -204,6 +205,7 @@ export function update(g: Game, dt: number) {
       applyChronoRiftsToBalls(g.bossSys.boss.chronoRifts, g.balls, dt)
     }
     for (const ball of g.balls) g.physics.updateBall(ball, dt)
+    updateSparkAura(g)
     g.physics.updateBombs(dt)
     compactInPlace(g.balls, (b) => !b.lost)
     if (g.balls.length === 0) loseLife(g)

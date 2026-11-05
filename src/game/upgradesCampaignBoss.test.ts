@@ -28,7 +28,7 @@ describe("Новые апгрейды, мета-кристаллы, боссы �
     })
   })
 
-  it("UPGRADE_DEFS содержит все 6 новых постоянных улучшений", () => {
+  it("UPGRADE_DEFS содержит постоянные улучшения, включая sparkAura", () => {
     const ids = UPGRADE_DEFS.map((u) => u.id)
     expect(ids).toContain("paddleRotation")
     expect(ids).toContain("shieldStart")
@@ -36,6 +36,7 @@ describe("Новые апгрейды, мета-кристаллы, боссы �
     expect(ids).toContain("buffDuration")
     expect(ids).toContain("comboMaster")
     expect(ids).toContain("crystalVein")
+    expect(ids).toContain("sparkAura")
   })
 
   it("мета-кристаллы сохраняются, загружаются и сбрасываются", () => {

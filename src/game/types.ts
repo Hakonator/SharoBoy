@@ -340,6 +340,8 @@ export interface Block {
   /** Разрешённый диапазон суммарного смещения минибосса от `x0`. */
   mbSwayMin?: number
   mbSwayMax?: number
+  /** Время последнего поражения разрядом грозового ореола (сек). */
+  sparkAuraAt?: number
 }
 
 /** Вид мини-босса кампании (зеркало `MinibossKind` из `minibosses.ts`). */

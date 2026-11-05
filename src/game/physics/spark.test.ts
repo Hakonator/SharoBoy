@@ -4,11 +4,16 @@ import { Physics, type PhysicsWorld } from "../physics"
 import type { Ball, Block } from "../types"
 
 import {
+  SPARK_AURA_COOLDOWN,
+  SPARK_AURA_RADIUS_RATIO,
   SPARK_CHAIN_DELAY,
   SPARK_CHAIN_MAX,
   SPARK_CHAIN_RADIUS,
+  distanceToBlockSurface,
   queueSparkChain,
   sparkChainTargets,
+  updateSparkAura,
+  type SparkAuraWorld,
 } from "./spark"
 
 /** Эллипс-блок по образцу physics.test.ts. */
@@ -187,5 +192,262 @@ describe("электрошар — удар о блок", () => {
     // как strikeSpark: молния уже отрисована, урон — обычный
     new Physics(world).damageBlock(target, 1)
     expect(target.dead).toBe(true)
+  })
+})
+
+describe("distanceToBlockSurface", () => {
+  it("круг: вычисляет точное расстояние до поверхности и 0 при перекрытии", () => {
+    const b = makeBlock({ x: 200, y: 100, rx: 20, ry: 20, circle: true })
+    const ballFar = { x: 200, y: 150, r: 8 }
+    // центр-центр = 50, rx = 20, r = 8 -> 50 - 20 - 8 = 22
+    expect(distanceToBlockSurface(ballFar, b)).toBeCloseTo(22)
+
+    const ballTouch = { x: 200, y: 128, r: 8 }
+    // 28 - 20 - 8 = 0
+    expect(distanceToBlockSurface(ballTouch, b)).toBeCloseTo(0)
+
+    const ballInside = { x: 200, y: 110, r: 8 }
+    expect(distanceToBlockSurface(ballInside, b)).toBe(0)
+  })
+
+  it("прямоугольник: вычисляет расстояние по нормали и от угла", () => {
+    const b = makeBlock({ x: 200, y: 100, rx: 30, ry: 15, shape: "rect", rot: 0, circle: false })
+    // строго снизу: dy = 40, ry = 15, r = 8 -> 40 - 15 - 8 = 17
+    expect(distanceToBlockSurface({ x: 200, y: 140, r: 8 }, b)).toBeCloseTo(17)
+
+    // строго справа: dx = 50, rx = 30, r = 8 -> 50 - 30 - 8 = 12
+    expect(distanceToBlockSurface({ x: 250, y: 100, r: 8 }, b)).toBeCloseTo(12)
+
+    // от угла (230, 115): точка шара (236, 123) -> d_corner = hypot(6, 8) = 10 -> 10 - 8 = 2
+    expect(distanceToBlockSurface({ x: 236, y: 123, r: 8 }, b)).toBeCloseTo(2)
+
+    // перекрытие
+    expect(distanceToBlockSurface({ x: 200, y: 100, r: 8 }, b)).toBe(0)
+  })
+
+  it("скруглённый прямоугольник: учитывает скругление углов", () => {
+    const b = makeBlock({
+      x: 200,
+      y: 100,
+      rx: 30,
+      ry: 16,
+      shape: "round_rect",
+      rot: 0,
+      circle: false,
+    })
+    // снизу по центру: скругление не влияет на плоскую грань
+    // dy = 40, ry = 16, r = 8 -> 40 - 16 - 8 = 16
+    expect(distanceToBlockSurface({ x: 200, y: 140, r: 8 }, b)).toBeCloseTo(16)
+  })
+
+  it("повёрнутый эллипс: корректно проецирует в локальную систему координат", () => {
+    // поворот на 90 градусов (Math.PI / 2): большая полуось rx=30 направлена по Y, ry=16 по X
+    const b = makeBlock({
+      x: 200,
+      y: 100,
+      rx: 30,
+      ry: 16,
+      rot: Math.PI / 2,
+      circle: false,
+      shape: "ellipse",
+    })
+    // шар снизу на (200, 150): расстояние от центра вдоль оси Y равно 50
+    // так как rx=30 направлена по оси Y, край эллипса находится на Y = 130
+    // расстояние между поверхностями: 50 - 30 - 8 = 12
+    expect(distanceToBlockSurface({ x: 200, y: 150, r: 8 }, b)).toBeCloseTo(12, 1)
+  })
+})
+
+function makeAuraWorld(options: {
+  sparkActive?: boolean
+  sparkAuraLevel?: number
+  ball?: Partial<Ball>
+  blocks?: Block[]
+  time?: number
+}) {
+  const lightnings: { x1: number; y1: number; x2: number; y2: number; t: number }[] = []
+  const bursts: { x: number; y: number; color: string; count: number; speed: number }[] = []
+  const zaps: (number | undefined)[] = []
+  const damaged: { block: Block; dmg: number }[] = []
+
+  const ball: Ball = {
+    x: 200,
+    y: 135,
+    vx: 0,
+    vy: -300,
+    r: 8,
+    speed: 300,
+    stuck: false,
+    stuckOffset: 0,
+    trail: [],
+    squash: 0,
+    sinceHit: 10,
+    ...options.ball,
+  }
+
+  const world: SparkAuraWorld = {
+    time: options.time ?? 1.0,
+    sparkUntil: (options.sparkActive ?? true) ? 10 : 0,
+    sparkActive: () => options.sparkActive ?? true,
+    upgrades: {
+      sparkAura: options.sparkAuraLevel ?? 1,
+    },
+    balls: [ball],
+    blocks: options.blocks ?? [],
+    w: 400,
+    fx: {
+      lightnings,
+      burst: (x, y, color, count, speed) => bursts.push({ x, y, color, count, speed }),
+    },
+    sfx: {
+      zap: (pan) => zaps.push(pan),
+    },
+    physics: {
+      damageBlock: (b, dmg = 1) => {
+        damaged.push({ block: b, dmg })
+        b.hp -= dmg
+        if (b.hp <= 0) b.dead = true
+      },
+    },
+  }
+
+  return { world, ball, lightnings, bursts, zaps, damaged }
+}
+
+describe("updateSparkAura", () => {
+  it("константы грозового ореола: радиус 4 * r (2 диаметра) и кулдаун 0.35 с", () => {
+    expect(SPARK_AURA_RADIUS_RATIO).toBe(4)
+    expect(SPARK_AURA_COOLDOWN).toBe(0.35)
+  })
+
+  it("поражает блок молнией в пределах 2 диаметров шара при активном грозовом ореоле", () => {
+    // блок: rect 30x15 в (200, 100), шар r=8 в (200, 135) -> dist = 35 - 15 - 8 = 12 <= 32 (4 * 8)
+    const block = makeBlock({ x: 200, y: 100, rx: 30, ry: 15, shape: "rect", hp: 3 })
+    const { world, lightnings, bursts, zaps, damaged } = makeAuraWorld({
+      blocks: [block],
+      time: 1.0,
+    })
+
+    updateSparkAura(world)
+
+    expect(lightnings).toHaveLength(1)
+    expect(lightnings[0]).toEqual({ x1: 200, y1: 135, x2: 200, y2: 100, t: 0 })
+    expect(bursts).toHaveLength(1)
+    expect(bursts[0]).toEqual({ x: 200, y: 100, color: "#ffe95c", count: 4, speed: 120 })
+    expect(zaps).toHaveLength(1)
+    expect(zaps[0]).toBeCloseTo(0) // по центру экрана (200 / 400 * 2 - 1 = 0)
+    expect(damaged).toHaveLength(1)
+    expect(damaged[0].dmg).toBe(1)
+    expect(block.hp).toBe(2)
+    expect(block.sparkAuraAt).toBe(1.0)
+  })
+
+  it("не поражает блок за пределами радиуса 2 диаметров шара", () => {
+    // шар в (200, 170): dist = 70 - 15 - 8 = 47 > 32
+    const block = makeBlock({ x: 200, y: 100, rx: 30, ry: 15, shape: "rect", hp: 3 })
+    const { world, lightnings, damaged } = makeAuraWorld({
+      ball: { y: 170 },
+      blocks: [block],
+      time: 1.0,
+    })
+
+    updateSparkAura(world)
+
+    expect(lightnings).toHaveLength(0)
+    expect(damaged).toHaveLength(0)
+    expect(block.hp).toBe(3)
+    expect(block.sparkAuraAt).toBeUndefined()
+  })
+
+  it("соблюдает кулдаун 0.35 с между разрядами по одному блоку", () => {
+    const block = makeBlock({ x: 200, y: 100, rx: 30, ry: 15, shape: "rect", hp: 5 })
+    const { world, damaged } = makeAuraWorld({
+      blocks: [block],
+      time: 1.0,
+    })
+
+    // 1-й кадр: попадание
+    updateSparkAura(world)
+    expect(damaged).toHaveLength(1)
+
+    // 2-й кадр через 0.15 с: кулдаун ещё активен
+    ;(world as { time: number }).time = 1.15
+    updateSparkAura(world)
+    expect(damaged).toHaveLength(1)
+
+    // 3-й кадр через 0.36 с: кулдаун истёк, повторный разряд
+    ;(world as { time: number }).time = 1.36
+    updateSparkAura(world)
+    expect(damaged).toHaveLength(2)
+    expect(block.hp).toBe(3)
+    expect(block.sparkAuraAt).toBe(1.36)
+  })
+
+  it("не срабатывает, если улучшение sparkAura не куплено (lvl = 0)", () => {
+    const block = makeBlock({ x: 200, y: 100, rx: 30, ry: 15, shape: "rect", hp: 3 })
+    const { world, lightnings, damaged } = makeAuraWorld({
+      sparkAuraLevel: 0,
+      blocks: [block],
+      time: 1.0,
+    })
+
+    updateSparkAura(world)
+
+    expect(lightnings).toHaveLength(0)
+    expect(damaged).toHaveLength(0)
+  })
+
+  it("не срабатывает, если электрошар не активен", () => {
+    const block = makeBlock({ x: 200, y: 100, rx: 30, ry: 15, shape: "rect", hp: 3 })
+    const { world, lightnings, damaged } = makeAuraWorld({
+      sparkActive: false,
+      blocks: [block],
+      time: 1.0,
+    })
+
+    updateSparkAura(world)
+
+    expect(lightnings).toHaveLength(0)
+    expect(damaged).toHaveLength(0)
+  })
+
+  it("не срабатывает для застрявшего шара на ракетке (stuck) или потерянного (lost)", () => {
+    const block = makeBlock({ x: 200, y: 100, rx: 30, ry: 15, shape: "rect", hp: 3 })
+    const stuckWorld = makeAuraWorld({
+      ball: { stuck: true },
+      blocks: [block],
+      time: 1.0,
+    })
+    updateSparkAura(stuckWorld.world)
+    expect(stuckWorld.lightnings).toHaveLength(0)
+
+    const lostWorld = makeAuraWorld({
+      ball: { lost: true },
+      blocks: [block],
+      time: 1.0,
+    })
+    updateSparkAura(lostWorld.world)
+    expect(lostWorld.lightnings).toHaveLength(0)
+  })
+
+  it("не бьёт мёртвые блоки или блоки в нематериальной фазе", () => {
+    const deadBlock = makeBlock({ x: 200, y: 100, rx: 30, ry: 15, shape: "rect", dead: true })
+    const phaseBlock = makeBlock({
+      x: 200,
+      y: 100,
+      rx: 30,
+      ry: 15,
+      shape: "rect",
+      sp: { phase: { period: 2, active: 0.5, offset: 0 } },
+    })
+    // при time = 1.5 norm / period = 1.5 / 2 = 0.75 >= active (0.5) -> нематериален
+    const { world, lightnings } = makeAuraWorld({
+      blocks: [deadBlock, phaseBlock],
+      time: 1.5,
+    })
+
+    updateSparkAura(world)
+
+    expect(lightnings).toHaveLength(0)
   })
 })
