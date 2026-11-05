@@ -84,6 +84,13 @@ export function syncEffectsHud(g: Game) {
     t < g.explosiveUntil ? 1 : 0,
     t < g.bigUntil ? 1 : 0,
     t < g.magnetUntil ? 1 : 0,
+    !g.settings?.chargedBounce
+      ? 0
+      : (g.paddle.charge ?? 0) >= 1
+        ? 2
+        : (g.paddle.charge ?? 0) > 0
+          ? 1
+          : 0,
     activeSynergies.join(","),
   ].join("")
   if (key !== g.effectsKey) {
@@ -172,6 +179,7 @@ export function pushHud(g: Game) {
     finalBossDefeated: g.finalBossDefeated,
     scoreBreakdown: g.scoreBreakdown,
     intermediateScore: g.intermediateScore,
+    charge: g.settings?.chargedBounce ? (g.paddle.charge ?? 0) : 0,
     newAchievements: g.achQueue.splice(0),
   })
 }

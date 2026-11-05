@@ -10,6 +10,11 @@ import { clamp } from "./utils"
 import type { InputHost, InputKeys } from "./inputHost"
 export type { InputHost, InputKeys } from "./inputHost"
 
+/** Время удержания ввода для полного накопления заряженного отскока (сек). */
+export const CHARGE_DURATION = 0.6
+/** Минимальный порог удержания на таче для разделения тапа и заряда (сек). */
+export const HOLD_MIN_TIME = 0.2
+
 export class InputController {
   /** Состояние клавиш — читается игровым циклом. */
   readonly keys: InputKeys = { left: false, right: false, space: false }
@@ -21,6 +26,14 @@ export class InputController {
   leftButton = false
   /** Нажата ли правая кнопка мыши (для поворота ракетки в режиме отладки). */
   rightButton = false
+  /** Текущий прогресс заряда заряженного отскока (0..1). */
+  charge = 0
+  /** Удерживается ли ввод для заряда платформы. */
+  holding = false
+  /** Накопленное время удержания ввода (сек). */
+  holdTime = 0
+  /** Тип текущего устройства ввода, удерживающего заряд. */
+  holdPointerType: "touch" | "mouse" | "keyboard" | null = null
   /** PointerId пальца, который вращает ракетку (тач); -1 — нет такого пальца. */
   private touchRotateId = -1
   private touchAimId = -1
@@ -28,6 +41,7 @@ export class InputController {
 
   private virtualX: number | null = null
   private tapFire = false
+  private chargeReleased = false
   /** true — снятие захвата инициировано самим контроллером (releaseLock),
    *  а не пользователем: не трактуем как нажатие Esc. */
   private expectedUnlock = false
@@ -48,6 +62,47 @@ export class InputController {
     return was
   }
 
+  /** Разовый факт отпускания полного заряда: прочитать и сбросить. */
+  consumeChargeRelease(): boolean {
+    const was = this.chargeReleased
+    this.chargeReleased = false
+    return was
+  }
+
+  /** Полный сброс состояния накопления заряда ракетки. */
+  clearCharge() {
+    this.holding = false
+    this.holdTime = 0
+    this.charge = 0
+    this.chargeReleased = false
+    this.holdPointerType = null
+  }
+
+  /** Обновление прогресса накопления заряда ракетки по таймеру игрового цикла. */
+  updateCharge(dt: number, enabled: boolean, ballStuck: boolean) {
+    if (!enabled || ballStuck || !this.holding) {
+      this.charge = 0
+      if (!this.holding) {
+        this.holdTime = 0
+      }
+      return
+    }
+    this.holdTime += dt
+    if (this.holdPointerType === "touch") {
+      if (this.holdTime <= HOLD_MIN_TIME) {
+        this.charge = 0
+      } else {
+        this.charge = clamp(
+          (this.holdTime - HOLD_MIN_TIME) / (CHARGE_DURATION - HOLD_MIN_TIME),
+          0,
+          1
+        )
+      }
+    } else {
+      this.charge = clamp(this.holdTime / CHARGE_DURATION, 0, 1)
+    }
+  }
+
   /** Сбросить клавиши (потеря фокуса и т.п.). */
   clearKeys() {
     this.keys.left = false
@@ -56,6 +111,7 @@ export class InputController {
     this.leftButton = false
     this.rightButton = false
     this.touchRotateId = -1
+    this.clearCharge()
   }
 
   private handleMouseDown = (e: MouseEvent) => {
@@ -156,8 +212,16 @@ export class InputController {
     if (c === "ArrowRight" || c === "KeyD") this.keys.right = true
     if (c === "Space") e.preventDefault()
     const wasStuck = this.host.ballStuck()
+    const laserArmed = Boolean(this.host.isLaserArmed?.())
     if (c === "Space" || c === "Enter") this.host.primaryAction()
-    if (c === "Space" && !wasStuck) this.keys.space = true
+    if (c === "Space" && !wasStuck) {
+      this.keys.space = true
+      if (!laserArmed && !this.holding) {
+        this.holding = true
+        this.holdTime = 0
+        this.holdPointerType = "keyboard"
+      }
+    }
     if (c === "KeyP" || c === "Escape") this.host.togglePause()
     if (c === "KeyM") this.host.toggleMute()
     if (c === "KeyN") this.host.toggleMusic()
@@ -189,7 +253,18 @@ export class InputController {
   private handleKeyUp = (e: KeyboardEvent) => {
     if (e.code === "ArrowLeft" || e.code === "KeyA") this.keys.left = false
     if (e.code === "ArrowRight" || e.code === "KeyD") this.keys.right = false
-    if (e.code === "Space") this.keys.space = false
+    if (e.code === "Space") {
+      this.keys.space = false
+      if (this.holding && this.holdPointerType === "keyboard") {
+        if (this.charge >= 1.0) {
+          this.chargeReleased = true
+        }
+        this.holding = false
+        this.holdTime = 0
+        this.charge = 0
+        this.holdPointerType = null
+      }
+    }
   }
 
   private handleBlur = () => {
@@ -279,6 +354,7 @@ export class InputController {
       this.suppressMouseUntil = performance.now() + 600
     }
     const wasStuck = this.host.ballStuck()
+    const laserArmed = Boolean(this.host.isLaserArmed?.())
     // Ракетку в точку касания НЕ перекидываем — палец/мышь могут быть далеко
     // от ракетки, и ракетка «уезжала» к месту тапа.
     if (this.host.isPlaying()) {
@@ -303,12 +379,22 @@ export class InputController {
         // Тап по полю взводит выстрел только если шар уже в воздухе (не на ракетке)
         if (!wasStuck) {
           this.tapFire = true
+          if (!laserArmed) {
+            this.holding = true
+            this.holdTime = 0
+            this.holdPointerType = "touch"
+          }
         }
         return // обычный тач: шар запускается при отпускании (handlePointerUp)
       }
       // Мышь/стилус: запуск шара, если прилип; огонь взводится только последующим кликом
       if (!wasStuck) {
         this.tapFire = true
+        if (!laserArmed) {
+          this.holding = true
+          this.holdTime = 0
+          this.holdPointerType = "mouse"
+        }
       }
       this.host.launchIfPlaying()
       this.requestLock()
@@ -334,6 +420,15 @@ export class InputController {
       if (e.pointerType === "touch") this.suppressMouseUntil = performance.now() + 600
       return
     }
+    if (this.holding && (this.holdPointerType === "touch" || this.holdPointerType === "mouse")) {
+      if (this.charge >= 1.0) {
+        this.chargeReleased = true
+      }
+      this.holding = false
+      this.holdTime = 0
+      this.charge = 0
+      this.holdPointerType = null
+    }
     if (
       this.host.isPlaying() &&
       (e.pointerType === "touch" || e.pointerType === "pen") &&
@@ -356,6 +451,9 @@ export class InputController {
       this.touchRotateId = -1
       this.leftButton = false
       this.rightButton = false
+    }
+    if (this.holding && this.holdPointerType === "touch") {
+      this.clearCharge()
     }
     if (e.pointerType === "touch") this.suppressMouseUntil = performance.now() + 600
   }

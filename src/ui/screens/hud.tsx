@@ -459,6 +459,16 @@ export function HudOverlay({
               ТАП / КЛИК / ПРОБЕЛ — ЗАПУСК
             </div>
           )}
+          {!hud.stuck && hud.charge !== undefined && hud.charge >= 1.0 && (
+            <div className="anim-blink hud-chip border-[#ffe600]/80 px-3 py-1.5 font-display text-xs tracking-wider text-[#ffe600] shadow-[0_0_14px_rgba(255,230,0,0.6)] sm:px-4 sm:py-2 sm:text-sm">
+              ⚡ ЗАРЯЖЕНО! ОТПУСТИТЕ ДЛЯ ИМПУЛЬСА (+18%)
+            </div>
+          )}
+          {!hud.stuck && hud.charge !== undefined && hud.charge > 0 && hud.charge < 1.0 && (
+            <div className="hud-chip border-[#38bdf8]/60 px-3 py-1 font-display text-xs tracking-wider text-[#7dd3fc] shadow-[0_0_10px_rgba(56,189,248,0.4)] sm:px-4 sm:py-1.5 sm:text-sm">
+              ⚡ ЗАРЯДКА...
+            </div>
+          )}
         </div>
       )}
 

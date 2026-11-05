@@ -6,7 +6,7 @@
  * проверяют ровно это: лимит блоков, отражение от лишнего блока и сброс
  * счётчика на отскоке.
  */
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { BIG_BALL_RADIUS, type PhysicsWorld } from "../physics"
 import type { Ball, Block } from "../types"
@@ -30,6 +30,8 @@ import {
   THERMAL_LANCE_DURATION,
   THERMAL_LANCE_MAX_TARGETS,
   THERMAL_LANCE_RADIUS,
+  CHARGED_BOUNCE_SPEED_MULT,
+  applyChargedBounce,
   applyClutchRebound,
   applyExplosiveBallAoE,
   applyThermalShockSteamAoE,
@@ -638,5 +640,74 @@ describe("Геометрические формы блоков: rect и round_re
 
     expect(ball.vy).toBeLessThan(0)
     expect(block.hp).toBe(4)
+  })
+
+  describe("Заряженный отскок ракетки (T-060)", () => {
+    it("CHARGED_BOUNCE_SPEED_MULT равен 1.18 (+18% скорости)", () => {
+      expect(CHARGED_BOUNCE_SPEED_MULT).toBe(1.18)
+    })
+
+    it("applyChargedBounce применяет +18% скорости, микро-паузу, эффекты и сбрасывает заряд", () => {
+      let consumed = false
+      const ball = makeBall(200, 500)
+      ball.vx = 100
+      ball.vy = -300
+      ball.speed = 300
+
+      const rings: unknown[] = []
+      const popups: unknown[] = []
+      const sfxPaddle = vi.fn()
+      const fxBurst = vi.fn()
+
+      const world = {
+        ...makeWorld([], false),
+        chargedBounceActive: () => true,
+        consumeChargedBounce: () => {
+          consumed = true
+        },
+        hitStop: 0,
+        shake: 0,
+        sfx: {
+          paddle: sfxPaddle,
+        },
+        fx: {
+          rings,
+          popups,
+          burst: fxBurst,
+        },
+      } as unknown as PhysicsWorld
+
+      const applied = applyChargedBounce(world, ball, 0)
+      expect(applied).toBe(true)
+      expect(ball.vx).toBeCloseTo(118, 1)
+      expect(ball.vy).toBeCloseTo(-354, 1)
+      expect(ball.speed).toBeCloseTo(354, 1)
+      expect(consumed).toBe(true)
+      expect(world.hitStop).toBeGreaterThanOrEqual(0.04)
+      expect(world.shake).toBeGreaterThanOrEqual(2)
+      expect(sfxPaddle).toHaveBeenCalled()
+      expect(fxBurst).toHaveBeenCalledWith(ball.x, ball.y, "#ffe600", 12, 200)
+      expect(popups).toHaveLength(1)
+      expect((popups[0] as { text: string }).text).toContain("ЗАРЯД! +18%")
+      expect(rings).toHaveLength(1)
+    })
+
+    it("applyChargedBounce ничего не делает, если chargedBounceActive() false", () => {
+      const ball = makeBall(200, 500)
+      ball.vx = 100
+      ball.vy = -300
+      ball.speed = 300
+
+      const world = {
+        ...makeWorld([], false),
+        chargedBounceActive: () => false,
+      } as unknown as PhysicsWorld
+
+      const applied = applyChargedBounce(world, ball, 0)
+      expect(applied).toBe(false)
+      expect(ball.vx).toBe(100)
+      expect(ball.vy).toBe(-300)
+      expect(ball.speed).toBe(300)
+    })
   })
 })

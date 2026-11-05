@@ -452,6 +452,16 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     damageMiniboss: (dmg, block) => damageMiniboss(g, dmg, block),
     onBombHitPaddle: () => onBombHitPaddle(g),
+    chargedBounceActive: () =>
+      Boolean(
+        g.settings.chargedBounce &&
+        (g.time < g.chargedImpulseUntil || (g.paddle.charge ?? 0) >= 1.0)
+      ),
+    consumeChargedBounce: () => {
+      g.chargedImpulseUntil = 0
+      if (g.paddle.charge) g.paddle.charge = 0
+      g.input.clearCharge()
+    },
     onShieldBreak: () => {
       if (g.campaignRelics?.relicFrost) {
         g.frostUntil = Math.max(g.frostUntil, g.time + 6)

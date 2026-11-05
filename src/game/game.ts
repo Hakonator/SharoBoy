@@ -230,6 +230,8 @@ export class Game {
   fpsElapsed = 0
   paddle: PaddleState = { x: 480, y: 600, w: 150, baseW: 150, h: 18, vx: 0, squash: 0 }
   aimAngle = -Math.PI / 2
+  /** Окно активности импульса заряженного отскока (сек). */
+  chargedImpulseUntil = 0
   /** Импульсный поворот ракетки (однократный резкий доворот + возврат). */
   paddleImpulse: { dir: number; t: number } | null = null
   /** Предыдущее состояние кнопок мыши для детекта краёв нажатия. */

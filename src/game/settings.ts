@@ -17,6 +17,8 @@ export interface GameSettings {
   comboPitch: boolean
   /** Подводный muffling-фильтр низких частот во время паузы. */
   underwaterFilter: boolean
+  /** Заряженный отскок ракетки (удержание ввода для импульса при отскоке). */
+  chargedBounce: boolean
 }
 
 export const SETTINGS_STORAGE_KEY = "sharoboy-game-settings"
@@ -28,6 +30,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   stereoPanning: true,
   comboPitch: true,
   underwaterFilter: true,
+  chargedBounce: true,
 }
 
 type SettingsListener = (settings: GameSettings) => void
@@ -66,6 +69,9 @@ function validateSettings(raw: unknown): GameSettings {
       ? obj.underwaterFilter
       : DEFAULT_SETTINGS.underwaterFilter
 
+  const chargedBounce =
+    typeof obj.chargedBounce === "boolean" ? obj.chargedBounce : DEFAULT_SETTINGS.chargedBounce
+
   return {
     graphicsQuality,
     screenShake,
@@ -73,6 +79,7 @@ function validateSettings(raw: unknown): GameSettings {
     stereoPanning,
     comboPitch,
     underwaterFilter,
+    chargedBounce,
   }
 }
 

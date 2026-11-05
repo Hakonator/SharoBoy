@@ -178,6 +178,8 @@ export interface HudData {
   intermediateScore?: IntermediateScoreData | null
   /** Ожидается ли переход в бой сразу после закрытия события/терминала. */
   campaignPendingBattle?: boolean
+  /** Прогресс заряда заряженного отскока платформы (0..1). */
+  charge?: number
 }
 
 export interface CampaignShopItem {
@@ -525,6 +527,12 @@ export interface PaddleState {
   squash: number
   /** Поворот в радианах (режим отладки: ЛКМ/ПКМ для удара с ускорением). */
   rot?: number
+  /** Прогресс заряда заряженного отскока (0..1). */
+  charge?: number
+  /** Таймер анимации рывка платформы вверх (сек). */
+  jerkTimer?: number
+  /** Текущее вертикальное смещение рывка (px, отрицательное = вверх). */
+  jerkY?: number
 }
 
 /** Направление запуска и предсказанные сегменты прицела перед подачей шара. */

@@ -252,4 +252,64 @@ describe("HudOverlay: кнопка быстрого пропуска уровн�
     )
     expect(htmlLandscape).toContain("📅 День · Уровень 2/4")
   })
+
+  it("отображает подсказку заряженного отскока при charge >= 1.0 и прогресс при 0 < charge < 1.0 (T-060)", () => {
+    const hudFull = makeHud("playing")
+    hudFull.charge = 1.0
+    const htmlFull = renderToStaticMarkup(
+      <HudOverlay
+        hud={hudFull}
+        inGame
+        portrait={false}
+        onPause={() => {}}
+        onMute={() => {}}
+        onMusic={() => {}}
+        onMusicVolume={() => {}}
+        onSfxVolume={() => {}}
+        debug={false}
+        onDebugSkipLevel={() => {}}
+        onExitCustomMap={() => {}}
+      />
+    )
+    expect(htmlFull).toContain("ЗАРЯЖЕНО! ОТПУСТИТЕ ДЛЯ ИМПУЛЬСА (+18%)")
+
+    const hudCharging = makeHud("playing")
+    hudCharging.charge = 0.5
+    const htmlCharging = renderToStaticMarkup(
+      <HudOverlay
+        hud={hudCharging}
+        inGame
+        portrait={false}
+        onPause={() => {}}
+        onMute={() => {}}
+        onMusic={() => {}}
+        onMusicVolume={() => {}}
+        onSfxVolume={() => {}}
+        debug={false}
+        onDebugSkipLevel={() => {}}
+        onExitCustomMap={() => {}}
+      />
+    )
+    expect(htmlCharging).toContain("ЗАРЯДКА...")
+
+    const hudZero = makeHud("playing")
+    hudZero.charge = 0
+    const htmlZero = renderToStaticMarkup(
+      <HudOverlay
+        hud={hudZero}
+        inGame
+        portrait={false}
+        onPause={() => {}}
+        onMute={() => {}}
+        onMusic={() => {}}
+        onMusicVolume={() => {}}
+        onSfxVolume={() => {}}
+        debug={false}
+        onDebugSkipLevel={() => {}}
+        onExitCustomMap={() => {}}
+      />
+    )
+    expect(htmlZero).not.toContain("ЗАРЯЖЕНО")
+    expect(htmlZero).not.toContain("ЗАРЯДКА")
+  })
 })

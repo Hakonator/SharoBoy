@@ -98,6 +98,7 @@ describe("SettingsModal", () => {
     expect(html).toContain("Пространственное стерео")
     expect(html).toContain("Восходящий тон комбо")
     expect(html).toContain("Подводный фильтр в паузе")
+    expect(html).toContain("Заряженный отскок")
     expect(html).toContain("Сбросить по умолчанию")
     expect(html).toContain("Готово")
   })

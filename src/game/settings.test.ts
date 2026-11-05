@@ -43,6 +43,7 @@ describe("game/settings", () => {
     expect(settings.stereoPanning).toBe(true)
     expect(settings.comboPitch).toBe(true)
     expect(settings.underwaterFilter).toBe(true)
+    expect(settings.chargedBounce).toBe(true)
   })
 
   it("saves and updates settings with validation", () => {
@@ -51,6 +52,7 @@ describe("game/settings", () => {
       screenShake: 0.5,
       screenFlash: 0,
       stereoPanning: false,
+      chargedBounce: false,
     })
 
     const stored = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!)
@@ -58,12 +60,14 @@ describe("game/settings", () => {
     expect(stored.screenShake).toBe(0.5)
     expect(stored.screenFlash).toBe(0)
     expect(stored.stereoPanning).toBe(false)
+    expect(stored.chargedBounce).toBe(false)
     expect(stored.comboPitch).toBe(true) // retained default
 
     const loaded = loadSettings()
     expect(loaded.graphicsQuality).toBe("ultra")
     expect(loaded.screenShake).toBe(0.5)
     expect(loaded.screenFlash).toBe(0)
+    expect(loaded.chargedBounce).toBe(false)
   })
 
   it("ignores invalid values and falls back to defaults", () => {

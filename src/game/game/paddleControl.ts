@@ -93,6 +93,44 @@ export function updatePaddleRotation(g: Game, dt: number) {
   // Плавно подходим к целевому углу
   p.rot = (p.rot ?? 0) + (target - (p.rot ?? 0)) * Math.min(1, dt * ROT_SPEED)
 }
+export const CHARGE_DURATION = 0.6
+export const HOLD_MIN_TIME = 0.2
+export const CHARGED_BOUNCE_SPEED_MULT = 1.18
+export const CHARGED_JERK_DURATION = 0.12
+export const CHARGED_JERK_OFFSET = -8
+
+/** Обновление состояния заряда ракетки и анимации рывка (T-060). */
+export function updatePaddleCharge(g: Game, dt: number) {
+  const enabled = Boolean(g.settings.chargedBounce)
+  const ballStuck = g.balls.some((b) => b.stuck)
+
+  // Анимация вертикального рывка платформы
+  if ((g.paddle.jerkTimer ?? 0) > 0) {
+    g.paddle.jerkTimer = Math.max(0, (g.paddle.jerkTimer ?? 0) - dt)
+    const factor = (g.paddle.jerkTimer ?? 0) / CHARGED_JERK_DURATION
+    g.paddle.jerkY = CHARGED_JERK_OFFSET * factor
+  } else {
+    g.paddle.jerkY = 0
+  }
+
+  if (!enabled || ballStuck) {
+    g.paddle.charge = 0
+    g.input.updateCharge(dt, false, ballStuck)
+    return
+  }
+
+  g.input.updateCharge(dt, true, ballStuck)
+  g.paddle.charge = g.input.charge
+
+  if (g.input.consumeChargeRelease()) {
+    g.paddle.jerkTimer = CHARGED_JERK_DURATION
+    g.paddle.jerkY = CHARGED_JERK_OFFSET
+    g.chargedImpulseUntil = g.time + 0.35
+    g.sfx.power()
+    g.fx.burst(g.paddle.x, g.paddle.y, "#ffe600", 10, 160)
+  }
+}
+
 /** Отступ ракетки от нижнего края: на таче выше — палец не закрывает ракетку.
  *  Задаётся в CSS-пикселях (размер пальца физический и от масштаба мира не
  *  зависит), поэтому в мировые единицы переводим делением. */

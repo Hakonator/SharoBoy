@@ -9,7 +9,7 @@ import { pushHud, syncEffectsHud } from "./hudSync"
 import { applyFishWake, updateMouthBubbles } from "./minibossFx"
 import { updateMinibosses } from "./minibossRuntime"
 import { stepBlock } from "./blockMotion"
-import { updatePaddleRotation } from "./paddleControl"
+import { updatePaddleCharge, updatePaddleRotation } from "./paddleControl"
 import { draw } from "./drawScene"
 import { loseLife, onLevelCleared } from "./runFlow"
 
@@ -103,9 +103,10 @@ export function update(g: Game, dt: number) {
 
   if (g.phase !== "playing") return
 
-  syncEffectsHud(g)
   g.physics.updatePaddle(dt)
   updatePaddleRotation(g, dt)
+  updatePaddleCharge(g, dt)
+  syncEffectsHud(g)
   /* Прилипший шар следует за ракеткой даже пока мир заморожен баннером/отсчётом:
        иначе на старте партии шар оставался на точке спавна, а ракетка уезжала к курсору. */
   for (const ball of g.balls) g.physics.stickToPaddle(ball)

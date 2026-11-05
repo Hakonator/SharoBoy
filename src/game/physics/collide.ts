@@ -165,6 +165,42 @@ export function applyClutchRebound(g: PhysicsWorld, ball: Ball, rel: number, pad
   }
 }
 
+/** Множитель импульса скорости шара при заряженном отскоке (+18%, T-060). */
+export const CHARGED_BOUNCE_SPEED_MULT = 1.18
+
+/**
+ * Применение заряженного отскока ракетки: +18% скорости вдоль вектора отскока,
+ * микро-пауза, вспышка, кольцо и всплывающий текст (T-060).
+ */
+export function applyChargedBounce(g: PhysicsWorld, ball: Ball, paddlePan: number): boolean {
+  if (!g.chargedBounceActive?.()) return false
+  ball.speed = Math.min(ball.speed * CHARGED_BOUNCE_SPEED_MULT, 1200)
+  ball.vx *= CHARGED_BOUNCE_SPEED_MULT
+  ball.vy *= CHARGED_BOUNCE_SPEED_MULT
+  g.hitStop = Math.max(g.hitStop, 0.04)
+  g.shake = Math.min(g.shake + 2, 6)
+  g.sfx.paddle(1, paddlePan)
+  g.fx.burst(ball.x, ball.y, "#ffe600", 12, 200)
+  g.fx.rings.push({
+    x: ball.x,
+    y: ball.y,
+    r: 10,
+    maxR: 70,
+    color: "rgba(255, 230, 0, 0.8)",
+    t: 0,
+  })
+  g.fx.popups.push({
+    x: ball.x,
+    y: ball.y - 28,
+    text: "ЗАРЯД! +18% ⚡",
+    color: "#ffe600",
+    t: 0,
+    size: 18,
+  })
+  g.consumeChargedBounce?.()
+  return true
+}
+
 /** Отскок от ракетки: угол зависит от точки попадания и её скорости; магнит — прилипание. */
 export function collidePaddle(g: PhysicsWorld, ball: Ball) {
   const p = g.paddle
@@ -263,6 +299,7 @@ export function collidePaddle(g: PhysicsWorld, ball: Ball) {
   g.combo = Math.floor(g.combo * keepMult)
   if (Math.abs(rel) > 0.65) g.hitStop = Math.max(g.hitStop, 0.015)
   applyClutchRebound(g, ball, rel, paddlePan)
+  applyChargedBounce(g, ball, paddlePan)
   g.sfx.paddle(Math.abs(rel), paddlePan)
   g.fx.burst(ball.x, ball.y - ball.r, "#7cf5ff", 6, 130)
   g.onPaddleBounce?.()
@@ -322,6 +359,7 @@ export function collidePaddleShape(
   if (Math.abs(rel) > 0.65) g.hitStop = Math.max(g.hitStop, 0.015)
   const paddlePan = clamp((ball.x / g.w) * 2 - 1, -0.85, 0.85)
   applyClutchRebound(g, ball, rel, paddlePan)
+  applyChargedBounce(g, ball, paddlePan)
   g.sfx.paddle(Math.abs(rel), paddlePan)
   g.onPaddleBounce?.()
   g.pushHud()

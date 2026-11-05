@@ -66,8 +66,9 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
   const time = v.time
   const ww = p.w * (1 + p.squash * 0.12)
   const hh = p.h * (1 - p.squash * 0.3)
+  const jerkY = p.jerkY ?? 0
   ctx.save()
-  ctx.translate(p.x, p.y)
+  ctx.translate(p.x, p.y + jerkY)
   // В режиме отладки ракетка поворачивается по ЛКМ/ПКМ, иначе — лёгкий наклон от скорости
   ctx.rotate(p.rot ?? clamp(p.vx * 0.00011, -0.1, 0.1))
   const skinDef = getPaddleSkinDef(v.skin ?? "default")
@@ -231,6 +232,34 @@ export function drawPaddle(ctx: Ctx, v: PaddleView) {
     ctx.beginPath()
     ctx.arc(0, -hh / 2 - 2, 5 + Math.sin(time * 9) * 1.5, 0, Math.PI * 2)
     ctx.stroke()
+  }
+  if ((p.charge ?? 0) > 0) {
+    const charge = clamp(p.charge ?? 0, 0, 1)
+    const chargeW = (ww - 20) * charge
+    const chargeH = 3
+    const barY = -hh / 2 + 3
+    ctx.save()
+    if (charge >= 1.0) {
+      const pulse = 0.8 + 0.2 * Math.sin(time * 20)
+      ctx.shadowColor = "#ffe600"
+      ctx.shadowBlur = 14 * pulse
+      ctx.fillStyle = "#fff370"
+      roundRect(ctx, -chargeW / 2, barY, chargeW, chargeH, 1.5)
+      ctx.fill()
+      // Энергетическая аура вокруг платформы при полном заряде
+      ctx.strokeStyle = `rgba(255, 230, 0, ${0.45 + 0.35 * Math.sin(time * 24)})`
+      ctx.lineWidth = 2
+      ctx.shadowBlur = 16
+      roundRect(ctx, -ww / 2 - 2, -hh / 2 - 2, ww + 4, hh + 4, hh / 2 + 2)
+      ctx.stroke()
+    } else {
+      ctx.shadowColor = "#38bdf8"
+      ctx.shadowBlur = 8 * charge
+      ctx.fillStyle = "#7dd3fc"
+      roundRect(ctx, -chargeW / 2, barY, chargeW, chargeH, 1.5)
+      ctx.fill()
+    }
+    ctx.restore()
   }
   ctx.restore()
 }

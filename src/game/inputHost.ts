@@ -29,6 +29,8 @@ export interface InputHost {
   aimFromPointer(clientX: number, clientY: number): void
   aimGuideActive(): boolean
   ballStuck(): boolean
+  /** Взведён ли лазер (приоритет над зарядом отскока). */
+  isLaserArmed?(): boolean
   /** Первый тач-ввод: хост адаптируется (поднимает ракетку над пальцем). */
   onTouchInput(): void
   /** Пауза/снятие паузы (клавиши P/Esc). */

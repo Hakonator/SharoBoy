@@ -180,6 +180,7 @@ export function createInput(g: Game, canvas: HTMLCanvasElement): InputController
     },
     aimGuideActive: () => g.isAimGuideActive(),
     ballStuck: () => g.balls.some((ball) => ball.stuck),
+    isLaserArmed: () => g.laserArmed,
     onTouchInput: () => enableTouchMode(g),
     togglePause: () => togglePause(g),
     toggleMute: () => toggleMute(g),
