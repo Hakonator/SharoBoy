@@ -14,6 +14,7 @@ import {
   buildCrabBossLevel,
   buildChronoBossLevel,
   buildCryoBossLevel,
+  buildKrakenBossLevel,
   buildLampreyBossLevel,
   buildWave,
   serveBall,
@@ -119,6 +120,8 @@ export function spawnDebugBoss(g: Game, kind: BossVariantKind) {
     buildLampreyBossLevel(g, variant)
   } else if (kind === "chrono") {
     buildChronoBossLevel(g, variant)
+  } else if (kind === "kraken") {
+    buildKrakenBossLevel(g, variant)
   } else {
     buildOctopusBossLevel(g, variant)
   }

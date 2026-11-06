@@ -12,6 +12,7 @@ import { stepCrab } from "./bossCrab"
 import { stepChrono } from "./bossChrono"
 import { clearCryo, cryoTurbinesAlive, stepCryoDrone } from "./bossCryo"
 import { clearLamprey, lampreyDamageMult, lampreyHeadExposed, stepLamprey } from "./bossLamprey"
+import { clearKraken, rebirthKraken, stepKraken } from "./bossKraken"
 import { bossPhases, BOSS_LAST_STAND_AT, type BossPhases } from "./bossVariants"
 
 /**
@@ -156,6 +157,9 @@ export class BossSystem {
     } else if (bo.isLamprey) {
       // Минога скользит по периметру сама — общий патруль ей не нужен.
       stepLamprey(this.g, bo, angry, dt)
+    } else if (bo.isKraken) {
+      bo.y = bo.baseY + Math.sin(bo.t * 1.4) * 20
+      stepKraken(this.g, bo, angry, dt)
     } else {
       bo.y = bo.baseY + Math.sin(bo.t * 1.7) * 22
     }
@@ -338,7 +342,7 @@ export class BossSystem {
     // Боссы со щупальцами: тело неуязвимо, пока живы хотя бы некоторые
     // щупальца/отростки (в каждом несколько сегментов; если все сегменты
     // щупальца уничтожены — щупальце считается мёртвым).
-    if (bo.isOctopus || bo.isJellyfish) {
+    if (bo.isOctopus || bo.isJellyfish || (bo.isKraken && bo.krakenPhase === 1)) {
       const tentacles = this.g.blocks.filter((b) => b.isTentacle && !b.dead) as (Block & {
         tentacleId: number
       })[]
@@ -348,7 +352,7 @@ export class BossSystem {
       if (aliveIds.size > 0) {
         // Есть живые щупальца — урон по телу заблокирован.
         this.g.sfx.brick(1)
-        this.g.fx.burst(bo.x, bo.y, "#ff5ca8", 4, 100)
+        this.g.fx.burst(bo.x, bo.y, bo.isKraken ? "#c084fc" : "#ff5ca8", 5, 110)
         return
       }
     } else if (bo.isCrab) {
@@ -409,7 +413,11 @@ export class BossSystem {
     }
     this.g.addRawScore(isCrit ? 25 : 5)
     if (bo.hp <= 0) {
-      this.kill()
+      if (bo.isKraken && bo.krakenPhase === 1) {
+        rebirthKraken(this.g, bo)
+      } else {
+        this.kill()
+      }
     } else {
       this.g.pushHud()
     }
@@ -427,6 +435,7 @@ export class BossSystem {
     if (bo.isLamprey) clearLamprey(this.g.blocks)
     // Лёд крио-дрона переживал победу и оставлял невидимые преграды на арене.
     if (bo.isCryo) clearCryo(this.g.blocks)
+    if (bo.isKraken) clearKraken(this.g.blocks)
     this.g.onBossKilled()
     this.g.addRawScore(1500)
     this.g.hitStop = Math.max(this.g.hitStop, 0.5)
@@ -452,7 +461,15 @@ export class BossSystem {
        помечено мёртвыми — взрываем по точкам. */
     let i = 0
     for (const b of [...this.g.blocks]) {
-      if (b.minionOrbit || b.bomb || b.isTentacle || b.isLampreySeg || b.isCryoPart || b.isClaw) {
+      if (
+        b.minionOrbit ||
+        b.bomb ||
+        b.isTentacle ||
+        b.isLampreySeg ||
+        b.isCryoPart ||
+        b.isClaw ||
+        b.isKrakenShard
+      ) {
         this.g.boomQueue.push({ x: b.x, y: b.y, at: this.g.time + 0.12 + i * 0.1 })
         b.hp = 0
         b.dead = true

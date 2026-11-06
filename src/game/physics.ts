@@ -33,6 +33,7 @@ import {
 } from "./physics/destruction"
 import { BASE_BALL_RADIUS, BIG_BALL_RADIUS, ballSpeedMult } from "./physics/speed"
 import { applyBallTimers, specialSpeedMult } from "./physics/special"
+import { applyKrakenVortexPhysics } from "./bossKraken"
 import { spawnBallTrailFx } from "./physics/ballFx"
 
 export { FIREBALL_DAMAGE_MULT } from "./physics/destruction"
@@ -453,6 +454,9 @@ export class Physics {
 
     applyBlockMagnets(g, ball, dt)
     applyGravityWells(g, ball, dt)
+    if (g.boss?.isKraken && g.boss.krakenPhase === 2 && g.boss.krakenVortexActive) {
+      applyKrakenVortexPhysics(g.boss, ball, dt)
+    }
   }
 
   /** Урон блоку; при разрушении — очки, эффекты, дроп бонуса, «матрёшка». */

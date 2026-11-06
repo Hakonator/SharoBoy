@@ -29,6 +29,7 @@ import {
   buildCrabBossLevel,
   buildCryoBossLevel,
   buildChronoBossLevel,
+  buildKrakenBossLevel,
   buildLampreyBossLevel,
   serveBall,
 } from "./levelBuild"
@@ -378,7 +379,9 @@ export function startMapBattle(g: Game, node: CampaignNode) {
       buildLampreyBossLevel(g, variant)
     } else if (variant.kind === "chrono") {
       buildChronoBossLevel(g, variant)
-    } else if (variant.kind === "octopus" || variant.kind === "kraken") {
+    } else if (variant.kind === "kraken") {
+      buildKrakenBossLevel(g, variant)
+    } else if (variant.kind === "octopus") {
       buildOctopusBossLevel(g, variant)
     } else {
       g.bossSys.setPhases(variant)

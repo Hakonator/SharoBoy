@@ -13,6 +13,7 @@ import { buildCrabBoss } from "../bossCrab"
 import { buildChronoBoss } from "../bossChrono"
 import { buildCryoDrone } from "../bossCryo"
 import { buildLamprey } from "../bossLamprey"
+import { buildKrakenBoss } from "../bossKraken"
 import type { LevelSpec } from "../levels"
 import { hasModifier } from "../campaignModifiers"
 import { BRITTLE_RADIUS_MULT } from "../blockKinds"
@@ -116,7 +117,7 @@ export function buildBossLevel(g: Game, hp: number, minions: number, bombs: numb
   g.blocksInitial = Math.max(1, blocks.length)
 }
 
-/** Финальный босс кампании — осьминог/кракен: тело + щупальца, параметры из варианта. */
+/** Финальный босс кампании — осьминог: тело + щупальца, параметры из варианта. */
 export function buildOctopusBossLevel(g: Game, variant: BossVariant) {
   g.bossSys.clear()
   g.bossDefeated = false
@@ -124,6 +125,20 @@ export function buildOctopusBossLevel(g: Game, variant: BossVariant) {
   resetMiniboss(g)
   g.blocks = []
   const boss = buildOctopusBoss(g, variant.hp, variant)
+  g.bossSys.setPhases(variant)
+  g.bossSys.spawn(boss)
+  g.blocksInitial = Math.max(1, g.blocks.length)
+}
+
+/** Финальный босс кампании — Кракен Бездны: двухфазный колосс с перерождением в Ядро Разлома. */
+export function buildKrakenBossLevel(g: Game, variant: BossVariant) {
+  g.bossSys.clear()
+  g.bossDefeated = false
+  g.boomQueue = []
+  resetMiniboss(g)
+  g.blocks = []
+  const { boss, blocks } = buildKrakenBoss(g.w, g.h, variant.hp, variant)
+  g.blocks = blocks
   g.bossSys.setPhases(variant)
   g.bossSys.spawn(boss)
   g.blocksInitial = Math.max(1, g.blocks.length)
@@ -243,6 +258,8 @@ export function buildBossRushStage(g: Game, index: number) {
     buildLampreyBossLevel(g, variant)
   } else if (kind === "chrono") {
     buildChronoBossLevel(g, variant)
+  } else if (kind === "kraken") {
+    buildKrakenBossLevel(g, variant)
   } else {
     buildOctopusBossLevel(g, variant)
   }

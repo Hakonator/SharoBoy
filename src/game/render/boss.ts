@@ -1378,6 +1378,304 @@ function drawLampreyBoss(ctx: Ctx, bo: BossState, blocks: Block[], balls: Ball[]
   }
 }
 
+/** Отрисовка босса «Кракен Бездны» (две полноценные ипостаси с уникальным визуалом). */
+function drawKrakenBoss(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block[]) {
+  if (bo.krakenPhase === 2) {
+    drawKrakenPhase2(ctx, bo, blocks)
+  } else {
+    drawKrakenPhase1(ctx, bo, balls, blocks)
+  }
+}
+
+/** Ипостась I: Кракен-Титан — биомеханический колосс Бездны со щупальцами и Оком Энтропии. */
+function drawKrakenPhase1(ctx: Ctx, bo: BossState, balls: Ball[], blocks: Block[]) {
+  const angry = bo.hp < bo.maxHp * (bo.angryAt ?? 0.55)
+
+  // 1. Щупальца Кракена — звенья с пурпурными неоновыми био-связями
+  const tentacles = blocks.filter((b) => b.isTentacle && !b.dead) as (Block & {
+    tentacleId: number
+    tentacleSeg: number
+  })[]
+  const byId = new Map<number, typeof tentacles>()
+  for (const t of tentacles) {
+    const arr = byId.get(t.tentacleId) ?? []
+    arr.push(t)
+    byId.set(t.tentacleId, arr)
+  }
+
+  const segColor = (t: (typeof tentacles)[0]) => {
+    const frac = clamp((t.hp ?? 1) / (t.maxHp ?? 1), 0, 1)
+    if (frac > 0.6) return "rgba(192,132,252,0.9)"
+    if (frac > 0.3) return "rgba(236,72,153,0.85)"
+    return "rgba(239,68,68,0.8)"
+  }
+
+  for (const segs of byId.values()) {
+    if (segs.length > 1) {
+      segs.sort((a, b) => (a.tentacleSeg ?? 0) - (b.tentacleSeg ?? 0))
+      ctx.strokeStyle = "rgba(126,34,206,0.65)"
+      ctx.lineWidth = 3.5
+      ctx.beginPath()
+      ctx.moveTo(segs[0].x, segs[0].y)
+      for (let k = 1; k < segs.length; k++) {
+        ctx.lineTo(segs[k].x, segs[k].y)
+      }
+      ctx.stroke()
+    }
+    for (const seg of segs) {
+      const r = seg.rx
+      ctx.save()
+      ctx.shadowColor = segColor(seg)
+      ctx.shadowBlur = 15
+      const g = ctx.createRadialGradient(seg.x - r * 0.3, seg.y - r * 0.3, 1, seg.x, seg.y, r * 1.2)
+      g.addColorStop(0, "#ffffff")
+      g.addColorStop(0.35, segColor(seg))
+      g.addColorStop(0.75, "#581c87")
+      g.addColorStop(1, "#1e0836")
+      ctx.fillStyle = g
+      ctx.beginPath()
+      ctx.arc(seg.x, seg.y, r, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    }
+  }
+
+  // 2. Тело Кракена-Титана
+  ctx.save()
+  ctx.translate(bo.x, bo.y)
+
+  // Текстовый бейдж
+  ctx.font = '11px "Russo One", sans-serif'
+  ctx.fillStyle = "#c084fc"
+  ctx.textAlign = "center"
+  ctx.fillText("КРАКЕН-ТИТАН · ФАЗА I", 0, -bo.r - 26)
+
+  // Кольцо здоровья
+  const frac = clamp(bo.hp / bo.maxHp, 0, 1)
+  ctx.lineWidth = 6
+  ctx.strokeStyle = "rgba(15,5,30,0.8)"
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r + 14, 0, Math.PI * 2)
+  ctx.stroke()
+
+  ctx.strokeStyle = frac > 0.55 ? "#c084fc" : frac > 0.25 ? "#ec4899" : "#ef4444"
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
+  ctx.stroke()
+
+  // Барьер Бездны (пока живы щупальца)
+  const hasShield = byId.size > 0
+  if (hasShield) {
+    const pulse = 0.3 + 0.15 * Math.sin(bo.t * 4)
+    ctx.strokeStyle = `rgba(192,132,252,${pulse})`
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    ctx.arc(0, 0, bo.r + 8, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+
+  // Биомеханический панцирь
+  ctx.shadowColor = angry ? "#ff2a6d" : "#9333ea"
+  ctx.shadowBlur = 28
+  const bg = ctx.createRadialGradient(-bo.r * 0.35, -bo.r * 0.35, 3, 0, 0, bo.r * 1.25)
+  bg.addColorStop(0, angry ? "#fed7aa" : "#e9d5ff")
+  bg.addColorStop(0.35, angry ? "#dc2626" : "#7c3aed")
+  bg.addColorStop(0.75, angry ? "#450a0a" : "#2e1065")
+  bg.addColorStop(1, "#0a0314")
+  ctx.fillStyle = bg
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.shadowBlur = 0
+
+  if (bo.flash > 0) {
+    ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.75})`
+    ctx.beginPath()
+    ctx.arc(0, 0, bo.r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // Панцирные ребра экзоскелета
+  ctx.strokeStyle = "rgba(233,213,255,0.3)"
+  ctx.lineWidth = 1.5
+  for (let i = 0; i < 4; i++) {
+    const ang = -Math.PI / 2 + ((i - 1.5) * Math.PI) / 3.5
+    ctx.beginPath()
+    ctx.moveTo(Math.cos(ang) * (bo.r * 0.45), Math.sin(ang) * (bo.r * 0.45))
+    ctx.lineTo(Math.cos(ang) * (bo.r * 0.95), Math.sin(ang) * (bo.r * 0.95))
+    ctx.stroke()
+  }
+
+  // Око Энтропии (центральный мистический глаз Бездны, следящий за шаром)
+  const target = balls.find((b) => !b.stuck)
+  let lookX = 0
+  let lookY = 0
+  if (target) {
+    const dx = target.x - bo.x
+    const dy = target.y - bo.y
+    const dl = Math.hypot(dx, dy) || 1
+    lookX = (dx / dl) * bo.r * 0.1
+    lookY = (dy / dl) * bo.r * 0.1
+  }
+
+  // Глазница
+  ctx.fillStyle = "#090214"
+  ctx.beginPath()
+  ctx.ellipse(0, 0, bo.r * 0.36, bo.r * 0.28, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = "#c084fc"
+  ctx.lineWidth = 1.8
+  ctx.stroke()
+
+  // Радужка
+  const irisG = ctx.createRadialGradient(lookX, lookY, 1, lookX, lookY, bo.r * 0.22)
+  irisG.addColorStop(0, "#38bdf8")
+  irisG.addColorStop(0.5, "#c084fc")
+  irisG.addColorStop(1, "#581c87")
+  ctx.fillStyle = irisG
+  ctx.beginPath()
+  ctx.ellipse(lookX, lookY, bo.r * 0.22, bo.r * 0.18, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Вертикальный щелевидный зрачок Бездны
+  ctx.fillStyle = "#05010a"
+  ctx.beginPath()
+  ctx.ellipse(lookX, lookY, bo.r * 0.05, bo.r * 0.15, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.restore()
+}
+
+/** Ипостась II: «Ядро Разлома / Сингулярность Бездны» — космическая квантовая аномалия. */
+function drawKrakenPhase2(ctx: Ctx, bo: BossState, blocks: Block[]) {
+  ctx.save()
+  ctx.translate(bo.x, bo.y)
+
+  // Текстовый бейдж (пульсирующий циан/фиолет)
+  const pulseA = 0.75 + 0.25 * Math.sin(bo.t * 5)
+  ctx.font = '11px "Russo One", sans-serif'
+  ctx.fillStyle = `rgba(56,189,248,${pulseA})`
+  ctx.textAlign = "center"
+  ctx.fillText("ЯДРО РАЗЛОМА · ФАЗА II", 0, -bo.r - 26)
+
+  // Кольцо здоровья Сингулярности
+  const frac = clamp(bo.hp / bo.maxHp, 0, 1)
+  ctx.lineWidth = 6
+  ctx.strokeStyle = "rgba(8,18,32,0.85)"
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r + 14, 0, Math.PI * 2)
+  ctx.stroke()
+
+  ctx.strokeStyle = frac > 0.55 ? "#38bdf8" : frac > 0.25 ? "#c084fc" : "#ff2a6d"
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
+  ctx.stroke()
+
+  // Волны гравитационного прилива (стягивание к центру)
+  if (bo.krakenVortexActive) {
+    for (let w = 0; w < 3; w++) {
+      const progress = (bo.t * 1.6 + w * 0.33) % 1
+      const waveR = bo.r * (2.6 - progress * 1.6)
+      const alpha = Math.sin(progress * Math.PI) * 0.55
+      ctx.strokeStyle = `rgba(192,132,252,${alpha})`
+      ctx.lineWidth = 2.4
+      ctx.beginPath()
+      ctx.arc(0, 0, waveR, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+  }
+
+  // Вращающийся аккреционный диск (3 спиральных плазменных рукава)
+  const arms = 3
+  const baseRot = bo.krakenRiftAngle ?? bo.t * 2.5
+  const steps = 32
+
+  ctx.save()
+  ctx.shadowColor = "#c084fc"
+  ctx.shadowBlur = 20
+  for (let a = 0; a < arms; a++) {
+    const armAngle = (a * Math.PI * 2) / arms + baseRot
+    ctx.beginPath()
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps
+      const rad = bo.r * (0.35 + 0.9 * Math.pow(t, 0.85))
+      const theta = armAngle + t * Math.PI * 2.2
+      const px = Math.cos(theta) * rad
+      const py = Math.sin(theta) * rad
+      if (s === 0) ctx.moveTo(px, py)
+      else ctx.lineTo(px, py)
+    }
+    ctx.strokeStyle = a % 2 === 0 ? "rgba(192,132,252,0.85)" : "rgba(56,189,248,0.85)"
+    ctx.lineWidth = 3.2
+    ctx.lineCap = "round"
+    ctx.stroke()
+  }
+  ctx.restore()
+
+  // Фотонная сфера горизонта событий
+  ctx.strokeStyle = "rgba(224,242,254,0.7)"
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r * 0.58, 0, Math.PI * 2)
+  ctx.stroke()
+
+  // Центральная Чёрная Дыра
+  ctx.shadowColor = "#38bdf8"
+  ctx.shadowBlur = 24
+  const coreG = ctx.createRadialGradient(0, 0, 2, 0, 0, bo.r * 0.54)
+  coreG.addColorStop(0, "#020108")
+  coreG.addColorStop(0.7, "#050212")
+  coreG.addColorStop(0.92, "#1e0938")
+  coreG.addColorStop(1, "#38bdf8")
+  ctx.fillStyle = coreG
+  ctx.beginPath()
+  ctx.arc(0, 0, bo.r * 0.54, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.shadowBlur = 0
+
+  if (bo.flash > 0) {
+    ctx.fillStyle = `rgba(255,255,255,${bo.flash * 0.8})`
+    ctx.beginPath()
+    ctx.arc(0, 0, bo.r * 0.54, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  ctx.restore()
+
+  // 3. Отрисовка орбитальных квантовых осколков разлома
+  for (const b of blocks) {
+    if (!b.isKrakenShard || b.dead) continue
+    ctx.save()
+    ctx.translate(b.x, b.y)
+    ctx.shadowColor = "#38bdf8"
+    ctx.shadowBlur = 14
+
+    // Ромбовидный кристаллический осколок
+    const s = b.rx
+    ctx.fillStyle = "rgba(56,189,248,0.8)"
+    ctx.beginPath()
+    ctx.moveTo(0, -s)
+    ctx.lineTo(s * 0.75, 0)
+    ctx.lineTo(0, s)
+    ctx.lineTo(-s * 0.75, 0)
+    ctx.closePath()
+    ctx.fill()
+
+    ctx.strokeStyle = "#ffffff"
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+
+    // Мини-полоска HP осколка
+    const shardFrac = clamp((b.hp ?? 1) / (b.maxHp ?? 1), 0, 1)
+    ctx.fillStyle = "rgba(10,20,30,0.7)"
+    ctx.fillRect(-12, -s - 6, 24, 3)
+    ctx.fillStyle = "#38bdf8"
+    ctx.fillRect(-12, -s - 6, 24 * shardFrac, 3)
+
+    ctx.restore()
+  }
+}
+
 export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks: Block[]) {
   const bo = boss
   if (!bo) return
@@ -1399,6 +1697,10 @@ export function drawBoss(ctx: Ctx, boss: BossState | null, balls: Ball[], blocks
   }
   if (bo.isChrono) {
     drawChronoBoss(ctx, bo)
+    return
+  }
+  if (bo.isKraken) {
+    drawKrakenBoss(ctx, bo, balls, blocks)
     return
   }
   const angry = bo.hp < bo.maxHp * 0.4
