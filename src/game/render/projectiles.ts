@@ -145,7 +145,7 @@ export function drawBalls(ctx: Ctx, balls: Ball[], v: BallView) {
         ctx.beginPath()
         ctx.moveTo(b.x + Math.cos(a0) * b.r, b.y + Math.sin(a0) * b.r)
         ctx.lineTo(b.x + Math.cos(a0) * (b.r + len), b.y + Math.sin(a0) * (b.r + len))
-        ctx.strokeStyle = "rgba(255,245,120,0.7)"
+        ctx.strokeStyle = skinDef.colors.glow || "rgba(255,245,120,0.7)"
         ctx.lineWidth = 1.2
         ctx.stroke()
       }
@@ -155,9 +155,9 @@ export function drawBalls(ctx: Ctx, balls: Ball[], v: BallView) {
         const dist = b.r * (1.2 + Math.sin(v.time * 6 + i) * 0.3)
         const sx = b.x + Math.cos(a0) * dist
         const sy = b.y + Math.sin(a0) * dist
-        ctx.fillStyle = "rgba(225,180,255,0.75)"
+        ctx.fillStyle = skinDef.colors.mid || "rgba(225,180,255,0.75)"
         ctx.beginPath()
-        ctx.arc(sx, sy, 1.3, 0, Math.PI * 2)
+        ctx.arc(sx, sy, 1.4, 0, Math.PI * 2)
         ctx.fill()
       }
     }

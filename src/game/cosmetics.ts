@@ -1,11 +1,31 @@
 import { lsGet, lsSet } from "./utils"
 
 export type PaddleSkinId =
-  "default" | "cyberpunk" | "gold" | "ice" | "retro" | "chronos" | "cryo" | "pulse"
+  | "default"
+  | "cyberpunk"
+  | "gold"
+  | "ice"
+  | "retro"
+  | "chronos"
+  | "cryo"
+  | "pulse"
+  | "emerald"
+  | "ruby"
+  | "void"
 export type BallTrailId =
-  "default" | "fire" | "electric" | "rainbow" | "void" | "spark_arc" | "frost" | "stardust"
+  | "default"
+  | "fire"
+  | "electric"
+  | "rainbow"
+  | "void"
+  | "spark_arc"
+  | "frost"
+  | "stardust"
+  | "emerald"
+  | "chrono"
+  | "plasma"
 export type TableThemeId =
-  "ocean" | "nebula" | "retrowave" | "abyss" | "earth_orbit" | "singularity"
+  "ocean" | "nebula" | "retrowave" | "abyss" | "earth_orbit" | "singularity" | "volcano"
 
 export type CosmeticCategory = "paddle" | "ball" | "theme"
 
@@ -111,14 +131,14 @@ export const PADDLE_SKINS: readonly PaddleSkinDef[] = [
     name: "Ледяной Кристалл",
     category: "paddle",
     cost: 60,
-    desc: "Гранёный арктический лёд с кристальным сапфировым блеском.",
+    desc: "Гранёный сапфировый ледник с морозным кристальным блеском и белым кантом.",
     icon: "❄️",
     colors: {
-      top: "#e0f7ff",
-      mid: "#70d6ff",
-      dark: "#0a58ca",
-      glow: "#70d6ff",
-      stroke: "#ffffff",
+      top: "#ffffff",
+      mid: "#3b82f6",
+      dark: "#1e3a8a",
+      glow: "#60a5fa",
+      stroke: "#dbeafe",
     },
   },
   {
@@ -153,17 +173,17 @@ export const PADDLE_SKINS: readonly PaddleSkinDef[] = [
   },
   {
     id: "cryo",
-    name: "Крио-Броня",
+    name: "Магма-Титан",
     category: "paddle",
     cost: 70,
-    desc: "Гранёный сапфировый композит с морозным сиянием хладагента станции.",
-    icon: "❄️",
+    desc: "Тёмный обсидиановый корпус с раскалёнными магматическими жилами и багровым жаром.",
+    icon: "🌋",
     colors: {
-      top: "#f0fdfa",
-      mid: "#06b6d4",
-      dark: "#0e7490",
-      glow: "#22d3ee",
-      stroke: "#e0f2fe",
+      top: "#ffb703",
+      mid: "#e63946",
+      dark: "#1a0505",
+      glow: "#ff3700",
+      stroke: "#ffa200",
     },
   },
   {
@@ -179,6 +199,51 @@ export const PADDLE_SKINS: readonly PaddleSkinDef[] = [
       dark: "#701a75",
       glow: "#d946ef",
       stroke: "#a855f7",
+    },
+  },
+  {
+    id: "emerald",
+    name: "Изумрудный Нефрит",
+    category: "paddle",
+    cost: 70,
+    desc: "Императорский зелёный нефрит с полированными золотыми фасками и био-свечением.",
+    icon: "❇️",
+    colors: {
+      top: "#d1fae5",
+      mid: "#10b981",
+      dark: "#064e3b",
+      glow: "#34d399",
+      stroke: "#fbbf24",
+    },
+  },
+  {
+    id: "ruby",
+    name: "Алый Рубин",
+    category: "paddle",
+    cost: 75,
+    desc: "Огранённый багровый корунд с тёмно-карминовым основанием и рубиновым свечением.",
+    icon: "💎",
+    colors: {
+      top: "#ffe4e6",
+      mid: "#e11d48",
+      dark: "#4c0519",
+      glow: "#f43f5e",
+      stroke: "#fb7185",
+    },
+  },
+  {
+    id: "void",
+    name: "Тёмная Материя",
+    category: "paddle",
+    cost: 80,
+    desc: "Сверхплотный композит из антиматерии глубокого космоса с неоновым фиолетовым пульсаром.",
+    icon: "🌌",
+    colors: {
+      top: "#f3e8ff",
+      mid: "#7e22ce",
+      dark: "#190326",
+      glow: "#a855f7",
+      stroke: "#e879f9",
     },
   },
 ] as const
@@ -258,31 +323,32 @@ export const BALL_TRAILS: readonly BallTrailDef[] = [
   },
   {
     id: "spark_arc",
-    name: "Искры молний",
+    name: "Магматический шлейф",
     category: "ball",
     cost: 60,
-    desc: "Дуговой электростатический след с искрами высокого напряжения.",
-    icon: "⚡",
+    desc: "Раскалённый след вулканической магмы с горящими углями и багровыми искрами.",
+    icon: "🌋",
     colors: {
-      trail: "rgba(255,233,92,",
-      mid: "#fef08a",
-      core: "#eab308",
-      glow: "#fde047",
+      trail: "rgba(255,60,15,",
+      mid: "#ff9d42",
+      core: "#8b0e00",
+      glow: "#ff3700",
       sparks: true,
     },
   },
   {
     id: "frost",
-    name: "Крио-хвост",
+    name: "Алмазная Изморозь",
     category: "ball",
     cost: 55,
-    desc: "Кристаллическая ледяная изморозь и лазурное сапфировое ядро.",
+    desc: "Ослепительный шлейф арктического льда с морозными кристаллами снега и алмазным ядром.",
     icon: "❄️",
     colors: {
-      trail: "rgba(56,189,248,",
-      mid: "#e0f2fe",
-      core: "#0284c7",
-      glow: "#38bdf8",
+      trail: "rgba(240,250,255,",
+      mid: "#ffffff",
+      core: "#38bdf8",
+      glow: "#e0f2fe",
+      stars: true,
     },
   },
   {
@@ -298,6 +364,51 @@ export const BALL_TRAILS: readonly BallTrailDef[] = [
       core: "#db2777",
       glow: "#f472b6",
       stars: true,
+    },
+  },
+  {
+    id: "emerald",
+    name: "Изумрудный Луч",
+    category: "ball",
+    cost: 65,
+    desc: "Ярко-зелёный био-плазменный след с танцующими изумрудными искрами.",
+    icon: "❇️",
+    colors: {
+      trail: "rgba(16,185,129,",
+      mid: "#a7f3d0",
+      core: "#047857",
+      glow: "#10b981",
+      sparks: true,
+    },
+  },
+  {
+    id: "chrono",
+    name: "Хроно-Эхо",
+    category: "ball",
+    cost: 70,
+    desc: "Временной волновой след с квантовыми искрами золота и лазури.",
+    icon: "⏳",
+    colors: {
+      trail: "rgba(245,158,11,",
+      mid: "#fef3c7",
+      core: "#b45309",
+      glow: "#fbbf24",
+      stars: true,
+    },
+  },
+  {
+    id: "plasma",
+    name: "Аметистовая Плазма",
+    category: "ball",
+    cost: 65,
+    desc: "Концентрированный заряд тёмной фиолетовой плазмы с электростатическими микро-дугами.",
+    icon: "🔮",
+    colors: {
+      trail: "rgba(168,85,247,",
+      mid: "#f3e8ff",
+      core: "#6b21a8",
+      glow: "#c084fc",
+      sparks: true,
     },
   },
 ] as const
@@ -387,6 +498,21 @@ export const TABLE_THEMES: readonly TableThemeDef[] = [
       bgMid: "#180230",
       bgBot: "#080014",
       bubble: "rgba(251,191,36,0.11)",
+      stars: true,
+    },
+  },
+  {
+    id: "volcano",
+    name: "Вулканический Разлом",
+    category: "theme",
+    cost: 75,
+    desc: "Тёмные базальтовые плиты над кипящей геотермальной лавой и огненные искры.",
+    icon: "🌋",
+    colors: {
+      bgTop: "#3d0b00",
+      bgMid: "#1f0500",
+      bgBot: "#0d0200",
+      bubble: "rgba(255,100,30,0.11)",
       stars: true,
     },
   },
