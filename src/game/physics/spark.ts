@@ -4,6 +4,7 @@
  * нанося каждому обычный урон прямого попадания. Чистая логика без Canvas.
  */
 import type { Ball, Block, SparkHit } from "../types"
+import type { HapticPattern } from "../haptics"
 import { clamp } from "../utils"
 
 /** Радиус прыжка искры к следующему блоку (в мировых единицах). */
@@ -151,6 +152,8 @@ export interface SparkAuraWorld {
   readonly physics: {
     damageBlock(b: Block, dmg?: number): void
   }
+  readonly haptic?: (pattern: HapticPattern) => void
+  readonly onSparkKill?: () => void
 }
 
 /**
@@ -199,7 +202,12 @@ export function updateSparkAura(g: SparkAuraWorld): void {
         g.fx.burst(b.x, b.y, "#ffe95c", 4, 120)
         const pan = clamp((b.x / (g.w || 400)) * 2 - 1, -0.85, 0.85)
         g.sfx.zap(pan)
+        g.haptic?.("light")
+        const wasDead = b.dead
         g.physics.damageBlock(b, 1)
+        if (!wasDead && b.dead) {
+          g.onSparkKill?.()
+        }
       }
     }
   }

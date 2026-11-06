@@ -15,6 +15,8 @@ export type SynergyId =
   | "supernova"
   | "absolute_bulwark"
   | "thermal_lance"
+  | "cryo_plasma"
+  | "thunder_blade"
 
 export interface SynergyMeta {
   readonly id: SynergyId
@@ -98,6 +100,26 @@ export const SYNERGIES_META: Record<SynergyId, SynergyMeta> = {
     color: "#ff5722",
     glowColor: "rgba(255, 87, 34, 0.45)",
   },
+  cryo_plasma: {
+    id: "cryo_plasma",
+    name: "Крио-плазма",
+    shortName: "КРИОПЛАЗМА",
+    desc: "Мороз + Взрыв: взрывной заряд замораживает задетые блоки и распространяет волну абсолютного холода.",
+    ingredients: ["Морозный шар", "Плазменный заряд"],
+    icon: "❄️",
+    color: "#38bdf8",
+    glowColor: "rgba(56, 189, 248, 0.45)",
+  },
+  thunder_blade: {
+    id: "thunder_blade",
+    name: "Громовой Клин",
+    shortName: "ГРОМОКЛИН",
+    desc: "Пробивание + Электрошар: каждое пробивание блока порождает веер молний, бьющих по 2 ближайшим блокам.",
+    ingredients: ["Кинетический клинок", "Электрошар / Искра"],
+    icon: "⚡",
+    color: "#eab308",
+    glowColor: "rgba(234, 179, 8, 0.45)",
+  },
 }
 
 /** Состояние игры, достаточное для детекции активных синергий. */
@@ -114,6 +136,7 @@ export interface SynergyDetectorState {
   fireUntil?: number
   frostUntil?: number
   wideUntil?: number
+  upgrades?: Record<string, number>
   campaignRelics?:
     | CampaignRelicsState
     | {
@@ -246,6 +269,35 @@ export function isThermalLanceActive(g: SynergyDetectorState): boolean {
   return Boolean(fire)
 }
 
+/**
+ * 8. «Крио-плазма»:
+ * Морозный шар (бонус «Мороз» или реликвия «Крио-резонатор») +
+ * Взрывной шар («Плазменный заряд»).
+ */
+export function isCryoPlasmaActive(g: SynergyDetectorState): boolean {
+  const frost = g.frostActive
+    ? g.frostActive()
+    : (g.frostUntil ?? 0) > (g.time ?? 0) || Boolean(g.campaignRelics?.relicFrost)
+  const explosive = g.explosiveActive
+    ? g.explosiveActive()
+    : (g.explosiveUntil ?? 0) > (g.time ?? 0)
+  return Boolean(frost && explosive)
+}
+
+/**
+ * 9. «Громовой Клин»:
+ * Проникающий шар («Кинетический клинок») +
+ * (Электрошар / Реликвия «Грозовой коралл» / Улучшение «Грозовой ореол»).
+ */
+export function isThunderBladeActive(g: SynergyDetectorState): boolean {
+  const pierce = g.pierceActive ? g.pierceActive() : (g.pierceUntil ?? 0) > (g.time ?? 0)
+  if (!pierce) return false
+  const spark = g.sparkActive ? g.sparkActive() : (g.sparkUntil ?? 0) > (g.time ?? 0)
+  const hasSparkRelic = Boolean(g.campaignRelics?.relicSpark)
+  const hasSparkAura = Boolean((g.upgrades?.sparkAura ?? 0) > 0)
+  return Boolean(spark || hasSparkRelic || hasSparkAura)
+}
+
 /** Возвращает список идентификаторов всех синергий, активных в текущий момент. */
 export function getActiveSynergies(g: SynergyDetectorState): SynergyId[] {
   const active: SynergyId[] = []
@@ -256,5 +308,7 @@ export function getActiveSynergies(g: SynergyDetectorState): SynergyId[] {
   if (isSupernovaActive(g)) active.push("supernova")
   if (isAbsoluteBulwarkActive(g)) active.push("absolute_bulwark")
   if (isThermalLanceActive(g)) active.push("thermal_lance")
+  if (isCryoPlasmaActive(g)) active.push("cryo_plasma")
+  if (isThunderBladeActive(g)) active.push("thunder_blade")
   return active
 }

@@ -161,6 +161,7 @@ export function applyClutchRebound(g: PhysicsWorld, ball: Ball, rel: number, pad
       t: 0,
       size: 18,
     })
+    g.haptic?.("save")
     g.onClutchSave?.()
   }
 }
@@ -197,6 +198,8 @@ export function applyChargedBounce(g: PhysicsWorld, ball: Ball, paddlePan: numbe
     t: 0,
     size: 18,
   })
+  g.haptic?.("medium")
+  g.onChargedBounce?.()
   g.consumeChargedBounce?.()
   return true
 }
@@ -528,6 +531,9 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
         if (g.isThermalLanceActive?.()) {
           applyThermalLanceAoE(g, b)
         }
+        if (g.isThunderBladeActive?.()) {
+          applyThunderBladeAoE(g, b)
+        }
         continue
       }
     }
@@ -589,7 +595,8 @@ export function collideBlocks(g: PhysicsWorld, ball: Ball) {
         g,
         b,
         Boolean(g.isChainResonanceActive?.()),
-        Boolean(g.isSupernovaActive?.())
+        Boolean(g.isSupernovaActive?.()),
+        Boolean(g.isCryoPlasmaActive?.())
       )
     }
     return
@@ -694,16 +701,34 @@ export function applyThermalLanceAoE(g: PhysicsWorld, source: Block) {
 }
 
 /**
+ * Веер молний синергии «Громовой Клин»:
+ * Срабатывает при пробивании блока кинетическим клинком при активном электрошаре / ауре.
+ * Поражает до 2 ближайших живых блоков цепной молнией (T-067).
+ */
+export function applyThunderBladeAoE(g: PhysicsWorld, source: Block) {
+  const pan = clamp((source.x / g.w) * 2 - 1, -0.85, 0.85)
+  g.sfx.zap(pan)
+  g.fx.burst(source.x, source.y, "#eab308", 8, 170)
+  g.fx.burst(source.x, source.y, "#ffffff", 4, 120)
+  const targets = sparkChainTargets(g.blocks, source, { max: 2, radius: 110, exclude: source })
+  if (targets.length > 0) {
+    queueSparkChain(g.sparkQueue, targets, source, g.time)
+  }
+}
+
+/**
  * Взрывная волна «Плазменного заряда»: подрывает соседей в радиусе 72 на урон 1.
  * При активной синергии «Цепной Резонанс» радиус расширяется до 108 px,
  * урон удваивается до 2, лимит целей вырастает до 14, а цепные блоки детонируют.
  * При активной синергии «Сверхновая» радиус 96 px, урон 3 по 12 целям с магма-взрывом.
+ * При активной синергии «Крио-плазма» задетые блоки замораживаются.
  */
 export function applyExplosiveBallAoE(
   g: PhysicsWorld,
   source: Block,
   isChainResonance = false,
-  isSupernova = false
+  isSupernova = false,
+  isCryoPlasma = false
 ) {
   const radius =
     isChainResonance && isSupernova
@@ -726,12 +751,20 @@ export function applyExplosiveBallAoE(
     : isChainResonance
       ? CHAIN_RESONANCE_DAMAGE
       : EXPLOSIVE_BALL_DAMAGE
-  const burstColor = isSupernova ? "#ef4444" : isChainResonance ? "#ffaa00" : "#ff8a3d"
-  const ringColor = isSupernova
-    ? "rgba(239, 68, 68, 0.95)"
-    : isChainResonance
-      ? "rgba(255, 170, 0, 0.95)"
-      : "rgba(255, 122, 54, 0.85)"
+  const burstColor = isCryoPlasma
+    ? "#38bdf8"
+    : isSupernova
+      ? "#ef4444"
+      : isChainResonance
+        ? "#ffaa00"
+        : "#ff8a3d"
+  const ringColor = isCryoPlasma
+    ? "rgba(56, 189, 248, 0.9)"
+    : isSupernova
+      ? "rgba(239, 68, 68, 0.95)"
+      : isChainResonance
+        ? "rgba(255, 170, 0, 0.95)"
+        : "rgba(255, 122, 54, 0.85)"
 
   g.fx.burst(
     source.x,
@@ -749,6 +782,11 @@ export function applyExplosiveBallAoE(
     t: 0,
   })
 
+  if (isCryoPlasma) {
+    const pan = clamp((source.x / g.w) * 2 - 1, -0.85, 0.85)
+    g.sfx.freeze(pan)
+  }
+
   const candidates: Block[] = []
   for (const other of g.blocks) {
     if (other === source || other.dead || other.isMiniboss || other.bomb) continue
@@ -760,6 +798,9 @@ export function applyExplosiveBallAoE(
 
   for (const other of candidates) {
     if (!other.dead) {
+      if (isCryoPlasma && !other.isMiniboss && !other.bomb) {
+        other.frozen = true
+      }
       damageBlock(g, other, damage, isChainResonance)
     }
   }

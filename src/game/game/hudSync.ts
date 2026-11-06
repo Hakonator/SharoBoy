@@ -110,6 +110,10 @@ export function pushHud(g: Game) {
     coins: g.coins,
     upgradeLevels: Object.values(g.upgrades).reduce((a, b) => a + b, 0),
     upgradesMaxed: UPGRADE_DEFS.every((d) => (g.upgrades[d.id] ?? 0) >= d.max),
+    sparkKills: g.runSparkKills,
+    chargedBounces: g.runChargedBounces,
+    darkArenaCleared: g.darkArenaCleared,
+    defeatedMinibossKinds: g.defeatedMinibossKinds,
   })
   if (fresh.length) {
     g.achQueue.push(...fresh.map((a) => a.id))

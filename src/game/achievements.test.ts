@@ -43,10 +43,10 @@ afterEach(() => {
 })
 
 describe("ACHIEVEMENTS — справочник", () => {
-  it("содержит 12 достижений с уникальными id", () => {
-    expect(ACHIEVEMENTS).toHaveLength(12)
+  it("содержит 16 достижений с уникальными id", () => {
+    expect(ACHIEVEMENTS).toHaveLength(16)
     const set = new Set(ACHIEVEMENTS.map((d) => d.id))
-    expect(set.size).toBe(12)
+    expect(set.size).toBe(16)
   })
 
   it("у каждого достижения заполнены name и desc", () => {
@@ -106,6 +106,29 @@ describe("evaluateAch — условия разблокировки", () => {
     expect(ids(evaluateAch({ ...baseCtx, coins: 100 }))).toEqual(["coins-100"])
     expect(ids(evaluateAch({ ...baseCtx, upgradeLevels: 1 }))).toEqual(["upgrade-1"])
     expect(ids(evaluateAch({ ...baseCtx, upgradesMaxed: true }))).toEqual(["upgrade-all"])
+  })
+
+  it("новые достижения T-068: громовержец, заряженный мастер, слепой сектор, биолог бездны", () => {
+    expect(ids(evaluateAch({ ...baseCtx, sparkKills: 24 }))).toEqual([])
+    expect(ids(evaluateAch({ ...baseCtx, sparkKills: 25 }))).toEqual(["spark-aura"])
+
+    expect(ids(evaluateAch({ ...baseCtx, chargedBounces: 14 }))).toEqual([])
+    expect(ids(evaluateAch({ ...baseCtx, chargedBounces: 15 }))).toEqual(["charged-master"])
+
+    expect(ids(evaluateAch({ ...baseCtx, darkArenaCleared: false }))).toEqual([])
+    expect(ids(evaluateAch({ ...baseCtx, darkArenaCleared: true }))).toEqual(["dark-arena"])
+
+    expect(
+      ids(evaluateAch({ ...baseCtx, defeatedMinibossKinds: ["fish", "jelly", "armored_crab"] }))
+    ).toEqual([])
+    expect(
+      ids(
+        evaluateAch({
+          ...baseCtx,
+          defeatedMinibossKinds: ["fish", "jelly", "armored_crab", "slippery_eel"],
+        })
+      )
+    ).toEqual(["all-minibosses"])
   })
 
   it("повторный вызов не выдаёт уже открытые достижения", () => {

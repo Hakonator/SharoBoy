@@ -21,7 +21,10 @@ import {
   isSupernovaActive,
   isThermalShockActive,
   isThermalLanceActive,
+  isCryoPlasmaActive,
+  isThunderBladeActive,
 } from "../synergies"
+import { triggerHaptic } from "../haptics"
 
 import { addCoins } from "./progress"
 import { pushHud } from "./hudSync"
@@ -434,6 +437,7 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
       g.bossSys.damage(dmg, fromWeapon, isCrit)
       if (isCrit) {
         g.runCritHits++
+        triggerHaptic("heavy", g.settings?.haptics)
         if (g.activeChallenge) {
           recordChallengeCrit(g.activeChallenge, () => {
             g.fx.popups.push({
@@ -463,6 +467,7 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
       g.input.clearCharge()
     },
     onShieldBreak: () => {
+      triggerHaptic("damage", g.settings?.haptics)
       if (g.campaignRelics?.relicFrost) {
         g.frostUntil = Math.max(g.frostUntil, g.time + 6)
         g.fireUntil = 0
@@ -511,6 +516,7 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     },
     onClutchSave: () => {
       g.runClutchSaves++
+      triggerHaptic("save", g.settings?.haptics)
       // Задания дня: «На волоске» считает те же сэйвы у границы.
       recordQuestProgress({ clutchSaves: 1 })
       if (g.activeChallenge) {
@@ -595,12 +601,20 @@ export function makePhysicsHost(g: Game): PhysicsWorld {
     isSupernovaActive: () => isSupernovaActive(g),
     isAbsoluteBulwarkActive: () => isAbsoluteBulwarkActive(g),
     isThermalLanceActive: () => isThermalLanceActive(g),
+    isCryoPlasmaActive: () => isCryoPlasmaActive(g),
+    isThunderBladeActive: () => isThunderBladeActive(g),
+    haptic: (pattern) => triggerHaptic(pattern, g.settings?.haptics),
+    onChargedBounce: () => {
+      g.runChargedBounces = (g.runChargedBounces ?? 0) + 1
+      triggerHaptic("medium", g.settings?.haptics)
+    },
     pushHud: () => pushHud(g),
   }
 }
 /** Хост для WeaponsSystem: снаряды, поля лазера и урон делегируется системам. */
 export function makeWeaponsHost(g: Game): WeaponsWorld {
   return {
+    haptic: (pattern) => triggerHaptic(pattern, g.settings?.haptics),
     get time() {
       return g.time
     },

@@ -19,6 +19,7 @@ import {
   particleLimitForQuality,
   subscribeSettings,
 } from "./settings"
+import { type HapticPattern, triggerHaptic } from "./haptics"
 import {
   type TacticalModulesSettings,
   loadTacticalModules,
@@ -47,7 +48,7 @@ import type {
 import type { CampaignMap } from "./campaignMap"
 import type { MapPlaylistSpec, PlayerMapSpec } from "./mapSpec"
 import type { LevelSpec } from "./levels"
-import type { MinibossKind } from "./minibosses"
+import { type MinibossKind, loadDefeatedMinibosses } from "./minibosses"
 import type { BossVariantKind } from "./bossVariants"
 import type { BossTransmissionData } from "./bossDialogs"
 import { buyCampaignShopItem, closeCampaignShop } from "./campaignShop"
@@ -149,6 +150,14 @@ export class Game {
   /** статистика текущей партии — для достижений */
   runBossKills = 0
   runLivesLost = 0
+  /** Число заряженных отскоков ракеткой за забег (T-068) */
+  runChargedBounces = 0
+  /** Число блоков, разрушенных разрядами молний или грозовым ореолом (T-068) */
+  runSparkKills = 0
+  /** Пройден ли сектор с мутатором "dark_arena" (T-068) */
+  darkArenaCleared = false
+  /** Побеждённые виды мини-боссов (T-068) */
+  defeatedMinibossKinds: MinibossKind[] = []
   /** Детальная статистика забега — для Score Breakdown */
   runBlocksDestroyed = 0
   runBlocksScore = 0
@@ -413,12 +422,23 @@ export class Game {
     this.top = loadScoreEntries(this, "sharoboy-top")
     this.topEndless = loadScoreEntries(this, "sharoboy-top-endless")
     this.topDaily = loadScoreEntries(this, "sharoboy-top-daily")
+    this.defeatedMinibossKinds = loadDefeatedMinibosses()
     loadProgress(this)
   }
 
   /** Текущая форма верхней поверхности ракетки — см. game/paddleControl.ts. */
   paddleShapeKind(): PaddleShapeKind {
     return paddleShape(this)
+  }
+
+  /** Тактильный отклик (вибрация) с проверкой настроек (T-066). */
+  haptic(pattern: HapticPattern) {
+    triggerHaptic(pattern, this.settings?.haptics)
+  }
+
+  /** Учёт уничтожения блока разрядом молнии или аурой (T-068). */
+  onSparkKill() {
+    this.runSparkKills = (this.runSparkKills ?? 0) + 1
   }
   loop = (t: number) => gameLoop(this, t)
   /** Реакция на изменение размера окна (см. game/lifecycle.ts). */

@@ -358,6 +358,31 @@ export function SettingsModal({
                 />
               </button>
             </div>
+
+            {/* Вибрация / Тактильный отклик (T-066) */}
+            <div className="flex items-center justify-between rounded-lg border border-line/50 bg-abyss/40 p-3">
+              <div className="pr-3">
+                <div className="font-medium text-foam">Вибрация (тактильный отклик)</div>
+                <div className="text-xs text-dim">
+                  Тактильная отдача при ударах, заряженном отскоке, критах и взрывах
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => updateSetting("haptics", !settings.haptics)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  settings.haptics ? "bg-cyan-neon" : "bg-line"
+                }`}
+                aria-pressed={settings.haptics}
+                aria-label="Вибрация"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-deep shadow ring-0 transition duration-200 ease-in-out ${
+                    settings.haptics ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
           </section>
 
           {/* СЕКЦИЯ: ТАКТИЧЕСКИЕ МОДУЛИ (если есть купленные) */}

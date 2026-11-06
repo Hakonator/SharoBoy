@@ -36,6 +36,7 @@ import {
   applyExplosiveBallAoE,
   applyThermalShockSteamAoE,
   applyThermalLanceAoE,
+  applyThunderBladeAoE,
   collideBlocks,
   collideBoss,
   collidePaddle,
@@ -583,6 +584,49 @@ describe("Синергии боевых механик (T-040, §3.1 Roadmap)", 
       // Обычный урон 1 + бонус 2 от Термокопья = 3
       expect(bossDamageDealt).toBe(3)
       expect(world.shake).toBeGreaterThanOrEqual(3)
+    })
+  })
+
+  describe("«Крио-плазма» (Cryo Plasma, T-067)", () => {
+    it("замораживает задетые взрывом блоки и воспроизводит звук заморозки", () => {
+      const source = makeBlock(200, 300)
+      const near1 = makeBlock(200, 340) // расстояние 40
+      const near2 = makeBlock(230, 300) // расстояние 30
+      const far = makeBlock(200, 420) // расстояние 120 (> 72)
+
+      let freezeSoundCalled = false
+      const world = makeWorld([source, near1, near2, far], false, true)
+      world.sfx.freeze = () => {
+        freezeSoundCalled = true
+      }
+
+      applyExplosiveBallAoE(world, source, false, false, true)
+
+      expect(near1.frozen).toBe(true)
+      expect(near2.frozen).toBe(true)
+      expect(far.frozen).toBeUndefined()
+      expect(freezeSoundCalled).toBe(true)
+    })
+  })
+
+  describe("«Громовой Клин» (Thunder Blade, T-067)", () => {
+    it("порождает веер молний по 2 ближайшим блокам и звук разряда", () => {
+      const source = makeBlock(200, 300)
+      const near1 = makeBlock(200, 340) // расстояние 40
+      const near2 = makeBlock(240, 300) // расстояние 40
+      const near3 = makeBlock(260, 300) // расстояние 60
+
+      let zapCalled = false
+      const world = makeWorld([source, near1, near2, near3], false, false)
+      world.sfx.zap = () => {
+        zapCalled = true
+      }
+
+      applyThunderBladeAoE(world, source)
+
+      expect(zapCalled).toBe(true)
+      expect(world.sparkQueue).toHaveLength(2)
+      expect(world.sparkQueue.map((q) => q.block)).toEqual([near1, near2])
     })
   })
 })

@@ -26,6 +26,30 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "coins-100", icon: "🪙", name: "Коллекционер", desc: "Собрать 100 монет суммарно" },
   { id: "upgrade-1", icon: "🛠", name: "Инженер", desc: "Купить первое улучшение" },
   { id: "upgrade-all", icon: "🧰", name: "Конструктор", desc: "Все улучшения на максимум" },
+  {
+    id: "spark-aura",
+    icon: "⚡",
+    name: "Громовержец",
+    desc: "Уничтожить 25 блоков разрядами молний или грозовым ореолом",
+  },
+  {
+    id: "charged-master",
+    icon: "🚀",
+    name: "На максимальной тяге",
+    desc: "Выполнить 15 заряженных отскоков ракеткой за забег",
+  },
+  {
+    id: "dark-arena",
+    icon: "🌑",
+    name: "Впотьмах",
+    desc: "Пройти сектор с модификатором «Слепой сектор»",
+  },
+  {
+    id: "all-minibosses",
+    icon: "🐙",
+    name: "Биолог Бездны",
+    desc: "Одолеть все 4 вида мини-боссов станции",
+  },
 ]
 
 /** Контекст текущей партии/прогресса — заполняется движком. */
@@ -39,6 +63,10 @@ export interface AchContext {
   coins: number
   upgradeLevels: number
   upgradesMaxed: boolean
+  sparkKills?: number
+  chargedBounces?: number
+  darkArenaCleared?: boolean
+  defeatedMinibossKinds?: readonly string[]
 }
 
 const LS_KEY = "sharoboy-achievements"
@@ -102,6 +130,10 @@ export function evaluateAch(ctx: AchContext): AchievementDef[] {
   tryUnlock("coins-100", ctx.coins >= 100)
   tryUnlock("upgrade-1", ctx.upgradeLevels >= 1)
   tryUnlock("upgrade-all", ctx.upgradesMaxed)
+  tryUnlock("spark-aura", (ctx.sparkKills ?? 0) >= 25)
+  tryUnlock("charged-master", (ctx.chargedBounces ?? 0) >= 15)
+  tryUnlock("dark-arena", Boolean(ctx.darkArenaCleared))
+  tryUnlock("all-minibosses", (ctx.defeatedMinibossKinds?.length ?? 0) >= 4)
 
   if (fresh.length) persist(unlocked)
   return fresh

@@ -44,6 +44,7 @@ describe("game/settings", () => {
     expect(settings.comboPitch).toBe(true)
     expect(settings.underwaterFilter).toBe(true)
     expect(settings.chargedBounce).toBe(true)
+    expect(settings.haptics).toBe(true)
   })
 
   it("saves and updates settings with validation", () => {
@@ -53,6 +54,7 @@ describe("game/settings", () => {
       screenFlash: 0,
       stereoPanning: false,
       chargedBounce: false,
+      haptics: false,
     })
 
     const stored = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!)
@@ -61,6 +63,7 @@ describe("game/settings", () => {
     expect(stored.screenFlash).toBe(0)
     expect(stored.stereoPanning).toBe(false)
     expect(stored.chargedBounce).toBe(false)
+    expect(stored.haptics).toBe(false)
     expect(stored.comboPitch).toBe(true) // retained default
 
     const loaded = loadSettings()
@@ -68,6 +71,7 @@ describe("game/settings", () => {
     expect(loaded.screenShake).toBe(0.5)
     expect(loaded.screenFlash).toBe(0)
     expect(loaded.chargedBounce).toBe(false)
+    expect(loaded.haptics).toBe(false)
   })
 
   it("ignores invalid values and falls back to defaults", () => {

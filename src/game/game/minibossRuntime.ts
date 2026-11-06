@@ -11,6 +11,7 @@ import {
   CRAB_SHARD_SPEED,
   MINIBOSS_HP_FIRST,
   MINIBOSS_LIFE_CHANCE,
+  saveDefeatedMinibosses,
 } from "../minibosses"
 import { rand } from "../utils"
 import type { Block, MinibossCreature } from "../types"
@@ -200,6 +201,10 @@ export function killMiniboss(
   if (creature.kind === "fish") {
     g.mouthBubbles = []
     g.fishMouth = false
+  }
+  if (g.defeatedMinibossKinds && !g.defeatedMinibossKinds.includes(creature.kind)) {
+    g.defeatedMinibossKinds = [...g.defeatedMinibossKinds, creature.kind]
+    saveDefeatedMinibosses(g.defeatedMinibossKinds)
   }
   addRawScore(g, 800)
   g.fx.popups.push({

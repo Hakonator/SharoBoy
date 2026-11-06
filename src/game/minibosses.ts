@@ -28,6 +28,30 @@ export const MINIBOSS_KINDS: readonly MinibossKind[] = [
   "slippery_eel",
 ]
 
+export const DEFEATED_MINIBOSSES_KEY = "sharoboy-defeated-minibosses"
+
+/** Загрузить список поверженных видов минибоссов из localStorage. */
+export function loadDefeatedMinibosses(): MinibossKind[] {
+  try {
+    const raw = localStorage.getItem(DEFEATED_MINIBOSSES_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((k): k is MinibossKind => MINIBOSS_KINDS.includes(k as MinibossKind))
+  } catch {
+    return []
+  }
+}
+
+/** Сохранить список поверженных видов минибоссов в localStorage. */
+export function saveDefeatedMinibosses(kinds: readonly MinibossKind[]): void {
+  try {
+    localStorage.setItem(DEFEATED_MINIBOSSES_KEY, JSON.stringify(Array.from(new Set(kinds))))
+  } catch {
+    /* приватный режим */
+  }
+}
+
 /** Шанс появления минибосса в обычном узле кампании (≈20%). */
 export const MINIBOSS_NODE_CHANCE = 0.2
 /** Шанс, что в узле появятся сразу ДВА существа (рыба + медуза). */

@@ -10,13 +10,15 @@ import {
   isSupernovaActive,
   isThermalShockActive,
   isThermalLanceActive,
+  isCryoPlasmaActive,
+  isThunderBladeActive,
   type SynergyDetectorState,
   type SynergyId,
 } from "./synergies"
 
 describe("Synergies Engine (T-040, §3.1 Roadmap)", () => {
   describe("Метаданные синергий", () => {
-    it("содержит описания для всех 7 синергий дорожной карты", () => {
+    it("содержит описания для всех 9 синергий дорожной карты", () => {
       const ids: SynergyId[] = [
         "kinetic_sniper",
         "chain_resonance",
@@ -25,6 +27,8 @@ describe("Synergies Engine (T-040, §3.1 Roadmap)", () => {
         "supernova",
         "absolute_bulwark",
         "thermal_lance",
+        "cryo_plasma",
+        "thunder_blade",
       ]
       for (const id of ids) {
         const meta = SYNERGIES_META[id]
@@ -302,12 +306,91 @@ describe("Synergies Engine (T-040, §3.1 Roadmap)", () => {
     })
   })
 
+  describe("«Крио-плазма» (Cryo Plasma, T-067)", () => {
+    it("не активна, если нет морозного шара", () => {
+      expect(isCryoPlasmaActive({ time: 5, frostUntil: 0, explosiveUntil: 10 })).toBe(false)
+    })
+
+    it("не активна, если нет взрывного заряда", () => {
+      expect(isCryoPlasmaActive({ time: 5, frostUntil: 10, explosiveUntil: 0 })).toBe(false)
+    })
+
+    it("активна при сочетании frostUntil и explosiveUntil", () => {
+      expect(isCryoPlasmaActive({ time: 5, frostUntil: 10, explosiveUntil: 10 })).toBe(true)
+    })
+
+    it("активна с реликвией relicFrost и explosiveUntil", () => {
+      expect(
+        isCryoPlasmaActive({
+          time: 5,
+          frostUntil: 0,
+          explosiveUntil: 10,
+          campaignRelics: { relicFrost: true },
+        })
+      ).toBe(true)
+    })
+
+    it("поддерживает функциональные геттеры frostActive и explosiveActive", () => {
+      expect(
+        isCryoPlasmaActive({
+          frostActive: () => true,
+          explosiveActive: () => true,
+        })
+      ).toBe(true)
+    })
+  })
+
+  describe("«Громовой Клин» (Thunder Blade, T-067)", () => {
+    it("не активен, если нет проникающего шара", () => {
+      expect(isThunderBladeActive({ time: 5, pierceUntil: 0, sparkUntil: 10 })).toBe(false)
+    })
+
+    it("не активен, если нет искр/электрошара", () => {
+      expect(isThunderBladeActive({ time: 5, pierceUntil: 10, sparkUntil: 0 })).toBe(false)
+    })
+
+    it("активен при сочетании pierceUntil и sparkUntil", () => {
+      expect(isThunderBladeActive({ time: 5, pierceUntil: 10, sparkUntil: 10 })).toBe(true)
+    })
+
+    it("активен с реликвией relicSpark", () => {
+      expect(
+        isThunderBladeActive({
+          time: 5,
+          pierceUntil: 10,
+          sparkUntil: 0,
+          campaignRelics: { relicSpark: true },
+        })
+      ).toBe(true)
+    })
+
+    it("активен с улучшением sparkAura", () => {
+      expect(
+        isThunderBladeActive({
+          time: 5,
+          pierceUntil: 10,
+          sparkUntil: 0,
+          upgrades: { sparkAura: 1 },
+        })
+      ).toBe(true)
+    })
+
+    it("поддерживает функциональные геттеры", () => {
+      expect(
+        isThunderBladeActive({
+          pierceActive: () => true,
+          sparkActive: () => true,
+        })
+      ).toBe(true)
+    })
+  })
+
   describe("getActiveSynergies", () => {
     it("возвращает пустой массив при отсутствии активных компонентов", () => {
       expect(getActiveSynergies({ time: 10 })).toEqual([])
     })
 
-    it("корректно возвращает все 7 одновременно активных синергий", () => {
+    it("корректно возвращает все 9 одновременно активных синергий", () => {
       const state: SynergyDetectorState = {
         time: 10,
         pierceUntil: 20,
@@ -329,7 +412,9 @@ describe("Synergies Engine (T-040, §3.1 Roadmap)", () => {
       expect(active).toContain("supernova")
       expect(active).toContain("absolute_bulwark")
       expect(active).toContain("thermal_lance")
-      expect(active).toHaveLength(7)
+      expect(active).toContain("cryo_plasma")
+      expect(active).toContain("thunder_blade")
+      expect(active).toHaveLength(9)
     })
   })
 })

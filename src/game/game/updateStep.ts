@@ -19,8 +19,13 @@ function strikeSpark(g: Game, q: SparkHit) {
   g.fx.lightnings.push({ x1: q.from.x, y1: q.from.y, x2: q.block.x, y2: q.block.y, t: 0 })
   if (q.block.dead) return
   g.sfx.zap()
+  g.haptic("light")
   g.fx.burst(q.block.x, q.block.y, "#ffe95c", 6, 160)
+  const wasDead = q.block.dead
   g.physics.damageBlock(q.block, g.debugBallDamage)
+  if (!wasDead && q.block.dead) {
+    g.onSparkKill()
+  }
 }
 
 /** Игровой цикл: дельта времени, hit-stop, счётчик FPS, шаг update/draw. */

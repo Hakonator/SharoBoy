@@ -5,6 +5,7 @@
  */
 import type { Effects } from "./effects"
 import type { SFX } from "./audio"
+import type { HapticPattern } from "./haptics"
 import type {
   Ball,
   Block,
@@ -35,7 +36,12 @@ import { spawnBallTrailFx } from "./physics/ballFx"
 
 export { FIREBALL_DAMAGE_MULT } from "./physics/destruction"
 export { FROST_FREEZE_RADIUS, freezeCluster } from "./physics/frost"
-export { CHARGED_BOUNCE_SPEED_MULT, applyChargedBounce } from "./physics/collide"
+export {
+  CHARGED_BOUNCE_SPEED_MULT,
+  applyChargedBounce,
+  applyExplosiveBallAoE,
+  applyThunderBladeAoE,
+} from "./physics/collide"
 export {
   SPARK_CHAIN_DELAY,
   SPARK_CHAIN_MAX,
@@ -157,6 +163,14 @@ export interface PhysicsWorld {
   isAbsoluteBulwarkActive?(): boolean
   /** Активна синергия «Термокопьё» (огненный термический след при пробивании). */
   isThermalLanceActive?(): boolean
+  /** Активна синергия «Крио-плазма» (замораживание блоков при взрыве) (T-067). */
+  isCryoPlasmaActive?(): boolean
+  /** Активна синергия «Громовой клин» (веер молний при сквозном пробивании) (T-067). */
+  isThunderBladeActive?(): boolean
+  /** Тактильный отклик (вибрация) устройства (T-066). */
+  haptic?(pattern: HapticPattern): void
+  /** Событие применения заряженного отскока (T-068). */
+  onChargedBounce?(): void
   /** Активен ли заряженный отскок ракетки (+18% импульса вдоль нормали). */
   chargedBounceActive?(): boolean
   /** Сбросить состояние заряженного отскока после применения к мячу. */

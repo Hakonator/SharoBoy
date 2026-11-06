@@ -4,6 +4,7 @@
  */
 import type { Effects } from "./effects"
 import type { SFX } from "./audio"
+import type { HapticPattern } from "./haptics"
 import type { Block, BossState, PaddleState, PaddleShapeKind, Projectile } from "./types"
 import { Physics } from "./physics"
 import { clamp, rand, rotatedExtents } from "./utils"
@@ -29,6 +30,7 @@ export interface WeaponsWorld {
   sfx: SFX
   damageBlock(b: Block, dmg: number): void
   damageBoss(dmg: number, fromWeapon: boolean): void
+  haptic?(pattern: HapticPattern): void
 }
 
 export class WeaponsSystem {
@@ -199,6 +201,7 @@ export class WeaponsSystem {
 
   explode(x: number, y: number) {
     const g = this.g
+    g.haptic?.("heavy")
     g.sfx.explosion()
     g.shake = Math.min(g.shake + 5, 12)
     g.flash = Math.max(g.flash, 0.4)

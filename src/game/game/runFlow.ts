@@ -9,6 +9,7 @@ import { DRAFT_MAX_PICKS, applyDraftPick, isDraftWave, rollDraftOptions } from "
 import { recordChallengeBallLost } from "../campaignChallenges"
 import { recordQuestProgress } from "../dailyQuests"
 import { isAbsoluteBulwarkActive } from "../synergies"
+import { triggerHaptic } from "../haptics"
 import {
   applyFinalScoreBreakdown,
   computeScoreBreakdown,
@@ -66,6 +67,9 @@ export function resetRun(g: Game) {
   g.newRecord = false
   g.runBossKills = 0
   g.runLivesLost = 0
+  g.runChargedBounces = 0
+  g.runSparkKills = 0
+  g.darkArenaCleared = false
   g.debugBallDamage = 1
   g.fx.clear()
   g.powers = []
@@ -183,6 +187,9 @@ export function stopWeaponsAndAura(g: Game): void {
 
 export function onLevelCleared(g: Game) {
   stopWeaponsAndAura(g)
+  if (hasModifier(gameModifiers(g), "dark_arena")) {
+    g.darkArenaCleared = true
+  }
   g.runSectorsCleared = (g.runSectorsCleared ?? 0) + 1
   if (
     g.runSectorStartTime > 0 &&
@@ -627,6 +634,7 @@ export function loseLife(g: Game) {
   }
   g.shake = 10
   g.sfx.loseLife()
+  triggerHaptic("damage", g.settings?.haptics)
   g.wideUntil = 0
   g.slowUntil = 0
   g.fastUntil = 0
@@ -760,6 +768,7 @@ export function onBombHitPaddle(g: Game) {
   if (g.phase !== "playing") return
   if (isAbsoluteBulwarkActive(g)) {
     g.sfx.shieldHit()
+    triggerHaptic("heavy", g.settings?.haptics)
     g.shake = 6
     g.fx.burst(g.paddle.x, g.paddle.y, "#10b981", 16, 200)
     g.fx.rings.push({

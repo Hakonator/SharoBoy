@@ -19,6 +19,8 @@ export interface GameSettings {
   underwaterFilter: boolean
   /** Заряженный отскок ракетки (удержание ввода для импульса при отскоке). */
   chargedBounce: boolean
+  /** Тактильный отклик (вибрация) при ударах, заряде, критах и взрывах (T-066). */
+  haptics: boolean
 }
 
 export const SETTINGS_STORAGE_KEY = "sharoboy-game-settings"
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   comboPitch: true,
   underwaterFilter: true,
   chargedBounce: true,
+  haptics: true,
 }
 
 type SettingsListener = (settings: GameSettings) => void
@@ -72,6 +75,8 @@ function validateSettings(raw: unknown): GameSettings {
   const chargedBounce =
     typeof obj.chargedBounce === "boolean" ? obj.chargedBounce : DEFAULT_SETTINGS.chargedBounce
 
+  const haptics = typeof obj.haptics === "boolean" ? obj.haptics : DEFAULT_SETTINGS.haptics
+
   return {
     graphicsQuality,
     screenShake,
@@ -80,6 +85,7 @@ function validateSettings(raw: unknown): GameSettings {
     comboPitch,
     underwaterFilter,
     chargedBounce,
+    haptics,
   }
 }
 
