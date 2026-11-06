@@ -7,6 +7,7 @@ import type { SFX } from "./audio"
 import type { HapticPattern } from "./haptics"
 import type { Block, BossState, PaddleState, PaddleShapeKind, Projectile } from "./types"
 import { Physics } from "./physics"
+import { PRISM_REFRACT_DAMAGE } from "./blockKinds"
 import { clamp, rand, rotatedExtents } from "./utils"
 
 /** Хост-интерфейс: состояние движка, которым управляет система оружия. */
@@ -145,6 +146,9 @@ export class WeaponsSystem {
         color: "rgba(124,245,255,0.85)",
         t: 0,
       })
+      if (best.sp?.prism) {
+        this.refractPrism(best)
+      }
       if (!g.boss && (g.blocks.length === 0 || g.blocks.every((b) => b.dead))) {
         this.stop()
       }
@@ -155,6 +159,29 @@ export class WeaponsSystem {
       g.fx.burst(px, g.boss.y + g.boss.r, "#7cf5ff", 8, 180)
       if (!g.boss) {
         this.stop()
+      }
+    }
+  }
+
+  private refractPrism(prism: Block) {
+    const g = this.g
+    const py = prism.y
+    const e = rotatedExtents(prism.rx, prism.ry, prism.rot)
+    g.fx.burst(prism.x, prism.y, "#e07cf5", 14, 220)
+    g.fx.rings.push({
+      x: prism.x,
+      y: prism.y,
+      r: 6,
+      maxR: 54,
+      color: "rgba(224,124,245,0.85)",
+      t: 0,
+    })
+    for (const b of g.blocks) {
+      if (b === prism || b.dead) continue
+      const be = rotatedExtents(b.rx, b.ry, b.rot)
+      if (Math.abs(b.y - py) <= be.hh + e.hh * 0.6) {
+        if (!b.isMiniboss) g.damageBlock(b, PRISM_REFRACT_DAMAGE)
+        g.fx.burst(b.x, b.y, "#7cf5ff", 6, 120)
       }
     }
   }

@@ -131,6 +131,43 @@ describe("WeaponsSystem", () => {
     expect(world.laserWasOn).toBe(false)
   })
 
+  it("лазер при попадании в блок-призму преломляется горизонтально и наносит урон соседям", () => {
+    const prismBlock = makeTestBlock({ x: 164, y: 150, rx: 20, ry: 20, sp: { prism: true } })
+    const neighborBlock = makeTestBlock({ x: 300, y: 150, rx: 20, ry: 20 })
+    const damageBlock = vi.fn()
+
+    const world: WeaponsWorld = {
+      time: 0.05,
+      paddle: makePaddle(),
+      blocks: [prismBlock, neighborBlock],
+      boss: null,
+      projectiles: [],
+      rocketUntil: 0,
+      weaponCd: 0,
+      laserArmed: false,
+      laserArmedUntil: 0,
+      laserUntil: 2.0,
+      laserWasOn: false,
+      paddleShape: () => "flat",
+      shake: 0,
+      flash: 0,
+      fx: { burst: vi.fn(), rings: [], particles: [] } as unknown as WeaponsWorld["fx"],
+      sfx: {
+        laser: vi.fn(),
+        rocket: vi.fn(),
+        explosion: vi.fn(),
+      } as unknown as WeaponsWorld["sfx"],
+      damageBlock,
+      damageBoss: vi.fn(),
+    }
+
+    const ws = new WeaponsSystem(world)
+    ws.updateLaser(false)
+
+    expect(damageBlock).toHaveBeenCalledWith(prismBlock, 3)
+    expect(damageBlock).toHaveBeenCalledWith(neighborBlock, 2)
+  })
+
   it("stopWeaponsAndAura сбрасывает лазер, ракеты, снаряды, молнии и очереди", () => {
     const { g } = makeEnv()
     const game = g as unknown as Game

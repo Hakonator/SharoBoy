@@ -10,7 +10,8 @@ import { MenuSection, screenTag } from "./shared"
 /** Локальные рекорды: кампания и бесконечный режим (из localStorage). */
 export function MenuRecords({ hud, asSection = false }: { hud: HudData; asSection?: boolean }) {
   const hasDaily = (hud.topDaily?.length ?? 0) > 0
-  if (hud.top.length === 0 && hud.topEndless.length === 0 && !hasDaily) {
+  const hasBossRush = (hud.topBossRush?.length ?? 0) > 0
+  if (hud.top.length === 0 && hud.topEndless.length === 0 && !hasDaily && !hasBossRush) {
     return asSection ? null : (
       <div className="text-xs text-dim">Рекордов пока нет — сыграйте партию!</div>
     )
@@ -78,6 +79,33 @@ export function MenuRecords({ hud, asSection = false }: { hud: HudData; asSectio
           <ol className="space-y-1">
             {hud.topEndless.map((s, i) => (
               <li key={`e-${s.score}-${i}`} className="flex items-center font-display text-sm">
+                <span
+                  className={
+                    i === 0
+                      ? "text-gold"
+                      : i === 1
+                        ? "text-foam"
+                        : i === 2
+                          ? "text-coral"
+                          : "text-dim"
+                  }
+                >
+                  {i + 1}.
+                </span>
+                <span className="ml-2 min-w-0 truncate text-foam">{s.nick || "—"}</span>
+                <span className="mx-3 flex-1 border-b border-dotted border-line" />
+                <span className="text-foam tabular-nums">{s.score.toLocaleString("ru-RU")}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+      {hasBossRush && (
+        <div className="mb-2">
+          <div className="hud-label mb-1.5 text-amber-300">⚡ Босс-раш</div>
+          <ol className="space-y-1">
+            {hud.topBossRush!.map((s, i) => (
+              <li key={`br-${s.score}-${i}`} className="flex items-center font-display text-sm">
                 <span
                   className={
                     i === 0

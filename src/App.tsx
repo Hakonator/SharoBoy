@@ -265,6 +265,7 @@ export default function App() {
             onCampaign={() => setShowModifiersModal(true)}
             onDaily={() => setShowDailyModal(true)}
             onEndless={() => g()?.startEndless()}
+            onBossRush={() => g()?.startBossRush()}
             onCommunityMaps={() => setShowCommunityMaps(true)}
             onAdmin={() => setShowAdminPanel(true)}
             onBuyUpgrade={(id) => g()?.buyUpgrade(id)}
@@ -396,11 +397,13 @@ export default function App() {
           hud={hud}
           onResume={() => g()?.togglePause()}
           onRestart={() =>
-            hud.mode === "endless"
-              ? g()?.startEndless()
-              : hud.mode === "daily"
-                ? g()?.startDaily()
-                : g()?.startGame()
+            hud.mode === "boss_rush"
+              ? g()?.startBossRush()
+              : hud.mode === "endless"
+                ? g()?.startEndless()
+                : hud.mode === "daily"
+                  ? g()?.startDaily()
+                  : g()?.startGame()
           }
           onMenu={() => g()?.toMenu()}
           onOpenSettings={() => setShowSettings(true)}
@@ -426,11 +429,13 @@ export default function App() {
           hud={hud}
           topSubmit={topSubmit}
           onRestart={() =>
-            hud.mode === "endless"
-              ? g()?.startEndless()
-              : hud.mode === "daily"
-                ? g()?.startDaily()
-                : g()?.startGame()
+            hud.mode === "boss_rush"
+              ? g()?.startBossRush()
+              : hud.mode === "endless"
+                ? g()?.startEndless()
+                : hud.mode === "daily"
+                  ? g()?.startDaily()
+                  : g()?.startGame()
           }
           onMenu={() => g()?.toMenu()}
         />
@@ -440,7 +445,13 @@ export default function App() {
         <WinScreen
           hud={hud}
           topSubmit={topSubmit}
-          onRestart={() => (hud.mode === "daily" ? g()?.startDaily() : g()?.startGame())}
+          onRestart={() =>
+            hud.mode === "boss_rush"
+              ? g()?.startBossRush()
+              : hud.mode === "daily"
+                ? g()?.startDaily()
+                : g()?.startGame()
+          }
           onMenu={() => g()?.toMenu()}
         />
       )}

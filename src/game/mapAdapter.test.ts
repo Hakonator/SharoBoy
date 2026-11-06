@@ -91,6 +91,29 @@ describe("mapSpecToBlocks", () => {
     expect(blocks[1].sp?.magnet).toEqual({ radius: 160, force: 2200 })
   })
 
+  it("maps gravity_well and prism effects into Block.sp", () => {
+    const blocks = mapSpecToBlocks(
+      makeMap([
+        makeBlock({
+          id: "gravity-block",
+          effects: [{ kind: "gravity_well", radius: 320, force: 4000 }],
+        }),
+        makeBlock({
+          id: "default-gravity",
+          effects: [{ kind: "gravity_well" }],
+        }),
+        makeBlock({
+          id: "prism-block",
+          effects: [{ kind: "prism" }],
+        }),
+      ])
+    )
+
+    expect(blocks[0].sp?.gravityWell).toEqual({ radius: 320, force: 4000 })
+    expect(blocks[1].sp?.gravityWell).toEqual({ radius: 260, force: 3200 })
+    expect(blocks[2].sp?.prism).toBe(true)
+  })
+
   it("maps brittle and phase effects into Block.sp", () => {
     const blocks = mapSpecToBlocks(
       makeMap([

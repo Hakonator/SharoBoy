@@ -40,6 +40,7 @@ export function MenuScreen({
   onCampaign,
   onDaily,
   onEndless,
+  onBossRush,
   onCommunityMaps,
   onAdmin,
   onBuyUpgrade,
@@ -75,6 +76,7 @@ export function MenuScreen({
   onCampaign: () => void
   onDaily: () => void
   onEndless: () => void
+  onBossRush?: () => void
   onCommunityMaps: () => void
   onAdmin: () => void
   onBuyUpgrade: (id: string) => void
@@ -181,6 +183,13 @@ export function MenuScreen({
               onClick={onEndless}
             >
               Бесконечный
+            </button>
+            <button
+              className="btn-ghost px-3 py-2.5 font-display text-xs sm:px-5 sm:py-3.5 sm:text-base border-amber-400/40 text-amber-300 hover:border-amber-400 hover:bg-amber-400/10"
+              onClick={onBossRush}
+              type="button"
+            >
+              ⚡ Босс-раш
             </button>
             {hud.best > 0 && (
               <div className="hud-chip px-2.5 py-1.5 sm:px-3.5 sm:py-2.5">

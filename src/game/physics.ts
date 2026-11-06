@@ -19,6 +19,7 @@ import { clamp, rand } from "./utils"
 import { convexBump, surfaceAt } from "./physics/shapes"
 import {
   applyBlockMagnets,
+  applyGravityWells,
   collideBlocks as blockBounce,
   collideBoss as bossBounce,
   collidePaddle as paddleBounce,
@@ -451,6 +452,7 @@ export class Physics {
     }
 
     applyBlockMagnets(g, ball, dt)
+    applyGravityWells(g, ball, dt)
   }
 
   /** Урон блоку; при разрушении — очки, эффекты, дроп бонуса, «матрёшка». */

@@ -59,6 +59,8 @@ export type PlayerBlockEffect =
   | { kind: "cotton"; speedMultiplier?: number; duration?: number }
   | { kind: "spin"; direction?: "clockwise" | "counterclockwise" }
   | { kind: "portal"; pairId: string }
+  | { kind: "gravity_well"; radius?: number; force?: number }
+  | { kind: "prism" }
 
 export interface PlayerBlockLink {
   kind: "portal-pair"

@@ -12,6 +12,7 @@ import type { PhysicsWorld } from "../physics"
 import type { Ball, Block } from "../types"
 
 import { applyBallTimers, onBallHitSpecial, specialSpeedMult } from "./special"
+import { applyGravityWells } from "./collide"
 
 function makeBlock(over: Partial<Block> = {}): Block {
   return {
@@ -60,7 +61,7 @@ function makeWorld(blocks: Block[]) {
     h: 600,
     time: 5,
     blocks,
-    sfx: { spring: vi.fn(), thud: vi.fn(), warp: vi.fn() },
+    sfx: { spring: vi.fn(), thud: vi.fn(), warp: vi.fn(), brick: vi.fn() },
     fx: { burst: vi.fn(), rings: [] },
   } as unknown as PhysicsWorld
 }
@@ -181,5 +182,49 @@ describe("парный телепорт «чёрная дыра»", () => {
     const world = makeWorld([b])
     expect(onBallHitSpecial(world, b, makeBall(), 0, 0, 30)).toBe(false)
     expect(world.sfx.warp).not.toHaveBeenCalled()
+  })
+})
+
+describe("спецблоки: призма и гравитационная воронка", () => {
+  it("удар по призме воспроизводит кристальный звук и эффекты", () => {
+    const b = makeBlock({ sp: { prism: true } })
+    const world = makeWorld([b])
+    const ball = makeBall()
+    expect(onBallHitSpecial(world, b, ball, 0, 0, 30)).toBe(false)
+    expect(world.sfx.brick).toHaveBeenCalledWith(1)
+    expect(world.fx.burst).toHaveBeenCalled()
+    expect(world.fx.rings).toHaveLength(1)
+  })
+
+  it("гравитационная воронка притягивает и закручивает шар в радиусе действия", () => {
+    const well = makeBlock({
+      x: 300,
+      y: 200,
+      sp: { gravityWell: { radius: 200, force: 3000 } },
+    })
+    const world = makeWorld([well])
+    const ball = makeBall({ x: 200, y: 200, vx: 0, vy: -300 })
+
+    applyGravityWells(world, ball, 0.05)
+
+    // Шар находился слева от воронки (dx > 0): vx должен увеличиться в сторону воронки
+    expect(ball.vx).toBeGreaterThan(0)
+    // Тангенциальный вихрь смещает vy
+    expect(ball.vy).not.toBe(-300)
+  })
+
+  it("шар за пределами радиуса воронки не притягивается", () => {
+    const well = makeBlock({
+      x: 500,
+      y: 500,
+      sp: { gravityWell: { radius: 100, force: 3000 } },
+    })
+    const world = makeWorld([well])
+    const ball = makeBall({ x: 100, y: 100, vx: 0, vy: -300 })
+
+    applyGravityWells(world, ball, 0.05)
+
+    expect(ball.vx).toBe(0)
+    expect(ball.vy).toBe(-300)
   })
 })

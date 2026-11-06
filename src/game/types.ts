@@ -89,7 +89,7 @@ export type Phase = "menu" | "playing" | "paused" | "over" | "won" | "map"
  *  подхватывают форму автоматически. */
 export type PaddleShapeKind = "flat" | "convex" | "concave"
 
-export type GameMode = "campaign" | "endless" | "custom" | "daily"
+export type GameMode = "campaign" | "endless" | "custom" | "daily" | "boss_rush"
 
 export interface HudData {
   phase: Phase
@@ -180,6 +180,10 @@ export interface HudData {
   campaignPendingBattle?: boolean
   /** Прогресс заряда заряженного отскока платформы (0..1). */
   charge?: number
+  /** Топ локальных рекордов режима «Босс-раш». */
+  topBossRush?: ScoreEntry[]
+  /** Индекс текущего босса в режиме «Босс-раш» (0..7). */
+  bossRushIndex?: number
 }
 
 export interface CampaignShopItem {

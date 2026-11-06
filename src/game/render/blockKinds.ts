@@ -248,9 +248,114 @@ function drawPortalBody(ctx: Ctx, b: Block, x: number, y: number, time: number) 
   }
 }
 
-/** Полностью кастомные тела спецблоков (пружина/вата/портал). */
+/** Гравитационная воронка: тёмное сингулярное ядро + вращающиеся вихревые рукава. */
+function drawGravityWellBody(ctx: Ctx, b: Block, x: number, y: number, time: number) {
+  const isRect = b.shape === "rect"
+  const isRoundRect = b.shape === "round_rect"
+  const cr = Math.min(12, b.rx * 0.5, b.ry * 0.5)
+  const rr = isRoundRect ? cr / Math.max(1, Math.min(b.rx, b.ry)) : 0
+
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(b.rot)
+  ctx.scale(b.rx, b.ry)
+  ctx.fillStyle = gradient(ctx, "gravity_well", (c) => {
+    const rg = c.createRadialGradient(0, 0, 0.05, 0, 0, 1.1)
+    rg.addColorStop(0, "#050012")
+    rg.addColorStop(0.5, "#2a0845")
+    rg.addColorStop(1, "#0d0224")
+    return rg
+  })
+  if (isRect) {
+    ctx.beginPath()
+    ctx.rect(-0.95, -0.95, 1.9, 1.9)
+  } else if (isRoundRect) {
+    roundRect(ctx, -0.95, -0.95, 1.9, 1.9, rr * 0.95)
+  } else {
+    ctx.beginPath()
+    ctx.arc(0, 0, 1, 0, Math.PI * 2)
+  }
+  ctx.fill()
+  ctx.restore()
+
+  const spin = time * 3.2 + b.seed
+  const r = Math.max(b.rx, b.ry)
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(spin)
+  ctx.strokeStyle = "rgba(147, 51, 234, 0.75)"
+  ctx.lineWidth = 2
+  for (let i = 0; i < 3; i++) {
+    const ang = (i * Math.PI * 2) / 3
+    ctx.beginPath()
+    ctx.arc(0, 0, r * 0.75, ang, ang + 1.1)
+    ctx.stroke()
+  }
+  ctx.strokeStyle = "rgba(56, 189, 248, 0.6)"
+  ctx.lineWidth = 1.4
+  for (let i = 0; i < 3; i++) {
+    const ang = (i * Math.PI * 2) / 3 + 0.5
+    ctx.beginPath()
+    ctx.arc(0, 0, r * 0.45, -ang, -ang + 0.9)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+/** Призма-рефлектор: огранённый кристалл с радужными гранями и внутренним преломлением. */
+function drawPrismBody(ctx: Ctx, b: Block, x: number, y: number, time: number) {
+  const isRect = b.shape === "rect"
+  const isRoundRect = b.shape === "round_rect"
+  const cr = Math.min(12, b.rx * 0.5, b.ry * 0.5)
+  const rr = isRoundRect ? cr / Math.max(1, Math.min(b.rx, b.ry)) : 0
+
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(b.rot)
+  ctx.scale(b.rx, b.ry)
+  ctx.fillStyle = gradient(ctx, "prism", (c) => {
+    const lg = c.createLinearGradient(-1, -1, 1, 1)
+    lg.addColorStop(0, "#e0f7fa")
+    lg.addColorStop(0.35, "#80deea")
+    lg.addColorStop(0.7, "#ce93d8")
+    lg.addColorStop(1, "#1a237e")
+    return lg
+  })
+  if (isRect) {
+    ctx.beginPath()
+    ctx.rect(-0.95, -0.95, 1.9, 1.9)
+  } else if (isRoundRect) {
+    roundRect(ctx, -0.95, -0.95, 1.9, 1.9, rr * 0.95)
+  } else {
+    ctx.beginPath()
+    ctx.arc(0, 0, 1, 0, Math.PI * 2)
+  }
+  ctx.fill()
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.75)"
+  ctx.lineWidth = 0.08
+  ctx.beginPath()
+  ctx.moveTo(0, -0.7)
+  ctx.lineTo(0.7, 0)
+  ctx.lineTo(0, 0.7)
+  ctx.lineTo(-0.7, 0)
+  ctx.closePath()
+  ctx.stroke()
+
+  const shimmer = 0.5 + 0.5 * Math.sin(time * 3 + b.seed)
+  ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + 0.4 * shimmer})`
+  ctx.beginPath()
+  ctx.arc(-0.35, -0.35, 0.2, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.restore()
+}
+
+/** Полностью кастомные тела спецблоков (пружина/вата/портал/воронка/призма). */
 export function drawSpecialBody(ctx: Ctx, b: Block, x: number, y: number, time: number) {
   if (b.sp?.portalId) drawPortalBody(ctx, b, x, y, time)
+  else if (b.sp?.gravityWell) drawGravityWellBody(ctx, b, x, y, time)
+  else if (b.sp?.prism) drawPrismBody(ctx, b, x, y, time)
   else if (b.sp?.spring) drawSpringBody(ctx, b, x, y)
   else drawCottonBody(ctx, b, x, y, time)
 }
@@ -364,6 +469,15 @@ export function drawPriorityMarks(ctx: Ctx, b: Block, x: number, y: number, time
     ctx.beginPath()
     ctx.moveTo(halfWidth, top)
     ctx.lineTo(halfWidth, -b.ry * 0.12)
+    ctx.stroke()
+  }
+  if (sp.gravityWell) {
+    const pulseR =
+      Math.min(b.rx * 2.2, sp.gravityWell.radius * 0.45) * (0.8 + 0.2 * Math.sin(time * 3.5))
+    ctx.strokeStyle = "rgba(168, 85, 247, 0.4)"
+    ctx.lineWidth = 1.4
+    ctx.beginPath()
+    ctx.arc(0, 0, pulseR, 0, Math.PI * 2)
     ctx.stroke()
   }
   ctx.restore()

@@ -463,6 +463,27 @@ export function EditorInspector({ state, dispatch, author }: EditorInspectorProp
             />
           </Field>
         )}
+        <EffectToggle
+          label="Гравитация"
+          checked={has("gravity_well")}
+          onChange={(enabled) => setEffect("gravity_well", enabled)}
+        />
+        {effects.find((effect) => effect.kind === "gravity_well")?.kind === "gravity_well" && (
+          <GravityWellFields
+            effect={
+              effects.find((effect) => effect.kind === "gravity_well") as Extract<
+                PlayerBlockEffect,
+                { kind: "gravity_well" }
+              >
+            }
+            onChange={(effect) => replaceEffect("gravity_well", effect)}
+          />
+        )}
+        <EffectToggle
+          label="Призма-рефлектор"
+          checked={has("prism")}
+          onChange={(enabled) => setEffect("prism", enabled)}
+        />
       </section>
 
       <div className="mt-auto flex gap-2 border-t border-line pt-3">
@@ -781,6 +802,33 @@ function MagnetFields({
         min={-5000}
         max={5000}
         value={effect.force ?? 2200}
+        onChange={(force) => onChange({ ...effect, force })}
+      />
+    </div>
+  )
+}
+
+function GravityWellFields({
+  effect,
+  onChange,
+}: {
+  effect: Extract<PlayerBlockEffect, { kind: "gravity_well" }>
+  onChange: (effect: Extract<PlayerBlockEffect, { kind: "gravity_well" }>) => void
+}) {
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-3">
+      <NumberField
+        label="Радиус воронки"
+        min={40}
+        max={600}
+        value={effect.radius ?? 260}
+        onChange={(radius) => onChange({ ...effect, radius })}
+      />
+      <NumberField
+        label="Сила притяжения"
+        min={500}
+        max={8000}
+        value={effect.force ?? 3200}
         onChange={(force) => onChange({ ...effect, force })}
       />
     </div>
@@ -1825,6 +1873,27 @@ function GroupInspector({
             onChange={(effect) => setGroupEffect("magnet", true, effect)}
           />
         </GroupEffectRow>
+
+        <GroupEffectRow
+          label="Гравитация"
+          kind="gravity_well"
+          count={getEffectCount("gravity_well")}
+          total={count}
+          onToggle={(enabled) => setGroupEffect("gravity_well", enabled)}
+        >
+          <GravityWellFields
+            effect={{ kind: "gravity_well", radius: 260, force: 3200 }}
+            onChange={(effect) => setGroupEffect("gravity_well", true, effect)}
+          />
+        </GroupEffectRow>
+
+        <GroupEffectRow
+          label="Призма-рефлектор"
+          kind="prism"
+          count={getEffectCount("prism")}
+          total={count}
+          onToggle={(enabled) => setGroupEffect("prism", enabled)}
+        />
 
         <div className="rounded-lg border border-line/70 bg-abyss/40 p-3 space-y-2.5">
           <div className="flex items-center justify-between">

@@ -2251,6 +2251,10 @@ function effectMark(effect: PlayerBlockEffect): string | null {
       return effect.mode === "repel" || (effect.force ?? 0) < 0 ? "⊃−" : "⊃+"
     case "portal":
       return "◉"
+    case "gravity_well":
+      return "🌀"
+    case "prism":
+      return "💎"
     case "pulse":
       return "◎"
     case "spin":

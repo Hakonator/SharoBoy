@@ -1,6 +1,7 @@
 import type { Game } from "../game"
 import type { MapPlaylistSpec, PlayerMapSpec } from "../mapSpec"
 import { mapSpecToBlocks } from "../mapAdapter"
+import { fixedVariant } from "../bossVariants"
 import type { CampaignModifierId } from "../campaignModifiers"
 import { getDailyRunInfo, markTodayDailyPlayed } from "../daily"
 import { daySeed } from "../utils"
@@ -8,7 +9,7 @@ import { daySeed } from "../utils"
 import { applyTrack } from "./audioControls"
 import { startCampaignMap } from "./campaignFlow"
 import { pushHud, saveTop, setBanner } from "./hudSync"
-import { buildWave, serveBall } from "./levelBuild"
+import { buildBossRushStage, buildWave, serveBall, BOSS_RUSH_SEQUENCE } from "./levelBuild"
 import { applyUpgrades, addCoins } from "./progress"
 import { resetRun } from "./runFlow"
 
@@ -71,6 +72,51 @@ export function startEndless(g: Game) {
   g.phase = "playing"
   applyTrack(g)
   setBanner(g, "БЕСКОНЕЧНЫЙ РЕЖИМ — ВОЛНА 1")
+  pushHud(g)
+}
+
+/** Старт режима «Босс-раш» (Boss Rush): 8 последовательных боссов подряд. */
+export function startBossRush(g: Game) {
+  g.sfx.ensure()
+  g.sfx.ui()
+  g.mode = "boss_rush"
+  g.bossRushIndex = 0
+  g.bossRushStartTime = g.time
+  g.wave = 0
+  g.waveSpec = null
+  resetRun(g)
+  g.mode = "boss_rush"
+  g.lives = 4
+  buildBossRushStage(g, 0)
+  applyUpgrades(g)
+  if (g.tacticalModules.magnetStart) {
+    g.magnetUntil = g.time + 4 * (g.upgrades.magnet ?? 0)
+  }
+  g.laserArmed = (g.upgrades.laser ?? 0) > 0
+  g.laserArmedUntil = g.laserArmed ? Number.POSITIVE_INFINITY : 0
+  const firstKind = BOSS_RUSH_SEQUENCE[0]
+  const firstName = fixedVariant(firstKind).name
+  setBanner(g, `БОСС-РАШ [1/8]: ${firstName}`)
+  serveBall(g)
+  g.phase = "playing"
+  applyTrack(g)
+  pushHud(g)
+}
+
+/** Переход к следующему боссу в режиме «Босс-раш». */
+export function advanceBossRush(g: Game) {
+  g.bossRushIndex += 1
+  if (g.bossRushIndex >= BOSS_RUSH_SEQUENCE.length) {
+    return
+  }
+  buildBossRushStage(g, g.bossRushIndex)
+  applyUpgrades(g)
+  const kind = BOSS_RUSH_SEQUENCE[g.bossRushIndex]
+  const name = fixedVariant(kind).name
+  setBanner(g, `БОСС-РАШ [${g.bossRushIndex + 1}/8]: ${name}`)
+  serveBall(g)
+  g.phase = "playing"
+  applyTrack(g)
   pushHud(g)
 }
 
@@ -178,6 +224,8 @@ export function toMenu(g: Game) {
   g.campaignSparkBounceCount = 0
   g.phase = "menu"
   g.mode = "campaign"
+  g.bossRushIndex = 0
+  g.bossRushStartTime = 0
   g.customWinCondition = null
   g.customTargetBlocks = []
   g.customPlaylist = null

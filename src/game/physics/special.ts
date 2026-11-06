@@ -69,6 +69,19 @@ export function onBallHitSpecial(
     sp.rotDir = side
     sp.rotVel = clamp(sp.rotVel + side * SPIN_KICK * (0.4 + 0.6 * edge), -SPIN_MAX, SPIN_MAX)
   }
+  // призма: кристальный звук и радужная вспышка
+  if (sp.prism) {
+    g.sfx.brick?.(b.tier || 1)
+    g.fx.burst(b.x, b.y, "#7cf5ff", 8, 140)
+    g.fx.rings.push({
+      x: b.x,
+      y: b.y,
+      r: 6,
+      maxR: 38,
+      color: "rgba(180,240,255,0.85)",
+      t: 0,
+    })
+  }
   // телепорт: переброс в парный блок, контакт поглощён целиком
   if (sp.portalId !== undefined) return portalTransit(g, b, ball)
   return false

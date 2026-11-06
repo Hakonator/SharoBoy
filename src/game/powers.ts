@@ -10,6 +10,7 @@ import type {
   Ball,
   Block,
   BossState,
+  GameMode,
   PaddleState,
   PaddleShapeKind,
   PowerType,
@@ -35,7 +36,7 @@ export interface PowersWorld {
   readonly boss: BossState | null
   readonly blocksInitial: number
   /** Текущий режим партии: в кампании жизни выпадают только с минибоссов. */
-  readonly mode: "campaign" | "endless" | "custom" | "daily"
+  readonly mode: GameMode
   powers: PowerUp[]
   spawnTimer: number
   skyDropTimer: number

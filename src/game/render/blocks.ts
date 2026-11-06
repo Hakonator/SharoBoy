@@ -164,9 +164,9 @@ export function drawBlocks(ctx: Ctx, blocks: Block[], time: number) {
       ctx.restore()
       continue
     }
-    // Спецблоки §6: пружина/вата/портал рисуются целиком кастомно;
+    // Спецблоки §6: пружина/вата/портал/воронка/призма рисуются целиком кастомно;
     // пульсация/дрейф/вращение — стандартное тело + метки поверх.
-    if (b.sp?.portalId || b.sp?.spring || b.sp?.cotton) {
+    if (b.sp?.portalId || b.sp?.spring || b.sp?.cotton || b.sp?.gravityWell || b.sp?.prism) {
       drawSpecialBody(ctx, b, x, y, time)
       drawDebugLabel(ctx, b, x, y)
       drawPriorityMarks(ctx, b, x, y, time)

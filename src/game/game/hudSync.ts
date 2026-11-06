@@ -27,6 +27,11 @@ export function saveTop(g: Game) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
     lsSet("sharoboy-top-daily", JSON.stringify(g.topDaily))
+  } else if (g.mode === "boss_rush") {
+    g.topBossRush = withNick([...g.topBossRush, entry])
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+    lsSet("sharoboy-top-bossrush", JSON.stringify(g.topBossRush))
   } else {
     g.top = withNick([...g.top, entry])
       .sort((a, b) => b.score - a.score)
@@ -126,11 +131,13 @@ export function pushHud(g: Game) {
     lives: g.lives,
     level: g.mode === "endless" ? g.wave : g.level,
     levelCount:
-      g.mode === "custom" && g.customPlaylist
-        ? g.customPlaylist.maps.length
-        : g.mode === "endless"
-          ? -1
-          : (g.campaign?.tiers ?? LEVELS.length),
+      g.mode === "boss_rush"
+        ? 8
+        : g.mode === "custom" && g.customPlaylist
+          ? g.customPlaylist.maps.length
+          : g.mode === "endless"
+            ? -1
+            : (g.campaign?.tiers ?? LEVELS.length),
     levelName: levelDisplayName(g),
     mode: g.mode,
     wave: g.wave,
@@ -169,6 +176,8 @@ export function pushHud(g: Game) {
     top: g.top,
     topEndless: g.topEndless,
     topDaily: g.topDaily,
+    topBossRush: g.topBossRush,
+    bossRushIndex: g.bossRushIndex,
     map: currentMapView(g),
     campaignEvent: g.campaignEvent,
     campaignEventData: g.campaignEventData,

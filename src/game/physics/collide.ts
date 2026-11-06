@@ -847,6 +847,42 @@ export function applyBlockMagnets(g: PhysicsWorld, ball: Ball, dt: number) {
     ball.vy = Math.sin(angle) * currentSpeed
   }
 }
+
+/**
+ * Гравитационная воронка (червоточина): притягивает шар к центру блока
+ * с вихревым закручиванием (slingshot-эффект орбитального манёвра).
+ */
+export function applyGravityWells(g: PhysicsWorld, ball: Ball, dt: number) {
+  for (const block of g.blocks) {
+    const well = block.sp?.gravityWell
+    if (block.dead || !well || (block.sp?.phase && !isBlockPhaseActive(block, g.time))) continue
+    if (!Number.isFinite(well.radius) || !Number.isFinite(well.force)) continue
+    const dx = block.x - ball.x
+    const dy = block.y - ball.y
+    const distance = Math.hypot(dx, dy)
+    const range = Math.max(10, well.radius)
+    if (distance <= 2 || distance >= range) continue
+    const falloff = 1 - distance / range
+    const nx = dx / distance
+    const ny = dy / distance
+    // Тангенциальный вихрь закручивает шар по орбите
+    const tx = -ny * 0.35
+    const ty = nx * 0.35
+    const force = Math.abs(well.force) * falloff
+    ball.vx += (nx + tx) * force * dt
+    ball.vy += (ny + ty) * force * dt
+    const speed = Math.hypot(ball.vx, ball.vy)
+    const maxSpeed = 1100
+    const minSpeed = 200
+    if (speed > maxSpeed) {
+      ball.vx = (ball.vx / speed) * maxSpeed
+      ball.vy = (ball.vy / speed) * maxSpeed
+    } else if (speed < minSpeed && speed > 0) {
+      ball.vx = (ball.vx / speed) * minSpeed
+      ball.vy = (ball.vy / speed) * minSpeed
+    }
+  }
+}
 /** Столкновение с боссом: круговое отражение + урон (огненное ядро бьёт сильнее). */
 export function collideBoss(g: PhysicsWorld, ball: Ball) {
   const bo = g.boss

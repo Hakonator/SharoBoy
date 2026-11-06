@@ -10,6 +10,7 @@ import { recordChallengeBallLost } from "../campaignChallenges"
 import { recordQuestProgress } from "../dailyQuests"
 import { isAbsoluteBulwarkActive } from "../synergies"
 import { triggerHaptic } from "../haptics"
+import { fixedVariant } from "../bossVariants"
 import {
   applyFinalScoreBreakdown,
   computeScoreBreakdown,
@@ -22,8 +23,8 @@ import {
 import { applyTrack } from "./audioControls"
 import { enterMapView } from "./campaignFlow"
 import { pushHud, saveTop, setBanner } from "./hudSync"
-import { buildLevel, buildWave, serveBall } from "./levelBuild"
-import { advanceCustomPlaylist } from "./modes"
+import { buildLevel, buildWave, serveBall, BOSS_RUSH_SEQUENCE } from "./levelBuild"
+import { advanceCustomPlaylist, advanceBossRush } from "./modes"
 import { blockTop } from "./paddleControl"
 import { addCoins, addMetaCrystals } from "./progress"
 
@@ -242,6 +243,28 @@ export function onLevelCleared(g: Game) {
       title: `ВОЛНА ${g.wave} ЗАВЕРШЕНА`,
       subtitle: g.wave % 5 === 0 ? "Волна босса пройдена!" : "Бесконечный режим",
     })
+    return
+  }
+  if (g.mode === "boss_rush") {
+    g.score += 1500 + g.bossRushIndex * 350
+    g.lives = Math.min(g.lives + 1, 5)
+    g.sfx.levelClear()
+    const nextIdx = g.bossRushIndex + 1
+    if (nextIdx < BOSS_RUSH_SEQUENCE.length) {
+      const nextKind = BOSS_RUSH_SEQUENCE[nextIdx]
+      const nextName = fixedVariant(nextKind).name
+      showIntermediateScore(g, () => advanceBossRush(g), {
+        title: `БОСС ${g.bossRushIndex + 1}/8 ПОВЕРЖЕН!`,
+        subtitle: `Следующий противник: ${nextName}`,
+      })
+      return
+    }
+    saveTop(g)
+    applyFinalScoreBreakdown(g)
+    g.phase = "won"
+    addMetaCrystals(g, 250)
+    g.input.releaseLock()
+    pushHud(g)
     return
   }
   if (g.mode === "campaign" && g.campaign) {

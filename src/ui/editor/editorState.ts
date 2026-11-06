@@ -1068,6 +1068,10 @@ export function defaultEffect(
       return { kind, mode: "attract", radius: 240, force: 2200 }
     case "portal":
       return { kind, pairId: "portal-pair" }
+    case "gravity_well":
+      return { kind, radius: 260, force: 3200 }
+    case "prism":
+      return { kind }
     case "spin":
       return { kind, direction: "clockwise" }
     case "normal":

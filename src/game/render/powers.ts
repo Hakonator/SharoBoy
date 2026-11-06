@@ -133,5 +133,15 @@ export function drawLaserBeams(ctx: Ctx, v: LaserBeamView) {
     ctx.fillStyle = "rgba(240,255,255,0.95)"
     ctx.fill()
     ctx.restore()
+    if (best?.sp?.prism) {
+      const cw = ctx.canvas?.width || 1200
+      ctx.save()
+      ctx.globalAlpha = 0.7 * onAmt
+      ctx.shadowColor = "#e07cf5"
+      ctx.shadowBlur = 16
+      ctx.fillStyle = "#ffbbf8"
+      ctx.fillRect(0, hitY - 2, cw, 4)
+      ctx.restore()
+    }
   }
 }

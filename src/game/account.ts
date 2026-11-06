@@ -10,6 +10,8 @@ export const ACCOUNT_STORAGE_KEYS = [
   "sharoboy-best",
   "sharoboy-top",
   "sharoboy-top-endless",
+  "sharoboy-top-daily",
+  "sharoboy-top-bossrush",
   "sharoboy-achievements",
   "sharoboy-stats",
   "sharoboy-nick",

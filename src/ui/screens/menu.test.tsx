@@ -297,4 +297,11 @@ describe("MenuDebug: выбор минибосса в отладке", () => {
       expect(html).not.toContain("25 / 10")
     })
   })
+
+  describe("режим Босс-раш", () => {
+    it("отображает кнопку Босс-раш в главном меню", () => {
+      const html = renderMenu()
+      expect(html).toContain("Босс-раш")
+    })
+  })
 })

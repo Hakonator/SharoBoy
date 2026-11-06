@@ -4,6 +4,8 @@ import {
   BLOCK_MAGNET_FORCE,
   BLOCK_MAGNET_RADIUS_MULT,
   BRITTLE_RADIUS_MULT,
+  GRAVITY_WELL_DEFAULT_FORCE,
+  GRAVITY_WELL_DEFAULT_RADIUS,
   PHASE_ACTIVE_FRACTION,
   PHASE_PERIOD,
 } from "./blockKinds"
@@ -129,6 +131,21 @@ function applyEffect(
       if (portalId !== undefined) block.sp = { ...block.sp, portalId }
       break
     }
+    case "gravity_well":
+      block.sp = {
+        ...block.sp,
+        gravityWell: {
+          radius: effect.radius ?? GRAVITY_WELL_DEFAULT_RADIUS,
+          force: effect.force ?? GRAVITY_WELL_DEFAULT_FORCE,
+        },
+      }
+      break
+    case "prism":
+      block.sp = {
+        ...block.sp,
+        prism: true,
+      }
+      break
   }
 }
 

@@ -85,11 +85,13 @@ export function HudOverlay({
       } font-display text-[11px] leading-tight text-cyan-neon ${hidden ? "md:hidden" : ""}`}
     >
       <span className="text-dim">
-        {hud.mode === "endless"
-          ? `ВОЛНА ${hud.wave}`
-          : hud.mode === "daily"
-            ? `📅 УР. ${hud.level}/${hud.levelCount}`
-            : `УР. ${hud.level}/${hud.levelCount}`}
+        {hud.mode === "boss_rush"
+          ? `⚡ БОСС ${hud.level}/8`
+          : hud.mode === "endless"
+            ? `ВОЛНА ${hud.wave}`
+            : hud.mode === "daily"
+              ? `📅 УР. ${hud.level}/${hud.levelCount}`
+              : `УР. ${hud.level}/${hud.levelCount}`}
       </span>
       <span>
         ЦЕЛИ: <span className="tabular-nums">{hud.blocksLeft}</span>
@@ -385,11 +387,13 @@ export function HudOverlay({
               ) : (
                 <div className="hud-chip stripe-hazard hidden px-5 py-2 text-center md:block">
                   <div className="hud-label">
-                    {hud.mode === "endless"
-                      ? `Волна ${hud.wave} · ∞`
-                      : hud.mode === "daily"
-                        ? `📅 День · Уровень ${hud.level}/${hud.levelCount} · ${hud.levelName}`
-                        : `Уровень ${hud.level}/${hud.levelCount} · ${hud.levelName}`}
+                    {hud.mode === "boss_rush"
+                      ? `⚡ Босс-раш · Босс ${hud.level}/8 · ${hud.levelName}`
+                      : hud.mode === "endless"
+                        ? `Волна ${hud.wave} · ∞`
+                        : hud.mode === "daily"
+                          ? `📅 День · Уровень ${hud.level}/${hud.levelCount} · ${hud.levelName}`
+                          : `Уровень ${hud.level}/${hud.levelCount} · ${hud.levelName}`}
                   </div>
                   <div className="font-display text-lg leading-tight text-cyan-neon">
                     ЦЕЛИ: <span className="text-foam tabular-nums">{hud.blocksLeft}</span>

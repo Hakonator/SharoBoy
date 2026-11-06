@@ -273,6 +273,11 @@ export function GameOverScreen({
             📅 ЕЖЕДНЕВНОЕ ИСПЫТАНИЕ · УРОВЕНЬ {hud.level}/{hud.levelCount}
           </div>
         )}
+        {hud.mode === "boss_rush" && (
+          <div className="mt-4 font-display text-sm tracking-wider text-amber-300">
+            ⚡ БОСС-РАШ · ПОВЕРЖЕНО БОССОВ: {Math.max(0, hud.level - 1)}/8
+          </div>
+        )}
         <div className="mt-6 flex justify-center gap-3">
           <div className="hud-chip px-6 py-3">
             <div className="hud-label">Счёт</div>
@@ -597,6 +602,12 @@ export function WinScreen({
           <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-950/40 px-3 py-1 text-xs font-display font-bold text-purple-300">
             <span>📅</span>
             <span>ЕЖЕДНЕВНОЕ ИСПЫТАНИЕ</span>
+          </div>
+        )}
+        {hud.mode === "boss_rush" && (
+          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-950/40 px-3 py-1 text-xs font-display font-bold text-amber-300">
+            <span>⚡</span>
+            <span>БОСС-РАШ ПОЛНОСТЬЮ ПРОЙДЕН! (8/8)</span>
           </div>
         )}
         <div className="hud-label mb-2 tracking-[0.35em]">Все шары лопнули</div>

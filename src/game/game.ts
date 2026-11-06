@@ -35,7 +35,7 @@ import type {
   MinibossCreature,
   RunScoreBreakdown,
 } from "./types"
-import type { Ball, Block, Bubble, HudData, MouthBubble, PaddleShapeKind } from "./types"
+import type { Ball, Block, Bubble, GameMode, HudData, MouthBubble, PaddleShapeKind } from "./types"
 import type {
   PaddleState,
   Phase,
@@ -85,6 +85,7 @@ import {
   startGame,
   startDaily,
   startEndless,
+  startBossRush,
   startCustomMap,
   startCustomPlaylist,
   stopCustomMap,
@@ -182,7 +183,10 @@ export class Game {
   levelBlocksStart = 0
   /** очередь открытых достижений до следующей отправки HUD */
   achQueue: string[] = []
-  mode: "campaign" | "endless" | "custom" | "daily" = "campaign"
+  mode: GameMode = "campaign"
+  bossRushIndex = 0
+  bossRushStartTime = 0
+  topBossRush: ScoreEntry[] = []
   customWinCondition: PlayerMapSpec["winCondition"] | null = null
   customTargetBlocks: Block[] = []
   customLevelName: string | null = null
@@ -422,6 +426,7 @@ export class Game {
     this.top = loadScoreEntries(this, "sharoboy-top")
     this.topEndless = loadScoreEntries(this, "sharoboy-top-endless")
     this.topDaily = loadScoreEntries(this, "sharoboy-top-daily")
+    this.topBossRush = loadScoreEntries(this, "sharoboy-top-bossrush")
     this.defeatedMinibossKinds = loadDefeatedMinibosses()
     loadProgress(this)
   }
@@ -470,6 +475,9 @@ export class Game {
   }
   startEndless() {
     startEndless(this)
+  }
+  startBossRush() {
+    startBossRush(this)
   }
   startCustomMap(spec: PlayerMapSpec, onComplete?: (result: "won" | "over") => void) {
     startCustomMap(this, spec, onComplete)

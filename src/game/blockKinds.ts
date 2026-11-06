@@ -31,6 +31,10 @@ export interface BlockSpecial {
   portalId?: number
   /** Кулдаун телепорта пары (сек) — против зацикливания. */
   portalCd?: number
+  /** Гравитационная воронка: радиус действия и сила притяжения шаров с вихревым закручиванием. */
+  gravityWell?: { radius: number; force: number }
+  /** Призма-рефлектор: разделяет лазерные лучи на две горизонтальные проекции и резонирует при ударе. */
+  prism?: boolean
 }
 
 /** Амплитуда пульсации размера (доля от базовых rx/ry). */
@@ -69,3 +73,9 @@ export const BLOCK_MAGNET_FORCE = 2200
 export const BLOCK_MAGNET_MAX_DELTA_V = 72
 /** Максимальная угловая скорость поворота шара в поле блока (рад/с). */
 export const BLOCK_MAGNET_STEER_RATE = 4.5
+/** Радиус действия гравитационной воронки по умолчанию. */
+export const GRAVITY_WELL_DEFAULT_RADIUS = 260
+/** Сила притяжения гравитационной воронки по умолчанию (ед/сек²). */
+export const GRAVITY_WELL_DEFAULT_FORCE = 3200
+/** Урон, наносимый отражённым призмой лазерным лучом соседним блокам. */
+export const PRISM_REFRACT_DAMAGE = 2

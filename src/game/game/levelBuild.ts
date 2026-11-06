@@ -6,7 +6,7 @@ import { gridBlocks, buildBossArena } from "../levelPatterns"
 import { LEVELS } from "../levels"
 import { clamp, rand, mulberry32, daySeed } from "../utils"
 import type { Ball, Block, BossState } from "../types"
-import type { BossVariant } from "../bossVariants"
+import { fixedVariant, type BossVariant, type BossVariantKind } from "../bossVariants"
 import { JELLY_SEG_RADII, JELLY_SEG_COUNT, JELLY_TENTACLES, JELLY_BOLT_EVERY } from "../bossJelly"
 import { updateJellyTentacles } from "../bossJelly"
 import { buildCrabBoss } from "../bossCrab"
@@ -196,14 +196,69 @@ export function buildLampreyBossLevel(g: Game, variant: BossVariant) {
   g.blocksInitial = Math.max(1, blocks.length)
 }
 
+/** Последовательность 8 боссов режима «Босс-раш». */
+export const BOSS_RUSH_SEQUENCE: readonly BossVariantKind[] = [
+  "king",
+  "cryo",
+  "jellyfish",
+  "lamprey",
+  "crab",
+  "octopus",
+  "chrono",
+  "kraken",
+]
+
+/** Строит арену выбранного босса для этапа режима «Босс-раш». */
+export function buildBossRushStage(g: Game, index: number) {
+  const kind = BOSS_RUSH_SEQUENCE[index] ?? "king"
+  const tier = index < 2 ? 1 : index < 5 ? 2 : 3
+  const phases = index >= 5 ? 2 : 1
+  const variant = fixedVariant(kind, tier, { phases })
+
+  g.bossSys.clear()
+  g.blocks = []
+  g.balls = []
+  g.powers = []
+  g.projectiles = []
+  g.boomQueue = []
+  g.bossDefeated = false
+  g.activeBossKind = kind
+  resetMiniboss(g)
+
+  if (kind === "king") {
+    g.bossSys.setPhases(variant)
+    buildBossLevel(g, variant.hp, variant.minions, 4)
+  } else if (kind === "jellyfish") {
+    buildJellyfishBossLevel(g, variant)
+  } else if (kind === "cryo") {
+    buildCryoBossLevel(g, variant)
+  } else if (kind === "crab") {
+    buildCrabBossLevel(g, variant)
+  } else if (kind === "lamprey") {
+    buildLampreyBossLevel(g, variant)
+  } else if (kind === "chrono") {
+    buildChronoBossLevel(g, variant)
+  } else {
+    buildOctopusBossLevel(g, variant)
+  }
+
+  g.level = index + 1
+  g.levelLostBall = false
+  g.runSectorStartTime = g.time
+  g.levelScoreStart = g.score
+  g.levelBlocksStart = g.runBlocksDestroyed ?? 0
+}
+
 /** Скорость шара: в узле карты — по раскладке, иначе безопасный фолбэк. */
 export function levelSpeed(g: Game) {
+  if (g.mode === "boss_rush") return 420 + g.level * 20
   if (g.mode === "endless") return g.waveSpec?.speed ?? 400
   if (g.activeSpec) return g.activeSpec.speed
   return LEVELS[clamp(g.level - 1, 0, LEVELS.length - 1)].speed
 }
 
 export function levelDisplayName(g: Game) {
+  if (g.mode === "boss_rush") return `БОСС ${g.level}/8`
   if (g.mode === "endless") return g.waveSpec?.name ?? "ВОЛНА"
   if (g.mode === "custom") {
     if (g.customPlaylist) {

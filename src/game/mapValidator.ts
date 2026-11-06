@@ -295,6 +295,16 @@ function validateEffect(
         checkNumber(Number.NaN, `${path}.pairId`)
       }
       break
+    case "gravity_well":
+      if (effect.radius !== undefined) {
+        checkNumber(effect.radius, `${path}.radius`, { min: 20, max: 1500 })
+      }
+      if (effect.force !== undefined) {
+        checkNumber(effect.force, `${path}.force`, { min: 100, max: 20000 })
+      }
+      break
+    case "prism":
+      break
   }
 }
 
