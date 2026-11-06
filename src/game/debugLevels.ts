@@ -1,7 +1,12 @@
 import { makeBlock } from "./levelBuilder"
 import { mulberry32 } from "./utils"
 import type { Block } from "./types"
-import { BLOCK_MAGNET_FORCE, BLOCK_MAGNET_RADIUS_MULT } from "./blockKinds"
+import {
+  BLOCK_MAGNET_FORCE,
+  BLOCK_MAGNET_RADIUS_MULT,
+  GRAVITY_WELL_DEFAULT_FORCE,
+  GRAVITY_WELL_DEFAULT_RADIUS,
+} from "./blockKinds"
 
 /** Отдельная раскладка для визуальной проверки всех спецблоков. */
 export function buildSpecialBlocks(w: number, h: number, top: number): Block[] {
@@ -76,6 +81,25 @@ export function buildSpecialBlocks(w: number, h: number, top: number): Block[] {
     "MAGNET",
     {
       magnet: { radius: magnetBlockRadius, force: BLOCK_MAGNET_FORCE },
+    },
+    { hp: 2, maxHp: 2 }
+  )
+  const extraY = priorityY + Math.min(52, h * 0.08)
+  add(
+    w * 0.62,
+    extraY,
+    "GRAVITY WELL",
+    {
+      gravityWell: { radius: GRAVITY_WELL_DEFAULT_RADIUS, force: GRAVITY_WELL_DEFAULT_FORCE },
+    },
+    { hp: 2, maxHp: 2 }
+  )
+  add(
+    w * 0.84,
+    extraY,
+    "PRISM",
+    {
+      prism: true,
     },
     { hp: 2, maxHp: 2 }
   )

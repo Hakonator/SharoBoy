@@ -46,6 +46,19 @@ export function drawHitboxes(ctx: CanvasRenderingContext2D, v: HitboxView): void
       ctx.setLineDash([])
       ctx.restore()
     }
+    const well = b.sp?.gravityWell
+    if (well && Number.isFinite(well.radius) && well.radius > 0) {
+      ctx.save()
+      ctx.globalAlpha *= 0.72
+      ctx.strokeStyle = "rgba(180, 110, 255, 0.95)"
+      ctx.lineWidth = 1.8
+      ctx.setLineDash([7, 6])
+      ctx.beginPath()
+      ctx.arc(b.x, b.y, well.radius, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.setLineDash([])
+      ctx.restore()
+    }
   }
   for (const ball of v.balls) {
     ctx.beginPath()

@@ -10,6 +10,8 @@ import {
   BLOCK_MAGNET_RADIUS_MULT,
   BRITTLE_RADIUS_MULT,
   DRIFT_MAX_RADIUS_MULT,
+  GRAVITY_WELL_DEFAULT_FORCE,
+  GRAVITY_WELL_DEFAULT_RADIUS,
   PHASE_ACTIVE_FRACTION,
   PHASE_PERIOD,
 } from "../blockKinds"
@@ -66,13 +68,13 @@ function assignSpecial(b: Block, rng: () => number) {
 
 function assignPrioritySpecial(b: Block, rng: () => number, level = 3) {
   const roll = rng()
-  if (roll < 0.25) {
+  if (roll < 0.18) {
     // На старших ярусах (level >= 6) броня может быть двух- или трехслойной
     const armor = level >= 12 ? (rng() < 0.35 ? 3 : 2) : level >= 6 ? (rng() < 0.4 ? 2 : 1) : 1
     b.sp = { armor, armorMax: armor }
-  } else if (roll < 0.5) {
+  } else if (roll < 0.34) {
     b.sp = { brittle: { radius: Math.max(b.rx, b.ry) * BRITTLE_RADIUS_MULT, damage: 1 } }
-  } else if (roll < 0.75) {
+  } else if (roll < 0.5) {
     b.sp = {
       phase: {
         period: PHASE_PERIOD * (0.85 + rng() * 0.3),
@@ -80,7 +82,7 @@ function assignPrioritySpecial(b: Block, rng: () => number, level = 3) {
         offset: rng() * PHASE_PERIOD,
       },
     }
-  } else {
+  } else if (roll < 0.67) {
     // Магнитные блоки: притяжение и отталкивающие дефлекторы (repel)
     const mode = rng() < 0.35 ? "repel" : "attract"
     b.sp = {
@@ -90,6 +92,17 @@ function assignPrioritySpecial(b: Block, rng: () => number, level = 3) {
         mode,
       },
     }
+  } else if (roll < 0.84) {
+    // Гравитационная воронка: притяжение шаров с закручиванием в вихрь
+    b.sp = {
+      gravityWell: {
+        radius: Math.round(GRAVITY_WELL_DEFAULT_RADIUS * (0.85 + rng() * 0.3)),
+        force: Math.round(GRAVITY_WELL_DEFAULT_FORCE * (0.9 + rng() * 0.2)),
+      },
+    }
+  } else {
+    // Призма-рефрактор: расщепляет луч лазера горизонтально и резонирует
+    b.sp = { prism: true }
   }
 }
 

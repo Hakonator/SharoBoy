@@ -44,6 +44,8 @@ function kindOf(b: Block): string | null {
   if (sp.brittle) return "brittle"
   if (sp.phase) return "phase"
   if (sp.magnet) return "magnet"
+  if (sp.gravityWell) return "gravity_well"
+  if (sp.prism) return "prism"
   return "unknown"
 }
 
@@ -77,6 +79,8 @@ describe("decorateBlocks", () => {
       "brittle",
       "phase",
       "magnet",
+      "gravity_well",
+      "prism",
     ])
     for (const b of blocks) {
       const kind = kindOf(b)
@@ -207,5 +211,27 @@ describe("decorateBlocks", () => {
       }
     }
     expect(maxArmor).toBeGreaterThanOrEqual(2)
+  })
+
+  it("генерирует гравитационную воронку и призму-рефрактор", () => {
+    let hasGravity = false
+    let hasPrism = false
+    for (let seed = 0; seed < 100 && (!hasGravity || !hasPrism); seed++) {
+      const blocks = Array.from({ length: 60 }, (_, i) => makeBlock({ seed: i }))
+      decorateBlocks(blocks, 15, mulberry32(seed))
+      for (const b of blocks) {
+        if (b.sp?.gravityWell) {
+          hasGravity = true
+          expect(b.sp.gravityWell.radius).toBeGreaterThan(150)
+          expect(b.sp.gravityWell.force).toBeGreaterThan(2000)
+        }
+        if (b.sp?.prism) {
+          hasPrism = true
+          expect(b.sp.prism).toBe(true)
+        }
+      }
+    }
+    expect(hasGravity).toBe(true)
+    expect(hasPrism).toBe(true)
   })
 })

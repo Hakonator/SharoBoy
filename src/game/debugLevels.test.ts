@@ -16,6 +16,8 @@ describe("buildSpecialBlocks", () => {
       if (special?.brittle) return "brittle"
       if (special?.phase) return "phase"
       if (special?.magnet) return "magnet"
+      if (special?.gravityWell) return "gravity_well"
+      if (special?.prism) return "prism"
       if (block.debugLabel === "CHAIN") return "chain-target"
       return `drift-${special?.drift?.kind}`
     })
@@ -43,6 +45,8 @@ describe("buildSpecialBlocks", () => {
       "brittle",
       "phase",
       "magnet",
+      "gravity_well",
+      "prism",
     ])
     expect(blocks.filter((block) => block.sp?.portalId === 1)).toHaveLength(2)
     expect(blocks.every((block) => block.y < 430)).toBe(true)
@@ -67,5 +71,12 @@ describe("buildSpecialBlocks", () => {
     expect(spin?.sp?.rotDir).toBeDefined()
     const magnet = blocks.find((block) => block.sp?.magnet)
     expect(magnet?.sp?.magnet?.radius).toBe(42 * 4)
+    const gravity = blocks.find((block) => block.sp?.gravityWell)
+    expect(gravity?.debugLabel).toBe("GRAVITY WELL")
+    expect(gravity?.sp?.gravityWell?.force).toBe(3200)
+    expect(gravity?.sp?.gravityWell?.radius).toBe(260)
+    const prism = blocks.find((block) => block.sp?.prism)
+    expect(prism?.debugLabel).toBe("PRISM")
+    expect(prism?.sp?.prism).toBe(true)
   })
 })

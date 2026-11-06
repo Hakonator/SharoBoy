@@ -163,6 +163,7 @@ export function spawnDebugSpecialBlocks(g: Game) {
   g.blocks = buildSpecialBlocks(g.w, g.h, blockTop(g))
   g.blocksInitial = g.blocks.length
   if (g.phase === "menu") g.phase = "playing"
+  g.laserArmed = true
   serveBall(g)
   setBanner(g, "СТЕНД СПЕЦБЛОКОВ")
   pushHud(g)

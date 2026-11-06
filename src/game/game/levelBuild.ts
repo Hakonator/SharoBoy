@@ -89,7 +89,12 @@ function makeWorldBrittle(blocks: Block[]) {
 /** Детерминированная расстановка спецблоков: кампания — по уровню, бесконечный — по волне. */
 function decorateLevel(g: Game) {
   const lvl = g.mode === "endless" ? g.wave : g.level
-  const seed = g.mode === "endless" ? daySeed() * 31 + lvl * 7919 : lvl * 1013 + 17
+  const seed =
+    g.mode === "endless"
+      ? daySeed() * 31 + lvl * 7919
+      : g.campaignSeed
+        ? (g.campaignSeed + lvl * 7919) | 0
+        : lvl * 1013 + 17
   decorateBlocks(g.blocks, lvl, mulberry32(seed))
 }
 
