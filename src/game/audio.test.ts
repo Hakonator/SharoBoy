@@ -170,4 +170,36 @@ describe("SFX: раздельные ползунки громкости музы
       s.setUnderwater(false)
     }).not.toThrow()
   })
+
+  it("управляет динамической напряжённостью боя и адаптирует темп (T-070)", () => {
+    stubStorage()
+    const sfxStatic = SFX as unknown as {
+      stepFor: (t: "menu" | "game" | "map", intensity?: "calm" | "angry" | "last_stand") => number
+    }
+
+    const stepCalm = sfxStatic.stepFor("game", "calm")
+    const stepAngry = sfxStatic.stepFor("game", "angry")
+    const stepLastStand = sfxStatic.stepFor("game", "last_stand")
+
+    // Выше темп (BPM) -> короче шаг секунды на восьмую ноту
+    expect(stepCalm).toBeGreaterThan(stepAngry)
+    expect(stepAngry).toBeGreaterThan(stepLastStand)
+
+    const s = new SFX()
+    expect(s.getBattleIntensity()).toBe("calm")
+
+    s.setBattleIntensity("angry")
+    expect(s.getBattleIntensity()).toBe("angry")
+
+    s.setBattleIntensity("last_stand")
+    expect(s.getBattleIntensity()).toBe("last_stand")
+
+    // Смена трека сбрасывает интенсивность в спокойную
+    s.setTrack("menu")
+    expect(s.getBattleIntensity()).toBe("calm")
+
+    s.setBattleIntensity("angry")
+    s.stopMusic()
+    expect(s.getBattleIntensity()).toBe("calm")
+  })
 })

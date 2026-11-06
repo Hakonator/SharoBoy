@@ -46,7 +46,8 @@ function loadVolume(key: string, def: number): number {
   return Number.isFinite(n) ? clamp01(n) : def
 }
 
-type MusicKind = "menu" | "game" | "map"
+export type MusicKind = "menu" | "game" | "map"
+export type BattleIntensity = "calm" | "angry" | "last_stand"
 /** Крошечный WebAudio-синтезатор: короткие блипы на каждое действие +
  *  8-битная фоновая музыка (встроенный трекер, без внешних файлов). */
 export class SFX {
@@ -75,6 +76,8 @@ export class SFX {
   private musicStep = 0
   /** Активный трек. */
   private track: MusicKind = "menu"
+  /** Динамическая интенсивность музыки боя (ускорение и акценты при злой фазе и последнем рубеже). */
+  private battleIntensity: BattleIntensity = "calm"
   /** MP3-режим: играет файл из общего набора (вместо встроенного секвенсора). */
   private fileMode = MUSIC_FILES.length > 0
   /** Плеер файловой музыки: выбор трека, кроссфейд, пауза/возобновление. */
@@ -103,10 +106,29 @@ export class SFX {
     return 440 * Math.pow(2, (m - 69) / 12)
   }
 
-  /** Размер шага (восьмая нота) для трека. Меню — медленно и «душевно»,
-   *  карта кампании — совсем неторопливо и загадочно. */
-  private static stepFor(track: MusicKind): number {
-    return track === "menu" ? 60 / 76 / 2 : track === "map" ? 60 / 48 / 2 : 60 / 144 / 2
+  /** Размер шага (восьмая нота) для трека с учётом динамической интенсивности боя.
+   *  Меню — медленно и «душевно», карта кампании — неторопливо и загадочно.
+   *  В бою: calm (144 BPM) → angry (166 BPM) → last_stand (184 BPM). */
+  private static stepFor(track: MusicKind, intensity: BattleIntensity = "calm"): number {
+    if (track === "menu") return 60 / 76 / 2
+    if (track === "map") return 60 / 48 / 2
+    const bpm = intensity === "last_stand" ? 184 : intensity === "angry" ? 166 : 144
+    return 60 / bpm / 2
+  }
+
+  /** Установить боевую напряжённость музыки (спокойный темп, злая фаза или последний рубеж). */
+  setBattleIntensity(intensity: BattleIntensity) {
+    if (this.battleIntensity === intensity) return
+    this.battleIntensity = intensity
+    if (this.fileMode) {
+      const rate = intensity === "last_stand" ? 1.14 : intensity === "angry" ? 1.07 : 1.0
+      this.filePlayer.setPlaybackRate(rate)
+    }
+  }
+
+  /** Получить текущую боевую интенсивность саундтрека. */
+  getBattleIntensity(): BattleIntensity {
+    return this.battleIntensity
   }
 
   /** Вкл/выкл музыку во время игры: файл — пауза/продолжение с места,
@@ -183,6 +205,8 @@ export class SFX {
    *  играет собственный тихий синт-трек; без файлов — встроенный трекер. */
   setTrack(track: MusicKind) {
     this.track = track
+    this.battleIntensity = "calm"
+    this.filePlayer.setPlaybackRate(1.0)
     this.musicStep = 0
     this.fileMode = track !== "map" && MUSIC_FILES.length > 0
     // Файловая музыка работает и без WebAudio; секвенсору нужен контекст.
@@ -245,6 +269,7 @@ export class SFX {
 
   stopMusic() {
     this.musicOn = false
+    this.battleIntensity = "calm"
     this.filePlayer.stop()
     if (this.musicTimer !== null) {
       clearTimeout(this.musicTimer)
@@ -259,11 +284,11 @@ export class SFX {
       // Музыка выключена: держим ритм-курсор актуальным и продолжаем тикать,
       // чтобы при включении трек продолжился с текущего места без скачка.
       this.nextBeat = this.ctx.currentTime + 0.06
-      this.musicStep = Math.floor(this.nextBeat / SFX.stepFor(this.track))
+      this.musicStep = Math.floor(this.nextBeat / SFX.stepFor(this.track, this.battleIntensity))
       this.musicTimer = window.setTimeout(this.scheduleMusic, 100)
       return
     }
-    const step = SFX.stepFor(this.track)
+    const step = SFX.stepFor(this.track, this.battleIntensity)
     const isMap = this.track === "map"
     const lead = this.track === "menu" ? MENU_LEAD : isMap ? MAP_LEAD : GAME_LEAD
     const bass = this.track === "menu" ? MENU_BASS : isMap ? MAP_BASS : GAME_BASS
@@ -301,6 +326,26 @@ export class SFX {
         )
       if (th !== undefined && th > 0)
         this.tone(SFX.midi(th), step * 0.7, "triangle", 0.045, undefined, delay, this.musicGain)
+
+      // Динамические слои боя (акценты в злой фазе и тревожный пульс на последнем рубеже)
+      if (this.track === "game" && this.battleIntensity !== "calm") {
+        if (b > 0) {
+          // Утяжелённый суб-бас на октаву ниже
+          this.tone(
+            SFX.midi(b - 12),
+            step * 0.6,
+            "sawtooth",
+            this.battleIntensity === "last_stand" ? 0.045 : 0.035,
+            undefined,
+            delay,
+            this.musicGain
+          )
+        }
+        if (this.battleIntensity === "last_stand" && i % 2 === 1) {
+          // Тревожная пульсация высокого тона
+          this.tone(SFX.midi(79), step * 0.35, "square", 0.035, undefined, delay, this.musicGain)
+        }
+      }
       this.musicStep++
       this.nextBeat += step
     }

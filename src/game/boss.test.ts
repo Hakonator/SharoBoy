@@ -7,7 +7,13 @@ import type { BossState } from "./types"
 /** «Злая» фаза не должна телепортировать босса: позиция — непрерывная функция
  *  времени (фаза патруля интегрируется, частота меняется плавно). */
 describe("BossSystem — смена «злой» фазы без телепорта", () => {
-  function makeHost(sfx: Partial<{ brick: () => void; bossPhase: (kind: string) => void }> = {}) {
+  function makeHost(
+    sfx: Partial<{
+      brick: () => void
+      bossPhase: (kind: string) => void
+      setBattleIntensity: (intensity: string) => void
+    }> = {}
+  ) {
     return {
       w: 800,
       h: 600,
@@ -20,7 +26,7 @@ describe("BossSystem — смена «злой» фазы без телепор�
       boomQueue: [],
       paddle: { x: 400, y: 560, w: 90, h: 14 },
       fx: { burst() {}, rings: [], popups: [], particles: [] },
-      sfx: { brick() {}, bossPhase() {}, ...sfx },
+      sfx: { brick() {}, bossPhase() {}, setBattleIntensity() {}, ...sfx },
       addRawScore() {},
       onBossKilled() {},
       pushHud() {},
@@ -65,15 +71,23 @@ describe("BossSystem — смена «злой» фазы без телепор�
 
   it("смена фазы звучит один раз и своим акцентом для финальных боссов", () => {
     const played: string[] = []
-    const sys = new BossSystem(makeHost({ bossPhase: (kind) => played.push(kind) }))
+    const intensityCalls: string[] = []
+    const sys = new BossSystem(
+      makeHost({
+        bossPhase: (kind) => played.push(kind),
+        setBattleIntensity: (val) => intensityCalls.push(val),
+      })
+    )
     const boss: BossState = { ...makeBoss(100), isChrono: true, angryAt: 0.5 }
     sys.spawn(boss)
     for (let i = 0; i < 60; i++) sys.step(DT)
     expect(played).toEqual([]) // спокойная фаза молчит
+    expect(intensityCalls).toEqual([])
 
     boss.hp = 40 // порог пройден
     for (let i = 0; i < 60; i++) sys.step(DT)
     expect(played).toEqual(["chrono"])
+    expect(intensityCalls).toEqual(["angry"])
 
     // Повторный проход порога (хилы, регенерация) не должен дублировать акцент.
     boss.hp = 100
@@ -81,6 +95,7 @@ describe("BossSystem — смена «злой» фазы без телепор�
     boss.hp = 30
     for (let i = 0; i < 30; i++) sys.step(DT)
     expect(played).toEqual(["chrono"])
+    expect(intensityCalls).toEqual(["angry"])
   })
 })
 
@@ -101,7 +116,7 @@ describe("BossSystem — «последний рубеж»", () => {
       boomQueue: [],
       paddle: { x: 400, y: 560, w: 90, h: 14 },
       fx: { burst() {}, rings: [], popups: [], particles: [] },
-      sfx: { brick() {}, bossPhase() {}, power: vi.fn() },
+      sfx: { brick() {}, bossPhase() {}, power: vi.fn(), setBattleIntensity() {} },
       addRawScore() {},
       onBossKilled() {},
       pushHud() {},

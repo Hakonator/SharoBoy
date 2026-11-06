@@ -54,6 +54,7 @@ export class FileMusicPlayer {
   private fades = new Map<HTMLAudioElement, number>()
 
   private underwater = false
+  private playbackRate = 1.0
 
   constructor(
     /** Текущая целевая громкость (базовая × ползунок музыки). */
@@ -61,6 +62,18 @@ export class FileMusicPlayer {
     /** Должна ли музыка играть сейчас (musicOn && !musicMuted в SFX). */
     private readonly shouldPlay: () => boolean
   ) {}
+
+  /** Скорость воспроизведения для динамической адаптации темпа. */
+  setPlaybackRate(rate: number) {
+    this.playbackRate = rate
+    if (this.audio) {
+      try {
+        this.audio.playbackRate = rate
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 
   /** Активен ли файловый трек (в отличие от встроенного секвенсора). */
   get active(): boolean {
@@ -86,6 +99,11 @@ export class FileMusicPlayer {
   resume() {
     if (!this.audio) return
     this.audio.volume = this.effectiveVolume()
+    try {
+      this.audio.playbackRate = this.playbackRate
+    } catch {
+      /* ignore */
+    }
     void this.audio.play().catch(() => {})
   }
 
@@ -110,6 +128,11 @@ export class FileMusicPlayer {
     this.url = pick
     this.lastPlayedUrl = pick
     a.volume = 0
+    try {
+      a.playbackRate = this.playbackRate
+    } catch {
+      /* ignore */
+    }
     a.addEventListener("ended", () => {
       // Трек кончился — следующий случайный из набора
       if (this.shouldPlay()) this.play()
@@ -156,5 +179,6 @@ export class FileMusicPlayer {
       this.audio = null
     }
     this.url = null
+    this.playbackRate = 1.0
   }
 }

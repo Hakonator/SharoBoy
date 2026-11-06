@@ -45,6 +45,17 @@ export function drawBackground(
     ctx.strokeStyle = theme.colors.bubble
     ctx.lineWidth = 1
     ctx.stroke()
+
+    if (theme.colors.stars) {
+      // Для космических тем — тонкие лучики мерцания звёзд
+      ctx.beginPath()
+      ctx.moveTo(b.x - b.r * 1.5, b.y)
+      ctx.lineTo(b.x + b.r * 1.5, b.y)
+      ctx.moveTo(b.x, b.y - b.r * 1.5)
+      ctx.lineTo(b.x, b.y + b.r * 1.5)
+      ctx.lineWidth = 0.75
+      ctx.stroke()
+    }
   }
 }
 

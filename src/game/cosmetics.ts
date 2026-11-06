@@ -1,8 +1,11 @@
 import { lsGet, lsSet } from "./utils"
 
-export type PaddleSkinId = "default" | "cyberpunk" | "gold" | "ice" | "retro"
-export type BallTrailId = "default" | "fire" | "electric" | "rainbow" | "void"
-export type TableThemeId = "ocean" | "nebula" | "retrowave" | "abyss"
+export type PaddleSkinId =
+  "default" | "cyberpunk" | "gold" | "ice" | "retro" | "chronos" | "cryo" | "pulse"
+export type BallTrailId =
+  "default" | "fire" | "electric" | "rainbow" | "void" | "spark_arc" | "frost" | "stardust"
+export type TableThemeId =
+  "ocean" | "nebula" | "retrowave" | "abyss" | "earth_orbit" | "singularity"
 
 export type CosmeticCategory = "paddle" | "ball" | "theme"
 
@@ -133,6 +136,51 @@ export const PADDLE_SKINS: readonly PaddleSkinDef[] = [
       stroke: "#39ff14",
     },
   },
+  {
+    id: "chronos",
+    name: "Хронос-Сингулярность",
+    category: "paddle",
+    cost: 80,
+    desc: "Квантовый хроно-сплав с золотым сиянием и лазурным резонансным контуром.",
+    icon: "⏳",
+    colors: {
+      top: "#fff9db",
+      mid: "#f59e0b",
+      dark: "#78350f",
+      glow: "#fbbf24",
+      stroke: "#38bdf8",
+    },
+  },
+  {
+    id: "cryo",
+    name: "Крио-Броня",
+    category: "paddle",
+    cost: 70,
+    desc: "Гранёный сапфировый композит с морозным сиянием хладагента станции.",
+    icon: "❄️",
+    colors: {
+      top: "#f0fdfa",
+      mid: "#06b6d4",
+      dark: "#0e7490",
+      glow: "#22d3ee",
+      stroke: "#e0f2fe",
+    },
+  },
+  {
+    id: "pulse",
+    name: "Импульсный Контур",
+    category: "paddle",
+    cost: 65,
+    desc: "Кибер-электроника с бегущей волной высокого напряжения и неоном.",
+    icon: "💠",
+    colors: {
+      top: "#fae8ff",
+      mid: "#c026d3",
+      dark: "#701a75",
+      glow: "#d946ef",
+      stroke: "#a855f7",
+    },
+  },
 ] as const
 
 export const BALL_TRAILS: readonly BallTrailDef[] = [
@@ -208,6 +256,50 @@ export const BALL_TRAILS: readonly BallTrailDef[] = [
       stars: true,
     },
   },
+  {
+    id: "spark_arc",
+    name: "Искры молний",
+    category: "ball",
+    cost: 60,
+    desc: "Дуговой электростатический след с искрами высокого напряжения.",
+    icon: "⚡",
+    colors: {
+      trail: "rgba(255,233,92,",
+      mid: "#fef08a",
+      core: "#eab308",
+      glow: "#fde047",
+      sparks: true,
+    },
+  },
+  {
+    id: "frost",
+    name: "Крио-хвост",
+    category: "ball",
+    cost: 55,
+    desc: "Кристаллическая ледяная изморозь и лазурное сапфировое ядро.",
+    icon: "❄️",
+    colors: {
+      trail: "rgba(56,189,248,",
+      mid: "#e0f2fe",
+      core: "#0284c7",
+      glow: "#38bdf8",
+    },
+  },
+  {
+    id: "stardust",
+    name: "Звёздная пыль",
+    category: "ball",
+    cost: 75,
+    desc: "Мерцающие частицы космической туманности и звёздные искры.",
+    icon: "✨",
+    colors: {
+      trail: "rgba(236,72,153,",
+      mid: "#fdf2f8",
+      core: "#db2777",
+      glow: "#f472b6",
+      stars: true,
+    },
+  },
 ] as const
 
 export const TABLE_THEMES: readonly TableThemeDef[] = [
@@ -266,6 +358,36 @@ export const TABLE_THEMES: readonly TableThemeDef[] = [
       bgMid: "#052216",
       bgBot: "#020d09",
       bubble: "rgba(100,255,180,0.08)",
+    },
+  },
+  {
+    id: "earth_orbit",
+    name: "Орбита Земли",
+    category: "theme",
+    cost: 90,
+    desc: "Вид из купола станции «СФЕРА-1080» на звёзды и лазурный лимб Земли.",
+    icon: "🌍",
+    colors: {
+      bgTop: "#021226",
+      bgMid: "#031d3d",
+      bgBot: "#073359",
+      bubble: "rgba(125,211,252,0.12)",
+      stars: true,
+    },
+  },
+  {
+    id: "singularity",
+    name: "Ядро Сингулярности",
+    category: "theme",
+    cost: 85,
+    desc: "Сердце квантового суперкомпьютера в фиолетово-золотых градиентах.",
+    icon: "⚛️",
+    colors: {
+      bgTop: "#2e0854",
+      bgMid: "#180230",
+      bgBot: "#080014",
+      bubble: "rgba(251,191,36,0.11)",
+      stars: true,
     },
   },
 ] as const

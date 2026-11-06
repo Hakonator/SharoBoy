@@ -79,9 +79,13 @@ describe("MenuCosmetics", () => {
     expect(html).toContain("Классика Неона")
     expect(html).toContain("Киберпанк")
     expect(html).toContain("Золотая Аркада")
+    expect(html).toContain("Хронос-Сингулярность")
+    expect(html).toContain("Крио-Броня")
+    expect(html).toContain("Импульсный Контур")
     expect(html).toContain("Надет")
     expect(html).toContain("50 💠")
     expect(html).toContain("75 💠")
+    expect(html).toContain("80 💠")
   })
 
   it("renders correctly with 0 crystals", () => {

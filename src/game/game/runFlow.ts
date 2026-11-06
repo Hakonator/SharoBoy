@@ -107,7 +107,8 @@ export function resetRun(g: Game) {
   g.weaponCd = 0
   g.effectsKey = ""
   g.transition = 0
-  g.sfx.setUnderwater(false)
+  g.sfx?.setUnderwater?.(false)
+  g.sfx?.setBattleIntensity?.("calm")
 }
 
 export function launch(g: Game) {
@@ -183,6 +184,7 @@ export function stopWeaponsAndAura(g: Game): void {
   if (g.boomQueue) {
     g.boomQueue.length = 0
   }
+  g.sfx?.setBattleIntensity?.("calm")
 }
 
 export function onLevelCleared(g: Game) {

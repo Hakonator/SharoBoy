@@ -111,6 +111,7 @@ export class BossSystem {
       this.g.sfx.bossPhase(
         bo.isChrono ? "chrono" : bo.isOctopus || bo.isJellyfish ? "kraken" : "king"
       )
+      this.g.sfx.setBattleIntensity?.("angry")
     }
     /* «Последний рубеж»: одноразовое событие внутри «злой» фазы (порог ниже
        любого angryAt). Бомбы летят чаще, на орбите появляется подкрепление,
@@ -322,6 +323,7 @@ export class BossSystem {
     g.fx.burst(bo.x, bo.y, "#ff2a6d", 28, 340)
     g.shake = Math.min(g.shake + 10, 16)
     g.flash = Math.max(g.flash, 0.5)
+    g.sfx.setBattleIntensity?.("last_stand")
     g.sfx.power()
     g.pushHud()
   }

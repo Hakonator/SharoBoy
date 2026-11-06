@@ -94,9 +94,34 @@ describe("cosmetics", () => {
 
   it("getDef функции возвращают корректные дефиниции с фоллбэком", () => {
     expect(getPaddleSkinDef("cyberpunk").name).toBe("Киберпанк")
+    expect(getPaddleSkinDef("chronos").name).toBe("Хронос-Сингулярность")
+    expect(getPaddleSkinDef("cryo").name).toBe("Крио-Броня")
+    expect(getPaddleSkinDef("pulse").name).toBe("Импульсный Контур")
     expect(getBallTrailDef("fire").name).toBe("Огненный Метеор")
+    expect(getBallTrailDef("spark_arc").name).toBe("Искры молний")
+    expect(getBallTrailDef("frost").name).toBe("Крио-хвост")
+    expect(getBallTrailDef("stardust").name).toBe("Звёздная пыль")
     expect(getTableThemeDef("nebula").name).toBe("Космическая Туманность")
+    expect(getTableThemeDef("earth_orbit").name).toBe("Орбита Земли")
+    expect(getTableThemeDef("singularity").name).toBe("Ядро Сингулярности")
     // @ts-expect-error Тест некорректного id
     expect(getPaddleSkinDef("unknown").id).toBe("default")
+  })
+
+  it("покупка новых предметов Волны 4 корректно списывает кристаллы и экипирует", () => {
+    const initial = loadPlayerCosmetics()
+    const chronosDef = getPaddleSkinDef("chronos")
+    const res = buyCosmetic("paddle", "chronos", 200, initial)
+
+    expect(res.success).toBe(true)
+    expect(res.newCrystals).toBe(200 - chronosDef.cost)
+    expect(res.newCosmetics.equipped.paddle).toBe("chronos")
+    expect(isCosmeticUnlocked("paddle", "chronos", res.newCosmetics)).toBe(true)
+
+    const earthDef = getTableThemeDef("earth_orbit")
+    const resTheme = buyCosmetic("theme", "earth_orbit", res.newCrystals, res.newCosmetics)
+    expect(resTheme.success).toBe(true)
+    expect(resTheme.newCrystals).toBe(200 - chronosDef.cost - earthDef.cost)
+    expect(resTheme.newCosmetics.equipped.theme).toBe("earth_orbit")
   })
 })
