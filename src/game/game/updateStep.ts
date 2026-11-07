@@ -63,7 +63,7 @@ export function update(g: Game, dt: number) {
 
   g.fx.step(dt)
 
-  if (g.intermediateScore && g.phase === "playing") return
+  if ((g.intermediateScore || g.waveDraft) && g.phase === "playing") return
 
   for (const b of g.bubbles) {
     b.y -= b.vy * dt

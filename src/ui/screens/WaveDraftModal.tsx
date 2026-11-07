@@ -17,14 +17,17 @@ export interface WaveDraftModalProps {
  * режиме мутаторы меняют только правила боя, множители очков не растут.
  */
 export function WaveDraftModal({ data, onPick }: WaveDraftModalProps) {
-  // Пропуск по Escape: выбор не обязателен, иначе забег встанет навсегда.
+  // Пропуск по Escape или выбор клавишами 1-3.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onPick(null)
+      if (e.key === "1" && data.options[0]) onPick(data.options[0])
+      if (e.key === "2" && data.options[1]) onPick(data.options[1])
+      if (e.key === "3" && data.options[2]) onPick(data.options[2])
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [onPick])
+  }, [onPick, data.options])
 
   const takenTitles = data.taken.map((id) => CAMPAIGN_MODIFIERS_MAP[id]?.title ?? id)
 
@@ -72,7 +75,7 @@ export function WaveDraftModal({ data, onPick }: WaveDraftModalProps) {
         )}
 
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {data.options.map((id) => {
+          {data.options.map((id, index) => {
             const mod = CAMPAIGN_MODIFIERS_MAP[id]
             if (!mod) return null
             return (
@@ -83,9 +86,16 @@ export function WaveDraftModal({ data, onPick }: WaveDraftModalProps) {
                 onClick={() => onPick(id)}
                 className="flex flex-col rounded-xl border border-purple-500/30 bg-deep/60 p-3 text-left shadow-sm transition-all hover:border-purple-400/70 hover:bg-purple-950/30 active:scale-95"
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{mod.icon}</span>
-                  <span className="font-display text-sm tracking-wide text-foam">{mod.title}</span>
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{mod.icon}</span>
+                    <span className="font-display text-sm tracking-wide text-foam">
+                      {mod.title}
+                    </span>
+                  </div>
+                  <span className="hidden rounded border border-purple-500/30 bg-purple-500/10 px-1.5 py-0.5 font-mono text-[10px] text-purple-300 sm:inline-block">
+                    [{index + 1}]
+                  </span>
                 </div>
                 <p className="mt-1 text-xs text-foam/75">{mod.desc}</p>
               </button>

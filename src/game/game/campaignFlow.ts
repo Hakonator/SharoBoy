@@ -492,6 +492,8 @@ export function currentMapView(g: Game): CampaignMapView | null {
     visited: [...g.campaignVisited],
     visible: [...g.campaignVisible],
     minibosses: { ...g.campaignMbSeen },
-    ...(g.campaignEvent ? { eventTargetId: g.campaignEventTarget } : {}),
+    ...(g.campaignEvent && g.campaignEventTarget >= 0
+      ? { eventTargetId: g.campaignEventTarget }
+      : {}),
   }
 }

@@ -136,9 +136,10 @@ export function createInput(g: Game, canvas: HTMLCanvasElement): InputController
     worldWidth: () => g.w,
     worldHeight: () => g.h,
     sfxEnsure: () => g.sfx.ensure(),
-    isPlaying: () => g.phase === "playing",
+    isPlaying: () =>
+      g.phase === "playing" && !g.intermediateScore && !g.campaignEventData && !g.waveDraft,
     primaryAction: () => {
-      if (g.intermediateScore || g.campaignEventData) return
+      if (g.intermediateScore || g.campaignEventData || g.waveDraft) return
       if (g.phase === "menu" || g.phase === "over" || g.phase === "won") startGame(g)
       else if (g.phase === "playing") {
         if (g.balls.some((ball) => ball.stuck)) launch(g)
@@ -146,7 +147,7 @@ export function createInput(g: Game, canvas: HTMLCanvasElement): InputController
       } else if (g.phase === "map") enterNextNodeOnAction(g)
     },
     launchIfPlaying: () => {
-      if (g.intermediateScore || g.campaignEventData) return
+      if (g.intermediateScore || g.campaignEventData || g.waveDraft) return
       if (g.phase === "playing") launch(g)
     },
     aimWheel: (delta) => {

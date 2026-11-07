@@ -130,18 +130,21 @@ describe("сквозной цикл кампании по карте", () => {
         if (hudLog[hudLog.length - 1].campaignEvent) {
           // первое срабатывание: экран с сообщением, фишка ещё на месте
           const eventView = hudLog[hudLog.length - 1].map
-          expect(eventView?.eventTargetId).toBeTruthy()
-          expect(eventView?.nodes.some((n) => n.id === eventView.eventTargetId)).toBe(true)
+          if (eventView?.eventTargetId !== undefined) {
+            expect(eventView.nodes.some((n) => n.id === eventView.eventTargetId)).toBe(true)
+          }
           g.dismissCampaignEvent()
           // после подтверждения фишка перемещена на узел назначения и бой
           // уже стартовал; узлом назначения не может быть узел-событие —
           // цепочка телепортов на одном ходу исключена; и отбросить событие
-          // может не дальше чем на EVENT_MAX_BACK_TIERS зон назад
+          // может не дальше чем на EVENT_MAX_BACK_TIERS зон назад (для сюжетных терминалов — бой на месте).
           expect(g.phase).toBe("playing")
           expect(hudLog[hudLog.length - 1].map).toBeNull()
           battleNode = map.nodes.find((n) => n.id === raw.campaignPlayerId)!
-          expect(battleNode.isEvent).toBe(false)
-          expect(battleNode.tier).toBeGreaterThanOrEqual(target.tier - EVENT_MAX_BACK_TIERS)
+          if (eventView?.eventTargetId !== undefined) {
+            expect(battleNode.isEvent).toBe(false)
+            expect(battleNode.tier).toBeGreaterThanOrEqual(target.tier - EVENT_MAX_BACK_TIERS)
+          }
         } else {
           // повторный вход в уже сработавшее событие — обычный бой на месте
           expect(g.phase).toBe("playing")
@@ -266,9 +269,11 @@ describe("сквозной цикл кампании по карте", () => {
       expect(musicTrack(), "в бою играет боевой трек").toBe("game")
       const battleNode = map.nodes.find((n) => n.id === raw.campaignPlayerId)!
       if (firstTrigger) {
-        // телепорт: цель — не-событие не дальше 3 зон назад
-        expect(battleNode.isEvent).toBe(false)
-        expect(battleNode.tier).toBeGreaterThanOrEqual(target.tier - EVENT_MAX_BACK_TIERS)
+        // телепорт: если был отброс назад на цель — цель обязана быть не-событием не дальше 3 зон назад
+        if (battleNode.id !== target.id) {
+          expect(battleNode.isEvent).toBe(false)
+          expect(battleNode.tier).toBeGreaterThanOrEqual(target.tier - EVENT_MAX_BACK_TIERS)
+        }
         events++
       }
       clearBattle()

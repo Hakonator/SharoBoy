@@ -243,6 +243,8 @@ export function toMenu(g: Game) {
   g.activeSpec = null
   g.onBossNode = false
   g.campaignModifiers = []
+  g.draftModifiers = []
+  g.waveDraft = null
   g.activeChallenge = null
   applyTrack(g)
   g.balls = []
@@ -269,7 +271,7 @@ export function stopCustomMap(g: Game) {
 }
 
 export function togglePause(g: Game) {
-  if (g.intermediateScore) return
+  if (g.intermediateScore || g.waveDraft) return
   if (g.phase === "playing") {
     g.phase = "paused"
     g.input.keys.space = false

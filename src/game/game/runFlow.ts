@@ -452,6 +452,10 @@ export function openWaveDraft(g: Game, clearedWave = g.wave): boolean {
     taken: [...taken],
     remainingPicks: Math.max(0, DRAFT_MAX_PICKS - taken.length - 1),
   }
+  g.input?.releaseLock?.()
+  if (g.input) g.input.pointerX = null
+  if (g.paddle) g.paddle.vx = 0
+  g.sfx?.setUnderwater?.(true)
   g.sfx.levelClear()
   pushHud(g)
   return true
@@ -492,6 +496,10 @@ export function pickWaveDraft(g: Game, pick: CampaignModifierId | null): boolean
   }
   g.draftModifiers = after
   g.waveDraft = null
+  if (g.paddle) g.paddle.vx = 0
+  if (g.input) g.input.pointerX = null
+  g.sfx?.setUnderwater?.(false)
+  g.runSectorStartTime = g.time
   pushHud(g)
   return after.length > before.length
 }

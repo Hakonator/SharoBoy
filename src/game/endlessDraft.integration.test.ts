@@ -5,8 +5,10 @@ import type { CampaignModifierId } from "./campaignModifiers"
 import { computeRunMultipliers } from "./campaignModifiers"
 import { DRAFT_MAX_PICKS } from "./endlessDraft"
 import type { Game } from "./game"
+import { togglePause } from "./game/modes"
 import { advanceEndlessWave, gameModifiers, openWaveDraft, pickWaveDraft } from "./game/runFlow"
 import { onLevelCleared } from "./game/runFlow"
+import { update } from "./game/updateStep"
 
 function endlessEnv() {
   const { g } = makeEnv()
@@ -164,5 +166,47 @@ describe("Черновик мутаторов бесконечного режи�
     game.continueFromIntermediateScore()
     expect(game.wave).toBe(6)
     expect(game.waveDraft?.wave).toBe(5)
+  })
+
+  it("во время драфта мутаторов игра находится на паузе: ракетка и аэродропы не двигаются", () => {
+    const game = endlessEnv()
+    game.wave = 5
+    openWaveDraft(game)
+    expect(game.waveDraft).toBeTruthy()
+
+    // Запоминаем исходные координаты ракетки и таймеры
+    const initialPaddleX = game.paddle.x
+    game.paddle.vx = 0
+    game.input.pointerX = initialPaddleX + 250 // курсор мыши смещён
+    game.bannerTimer = 2.0
+
+    // Добавляем падающий аэродром
+    game.powers.push({ x: 100, y: 100, vy: 150, type: "wide", t: 0 })
+    const initialPowerY = game.powers[0].y
+    const initialSkyDropTimer = game.skyDropTimer
+
+    // Шагаем движком на 0.5 с
+    update(game, 0.5)
+
+    // Ракетка и падающий бонус обязаны остаться на месте
+    expect(game.paddle.x).toBe(initialPaddleX)
+    expect(game.powers[0].y).toBe(initialPowerY)
+    // Таймер баннера и таймер сброса бонусов с неба заморожены
+    expect(game.bannerTimer).toBe(2.0)
+    expect(game.skyDropTimer).toBe(initialSkyDropTimer)
+
+    // togglePause во время драфта блокируется
+    togglePause(game)
+    expect(game.phase).toBe("playing")
+
+    // Выбираем мутатор (или пропускаем) — игра снимается с паузы
+    pickWaveDraft(game, null)
+    expect(game.waveDraft).toBeNull()
+
+    // После закрытия драфта мир снова шагает
+    game.input.pointerX = initialPaddleX + 250
+    update(game, 0.5)
+    expect(game.powers[0].y).toBeGreaterThan(initialPowerY)
+    expect(game.paddle.x).not.toBe(initialPaddleX)
   })
 })

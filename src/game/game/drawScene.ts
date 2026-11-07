@@ -68,7 +68,11 @@ export function draw(g: Game) {
   drawPowers(ctx, g.powers)
   drawLaserBeams(ctx, {
     time: g.time,
-    hidden: g.phase === "menu" || Boolean(g.intermediateScore) || g.phase === "won",
+    hidden:
+      g.phase === "menu" ||
+      Boolean(g.intermediateScore) ||
+      Boolean(g.waveDraft) ||
+      g.phase === "won",
     laserUntil: g.laserUntil,
     paddle: g.paddle,
     blocks: g.blocks,
